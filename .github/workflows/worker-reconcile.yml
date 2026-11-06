@@ -78,7 +78,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-            echo '::error title=Missing Worker reconcile credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
+            echo '::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in this job. The repository Actions secret is a valid source. Check repository secret visibility and environment approval. Only if a same-name secret exists in the production environment can it override the repository secret; this failure does not prove the repository secret is missing. Do not expose or rotate the value based on this message.'
             exit 1
           fi
 
@@ -88,17 +88,17 @@ jobs:
 
           token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
           if not token:
-              print('::error title=Missing Worker reconcile credential::CLOUDFLARE_API_TOKEN is empty.')
+              print('::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in the production job; repository Actions secret visibility and environment approval, not Worker runtime bindings. A same-name production environment secret can override the repository secret; do not assume that it exists.')
               sys.exit(1)
 
           try:
               token.encode('ascii')
           except UnicodeEncodeError:
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains non-ASCII characters and cannot be used as an HTTP Authorization value. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains non-ASCII characters and cannot be used as an HTTP Authorization value. The repository Actions secret is a valid source. A same-name production environment secret would take precedence only if one exists; this error does not establish secret scope. Do not expose or rotate the value or bypass validation.')
               sys.exit(1)
 
           if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains whitespace or non-printable characters. The repository Actions secret is a valid source. Check for a same-name production environment override only if one is configured; do not silently trim, rotate, expose, or bypass validation.')
               sys.exit(1)
 
           if token.lower().startswith('bearer '):
@@ -128,6 +128,9 @@ jobs:
       - name: Verify provider-held Worker secret names before reconciliation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Bounded self-heal: only this exact legacy plaintext drift may pass
+          # preflight so canonical Wrangler deploy can remove the undeclared var.
+          FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -147,6 +150,20 @@ jobs:
 
           with open('wrangler.worker.toml', 'rb') as handle:
               config = tomllib.load(handle)
+
+          def contains_stale_cf_api_token(node):
+              if isinstance(node, dict):
+                  return 'CF_API_TOKEN' in node or any(
+                      contains_stale_cf_api_token(value) for value in node.values()
+                  )
+              if isinstance(node, list):
+                  return any(contains_stale_cf_api_token(value) for value in node)
+              return node == 'CF_API_TOKEN'
+
+          if contains_stale_cf_api_token(config):
+              print('::error title=Unsafe repair contract::CF_API_TOKEN must remain absent from wrangler.worker.toml so canonical deploy removes provider drift.')
+              sys.exit(1)
+
           names = config.get('secrets', {}).get('required')
           workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
           if not isinstance(names, list) or not names or any(
@@ -174,6 +191,10 @@ jobs:
 
           print(f'Canonical Worker secret-name preflight passed: {len(required)} provider-held names present; no values read.')
           PY
+
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
 
       - name: Record bounded authority receipt
         shell: bash
@@ -234,6 +255,15 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
+
+      - name: Verify repaired Worker binding types
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Strict mode: the temporary repair exception is intentionally absent here.
+          node scripts/verify-worker-binding-types.mjs
 
   runtime-proof:
     name: Prove Canonical API Origin and Exact SHA
