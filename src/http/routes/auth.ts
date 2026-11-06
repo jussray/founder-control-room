@@ -210,7 +210,7 @@ authRouter.get('/workspace/callback', rateLimitFounderOAuth, async (req, res) =>
   return res.redirect(303, '/app/');
 });
 
-authRouter.post('/session', async (req, res) => {
+authRouter.post('/session', rateLimitFounderOAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
