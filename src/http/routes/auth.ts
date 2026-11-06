@@ -233,7 +233,7 @@ authRouter.post('/session', async (req, res) => {
   return respondSuccess(res, { founder: { email } }, 201);
 });
 
-authRouter.post('/workspace/session', async (req, res) => {
+authRouter.post('/workspace/session', rateLimitFounderOAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
