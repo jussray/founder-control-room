@@ -218,6 +218,50 @@ describe('founder permission broker HTTP contract', () => {
     expect(replayWithAnotherOutcome.body.code).toBe('FOUNDER_PERMISSION_SCOPE_MISMATCH');
   });
 
+  it('rejects bearer-only retirement decisions and scopes founder approval to the exact lesson', async () => {
+    const app = createServer();
+    const retirementProposal = {
+      ...proposal, proposalId: 'learning-retirement-http', actionType: 'retire_learning',
+    };
+    const retirementTarget = {
+      type: 'learning_retirement',
+      learningId: '11111111-1111-4111-8111-111111111111',
+      originHeadSha: 'b'.repeat(40),
+    };
+    const requestId = 'permission:learning-retirement-http';
+    const created = await request(app)
+      .post('/mcp/founder-permissions/requests')
+      .set('Authorization', bearer).send({
+        requestId,requestedBySurface:'chatgpt',
+        proposal:retirementProposal,actionTarget:retirementTarget,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.founderPermissionSatisfied).toBe(false);
+    expect(created.body.executionAuthorized).toBe(false);
+
+    const bearerOnly = await interactivePost(app,
+      '/mcp/founder-permissions/requests/' + requestId + '/decision')
+      .send({decision:'approved'});
+    expect(bearerOnly.status).toBe(401);
+
+    interactiveSession.enabled = true;
+    const approved = await interactivePost(app,
+      '/mcp/founder-permissions/requests/' + requestId + '/decision')
+      .send({decision:'approved'});
+    expect(approved.status).toBe(200);
+    expect(approved.body.founderPermissionSatisfied).toBe(true);
+    expect(approved.body.executionAuthorized).toBe(false);
+
+    const tampered = await request(app)
+      .post('/mcp/founder-permissions/requests')
+      .set('Authorization',bearer).send({
+        requestId,requestedBySurface:'chatgpt',proposal:retirementProposal,
+        actionTarget: {...retirementTarget,learningId:'22222222-2222-4222-8222-222222222222'},
+      });
+    expect(tampered.status).toBe(409);
+    expect(tampered.body.code).toBe('FOUNDER_PERMISSION_SCOPE_MISMATCH');
+  });
+
   it('ignores bearer identity when authenticating the interactive decision cookie', async () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
