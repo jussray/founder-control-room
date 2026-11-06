@@ -43,7 +43,7 @@ begin
 
   select * into claimed
     from public.claim_revenue_strike_customer_send_lease(
-      'ci-preview-run',1,'ci-preview-founder',repeat('a',64),
+      'ci-preview-run',1::smallint,'ci-preview-founder',repeat('a',64),
       repeat('b',64),repeat('c',64),repeat('d',64),repeat('e',64),
       now() - interval '1 minute','ci-preview-actor',now()
     );
@@ -64,7 +64,7 @@ begin
 
   select count(*) into repeat_count
     from public.claim_revenue_strike_customer_send_lease(
-      'ci-preview-run',2,'ci-preview-founder',repeat('a',64),
+      'ci-preview-run',2::smallint,'ci-preview-founder',repeat('a',64),
       repeat('b',64),repeat('c',64),repeat('d',64),repeat('e',64),
       now() - interval '1 minute','ci-preview-actor',now()
     );
