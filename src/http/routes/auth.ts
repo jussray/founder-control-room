@@ -21,6 +21,14 @@ const rateLimitFounderOAuth = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts, please try again later.' },
 });
+const rateLimitFounderSessionReadback = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 120,
+  standardHeaders: false,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication requests, please try again later.' },
+});
+
 const rateLimitFounderPassword = rateLimit({
   windowMs: 15 * 60 * 1_000,
   limit: 5,
@@ -264,7 +272,7 @@ authRouter.post('/workspace/session', rateLimitFounderOAuth, async (req, res) =>
   return respondSuccess(res, { founder: provisioned.founder }, 201);
 });
 
-authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
+authRouter.get('/me', rateLimitFounderSessionReadback, requireFounder, (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return respondSuccess(res, { founder: req.founder });
 });
@@ -297,7 +305,7 @@ authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder
   return respondSuccess(res, { message: 'Founder password updated.' });
 });
 
-authRouter.post('/logout', async (req, res) => {
+authRouter.post('/logout', rateLimitFounderSessionReadback, async (req, res) => {
   const revoked = await revokeFounderSession(req, 'logout');
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder browser session could not be revoked.');
   clearFounderSession(res);
