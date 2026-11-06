@@ -3,6 +3,26 @@
 -- Uses actual FCR outcomes and approval_executions, not an imaginary fcr_receipts table.
 begin;
 
+-- Explicit server-owned classification: missions have no native domain column.
+-- A model-supplied target_domain is never enough to claim a cross-domain reuse.
+create table public.learning_mission_domains (
+  mission_id uuid primary key references public.missions(id) on delete restrict,
+  project_id uuid not null references public.projects(id) on delete restrict,
+  domain text not null check (length(btrim(domain)) between 2 and 64),
+  source_ref text not null check (length(btrim(source_ref)) between 8 and 300),
+  recorded_at timestamptz not null default now()
+);
+create function public.learning_domain_guard() returns trigger
+language plpgsql security invoker set search_path=public as $
+begin
+  if not exists(select 1 from public.missions where id=new.mission_id and project_id=new.project_id) then
+    raise exception 'LEARNING_DOMAIN_PROJECT_MISMATCH';
+  end if;
+  return new;
+end $;
+create trigger learning_domain_insert_guard before insert on public.learning_mission_domains
+for each row execute function public.learning_domain_guard();
+
 create table public.learning_records (
   id uuid primary key default gen_random_uuid(),
   outcome_id uuid not null unique references public.outcomes(id) on delete restrict,
@@ -60,12 +80,20 @@ create index learning_applications_target_idx on public.learning_applications(ci
 create table public.learning_application_reviews (
   id uuid primary key default gen_random_uuid(),
   application_id uuid not null unique references public.learning_applications(id) on delete restrict,
+  downstream_outcome_id uuid not null unique references public.outcomes(id) on delete restrict,
   outcome text not null check (outcome in ('held','failed','partial')),
   demonstrated_improvement boolean not null default false,
+  metric_before numeric,
+  metric_after numeric,
+  better_when text check (better_when in ('higher','lower')),
   evidence_refs jsonb not null check (jsonb_typeof(evidence_refs)='array' and jsonb_array_length(evidence_refs)>0),
   revision text not null check (length(btrim(revision)) between 8 and 2000),
   observed_at timestamptz not null default now(),
-  check (not demonstrated_improvement or outcome='held')
+  check (not demonstrated_improvement or (
+    outcome='held' and metric_before is not null and metric_after is not null
+    and ((better_when='higher' and metric_after>metric_before)
+      or (better_when='lower' and metric_after<metric_before))
+  ))
 );
 
 create function public.learning_record_guard() returns trigger
@@ -80,6 +108,8 @@ begin
      or v_o.project_id is distinct from new.origin_project_id
      or v_e.project_id is distinct from new.origin_project_id
      or not exists(select 1 from public.missions m where m.id=new.origin_mission_id and m.project_id=new.origin_project_id)
+     or not exists(select 1 from public.learning_mission_domains d
+       where d.mission_id=new.origin_mission_id and d.project_id=new.origin_project_id and d.domain=new.domain)
      or v_e.status <> 'succeeded' or v_e.success is distinct from true or v_e.executed_at is null
      or v_e.expected_head_sha is distinct from new.origin_head_sha
      or v_o.classification not in ('achieved','partial','failed')
@@ -159,7 +189,7 @@ for each row execute function public.learning_transition_guard();
 create function public.learning_progress(p_id uuid,p_expected text,p_next text,p_payload jsonb default '{}'::jsonb)
 returns public.learning_records
 language plpgsql security invoker set search_path=public as $$
-declare r public.learning_records; e record; a record; v_id uuid;
+declare r public.learning_records; e record; a record; o record; v_id uuid;
 begin
   select * into r from public.learning_records where id=p_id for update;
   if not found or r.state is distinct from p_expected then
@@ -182,7 +212,9 @@ begin
     if e.id is null or e.status <> 'succeeded' or e.success is distinct from true
        or e.executed_at is null or e.mission_id is null or e.mission_id=r.origin_mission_id
        or e.project_id is distinct from (select project_id from public.missions where id=e.mission_id)
-       or e.expected_head_sha is null then
+       or e.expected_head_sha is null
+       or not exists(select 1 from public.learning_mission_domains d
+         where d.mission_id=e.mission_id and d.project_id=e.project_id and d.domain=p_payload->>'target_domain') then
       raise exception 'LEARNING_DOWNSTREAM_EXECUTION_REQUIRED';
     end if;
     if p_payload->>'target_domain' is distinct from r.domain
@@ -199,11 +231,25 @@ begin
     select * into a from public.learning_applications
     where learning_id=p_id order by applied_at desc,id desc limit 1;
     if a.id is null then raise exception 'LEARNING_APPLICATION_REQUIRED'; end if;
+    select * into o from public.outcomes where id=(p_payload->>'downstream_outcome_id')::uuid;
+    if o.id is null or o.mission_id is distinct from a.cited_by_mission_id
+      or o.project_id is distinct from
+        (select project_id from public.approval_executions where id=a.cited_by_execution_id)
+      or o.classification not in ('achieved','partial','failed')
+      or o.observed_at is null or nullif(btrim(o.verification_method),'') is null
+      or jsonb_typeof(o.evidence) is distinct from 'array'
+      or jsonb_array_length(o.evidence)=0 then
+      raise exception 'LEARNING_DOWNSTREAM_OUTCOME_NOT_VERIFIED';
+    end if;
     insert into public.learning_application_reviews(
-      application_id,outcome,demonstrated_improvement,evidence_refs,revision
+      application_id,downstream_outcome_id,outcome,demonstrated_improvement,
+      metric_before,metric_after,better_when,evidence_refs,revision
     ) values(
-      a.id,p_payload->>'outcome',coalesce((p_payload->>'demonstrated_improvement')::boolean,false),
-      p_payload->'evidence_refs',p_payload->>'revision'
+      a.id,o.id,p_payload->>'outcome',
+      coalesce((p_payload->>'demonstrated_improvement')::boolean,false),
+      (p_payload->>'metric_before')::numeric,
+      (p_payload->>'metric_after')::numeric,
+      p_payload->>'better_when',p_payload->'evidence_refs',p_payload->>'revision'
     );
   elsif p_next='RETIRED' and p_expected<>'RETIRED' then
     v_id:=(p_payload->>'founder_permission_id')::uuid;
@@ -219,18 +265,21 @@ begin
 end $$;
 
 -- Privileged FCR backend only, never browser, public, or ordinary authenticated.
+alter table public.learning_mission_domains enable row level security;
 alter table public.learning_records enable row level security;
 alter table public.learning_signals enable row level security;
 alter table public.learning_interpretations enable row level security;
 alter table public.learning_applications enable row level security;
 alter table public.learning_application_reviews enable row level security;
-revoke all on public.learning_records,public.learning_signals,public.learning_interpretations,
+revoke all on public.learning_mission_domains,public.learning_records,public.learning_signals,public.learning_interpretations,
   public.learning_applications,public.learning_application_reviews from public,anon,authenticated;
+grant select,insert on public.learning_mission_domains to service_role;
 grant select,insert,update on public.learning_records to service_role;
 grant select,insert on public.learning_signals,public.learning_interpretations,
   public.learning_applications,public.learning_application_reviews to service_role;
 revoke all on function public.learning_progress(uuid,text,text,jsonb) from public,anon,authenticated;
 grant execute on function public.learning_progress(uuid,text,text,jsonb) to service_role;
+revoke all on function public.learning_domain_guard() from public,anon,authenticated;
 revoke all on function public.learning_record_guard() from public,anon,authenticated;
 revoke all on function public.learning_transition_guard() from public,anon,authenticated;
 comment on table public.learning_records is 'Learning OS observational domain. Execution/merge/deploy authority remains in FCR; source evidence and downstream application must be verified independently.';
