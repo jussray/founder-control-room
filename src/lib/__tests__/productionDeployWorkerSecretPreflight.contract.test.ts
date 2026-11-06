@@ -34,21 +34,26 @@ describe('production Worker secret preflight contract', () => {
     expect(authorityGate).not.toContain('.get(\'value\')');
   });
 
-  it('fails closed on malformed Cloudflare credentials before secret-name readback', () => {
+  it('runs the shared fail-closed credential contract before secret-name readback', () => {
     const authorityStart = workflow.indexOf('  authority-gate:');
     const supabaseStart = workflow.indexOf('  # ── 1.', authorityStart);
     const authorityGate = workflow.slice(authorityStart, supabaseStart);
 
-    const credentialCheckIndex = authorityGate.indexOf('token.encode(\'ascii\')');
+    const credentialCheckIndex = authorityGate.indexOf(
+      'node scripts/provider-credential-contract.mjs',
+    );
     const providerReadbackIndex = authorityGate.indexOf(
       'npx --yes wrangler@4.110.0 secret list',
     );
 
     expect(credentialCheckIndex).toBeGreaterThanOrEqual(0);
     expect(providerReadbackIndex).toBeGreaterThan(credentialCheckIndex);
-    expect(authorityGate).toContain('contains non-ASCII characters');
-    expect(authorityGate).toContain('contains whitespace or non-printable characters');
-    expect(authorityGate).toContain("re.fullmatch(r'[0-9a-f]{32}', account_id)");
+    expect(authorityGate).toContain('--env CLOUDFLARE_API_TOKEN');
+    expect(authorityGate).toContain('--account-id-env CLOUDFLARE_ACCOUNT_ID');
+    expect(authorityGate).toContain('--require-account-id true');
+    expect(authorityGate).toContain('--purpose fcr-production-deploy-authority');
+    expect(authorityGate).not.toContain("token.encode('ascii')");
+    expect(authorityGate).not.toContain("re.fullmatch(r'[0-9a-f]{32}', account_id)");
   });
 
   it('derives the provider-held set from the canonical Worker contract', () => {

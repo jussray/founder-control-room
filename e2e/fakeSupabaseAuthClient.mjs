@@ -5,7 +5,6 @@
 // inbox" without needing a real SMTP provider.
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { table } from './fakeStore.mjs';
 
 const pendingByTokenHash = new Map(); // tokenHash -> email
 const sessionsByAccessToken = new Map(); // accessToken -> { email, userId, refreshToken }
@@ -23,14 +22,6 @@ function issueSession(email, userId) {
     refresh_token: refreshToken,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   };
-}
-
-function bindSeededFounderIdentity(email, userId) {
-  const normalizedEmail = String(email ?? '').trim().toLowerCase();
-  const founder = table('founder_users').find((row) => (
-    String(row.email ?? '').trim().toLowerCase() === normalizedEmail
-  ));
-  if (founder) founder.user_id = userId;
 }
 
 // requireFounder.ts calls createSupabaseAuthClient() to obtain a fresh
@@ -56,7 +47,6 @@ export function createSupabaseAuthClient() {
         }
         pendingByTokenHash.delete(tokenHash);
         const userId = randomUUID();
-        bindSeededFounderIdentity(email, userId);
         const session = issueSession(email, userId);
         return { data: { session, user: { id: userId, email } }, error: null };
       },

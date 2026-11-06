@@ -2,6 +2,7 @@
 // e2e/loader.mjs. Implements exactly the query-builder chains this repo's
 // route/controller code actually calls (verified against the real source),
 // backed by the in-memory store in fakeStore.mjs.
+import { createHash, randomUUID } from 'node:crypto';
 import { table, matchesFilters, sortRows, withDefaults } from './fakeStore.mjs';
 
 class QueryBuilder {
@@ -88,6 +89,7 @@ class QueryBuilder {
       return { data: null, error: null };
     }
 
+    // select
     let result = sortRows(matched, this.orderCol, this.orderAsc);
     if (this.limitN != null) result = result.slice(0, this.limitN);
     return this._shapeResult(result, wantSingle, allowZero);
@@ -100,6 +102,48 @@ class QueryBuilder {
     }
     return { data: rows[0], error: null };
   }
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function classifyTruthEvidence(rows) {
+  if (rows.length === 0) return 'unknown';
+  if (rows.some((row) => row.relation === 'contradicts' || row.status === 'fail')) return 'conflicted';
+  const supporting = rows.filter((row) => row.relation === 'supports');
+  const allSupportingPass = supporting.length > 0 && supporting.every((row) => row.status === 'pass');
+  const hasIndependentSupport = supporting.some((row) => (
+    row.status === 'pass'
+    && ['github', 'cloudflare', 'supabase', 'playwright'].includes(row.provider)
+    && row.environment !== 'truth-console'
+  ));
+  if (allSupportingPass && hasIndependentSupport) return 'verified';
+  if (rows.some((row) => row.status === 'pending')) return 'unknown';
+  return 'inferred';
+}
+
+function invalidateTruthContinuity(claim, reason, now) {
+  const invalidated = [];
+  if (!claim.current_subject_fingerprint) return invalidated;
+  for (const row of table('continuity_records')) {
+    if (
+      row.project_id === claim.project_id
+      && row.subject_fingerprint === claim.current_subject_fingerprint
+      && !row.invalidated_at
+    ) {
+      row.invalidated_at = now;
+      row.invalidation_reason = reason;
+      invalidated.push({
+        id: row.id,
+        proof_cookie: row.proof_cookie,
+        subject_fingerprint: row.subject_fingerprint,
+        invalidated_at: row.invalidated_at,
+        invalidation_reason: row.invalidation_reason,
+      });
+    }
+  }
+  return invalidated;
 }
 
 async function fakeRpc(name, args) {
@@ -192,55 +236,205 @@ async function fakeRpc(name, args) {
     return { data: null, error: null };
   }
 
-  if (name === 'create_workspace_project_with_onboarding_event') {
-    const projects = table('projects');
-    const events = table('project_events');
-    const metadata = args?.p_event_metadata;
-    if (!args?.p_workspace_id || !String(args?.p_slug ?? '').trim() || !String(args?.p_name ?? '').trim()) {
-      return { data: null, error: { code: '22023', message: 'invalid workspace onboarding subject' } };
-    }
-    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-      return { data: null, error: { code: '22023', message: 'invalid onboarding event metadata' } };
-    }
-    if ('founder' in metadata || 'email' in metadata || 'founderEmail' in metadata) {
-      return { data: null, error: { code: '22023', message: 'founder identity is forbidden in onboarding event metadata' } };
-    }
-    if (projects.some((row) => row.slug === args.p_slug)) {
-      return { data: null, error: { code: '23505', message: 'duplicate project slug' } };
-    }
-
-    const project = withDefaults({
-      workspace_id: args.p_workspace_id,
-      slug: args.p_slug,
-      name: args.p_name,
-      repo_provider: args.p_repo_provider,
-      repo_identifier: args.p_repo_identifier,
-      stack: args.p_stack,
-      status: 'active',
-      risk_level: 'medium',
-    }, 'projects');
-    const event = withDefaults({
-      project_id: project.id,
-      source_event_id: `e2e-onboarding-${project.id}`,
-      event_type: 'founder_onboarding_bootstrapped',
-      severity: 'info',
-      screen: 'chief-workspace-onboarding',
-      metadata,
-    }, 'project_events');
-
-    // Commit both rows only after every validation above has succeeded. This
-    // mirrors the all-or-nothing PostgreSQL function used in production.
-    projects.push(project);
-    events.push(event);
-    return { data: project, error: null };
-  }
-
   if (name === 'is_v10_registry_approved') {
     const candidateHash = String(args?.candidate_hash ?? '').trim().toLowerCase();
     const approved = table('capability_registry_snapshots').some((row) => (
       String(row.registry_hash ?? '').toLowerCase() === candidateHash && row.status === 'approved'
     ));
     return { data: approved, error: null };
+  }
+
+  if (name === 'truth_console_attach_evidence') {
+    const claim = table('truth_claims').find((row) => row.id === args.p_claim_id);
+    if (!claim) return { data: null, error: { message: 'truth_claim_not_found' } };
+    const now = new Date().toISOString();
+    const evidence = {
+      id: randomUUID(),
+      project_id: claim.project_id,
+      mission_id: null,
+      subject: claim.statement,
+      kind: args.p_kind,
+      status: args.p_status,
+      provider: args.p_provider,
+      commit_sha: null,
+      environment: 'truth-console',
+      details_ref: args.p_details_ref,
+      reusable_until: null,
+      created_at: now,
+    };
+    table('evidence').push(evidence);
+    table('truth_claim_evidence').push({
+      claim_id: claim.id,
+      evidence_id: evidence.id,
+      relation: args.p_relation,
+      created_at: now,
+    });
+    const invalidatedContinuity = invalidateTruthContinuity(claim, 'claim_evidence_changed', now);
+    Object.assign(claim, {
+      classification: 'stale',
+      revision: Number(claim.revision ?? 1) + 1,
+      current_truth_snapshot_id: null,
+      updated_at: now,
+    });
+    return {
+      data: {
+        evidence: { ...evidence, relation: args.p_relation },
+        claim: { ...claim },
+        invalidatedContinuity,
+        authorityEffect: 'none',
+      },
+      error: null,
+    };
+  }
+
+  if (name === 'truth_console_reconcile_claim') {
+    const claim = table('truth_claims').find((row) => row.id === args.p_claim_id);
+    if (!claim) return { data: null, error: { message: 'truth_claim_not_found' } };
+    if (Number(claim.revision) !== Number(args.p_expected_revision)) {
+      return { data: null, error: { message: 'truth_claim_revision_mismatch' } };
+    }
+
+    const links = table('truth_claim_evidence').filter((row) => row.claim_id === claim.id);
+    const evidenceById = new Map(table('evidence').map((row) => [row.id, row]));
+    const evidenceRows = links
+      .map((link) => ({ ...evidenceById.get(link.evidence_id), relation: link.relation }))
+      .filter((row) => row.id)
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const classification = classifyTruthEvidence(evidenceRows);
+    const identity = evidenceRows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      relation: row.relation,
+      provider: row.provider,
+      kind: row.kind,
+      environment: row.environment,
+    }));
+    const evidenceIds = evidenceRows.map((row) => row.id);
+    const evidenceFingerprint = sha256(JSON.stringify(identity));
+    const subjectFingerprint = sha256(JSON.stringify({
+      contract: 'fcr/truth-claim-subject@v1',
+      claimId: claim.id,
+      projectId: claim.project_id,
+      statement: claim.statement,
+      revision: claim.revision,
+    }));
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const snapshot = {
+      id: randomUUID(),
+      founder_intent_id: null,
+      project_id: claim.project_id,
+      mission_id: null,
+      source_truth: {
+        contract: 'fcr/truth-claim@v1',
+        claimId: claim.id,
+        statement: claim.statement,
+        revision: claim.revision,
+        evidenceIds,
+      },
+      build_truth: {},
+      test_truth: {},
+      ci_truth: {},
+      deployment_truth: {},
+      runtime_truth: {},
+      provider_truth: {},
+      outcome_truth: { classification },
+      conflicts: [],
+      classification,
+      observed_at: nowIso,
+      expires_at: validUntil,
+      created_at: nowIso,
+    };
+    table('truth_snapshots').push(snapshot);
+    invalidateTruthContinuity(claim, 'superseded_by_reconciliation', nowIso);
+    const proofCookie = `fcr-proof-v1:${sha256(`${subjectFingerprint}:${evidenceFingerprint}:${snapshot.id}`).slice(0, 40)}`;
+    const continuity = {
+      id: randomUUID(),
+      founder_intent_id: null,
+      project_id: claim.project_id,
+      mission_id: null,
+      subject_fingerprint: subjectFingerprint,
+      proof_cookie: proofCookie,
+      truth_snapshot_id: snapshot.id,
+      authority_fingerprint: null,
+      runtime_fingerprint: null,
+      evidence_fingerprint: evidenceFingerprint,
+      valid_until: validUntil,
+      invalidated_at: null,
+      invalidation_reason: null,
+      created_at: nowIso,
+    };
+    table('continuity_records').push(continuity);
+    const receipt = {
+      id: randomUUID(),
+      project_id: claim.project_id,
+      controller: 'TruthConsole',
+      resource_id: claim.id,
+      reason: 'founder_truth_reconciliation',
+      status: classification === 'verified' ? 'converged' : 'drifted',
+      observed_changes: [{ classification, revision: claim.revision }],
+      proposed_actions: classification === 'verified' ? [] : [{ action: 'review_evidence', authority: 'none' }],
+      evidence_ids: evidenceIds,
+      requires_approval: false,
+      message: `Truth claim reconciled as ${classification}`,
+      started_at: nowIso,
+      completed_at: nowIso,
+    };
+    table('reconciliation_runs').push(receipt);
+    Object.assign(claim, {
+      classification,
+      current_truth_snapshot_id: snapshot.id,
+      current_subject_fingerprint: subjectFingerprint,
+      updated_at: nowIso,
+    });
+    return {
+      data: {
+        claim: { ...claim },
+        snapshot,
+        receipt,
+        continuity: { ...continuity, state: 'current' },
+        authorityEffect: 'none',
+      },
+      error: null,
+    };
+  }
+
+  if (name === 'truth_console_resolve_attack') {
+    const attack = table('truth_attacks').find((row) => row.id === args.p_attack_id);
+    if (!attack) return { data: null, error: { message: 'truth_attack_not_found' } };
+    if (attack.status === 'resolved') return { data: null, error: { message: 'truth_attack_already_resolved' } };
+    const claim = table('truth_claims').find((row) => row.id === attack.claim_id);
+    if (!claim) return { data: null, error: { message: 'truth_claim_not_found' } };
+    const linked = table('truth_claim_evidence').some((row) => (
+      row.claim_id === claim.id && row.evidence_id === args.p_evidence_id
+    ));
+    if (!linked) return { data: null, error: { message: 'truth_attack_evidence_not_linked' } };
+    const now = new Date().toISOString();
+    const invalidatedContinuity = invalidateTruthContinuity(claim, 'attack_resolution_changed_truth', now);
+    Object.assign(claim, {
+      classification: 'stale',
+      revision: Number(claim.revision ?? 1) + 1,
+      current_truth_snapshot_id: null,
+      updated_at: now,
+    });
+    Object.assign(attack, {
+      status: 'resolved',
+      resolution_answer: args.p_answer,
+      resolution_evidence_id: args.p_evidence_id,
+      resolved_at: now,
+      updated_at: now,
+    });
+    return {
+      data: {
+        attack: { ...attack },
+        claim: { ...claim },
+        invalidatedContinuity,
+        cookieState: 'stale',
+        authorityEffect: 'none',
+      },
+      error: null,
+    };
   }
 
   console.warn(`[fake supabase] unhandled rpc "${name}" — returning null`);
@@ -256,33 +450,50 @@ export function makeSupabaseClient() {
   return supabase;
 }
 
-// Seed the founder allowlist synchronously at process start. Optional workspace
-// fields are test-only state used by the focused tenancy browser proof.
+// Seed the founder allowlist synchronously at process start, mirroring what
+// migration 0002 does for real (`insert into founder_users ...`) — this
+// module is the first thing the loader redirects to, so this runs before
+// the HTTP server accepts any request.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  const founderRow = {
-    email: process.env.E2E_SEED_FOUNDER_EMAIL,
-    created_at: new Date().toISOString(),
-  };
-  if (process.env.E2E_SEED_FOUNDER_ROLE) founderRow.account_role = process.env.E2E_SEED_FOUNDER_ROLE;
-  if (process.env.E2E_SEED_WORKSPACE_ID) founderRow.workspace_id = process.env.E2E_SEED_WORKSPACE_ID;
-  table('founder_users').push(founderRow);
+  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
 }
 
-if (process.env.E2E_SEED_PROJECTS_JSON) {
-  let seedProjects;
-  try {
-    seedProjects = JSON.parse(process.env.E2E_SEED_PROJECTS_JSON);
-  } catch {
-    throw new Error('E2E_SEED_PROJECTS_JSON must be valid JSON');
+// Isolated product-workspace fixture for Playwright's real served FCR UI.
+// It is intentionally NOT a real V10 branch-approval receipt: a separate
+// negative test proves the production middleware refuses create_branch when
+// its Chief capability plan is absent. Only this Node loader can seed it.
+const workspaceProjectId = String(process.env.E2E_SEED_GITHUB_WORKSPACE_PROJECT_ID ?? '');
+const workspaceMissionId = String(process.env.E2E_SEED_GITHUB_WORKSPACE_MISSION_ID ?? '');
+const workspaceSha = String(process.env.E2E_SEED_GITHUB_WORKSPACE_SHA ?? '').toLowerCase();
+const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+if (workspaceProjectId || workspaceMissionId || workspaceSha) {
+  if (!uuid.test(workspaceProjectId) || !uuid.test(workspaceMissionId) || !/^[0-9a-f]{40}$/.test(workspaceSha)) {
+    throw new Error('E2E GitHub Workspace seed requires valid project, mission, and exact HEAD identities');
   }
-  if (!Array.isArray(seedProjects)) {
-    throw new Error('E2E_SEED_PROJECTS_JSON must be a JSON array');
-  }
-  for (const project of seedProjects) {
-    table('projects').push(withDefaults(project, 'projects'));
-  }
+  table('projects').push(withDefaults({
+    id: workspaceProjectId,
+    slug: 'founder-control-room',
+    name: 'FCR Browser Fixture',
+    repo_provider: 'github',
+    repo_identifier: 'jussray/founder-control-room',
+    verification_enabled: true,
+  }, 'projects'));
+  table('missions').push(withDefaults({
+    id: workspaceMissionId,
+    project_id: workspaceProjectId,
+    title: 'FCR GitHub Workspace integration fixture',
+    status: 'sandboxed',
+    branch_ref: 'terminal-proof',
+    base_ref: 'main',
+    required_checks: ['typecheck'],
+    policy_snapshot: { expectedHeadSha: workspaceSha },
+  }, 'missions'));
 }
 
+// E2E-only mirror of the V10 founder approval boundary. The harness must
+// explicitly provide one exact registry hash and its canonical entries;
+// unlike an "always true" fake, every other registry remains unapproved and
+// the real middleware still verifies the entry hash and capability identity.
 const approvedV10RegistryHash = String(process.env.E2E_APPROVED_V10_REGISTRY_HASH ?? '').trim().toLowerCase();
 if (/^[0-9a-f]{64}$/.test(approvedV10RegistryHash)) {
   let entries = [];

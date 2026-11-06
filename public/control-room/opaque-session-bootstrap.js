@@ -3,18 +3,19 @@
 // The authoritative browser session is the same-origin HttpOnly
 // __Host-fcr_session capability. This file deliberately never reads, stores,
 // reconstructs, or forwards Supabase access/refresh credentials. It asks the
-// server for the authenticated platform-founder identity before the legacy SPA
-// is allowed to boot. Signed-out users and workspace-scoped founders are sent
-// to the canonical onboarding Composer instead of inheriting the global shell.
+// server for the authenticated founder identity, gives the legacy SPA only the
+// non-secret identity marker it still expects during boot, and lets every API
+// request authenticate through the browser's same-origin cookie.
 
 const LEGACY_SESSION_KEY = 'fcr_session';
-const ONBOARDING_PATH = '/founder-onboarding/';
 
 function unwrapApiData(value) {
   return value && value.success === true && value.data ? value.data : value;
 }
 
 function scrubLegacyBrowserCredentials() {
+  // Old builds used both URL fragments and sessionStorage for Supabase tokens.
+  // Neither is accepted as browser authority after the opaque-session cutover.
   sessionStorage.removeItem(LEGACY_SESSION_KEY);
   if (location.hash) {
     history.replaceState(null, '', location.pathname + location.search);
@@ -37,6 +38,8 @@ async function founderIdentityFromOpaqueSession() {
 }
 
 function installCookieBackedSignOut() {
+  // app.js historically cleared only sessionStorage. Capture the click before
+  // its legacy handler and revoke the server-side opaque session instead.
   document.addEventListener('click', async (event) => {
     const target = event.target instanceof Element ? event.target.closest('#sign-out') : null;
     if (!target) return;
@@ -54,11 +57,14 @@ function installCookieBackedSignOut() {
         body: '{}',
       });
       if (!response.ok && response.status !== 401) {
-        throw new Error('Founder sign-out failed (' + response.status + ')');
+        throw new Error(`Founder sign-out failed (${response.status})`);
       }
       sessionStorage.removeItem(LEGACY_SESSION_KEY);
-      location.replace(ONBOARDING_PATH);
+      location.replace('/welcome');
     } catch (error) {
+      // Do not lie about revocation. If server-side logout fails, keep the
+      // compatibility marker and current page intact so the browser remains
+      // visibly authenticated until the session can actually be revoked.
       target.disabled = false;
       target.textContent = 'Sign out failed';
       console.error(error instanceof Error ? error.message : String(error));
@@ -70,22 +76,20 @@ async function bootLegacyCockpit() {
   scrubLegacyBrowserCredentials();
   installCookieBackedSignOut();
 
-  let founder = null;
   try {
-    founder = await founderIdentityFromOpaqueSession();
+    const founder = await founderIdentityFromOpaqueSession();
+    if (founder) {
+      // Compatibility marker only. There is intentionally no access_token,
+      // refresh_token, expiry credential, or other bearer material here.
+      sessionStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(founder));
+    }
   } catch {
-    founder = null;
+    // app.js will render its normal signed-out surface if /auth/me is
+    // unavailable or the opaque session is invalid.
   }
 
-  if (!founder) {
-    location.replace(ONBOARDING_PATH);
-    return;
-  }
-
-  // Compatibility marker only. There is intentionally no access_token,
-  // refresh_token, expiry credential, or other bearer material here.
-  sessionStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(founder));
   await import('/control-room/app.js');
+  await import('/control-room/fcr-visual-shell.js');
 }
 
 void bootLegacyCockpit();

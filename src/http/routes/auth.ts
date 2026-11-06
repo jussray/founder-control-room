@@ -8,6 +8,7 @@ import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml, workspaceFounderCallbackHtml } from './onboarding.js';
+import { oauthConsentRouter } from './oauthConsent.js';
 
 export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE = 'If this email is on the founder allowlist, a secure login link has been sent.';
@@ -108,6 +109,9 @@ async function startWorkspaceGoogleLogin(res: Response) {
     return respondError(res, 503, 'OAUTH_UNAVAILABLE', 'Google sign-in is temporarily unavailable.');
   }
 }
+
+// Existing founder OAuth consent remains protected on the merged customer branch.
+authRouter.use('/oauth', oauthConsentRouter);
 
 authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');

@@ -30,6 +30,12 @@
     .danger { color:var(--danger); }
     .error { color:var(--danger); white-space:pre-wrap; }
     .file-row { text-align:left; width:100%; border-radius:12px; justify-content:flex-start; }
+    .workspace-links { display:flex; flex-wrap:wrap; gap:0.75rem; margin:1rem 0; }
+    .workspace-links a { border:1px solid var(--line); border-radius:999px; padding:0.55rem 0.85rem; text-decoration:none; }
+    .read-gate { border-left:3px solid var(--warn); padding-left:0.85rem; }
+    .terminal-output { min-height:5rem; overflow-wrap:anywhere; }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    @media (max-width: 640px) { main { padding:1rem; } header { flex-direction:column; align-items:stretch; } textarea.code { min-height:340px; } }
     pre { white-space:pre-wrap; background:#07111f; border:1px solid var(--line); border-radius:14px; padding:1rem; }
   </style>
 </head>
@@ -40,6 +46,7 @@
         <p class="muted">Founder Control Room</p>
         <h1>GitHub Workspace</h1>
         <p class="muted">Read files, edit mission branches, and write patches through founder-gated repository routes.</p>
+        <nav class="workspace-links" aria-label="Development workbench links"><a href="#workspace-editor">Edit source</a><a href="#workspace-terminal">Terminal</a><a href="/control-room/command-bridge.html">Command Bridge</a><a href="/control-room/?tab=missions">Mission proofs</a></nav>
       </div>
       <div class="toolbar">
         <a href="/control-room/"><button type="button">Back to Control Room</button></a>
@@ -76,7 +83,7 @@
         <div id="file-list" class="stack"><p class="muted">Load a project, then browse a folder.</p></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="workspace-editor">
         <h2>Editor</h2>
         <label>File path</label>
         <input id="file-path" placeholder="src/http/routes/projects.ts" />
@@ -107,6 +114,29 @@
       </div>
       <pre id="result">No write yet.</pre>
     </section>
+
+    <section class="panel" id="workspace-terminal" style="margin-top:1rem">
+      <h2>Guarded project terminal</h2>
+      <p class="muted read-gate">Read-only Git observations only: <span class="mono">git.head</span>, <span class="mono">git.status</span>, and <span class="mono">git.diff-stat</span>. Commands require a registered project, an authorized mission, and an exact commit SHA. Terminal execution is disabled by default and is loopback-restricted; builds, installs, Playwright runs, and deployments require a separately approved L99 sandbox.</p>
+      <div class="toolbar">
+        <button id="load-terminal-commands" type="button">Load permitted Git reads</button>
+        <a href="/control-room/?tab=terminal">Open full terminal controls</a>
+        <a href="/control-room/command-bridge.html">Open Command Bridge</a>
+      </div>
+      <form id="terminal-read-form" class="stack" style="margin-top:0.75rem">
+        <label for="terminal-command">Allowlisted command</label>
+        <select id="terminal-command" required disabled>
+          <option value="">Load commands first</option>
+        </select>
+        <div class="grid">
+          <div><label for="terminal-mission-id">Mission ID</label><input id="terminal-mission-id" placeholder="Exact FCR mission UUID" required /></div>
+          <div><label for="terminal-head">Expected HEAD SHA</label><input id="terminal-head" class="mono" placeholder="40-character Git SHA" minlength="40" maxlength="40" pattern="[a-fA-F0-9]{40}" required /></div>
+        </div>
+        <div class="toolbar"><button id="run-terminal-read" class="primary" type="submit" disabled>Run selected Git read</button></div>
+      </form>
+      <p id="terminal-status" class="muted" role="status">Not connected. Load the approved read commands to probe the guarded terminal.</p>
+      <pre class="terminal-output" id="terminal-output" aria-label="Terminal read receipt">No commands executed.</pre>
+    </section>
   </main>
 
   <script>
@@ -120,6 +150,11 @@
       missionId: document.getElementById('mission-id'),
       commitMessage: document.getElementById('commit-message'),
       result: document.getElementById('result'),
+      terminalMissionId: document.getElementById('terminal-mission-id'),
+      terminalHead: document.getElementById('terminal-head'),
+      terminalCommand: document.getElementById('terminal-command'),
+      terminalStatus: document.getElementById('terminal-status'),
+      terminalOutput: document.getElementById('terminal-output'),
     };
 
     function escapeHtml(value) {
@@ -188,18 +223,125 @@
       nodes.result.textContent = `Loaded ${data.path}@${data.ref}`;
     }
 
+    // One stable key per proposal. A network retry must never create a second
+    // GitHub commit because an HTTP response was lost. Content is held in RAM
+    // only; no source code, mission key, or approval is persisted in storage.
+    let pendingPatch = null;
+    let patchInFlight = false;
+
     async function commitPatch() {
+      if (patchInFlight) return;
       const missionId = nodes.missionId.value.trim();
       const path = nodes.filePath.value.trim();
       const message = nodes.commitMessage.value.trim();
       if (!missionId || !path || !message) throw new Error('missionId, file path, and commit message are required.');
-      const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
-        method: 'POST',
-        body: JSON.stringify({ message, changes: [{ path, content: nodes.fileContent.value }] }),
-      });
-      nodes.result.textContent = JSON.stringify(data, null, 2);
-      if (data.commitSha) nodes.readRef.value = data.branch || nodes.readRef.value;
+      const changes = [{ path, content: nodes.fileContent.value }];
+      const signature = JSON.stringify({ projectSlug: nodes.projectSlug.value.trim(), missionId, message, changes });
+      if (pendingPatch?.signature !== signature) {
+        if (!globalThis.crypto?.randomUUID) throw new Error('Secure browser UUID generation is unavailable. No patch was submitted.');
+        pendingPatch = { signature, idempotencyKey: crypto.randomUUID() };
+      }
+      const idempotencyKey = pendingPatch.idempotencyKey;
+      const button = document.getElementById('commit-patch');
+      patchInFlight = true;
+      button.disabled = true;
+      nodes.result.textContent = 'Requesting a mission-branch commit. Do not resubmit until its receipt is known.';
+      try {
+        const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
+          method: 'POST',
+          body: JSON.stringify({ idempotencyKey, message, changes }),
+        });
+        nodes.result.textContent = JSON.stringify(data, null, 2);
+        const receipt = data.result && typeof data.result === 'object' ? data.result : data;
+        if (typeof receipt.commitSha === 'string' && /^[0-9a-f]{40}$/i.test(receipt.commitSha)) {
+          nodes.readRef.value = receipt.branch || nodes.readRef.value;
+          nodes.terminalHead.value = receipt.commitSha.toLowerCase();
+          resetTerminalRead();
+        }
+        // Retain the key for an identical subsequent click; backend replay
+        // will return the prior result, not create a duplicate commit.
+      } finally {
+        patchInFlight = false;
+        button.disabled = false;
+      }
     }
+
+
+    // The workspace is project-scoped; never derive execution authority from URL parameters.
+    // A deep link selects a workspace only, not a mission approval or executable command.
+    const workspaceParams = new URLSearchParams(window.location.search);
+    const linkedProject = workspaceParams.get('project') || '';
+    if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(linkedProject)) nodes.projectSlug.value = linkedProject;
+    const linkedRef = workspaceParams.get('ref') || '';
+    if (/^[a-zA-Z0-9_./-]{1,160}$/.test(linkedRef) && !linkedRef.includes('..')) nodes.readRef.value = linkedRef;
+
+    function resetTerminalRead() {
+      nodes.terminalCommand.replaceChildren(new Option('Load commands first', ''));
+      nodes.terminalCommand.disabled = true;
+      document.getElementById('run-terminal-read').disabled = true;
+      nodes.terminalOutput.textContent = 'No commands executed.';
+      nodes.terminalStatus.textContent = 'Not connected. Load commands for this project.';
+    }
+
+    async function loadTerminalCommands() {
+      const slug = nodes.projectSlug.value.trim();
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error('Choose a registered project slug.');
+      resetTerminalRead();
+      const data = await api(`/terminal/${encodeURIComponent(slug)}/commands`);
+      // Defense in depth: only render commands the server declares to be read-only.
+      const commands = (Array.isArray(data.commands) ? data.commands : []).filter(
+        (cmd) => cmd && cmd.risk === 'read' && typeof cmd.id === 'string',
+      );
+      nodes.terminalCommand.replaceChildren(
+        new Option(commands.length ? 'Choose a Git read' : 'No approved Git reads', ''),
+        ...commands.map((cmd) => new Option(cmd.label || cmd.id, cmd.id)),
+      );
+      nodes.terminalCommand.disabled = commands.length === 0;
+      document.getElementById('run-terminal-read').disabled = commands.length === 0;
+      nodes.terminalStatus.textContent = commands.length
+        ? `Available: ${commands.length} read-only commands. No execution has occurred.`
+        : 'No commands available for this project.';
+    }
+
+    async function runTerminalRead(event) {
+      event.preventDefault();
+      const slug = nodes.projectSlug.value.trim();
+      const commandId = nodes.terminalCommand.value;
+      const missionId = nodes.terminalMissionId.value.trim();
+      const expectedCommitSha = nodes.terminalHead.value.trim().toLowerCase();
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error('Choose a registered project slug.');
+      if (!commandId || !missionId || !/^[a-f0-9]{40}$/.test(expectedCommitSha))
+        throw new Error('Choose an allowlisted read, a mission ID, and the exact 40-character HEAD SHA.');
+      nodes.terminalStatus.textContent = 'Requesting read-only command from FCR guard…';
+      const data = await api(`/terminal/${encodeURIComponent(slug)}/run`, {
+        method: 'POST',
+        body: JSON.stringify({commandId, missionId, expectedCommitSha, confirmWrite: false}),
+      });
+      nodes.terminalOutput.textContent = JSON.stringify(data, null, 2);
+      nodes.terminalStatus.textContent = 'Terminal response received. Inspect its status and observed SHA; do not count this as a build or browser proof.';
+    }
+
+    document.getElementById('load-terminal-commands').addEventListener('click', () => {
+      guarded(async () => {
+        try { await loadTerminalCommands(); }
+        catch (error) {
+          nodes.terminalStatus.textContent = error instanceof Error ? error.message : String(error);
+          throw error;
+        }
+      });
+    });
+    document.getElementById('terminal-read-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      guarded(async () => {
+        try { await runTerminalRead(event); }
+        catch (error) {
+          nodes.terminalStatus.textContent = error instanceof Error ? error.message : String(error);
+          throw error;
+        }
+      });
+    });
+    nodes.projectSlug.addEventListener('input', resetTerminalRead);
+    if (/^[a-f0-9]{40}$/i.test(nodes.readRef.value)) nodes.terminalHead.value = nodes.readRef.value.toLowerCase();
 
     document.getElementById('load-project').addEventListener('click', () => guarded(loadProject));
     document.getElementById('browse-files').addEventListener('click', () => guarded(browseFiles));
