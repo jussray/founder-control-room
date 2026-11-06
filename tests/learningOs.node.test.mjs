@@ -109,6 +109,30 @@ test('improved requires a metric actually better in the declared direction', () 
   assert.throws(() => move(s, { ...steps[4], improvement: { ...steps[4].improvement, after: 12 } }), /directional improvement/);
 });
 
+test('source result, verifier and evidence changes invalidate the entire study', () => {
+  const original = start();
+  const result = structuredClone(original);
+  result.source.result = 'failed';
+  assert.throws(() => readLearningStudy(result), /source evidence tampering/);
+  const provenance = structuredClone(original);
+  provenance.source.verifierId = 'made-up';
+  assert.throws(() => readLearningStudy(provenance), /source evidence tampering/);
+  const link = structuredClone(original);
+  link.source.evidenceRefs = ['receipt:forged'];
+  assert.throws(() => readLearningStudy(link), /source evidence tampering/);
+});
+
+test('untrusted contract label cannot start a verified learning study', () => {
+  assert.throws(() => start({ outcome: outcome({ contract: 'unknown-contract' }) }), /verified success or failure/);
+});
+
+test('event hashing remains stable when JSON key order changes', () => {
+  const source = through(4);
+  const reordered = structuredClone(source);
+  reordered.events = reordered.events.map(e => Object.fromEntries(Object.entries(e).reverse()));
+  assert.equal(readLearningStudy(reordered).phase, 'applied');
+});
+
 test('hash tampering, forged predecessor and malformed events fail closed', () => {
   const s = through(2);
   const forged = structuredClone(s);
