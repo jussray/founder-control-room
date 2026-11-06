@@ -474,6 +474,12 @@
       ]
     },
     {
+      "path": "src/providers/GitHubChangeGenealogyReader.ts",
+      "claims": [
+        "`src/providers/GitHubChangeGenealogyReader.ts` must redact the complete opaque GitHub installation token, including JWT-format ghs_ values with dot-delimited segments and URL-safe final characters, before comment/review excerpts are truncated or returned; redaction source tests do not establish live credential validity, provider identity, production deployment, or merge authority."
+      ]
+    },
+    {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
         "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
