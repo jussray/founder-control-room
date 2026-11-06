@@ -328,11 +328,11 @@ begin
     return;
   end if;
 
-  if lower(btrim(p_recipient_fingerprint)) !~ '^[0-9a-f]{64}
-    or lower(btrim(p_prospect_fingerprint)) !~ '^[0-9a-f]{64}
-    or lower(btrim(p_message_fingerprint)) !~ '^[0-9a-f]{64}
-    or lower(btrim(p_offer_fingerprint)) !~ '^[0-9a-f]{64}
-    or lower(btrim(p_historical_ledger_digest)) !~ '^[0-9a-f]{64} then
+  if lower(btrim(p_recipient_fingerprint)) !~ '^[0-9a-f]{64}$'
+    or lower(btrim(p_prospect_fingerprint)) !~ '^[0-9a-f]{64}$'
+    or lower(btrim(p_message_fingerprint)) !~ '^[0-9a-f]{64}$'
+    or lower(btrim(p_offer_fingerprint)) !~ '^[0-9a-f]{64}$'
+    or lower(btrim(p_historical_ledger_digest)) !~ '^[0-9a-f]{64}$' then
     return;
   end if;
 
