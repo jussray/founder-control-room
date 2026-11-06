@@ -245,8 +245,8 @@ create table if not exists public.post_metrics (
   receipt_id uuid not null
     references public.publication_receipts(id) on delete cascade,
   measured_at timestamptz not null default now(),
-  window text not null
-    check (window in ('24h', '72h', '7d', 'lifetime', 'rolling_7d')),
+  "window" text not null
+    check ("window" in ('24h', '72h', '7d', 'lifetime', 'rolling_7d')),
   evidence_state text not null default 'OBSERVED'
     check (evidence_state in ('OBSERVED', 'PARTIAL', 'UNKNOWN_NO_EVIDENCE')),
   -- No defaults on any metric column: an unmeasured metric stays NULL.
