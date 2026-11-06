@@ -143,6 +143,19 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
+  it('uses the bounded plaintext repair exception only before canonical deploy and proves strict cleanup afterward', () => {
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
+    const runtimeJob = reconcileWorkflow.indexOf('  runtime-proof:');
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    const workerDeploy = reconcileWorkflow.slice(workerJob, runtimeJob);
+    const strictProof = workerDeploy.slice(workerDeploy.indexOf('Verify repaired Worker binding types'));
+
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(workerDeploy).toContain('Verify repaired Worker binding types');
+    expect(strictProof).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(strictProof).not.toContain('FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL');
+  });
+
   it('proves direct API and public Pages version headers and bodies against the exact release SHA', () => {
     const runtimeProof = reconcileWorkflow.slice(reconcileWorkflow.indexOf('  runtime-proof:'));
     expect(runtimeProof).toContain('API_ORIGIN: https://api.foundercontrolroom.org');
@@ -181,6 +194,8 @@ describe('Founder deploy command authority contract', () => {
     expect(authorityGate).toContain('missing = sorted(required - present)');
     expect(authorityGate).toContain('sys.exit(1)');
     expect(authorityGate).toContain('trap \'rm -f "$secret_receipt"\' EXIT');
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(authorityGate).toContain('CF_API_TOKEN must remain absent from wrangler.worker.toml');
     expect(authorityGate).not.toContain('wrangler secret put');
     expect(authorityGate).not.toContain('wrangler deploy');
     expect(authorityGate).not.toContain('supabase db push');
@@ -198,28 +213,18 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
     expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
+    // Founder Path B ruling (2026-10-30): [secrets].required is the
+    // boot/deploy-essential set only. Feature secrets live in
+    // [secrets].optional and are installed before feature activation.
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
       'SUPABASE_PUBLISHABLE_KEY',
       'FOUNDER_SESSION_ENCRYPTION_KEY',
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
-      'GITHUB_PRIVATE_KEY',
-      'FCR_REMOTE_MCP_READ_TOKEN',
-      'FCR_SHOPIFY_WEBHOOK_SECRET',
-      'FCR_COMMERCE_HASH_SALT',
-      'FCR_CLOUDFLARE_MCP_READ_TOKEN',
       'OPENAI_API_KEY',
-      'ANTHROPIC_API_KEY',
-      'MODEL_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-      'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-      'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
-      'N8N_FOUNDER_CONTENT_WEBHOOK_URL',
-      'N8N_FOUNDER_CONTENT_BEARER_TOKEN',
-      'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT',
-      'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');
