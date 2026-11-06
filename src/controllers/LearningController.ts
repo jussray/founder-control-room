@@ -116,21 +116,34 @@ export class LearningController {
     originDomain: string;
     targetDomain: string;
     citedByExecutionId: string;
+    downstreamOutcomeId: string;
     howApplied: string;
     crossDomainReason?: string;
-  }) {
+    crossDomainPermissionId?: string;
+  }): Promise<LearningState> {
     assertCrossMissionApplication(input);
-    return this.progress({
-      learningId: input.learningId, expected: 'RETAINED', next: 'APPLIED',
-      payload: {
-        cited_by_execution_id: input.citedByExecutionId,
-        target_domain: input.targetDomain,
-        cross_domain_reason: input.crossDomainReason ?? null,
-        how_applied: input.howApplied,
-      },
+    if (input.originDomain !== input.targetDomain && !input.crossDomainPermissionId) {
+      throw new Error('LEARNING_CROSS_DOMAIN_FOUNDER_APPROVAL_REQUIRED');
+    }
+    const { data, error } = await supabase.rpc('learning_apply_verified', {
+      p_learning_id: input.learningId,
+      p_expected_state: 'RETAINED',
+      p_execution_id: input.citedByExecutionId,
+      p_outcome_id: input.downstreamOutcomeId,
+      p_target_domain: input.targetDomain,
+      p_how_applied: input.howApplied,
+      p_cross_domain_reason: input.crossDomainReason ?? null,
+      p_founder_permission_id: input.crossDomainPermissionId ?? null,
     });
-    // The DB rechecks that the referenced downstream execution is genuinely
-    // successful and belongs to a *different* mission; caller IDs are not authority.
+    // The database transaction locks the lesson and independently binds
+    // the second mission, verified outcome, domain and one-use founder receipt.
+    if (error || !data) {
+      throw new Error(`LEARNING_APPLY_DENIED: ${error?.message ?? 'no receipt returned'}`);
+    }
+    if (data.id !== input.learningId || data.state !== 'APPLIED') {
+      throw new Error('LEARNING_APPLY_RECEIPT_MISMATCH');
+    }
+    return 'APPLIED';
   }
 
   revise(learningId: string, review: {
