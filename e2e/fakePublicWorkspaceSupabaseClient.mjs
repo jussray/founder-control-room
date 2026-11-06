@@ -5,26 +5,6 @@ function normalizedEmail(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-// Synthetic E2E only: model a trusted, pre-existing invitation rather than
-// allowing every verified email to create customer authority.
-const invitedCustomerEmail = normalizedEmail(process.env.E2E_CUSTOMER_INVITE_EMAIL);
-if (invitedCustomerEmail) {
-  const founders = table('founder_users');
-  if (!founders.some((row) => normalizedEmail(row.email) === invitedCustomerEmail)) {
-    const workspace = withDefaults({
-      slug: 'invited-e2e-customer-workspace',
-      name: 'Invited Test Workspace',
-    }, 'workspaces');
-    table('workspaces').push(workspace);
-    founders.push(withDefaults({
-      email: invitedCustomerEmail,
-      user_id: null,
-      workspace_id: workspace.id,
-      account_role: 'workspace_owner',
-    }, 'founder_users'));
-  }
-}
-
 async function workspaceAwareRpc(name, args) {
   if (name !== 'provision_workspace_founder') {
     return baseSupabase.rpc(name, args);
@@ -37,6 +17,7 @@ async function workspaceAwareRpc(name, args) {
   }
 
   const founders = table('founder_users');
+  const workspaces = table('workspaces');
   let founder = founders.find((row) => String(row.user_id ?? '') === userId);
 
   if (founder) {
@@ -79,9 +60,28 @@ async function workspaceAwareRpc(name, args) {
     return { data: null, error: { code: '42501', message: 'email identity already claimed' } };
   }
 
+  const workspace = withDefaults({
+    slug: `founder-${userId.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 20)}`,
+    name: 'Founder Workspace',
+  }, 'workspaces');
+  founder = withDefaults({
+    email,
+    user_id: userId,
+    workspace_id: workspace.id,
+    account_role: 'workspace_owner',
+  }, 'founder_users');
+
+  workspaces.push(workspace);
+  founders.push(founder);
+
   return {
-    data: null,
-    error: { code: '42501', message: 'workspace invitation required' },
+    data: {
+      email,
+      user_id: founder.user_id,
+      workspace_id: founder.workspace_id,
+      account_role: founder.account_role,
+    },
+    error: null,
   };
 }
 

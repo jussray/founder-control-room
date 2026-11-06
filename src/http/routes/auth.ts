@@ -47,17 +47,6 @@ async function isAllowlisted(email: string): Promise<boolean> {
   if (error) throw new Error('Founder allowlist check failed');
   return Boolean(data);
 }
-async function hasWorkspaceInvitation(email: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('founder_users')
-    .select('account_role, workspace_id')
-    .eq('email', email)
-    .maybeSingle();
-  if (error) throw new Error('Workspace invitation lookup failed');
-  return data?.account_role === 'workspace_owner'
-    && typeof data.workspace_id === 'string'
-    && data.workspace_id.length > 0;
-}
 function sessionWithVerifiedUser(session: Session, user: Session['user']): Session { return { ...session, user }; }
 async function establishFounderSession(req: Request, res: Response, session: Session): Promise<boolean> {
   try { await rotateFounderSession(req, res, session); return true; }
@@ -151,16 +140,14 @@ authRouter.post('/workspace/magic-link', rateLimitMagicLink, async (req, res) =>
   const email = normalizeEmail(req.body?.email);
   if (!email || !email.includes('@')) return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
   try {
-    if (await hasWorkspaceInvitation(email)) {
-      const { error } = await supabaseAuth.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${FOUNDER_API_URL}/auth/workspace/callback`,
-          shouldCreateUser: true,
-        },
-      });
-      if (error) console.error('Workspace signInWithOtp failed:', error.message);
-    }
+    const { error } = await supabaseAuth.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${FOUNDER_API_URL}/auth/workspace/callback`,
+        shouldCreateUser: true,
+      },
+    });
+    if (error) console.error('Workspace signInWithOtp failed:', error.message);
   } catch (error) {
     console.error('Workspace magic-link request failed:', error instanceof Error ? error.message : String(error));
   }

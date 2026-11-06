@@ -1,8 +1,8 @@
 -- Public customer-Founder provisioning for Founder Control Room.
 --
 -- This function is callable only by the trusted FCR service-role backend after
--- Supabase Auth has independently verified the user. It binds only
--- pre-invited workspace_owner membership. It can never create, promote, or convert an
+-- Supabase Auth has independently verified the user. It can create or bind only
+-- workspace_owner membership. It can never create, promote, or convert an
 -- identity into platform_owner authority.
 
 create or replace function public.provision_workspace_founder(
@@ -17,6 +17,7 @@ as $$
 declare
   v_email text := lower(btrim(coalesce(p_email, '')));
   v_member public.founder_users%rowtype;
+  v_workspace_id uuid;
 begin
   if p_user_id is null then
     raise exception 'verified user id is required' using errcode = '22023';
@@ -68,11 +69,6 @@ begin
         and user_id is null
       returning * into v_member;
 
-      if not found then
-        raise exception 'email identity already claimed'
-          using errcode = '42501';
-      end if;
-
       return jsonb_build_object(
         'email', v_email,
         'user_id', v_member.user_id,
@@ -85,10 +81,32 @@ begin
       using errcode = '42501';
   end if;
 
-  -- Beta onboarding is invitation-gated. Verified identity alone is
-  -- insufficient to create a workspace or member row.
-  raise exception 'workspace invitation required'
-    using errcode = '42501';
+  insert into public.workspaces (slug, name)
+  values (
+    'founder-' || substr(md5(p_user_id::text), 1, 20),
+    'Founder Workspace'
+  )
+  returning id into v_workspace_id;
+
+  insert into public.founder_users (
+    email,
+    user_id,
+    workspace_id,
+    account_role
+  ) values (
+    v_email,
+    p_user_id,
+    v_workspace_id,
+    'workspace_owner'
+  )
+  returning * into v_member;
+
+  return jsonb_build_object(
+    'email', v_email,
+    'user_id', v_member.user_id,
+    'workspace_id', v_member.workspace_id,
+    'account_role', v_member.account_role
+  );
 end;
 $$;
 
@@ -109,4 +127,4 @@ end
 $$;
 
 comment on function public.provision_workspace_founder(uuid, text) is
-  'Trusted FCR auth handoff: bind a verified Supabase Auth user to an existing invited workspace_owner membership; never self-provision or grant platform_owner authority.';
+  'Trusted FCR auth handoff: provision or bind one verified Supabase Auth user to one isolated workspace_owner membership; never grants platform_owner authority.';
