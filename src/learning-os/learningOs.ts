@@ -21,6 +21,7 @@ export interface LearningSource {
   result: 'succeeded' | 'failed';
   observedAt: string;
   evidenceRefs: string[];
+  verifierId: string;
 }
 
 export interface LearningApplication {
@@ -167,9 +168,22 @@ function normalStep(step: LearningStep): LearningStep {
   return normalized;
 }
 
+/** Stable hash identity independent of JSON object key insertion order. */
 function identity(event: Omit<LearningEvent, 'eventHash'>): object {
-  const { eventHash: _unused, ...rest } = event as LearningEvent;
-  return rest;
+  return [
+    event.studyId, event.sequence, event.previousHash,
+    event.phase, event.recordedAt, event.statement, event.evidenceRefs,
+    event.falsifier ?? null, event.retentionRef ?? null,
+    event.application ? [event.application.project, event.application.headSha, event.application.outcomeReceiptId] : null,
+    event.improvement ? [event.improvement.name, event.improvement.before, event.improvement.after, event.improvement.unit, event.improvement.betterWhen] : null,
+  ];
+}
+
+function sourceDigest(source: LearningSource): string {
+  return digest([
+    source.project, source.headSha, source.executionReceiptId, source.capabilityPlanHash,
+    source.result, source.observedAt, source.evidenceRefs, source.verifierId,
+  ]);
 }
 
 function eventHash(event: Omit<LearningEvent, 'eventHash'>): string {
@@ -185,13 +199,20 @@ export function readLearningStudy(study: LearningStudy): LearningRead {
     || !['succeeded', 'failed'].includes(study.source.result)) {
     throw new Error('LEARNING_INVALID: source identity');
   }
-  const expectedStudyId = digest([study.source.project, study.source.headSha, study.source.executionReceiptId]);
-  if (study.id !== expectedStudyId) throw new Error('LEARNING_INVALID: study identity');
+  required(study.source.project, 'source.project', 120);
+  required(study.source.verifierId, 'source.verifierId', 120);
+  if (instant(study.source.observedAt) !== study.source.observedAt) {
+    throw new Error('LEARNING_INVALID: noncanonical source observation time');
+  }
+  refs(study.source.evidenceRefs);
+  const expectedStudyId = sourceDigest(study.source);
+  if (study.id !== expectedStudyId) throw new Error('LEARNING_INVALID: source evidence tampering');
   let previous: LearningEvent | null = null;
   let applied = false;
   let improved = false;
   for (const [index, event] of study.events.entries()) {
-    const step = normalStep(event);
+    const { sequence: _sequence, studyId: _studyId, previousHash: _previousHash, eventHash: _eventHash, ...rawStep } = event;
+    const step = normalStep(rawStep);
     for (const key of Object.keys(step)) {
       if (JSON.stringify(step[key as keyof LearningStep]) !== JSON.stringify(event[key as keyof LearningEvent])) {
         throw new Error('LEARNING_INVALID: noncanonical step');
@@ -243,7 +264,8 @@ export function beginLearningStudy({
   required(verifiedBy, 'verifiedBy', 120);
   if (!SHA.test(headSha)) throw new Error('LEARNING_INVALID: head SHA');
   const problems = validateV10OutcomeObservation(outcome);
-  if (problems.length || outcome.verified !== true || typeof outcome.goalSucceeded !== 'boolean') {
+  if (outcome?.contract !== 'juss-v10/outcome-observation@v1'
+    || problems.length || outcome.verified !== true || typeof outcome.goalSucceeded !== 'boolean') {
     throw new Error('LEARNING_DENIED: verified success or failure outcome required');
   }
   if (typeof verifyOutcome !== 'function' || verifyOutcome(outcome, project, headSha) !== true) {
@@ -256,8 +278,9 @@ export function beginLearningStudy({
     result: outcome.goalSucceeded ? 'succeeded' : 'failed',
     observedAt: instant(outcome.observedAt),
     evidenceRefs: refs(outcome.evidenceUrls),
+    verifierId: verifiedBy,
   };
-  const id = digest([project, headSha, source.executionReceiptId]);
+  const id = sourceDigest(source);
   const step = normalStep({
     phase: 'observed', recordedAt: source.observedAt,
     statement, evidenceRefs: source.evidenceRefs,
