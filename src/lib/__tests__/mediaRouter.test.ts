@@ -6,6 +6,8 @@ import {
   InMemoryMediaBudgetReservationService,
   InMemoryMediaRevocationLedger,
   MEDIA_ATTACK_FLOW_IDS,
+  MEDIA_REQUIRED_FOUNDER_SKILLS,
+  mediaFounderSkillBundle,
   canCompleteWithPostProduction,
   canonicalMediaJson,
   evaluateMediaRoute,
@@ -26,6 +28,7 @@ const at = '2026-09-24T03:00:00.000Z';
 function passingAttackFlow(): MediaAttackFlowBundleV1 {
   return {
     version: 'media-attack-flow-v1',
+    founderSkills: mediaFounderSkillBundle(at),
     records: MEDIA_ATTACK_FLOW_IDS.map((flow, index) => ({
       flow,
       verdict: 'pass',
@@ -172,6 +175,37 @@ describe('media attack-flow gate', () => {
     expect(validateMediaAttackFlowBundle(missing)).toContain('attack flow attack10 must appear exactly once');
   });
 
+  it('requires the canonical founder-owned skill stack as evidence, not decoration', () => {
+    const bundle = passingAttackFlow();
+    expect(MEDIA_REQUIRED_FOUNDER_SKILLS.map((skill) => skill.id)).toEqual([
+      'juss-founder-os',
+      'ultrathink-devil',
+      'goalfix',
+      'juss-flow-launch-loop',
+      'outcome-first',
+    ]);
+
+    const missing = {
+      ...bundle,
+      founderSkills: {
+        ...bundle.founderSkills,
+        records: bundle.founderSkills.records.filter((record) => record.skillId !== 'goalfix'),
+      },
+    };
+    expect(validateMediaAttackFlowBundle(missing)).toContain('founder skill goalfix must appear exactly once');
+
+    const drifted = {
+      ...bundle,
+      founderSkills: {
+        ...bundle.founderSkills,
+        records: bundle.founderSkills.records.map((record) =>
+          record.skillId === 'ultrathink-devil' ? { ...record, version: '999.0.0' } : record,
+        ),
+      },
+    };
+    expect(validateMediaAttackFlowBundle(drifted)).toContain('founder skill ultrathink-devil must use version 1.0.0');
+  });
+
   it('blocks execution when any attack flow blocks', () => {
     const input = routeInput();
     input.attackFlow.records = input.attackFlow.records.map((record) =>
@@ -219,6 +253,58 @@ describe('deterministic post predicate', () => {
       reason: 'POST_INPUTS_MISSING',
     });
   });
+
+  it('does not bypass cross-project reuse authority on the deterministic path', () => {
+    const req = request({
+      type: 'post',
+      intent: 'assemble',
+      projectId: 'project-1',
+      referenceAssetIds: ['asset-1'],
+      referencePolicy: {
+        maySendToExternalProvider: false,
+        mayStoreInLibrary: true,
+        mayReuseCrossProject: false,
+      },
+    });
+    const foreign = asset({
+      projectId: 'project-2',
+      rights: {
+        commercialUseStatus: 'unknown',
+        reusableAcrossProjects: true,
+        reusableAcrossProjectsAuthorityRecordId: 'reuse-grant-1',
+        domainAuthorityGranted: true,
+        domainAuthorityRecordId: 'reuse-grant-1',
+      },
+    });
+    expect(canCompleteWithPostProduction(req, [foreign], context({
+      assetInputs: [{
+        assetId: 'asset-1',
+        role: 'source_footage',
+        maySendToExternalProvider: false,
+        domainApprovalSourceRecordId: 'reuse-grant-1',
+      }],
+    }))).toEqual({ ok: false, reason: 'POST_INPUTS_MISSING' });
+  });
+
+  it('requires explicit domain identity-reference context instead of registry tags', () => {
+    const req = request({
+      type: 'post',
+      intent: 'assemble',
+      referenceAssetIds: ['asset-1'],
+      constraints: { needsIdentityConsistency: true },
+    });
+    expect(canCompleteWithPostProduction(req, [asset({ tags: ['identity_reference'] })], context())).toEqual({
+      ok: false,
+      reason: 'IDENTITY_SOURCE_MISSING',
+    });
+    expect(canCompleteWithPostProduction(req, [asset()], context({
+      assetInputs: [{
+        assetId: 'asset-1',
+        role: 'identity_reference',
+        maySendToExternalProvider: false,
+      }],
+    }))).toEqual({ ok: true });
+  });
 });
 
 describe('route evaluator', () => {
@@ -234,7 +320,7 @@ describe('route evaluator', () => {
 
   it('uses a verified API free allowance before paid cost', () => {
     const input = routeInput(request({
-      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+      budget: { mode: 'free', maxCostUsd: 0.01, allowWrapper: false, requireDirectProviderWhenAvailable: true },
     }));
     input.allowance = snapshotAllowance({
       entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 1, source: 'api' }],
@@ -247,7 +333,7 @@ describe('route evaluator', () => {
 
   it('blocks free mode when the allowance is not verified by API', () => {
     const input = routeInput(request({
-      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+      budget: { mode: 'free', maxCostUsd: 0.01, allowWrapper: false, requireDirectProviderWhenAvailable: true },
     }));
     input.allowance = snapshotAllowance({
       entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 10, source: 'manual' }],
@@ -315,6 +401,29 @@ describe('route evaluator', () => {
     });
     expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
   });
+
+  it('enforces the ceiling against deterministic compute and storage, not only provider spend', () => {
+    const req = request({
+      type: 'post',
+      intent: 'compose',
+      referenceAssetIds: ['asset-1'],
+      budget: { mode: 'cheap', maxCostUsd: 0.005, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+    });
+    const input = routeInput(req);
+    input.availableAssets = [asset()];
+    expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
+  });
+
+  it('does not call a provider route free when non-provider estimated cost exceeds the ceiling', () => {
+    const req = request({
+      budget: { mode: 'free', maxCostUsd: 0, allowWrapper: false, requireDirectProviderWhenAvailable: true },
+    });
+    const input = routeInput(req);
+    input.allowance = snapshotAllowance({
+      entries: [{ providerId: 'google', modelId: 'nano-banana-test', balance: 1, source: 'api' }],
+    });
+    expect(evaluateMediaRoute(input).outcome).toMatchObject({ kind: 'BLOCKED', reason: 'OVER_BUDGET' });
+  });
 });
 
 describe('fingerprints', () => {
@@ -328,10 +437,21 @@ describe('fingerprints', () => {
 });
 
 describe('budget reservation and revocation', () => {
-  it('reserves atomically against the configured cap', async () => {
+  it('reserves atomically against the configured cap and is retry-idempotent by request', async () => {
     const service = new InMemoryMediaBudgetReservationService({ dailyCapUsd: 1, monthlyCapUsd: 2 });
-    expect((await service.reserve({ requestId: 'r1', amountUsd: 0.8 })).ok).toBe(true);
+    const first = await service.reserve({ requestId: 'r1', amountUsd: 0.8 });
+    expect(first.ok).toBe(true);
+    expect(await service.reserve({ requestId: 'r1', amountUsd: 0.8 })).toEqual(first);
+    expect(await service.reserve({ requestId: 'r1', amountUsd: 0.7 })).toEqual({ ok: false, reason: 'LEDGER_ERROR' });
     expect(await service.reserve({ requestId: 'r2', amountUsd: 0.3 })).toEqual({ ok: false, reason: 'EXCEEDS_DAILY' });
+  });
+
+  it('refuses invalid or over-reservation settlement amounts', async () => {
+    const service = new InMemoryMediaBudgetReservationService({ dailyCapUsd: 1, monthlyCapUsd: 2 });
+    const reservation = await service.reserve({ requestId: 'r1', amountUsd: 0.5 });
+    if (!reservation.ok) throw new Error('reservation should succeed');
+    await expect(service.commit({ reservationId: reservation.reservationId, actualUsd: 0.6 })).rejects.toThrow(/reserved amount/);
+    expect(await service.reserve({ requestId: 'bad', amountUsd: Number.NaN })).toEqual({ ok: false, reason: 'LEDGER_ERROR' });
   });
 
   it('appends revocation evidence and makes revoked status terminal', async () => {

@@ -47,7 +47,10 @@ const remoteReadMcp = read("src/http/routes/remoteReadMcp.ts");
 const signalEngineMcp = read("src/http/routes/founderSignalEngineMcp.ts");
 const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
+const mcpRateLimit = read("src/http/middleware/mcpRateLimit.ts");
 const server = read("src/http/server.ts");
+const runtimeProof = read(".github/workflows/prompt-workflow-router-runtime-proof.yml");
+const secretsDoc = read("docs/SECRETS.md");
 
 /* ---------- externalTools.ts: the tool catalog invoked by /mcp and /mcp/read ---------- */
 
@@ -113,6 +116,21 @@ assert(
     !remoteReadMcp.includes('Six read/preview-only tools'),
   "served MCP must not regress to the stale read-only-only catalog description",
 );
+
+/* ---------- deployed runtime proof: founder HTTP auth != canonical MCP OAuth ---------- */
+
+assert(
+  runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}'),
+  "operator relay runtime proof must use its dedicated canonical MCP OAuth token",
+);
+assert(
+  !runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}'),
+  "operator relay runtime proof must not relabel the founder browser bearer as MCP OAuth authority",
+);
+assert(
+  secretsDoc.includes('| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` |'),
+  "docs/SECRETS.md must document the dedicated operator-relay OAuth proof token",
+);
 assert(
   remoteReadMcp.includes('research/propose/review') &&
     remoteReadMcp.includes('carries no mutation authority'),
@@ -150,15 +168,43 @@ assert(
   "x-engagement signal MCP must compare its bearer token with timingSafeEqual, not a fast-exit equality",
 );
 
+// A shared route-local limiter is required in addition to the server's global
+// request baseline: /mcp and /mcp/read must not offer separate auth budgets.
+assert(
+  mcpRouter.includes('import { rateLimitExternalMcp } from "../middleware/mcpRateLimit.js";') &&
+    mcpRateLimit.includes("export const rateLimitExternalMcp = rateLimit({") &&
+    mcpRateLimit.includes("windowMs: 60 * 1_000,") &&
+    mcpRateLimit.includes("limit: 60,"),
+  "external MCP OAuth and compatibility routes must have a shared 60/minute local rate limiter",
+);
+
 /* ---------- every served mount point still carries its middleware ---------- */
 
 assert(
-  /mcpRouter\.post\("\/", handlePairedRemoteMcp\)/.test(mcpRouter),
+  /mcpRouter\.post\("\/", rateLimitExternalMcp, handlePairedRemoteMcp\)/.test(mcpRouter),
   "the canonical OAuth lane must remain mounted at POST /mcp",
 );
+// This compatibility route must retain both security paths. Static access
+// requires an exact token match; every other credential stays on OAuth.
+const compatibilityHandler = mcpRouter.match(
+  /const handleAutoDynamicRemoteReadMcp: RequestHandler = [\s\S]*?\n};/,
+);
 assert(
-  /mcpRouter\.post\("\/read", handleRemoteReadMcp\)/.test(mcpRouter),
-  "the compatibility static-token lane must remain mounted at POST /mcp/read",
+  /mcpRouter\.post\("\/read", rateLimitExternalMcp, handleAutoDynamicRemoteReadMcp\)/.test(mcpRouter) &&
+    /const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler\(\{\s*authMode: "static"/.test(mcpRouter) &&
+    /const handlePairedRemoteMcp = pairedOAuthMetadata\(createRemoteReadMcpHandler\(\{\s*authMode: "oauth"/.test(mcpRouter) &&
+    compatibilityHandler &&
+    compatibilityHandler[0].includes("if (usesLegacyStaticMcpToken(") &&
+    compatibilityHandler[0].includes("return handleLegacyStaticRemoteReadMcp(req, res, next);") &&
+    compatibilityHandler[0].includes("return res.redirect(307, CANONICAL_MCP_RESOURCE);") &&
+    mcpRouter.includes('const CANONICAL_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp";'),
+  "/mcp/read must retain exact-token legacy auth and redirect all other clients to canonical OAuth /mcp",
+);
+const pairedOauth = read("src/mcp/pairedSupabaseOAuth.ts");
+assert(
+  /return timingSafeEqual\(actualBuffer, expectedBuffer\);/.test(pairedOauth) &&
+    /if \(!expected \|\| !authorizationHeader\?\.startsWith\('Bearer '\)\) return false;/.test(pairedOauth),
+  "legacy token selection must reject missing credentials and use timing-safe comparison",
 );
 assert(
   /app\.use\('\/mcp', mcpRouter\)/.test(server),
