@@ -11,6 +11,13 @@ export function parseLedger(markdown) {
 
 export function auditLedger(rows, runs, expectedSha) {
   const errors = [];
+  const seen = new Set();
+  for (const row of rows.filter(r => r.sha === expectedSha)) {
+    const key = String(row.runId);
+    if (!Number.isSafeInteger(row.runId) || row.runId <= 0 || !row.name) errors.push(`MALFORMED_ENTRY ${key}`);
+    if (seen.has(key)) errors.push(`DUPLICATE_RUN ${key}`);
+    seen.add(key);
+  }
   const observed = runs.filter(r => r.head_sha === expectedSha && ['failure', 'cancelled'].includes(r.conclusion));
   for (const run of observed) {
     const entry = rows.find(r => r.sha === expectedSha && r.runId === run.id && r.name === run.name);
