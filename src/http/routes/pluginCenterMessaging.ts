@@ -395,8 +395,25 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
     whatsappReplyToMessageId,
   });
 
+  // An inbound message admits at most one approved reply operation. The
+  // provider-target reservation is stable across changed client keys or body
+  // revisions, preventing an unknown Gmail outcome from being resent by
+  // choosing a new idempotency key.
+  const senderScope = requestedChannel === 'email'
+    ? (gmailRead.expectedAccount ?? '')
+    : (growthInboxReplyStatus().channels.whatsapp.phoneNumberId ?? '');
+  const originalReplyTarget = requestedChannel === 'email'
+    ? gmailMessageId
+    : whatsappReplyToMessageId;
+  const durableIdempotencyKey = 'growth-reply:v1:' + sha256(JSON.stringify({
+    channel: requestedChannel,
+    projectSlug,
+    senderScope,
+    originalReplyTarget,
+  }));
+
   try {
-    const existing = await existingExecution(idempotencyKey);
+    const existing = await existingExecution(durableIdempotencyKey);
     if (existing) {
       const existingRequest = record(existing.request);
       if (text(existing.action_type) !== ACTION_TYPE || text(existingRequest?.requestFingerprint) !== fingerprint) {
@@ -424,7 +441,7 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
       : `whatsapp-message:${whatsappReplyToMessageId}`;
     const reservation = await reserveExecution({
       projectId: project.id,
-      idempotencyKey,
+      idempotencyKey: durableIdempotencyKey,
       founderEmail,
       channel: requestedChannel,
       projectSlug: project.slug,
