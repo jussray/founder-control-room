@@ -37,27 +37,28 @@ export async function resolveCommandCenterActor(
   token: string,
   config: CommandCenterAccessConfig,
   verify: (token: string) => Promise<CommandCenterVerifiedUser | null>,
-  founderAllowlisted: (email: string) => Promise<boolean>,
+  founderAllowlisted: (immutableUserId: string) => Promise<boolean>,
 ): Promise<CommandCenterActor | null> {
   if (!config.issuer || !UUID.test(config.ownerUserId) || !config.allowedClientIds.length) return null;
   const claims = parseClaims(token);
   if (!claims || claims.iss !== config.issuer || !UUID.test(String(claims.sub ?? ''))) return null;
   const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (claims.resource !== undefined && claims.resource !== COMMAND_CENTER_SITE_RESOURCE) return null;
-  const resourceBound = audience.includes(COMMAND_CENTER_SITE_RESOURCE)
-    || (audience.includes('authenticated') && claims.resource === COMMAND_CENTER_SITE_RESOURCE);
-  if (!resourceBound) return null;
+  // Supabase OAuth JWTs normally have aud=authenticated plus a signed client_id.
+  // scope/resource are NOT standard access-token claims; they are optional custom
+  // hook claims. The exact registered OAuth client ID is mandatory either way.
+  const validAudience = audience.includes(COMMAND_CENTER_SITE_RESOURCE) || audience.includes('authenticated');
+  if (!validAudience) return null;
   if (typeof claims.client_id !== 'string' || !config.allowedClientIds.includes(claims.client_id)) return null;
-  if (typeof claims.scope !== 'string' || !claims.scope.split(/\s+/).includes('openid')) return null;
   const now = config.now ?? Math.floor(Date.now() / 1000);
   if (typeof claims.exp !== 'number' || !Number.isFinite(claims.exp) || claims.exp <= now) return null;
   if (typeof claims.nbf === 'number' && claims.nbf > now + 30) return null;
   const verified = await verify(token).catch(() => null);
   if (!verified || verified.is_anonymous || verified.id !== claims.sub) return null;
   if (verified.id === config.ownerUserId) {
-    const email = typeof verified.email === 'string' ? verified.email.trim().toLowerCase() : '';
-    if (!email) return null;
-    const allowed = await founderAllowlisted(email).catch(() => false);
+    // Never promote by mutable email; this must be bound in founder_users
+    // to the exact immutable auth.users UUID of the authenticated actor.
+    const allowed = await founderAllowlisted(verified.id).catch(() => false);
     return allowed ? { role: 'owner', userId: verified.id, clientId: claims.client_id } : null;
   }
   return { role: 'customer', userId: verified.id, clientId: claims.client_id };
