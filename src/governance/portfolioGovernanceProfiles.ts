@@ -104,9 +104,14 @@ export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[
   {
     id: 'sleepwealth-agent', repositories: ['jussray/SleepWealth-Agent'], implementationState: 'bounded',
     humanAuthority: 'human approval inside simulation only', objectiveTruthSources: ['provider_evidence', 'system_observation'], minimumRecoveryLevel: 'R2',
-    hardConstraints: ['live execution is disabled', 'paper or mock results are not investment-performance claims', 'the project does not claim trading alpha'],
-    blockedActions: ['live-trade', 'enable-live-broker', 'auto-increase-ceiling'], requiredClaims: { paper_execution: ['approval_verified', 'risk_gate_verified', 'mock_execution_receipt_verified'] },
-    actionRiskFloors: { paper_execution: 'consequential' },
+    hardConstraints: ['live execution is disabled', 'paper or mock results are not investment-performance claims', 'the project does not claim trading alpha', 'customer-connected and pooled-managed account models never share a scope or credentials; each requires its own trusted, subject-bound receipts before any live gate review'],
+    blockedActions: ['live-trade', 'enable-live-broker', 'auto-increase-ceiling', 'accept-pooled-funds', 'cross-account-credential-use'],
+    requiredClaims: {
+      paper_execution: ['approval_verified', 'risk_gate_verified', 'mock_execution_receipt_verified'],
+      customer_scope_eligibility: ['customer_consent', 'broker_oauth_grant', 'account_risk_ceiling'],
+      pooled_scope_eligibility: ['legal_entity', 'regulatory_approval', 'custody_agreement', 'participant_agreements', 'independent_risk_authority', 'pooled_capital_ceiling', 'participant_accounting'],
+    },
+    actionRiskFloors: { paper_execution: 'consequential', customer_scope_eligibility: 'observe', pooled_scope_eligibility: 'observe' },
   },
   {
     id: 'untold-stories-storefront', repositories: ['jussray/untold-stories-storefront'], implementationState: 'foundation',

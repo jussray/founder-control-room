@@ -1,4 +1,4 @@
-import type { OperatorRelayResponseV1, RelayOperatorId, RelayStatus } from './operatorRelay.js';
+import { operatorRelayResponseHash, type OperatorRelayResponseV1, type RelayOperatorId, type RelayStatus } from './operatorRelay.js';
 import type { CapabilityObservation, CapabilityTaskClass } from './modelCapabilityMarket.js';
 
 /**
@@ -20,11 +20,11 @@ import type { CapabilityObservation, CapabilityTaskClass } from './modelCapabili
  * - Freshness: with a `window`, receipts completed before `now - maxAgeMs` are excluded so stale
  *   evidence cannot ride on one fresh receipt. A receipt whose `completedAt` does not parse is
  *   always excluded as stale; it cannot be placed in time.
- * - Proof: a provider answering is not outcome proof. Only receipts whose `relayId` is in
- *   `verifiedRelayIds` (confirmed by an independent verifier) contribute to `proofRate` and to
- *   `evidenceRefs`. With no verifier the observation carries no evidence references, and the market's
- *   own eligibility gate keeps the operator in trial. This is deliberate: adapter-proven is not
- *   provider-outcome-proven.
+ * - Proof: a provider answering is not outcome proof. Only exact `responseHash` values in
+ *   `verifiedResponseHashes` (confirmed by an independent verifier) contribute to `proofRate`
+ *   and `evidenceRefs`. A later response using the same relayId cannot borrow previous proof.
+ *   Without an independent verifier, the market keeps the operator in trial; adapter-proven is
+ *   not provider-outcome-proven.
  * - False green is a contract violation, not merely unverified: a `completed` receipt with zero
  *   evidence references, even if it bypassed the relay validator.
  * - Any runtime `authorityRequested` other than the exact string `'none'` (including a missing or
@@ -48,8 +48,8 @@ export interface RelayReceiptFoldInput {
   operatorId: RelayOperatorId;
   taskClass: CapabilityTaskClass;
   receipts: readonly OperatorRelayResponseV1[];
-  /** Relay ids whose outcome an independent verifier confirmed. Only these contribute proof. */
-  verifiedRelayIds?: ReadonlySet<string>;
+  /** Exact response hashes independently verified as outcomes (not merely provider delivery). */
+  verifiedResponseHashes?: ReadonlySet<string>;
   /** Receipts completed before `now - maxAgeMs` are excluded as stale. */
   window?: RelayReceiptFoldWindow;
 }
@@ -76,6 +76,17 @@ function normalizedEvidenceRefs(receipt: OperatorRelayResponseV1): string[] {
 
 function hasEvidence(receipt: OperatorRelayResponseV1): boolean {
   return normalizedEvidenceRefs(receipt).length > 0;
+}
+
+/** Independently trusted hashes cannot prove mutated or malformed receipt content. */
+function matchesCanonicalResponseHash(receipt: OperatorRelayResponseV1): boolean {
+  if (typeof receipt.responseHash !== 'string' || !/^[0-9a-f]{64}$/.test(receipt.responseHash)) return false;
+  try {
+    const { responseHash, ...identity } = receipt;
+    return operatorRelayResponseHash(identity) === responseHash;
+  } catch {
+    return false;
+  }
 }
 
 function requestsAuthority(receipt: OperatorRelayResponseV1): boolean {
@@ -137,10 +148,11 @@ export function foldRelayReceiptsIntoCapabilityObservation(input: RelayReceiptFo
     return { observation: null, ...summaryBase };
   }
 
-  const verifiedIds = input.verifiedRelayIds ?? new Set<string>();
+  const verifiedHashes = input.verifiedResponseHashes ?? new Set<string>();
   const completed = outcomes.filter((receipt) => receipt.status === 'completed');
   const failed = outcomes.filter((receipt) => receipt.status === 'failed');
-  const verified = outcomes.filter((receipt) => verifiedIds.has(receipt.relayId) && hasEvidence(receipt));
+  const verified = outcomes.filter((receipt) => verifiedHashes.has(receipt.responseHash)
+    && hasEvidence(receipt) && matchesCanonicalResponseHash(receipt));
   const falseGreen = completed.filter((receipt) => !hasEvidence(receipt));
   const authorityViolations = outcomes.filter(requestsAuthority);
   const evidenceRefs = [...new Set(verified.flatMap(normalizedEvidenceRefs))].sort();
@@ -153,6 +165,7 @@ export function foldRelayReceiptsIntoCapabilityObservation(input: RelayReceiptFo
     sampleSize: outcomes.length,
     successRate: rate(completed.length, completed.length + failed.length),
     proofRate: rate(verified.length, outcomes.length),
+    verifiedCompletedCount: verified.filter((receipt) => receipt.status === 'completed').length,
     falseGreenRate: rate(falseGreen.length, outcomes.length),
     authorityViolationRate: rate(authorityViolations.length, outcomes.length),
     evidenceRefs,
