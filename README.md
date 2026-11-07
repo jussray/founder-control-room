@@ -614,6 +614,8 @@ The OAuth consent UI is served by the FCR API service **through the same-origin 
 
 Source changes to `.github/workflows/ci.yml` are release-governance changes: its four core Type check, Lint, Unit Tests, and Playwright e2e jobs must install from the committed npm lockfile with `npm ci --no-audit --no-fund`, without bypassing existing jobs, independent review, Required Gate, or founder-final approval. This exact-head source contract prevents unconstrained dependency resolution during CI but does not prove deploy/runtime identity, production behavior, or customer outcomes.
 
+Workflow YAML syntax is checked on the same exact head: the `python-tests` job runs `scripts/verify_workflow_yaml.py` over every `.github/workflows/*.yml` and `*.yaml` file and fails closed on a parse error, an unreadable file, or an empty workflow set. This proves YAML syntax only. It does not validate the GitHub Actions schema and does not prove that GitHub accepts a workflow at dispatch time.
+
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
