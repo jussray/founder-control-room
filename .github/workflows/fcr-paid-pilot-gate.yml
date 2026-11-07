@@ -7,6 +7,9 @@ on:
       - 'scripts/fcr-paid-pilot-gate.mjs'
       - 'scripts/fcr-paid-pilot-gate.test.mjs'
       - '.github/workflows/fcr-paid-pilot-gate.yml'
+      - '.github/workflows/playwright.yml'
+      - '.github/workflows/deploy.yml'
+      - 'scripts/fcr-production-witness-contract.test.mjs'
   push:
     branches: [main]
     paths:
@@ -28,4 +31,4 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Run sandbox-only pilot gate tests
-        run: node --test scripts/fcr-paid-pilot-gate.test.mjs
+        run: node --test scripts/fcr-paid-pilot-gate.test.mjs scripts/fcr-production-witness-contract.test.mjs
