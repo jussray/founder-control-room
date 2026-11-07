@@ -253,3 +253,7 @@ Return one synthesis packet:
 - `NEXT GATE`: one exact founder decision/action
 
 The Council exists to improve the founder's decision quality and execution proof, not to dilute founder control.
+
+## Court
+
+For consequential FCR decisions, convene the architectural court in `.control-room/fcr-court.contract.json` (`juss/fcr-court@v1`): Content, Video, Governance, and Capability councils under the Founder Council. No second authority plane. Founder rules; separate approval gates stay mandatory.
