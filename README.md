@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
+
+The founder-only `/integration-cockpit/projects` and `/integration-cockpit/inspect/:id/:number` endpoints operate alongside the existing Control Room on its authenticated origin. The read-only diagnostic `observePullRequest` capability includes draft and closed PR identities so an operator can see blocked work. The existing independent `getPullRequestReviewContext` gate still rejects draft or closed PRs and exclusively controls the review context used by merge authority. Read-only observation must never populate that review context, grant merge or deployment authority, or treat skipped checks as proof. Exact-head checks, current base/head, and browser session are separate observations; live FCR/Cloudflare/Supabase production proof is not established by a local fixture, passing CI slice, or preview build. Games Hub repository mapping remains unresolved and is not guessed.
+
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
