@@ -17,7 +17,6 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
 }));
 
 import { commandCenterSiteRouter } from '../commandCenterSite.js';
-import { COMMAND_CENTER_SITE_RESOURCE } from '../../../auth/commandCenterSiteAccess.js';
 
 const OWNER = '11111111-1111-4111-8111-111111111111';
 const USER_A = '22222222-2222-4222-8222-222222222222';
@@ -56,7 +55,7 @@ beforeEach(() => {
     { tenant_id: TENANT_B, user_id: USER_B, status: 'active' },
   ];
   state.projects = [
-    { id: PROJECT_A, tenant_id: TENANT_A, name: 'A own work', status: 'new', observed_at: null },
+    { id: PROJECT_A, tenant_id: TENANT_A, name: 'A own work', status: 'unknown', observed_at: null },
     { id: PROJECT_B, tenant_id: TENANT_B, name: 'B own work', status: 'new', observed_at: null },
   ];
   state.getUser.mockImplementation(async (token: string) => {
