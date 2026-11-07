@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp, link, rm, writeFile, lstat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, all) => {
@@ -16,6 +16,16 @@ const run = (binary, argv) => {
   return res.stdout;
 };
 const sha = async p => createHash('sha256').update(await readFile(p)).digest('hex');
+const pathOccupied = async p => {
+  try { await lstat(p); return true; }
+  catch (error) { if (error?.code === 'ENOENT') return false; throw error; }
+};
+const maxUpscale = 1.25; // resizing cannot manufacture real detail
+const requireNativeDetail = (label, actual, factor) => {
+  if (!actual?.width || !actual?.height || !Number.isFinite(factor) || factor > maxUpscale) {
+    throw Error(`${label} source resolution too low: upscale ${Number(factor).toFixed(2)}x exceeds ${maxUpscale}x`);
+  }
+};
 const probe = p => {
   const data = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries',
     'format=duration:stream=codec_type,codec_name,width,height', '-of', 'json', p]));
@@ -33,8 +43,8 @@ const main = async () => {
   if (!args.output) throw Error('missing --output');
   const output = resolve(args.output);
   if ([intro, screen].includes(output)) throw Error('output cannot overwrite source');
-  if (existsSync(output)) throw Error('output exists; choose a fresh output path');
-  if (existsSync(`${output}.receipt.json`)) throw Error('receipt exists; choose a fresh output path');
+  if (await pathOccupied(output)) throw Error('output exists; choose a fresh output path');
+  if (await pathOccupied(`${output}.receipt.json`)) throw Error('receipt exists; choose a fresh output path');
   const voiceover = args.voiceover ? file('voiceover') : null;
   const world = args.world ? file('world') : null;
   if (voiceover && [intro, screen].includes(voiceover)) throw Error('voiceover needs separate audio media');
@@ -48,6 +58,12 @@ const main = async () => {
   if (!b.video || b.duration < 7) throw Error('screen must have >=7s authentic UI footage');
   if (!b.audio && !voiceover) throw Error('screen without audio requires genuine 7s --voiceover (no fake narration)');
   if (voiceover && probe(voiceover).duration < 7) throw Error('voiceover must be at least 7 seconds');
+  requireNativeDetail('intro', a.video, Math.max(w/a.video.width, h/a.video.height));
+  requireNativeDetail('screen', b.video, Math.min((w*0.92)/b.video.width, (h*0.78)/b.video.height));
+  if (world) {
+    const c = probe(world);
+    requireNativeDetail('approved world', c.video, Math.max(w/c.video.width,h/c.video.height));
+  }
   const dir = dirname(output);
   await mkdir(dir, { recursive: true });
   const workspace = await mkdtemp(join(dir, '.fcr-video-'));
@@ -84,7 +100,8 @@ const main = async () => {
       publish_authority: false, buffer_draft_id: null, public_post_url: null,
       review_required: ['founder_visual_approval','on_screen_private_info_check','source_rights_check','truth_claim_check']
     };
-    await rename(tmp, output);
+    // Same-filesystem, no-overwrite atomic link: refuses races and dangling symlinks.
+    await link(tmp, output);
     await writeFile(`${output}.receipt.json`,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
     console.log(JSON.stringify({status:'RENDERED_LOCAL_REVIEW_ONLY',output,receipt:`${output}.receipt.json`},null,2));
   } finally {await rm(workspace,{recursive:true,force:true});}
