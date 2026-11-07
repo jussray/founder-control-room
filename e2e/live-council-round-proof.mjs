@@ -19,6 +19,7 @@ const adapter = (label, evidenceRef) => async (request) => {
 const adapters = {
   codex: adapter('Codex', 'simulated:openai:browser-proof'),
   'claude-code': adapter('Claude', 'simulated:anthropic:browser-proof'),
+  'meta-ai': adapter('Meta AI', 'simulated:meta-ai:browser-proof'),
   muse: adapter('Muse', 'simulated:muse:browser-proof'),
 };
 
@@ -34,6 +35,7 @@ app.post('/proof', async (req, res) => {
     seats: [
       { operator: 'codex', capability: 'propose' },
       { operator: 'claude-code', capability: 'propose' },
+      { operator: 'meta-ai', capability: 'propose' },
       { operator: 'muse', capability: 'propose' },
     ],
   }, adapters);
@@ -64,10 +66,10 @@ try {
   assert.equal(result.body.transcript.humanRelay, false);
   assert.equal(result.body.transcript.sourceRef, 'founder-attested:claude-code');
   assert.deepEqual(seen.map(({ source, target }) => `${source}>${target}`), [
-    'fcr>codex', 'codex>claude-code', 'claude-code>muse',
+    'fcr>codex', 'codex>claude-code', 'claude-code>meta-ai', 'meta-ai>muse',
   ]);
   const hops = result.body.transcript.hops;
-  assert.equal(hops.length, 3);
+  assert.equal(hops.length, 4);
   for (let i = 1; i < hops.length; i += 1) assert.equal(hops[i].inputSha256, hops[i - 1].answerSha256);
   assert.equal(hops.every((hop) => hop.liveProviderEvidence === false), true);
 

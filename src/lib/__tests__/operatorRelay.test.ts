@@ -79,9 +79,11 @@ describe('operator relay', () => {
     expect(validateOperatorRelayRequest(request({ fromOperator: 'perplexity', toOperator: 'codex' }), NOW)).toEqual([]);
   });
 
-  it('rejects DeepSeek from the peer operator relay', () => {
-    const value = { ...request(), toOperator: 'deepseek-instructor' } as unknown as OperatorRelayRequestV1;
-    expect(validateOperatorRelayRequest(value, NOW)).toContain('toOperator is unsupported');
+  it('rejects DeepSeek and DeepSeek Instructor from the peer operator relay', () => {
+    const peerAlias = { ...request(), toOperator: 'deepseek' } as unknown as OperatorRelayRequestV1;
+    const instructor = { ...request(), toOperator: 'deepseek-instructor' } as unknown as OperatorRelayRequestV1;
+    expect(validateOperatorRelayRequest(peerAlias, NOW)).toContain('toOperator is unsupported');
+    expect(validateOperatorRelayRequest(instructor, NOW)).toContain('toOperator is unsupported');
   });
 
   it('rejects any mutation authority carried by the relay', () => {
