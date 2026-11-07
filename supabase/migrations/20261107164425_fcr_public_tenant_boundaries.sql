@@ -1,8 +1,8 @@
 -- FCR external Site: independent, initially empty customer namespaces.
 -- Source-only migration; a separate exact-candidate approval is required to apply.
 -- These tables never share FCR's founder-controlled projects or mission tables.
-begin;
-
+-- Intentionally no explicit transaction: the migration runner controls atomicity,
+-- and the Neon preview contract wraps this exact file in BEGIN/ROLLBACK.
 create table public.fcr_public_tenants (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 160),
@@ -64,4 +64,3 @@ comment on table public.fcr_public_projects is
   'Sanitized tenant projects, never founder portfolio records. Service-role-only.';
 
 -- Intentionally NO seeded founder tenants, copied projects, or memberships.
-commit;
