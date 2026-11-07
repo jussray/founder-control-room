@@ -1,7 +1,48 @@
+function stripTomlComments(source) {
+  let output = '';
+  let quote = null;
+  let escaped = false;
+  let inComment = false;
+
+  for (const character of source) {
+    if (inComment) {
+      if (character === '\n') {
+        inComment = false;
+        output += character;
+      }
+      continue;
+    }
+
+    if (quote) {
+      output += character;
+      if (quote === '"' && escaped) {
+        escaped = false;
+      } else if (quote === '"' && character === '\\') {
+        escaped = true;
+      } else if (character === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (character === '#') {
+      inComment = true;
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      quote = character;
+    }
+    output += character;
+  }
+
+  return output;
+}
+
 function parseNames(listSource, label) {
-  const names = [...listSource.matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((match) => match[1]);
-  const remainder = listSource
-    .replace(/#.*$/gm, '')
+  const uncommented = stripTomlComments(listSource);
+  const names = [...uncommented.matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((match) => match[1]);
+  const remainder = uncommented
     .replace(/["'][A-Z][A-Z0-9_]*["']/g, '')
     .replace(/[\s,]/g, '');
 
@@ -17,12 +58,63 @@ function parseNames(listSource, label) {
   return names;
 }
 
-function registryList(section, label) {
-  const match = section.match(new RegExp(`(?:^|\\n)\\s*${label}\\s*=\\s*\\[([\\s\\S]*?)\\]`, 'm'));
-  if (!match) {
+function arrayBody(section, label) {
+  const assignment = new RegExp(`(?:^|\\n)\\s*${label}\\s*=\\s*\\[`, 'm').exec(section);
+  if (!assignment) {
     throw new Error(`missing [secrets].${label} registry`);
   }
-  return parseNames(match[1], label);
+
+  const openOffset = assignment[0].lastIndexOf('[');
+  const openIndex = assignment.index + openOffset;
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  let inComment = false;
+
+  for (let index = openIndex; index < section.length; index += 1) {
+    const character = section[index];
+
+    if (inComment) {
+      if (character === '\n') inComment = false;
+      continue;
+    }
+
+    if (quote) {
+      if (quote === '"' && escaped) {
+        escaped = false;
+      } else if (quote === '"' && character === '\\') {
+        escaped = true;
+      } else if (character === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (character === '#') {
+      inComment = true;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '[') {
+      depth += 1;
+      continue;
+    }
+    if (character === ']') {
+      depth -= 1;
+      if (depth === 0) {
+        return section.slice(openIndex + 1, index);
+      }
+    }
+  }
+
+  throw new Error(`unterminated [secrets].${label} registry`);
+}
+
+function registryList(section, label) {
+  return parseNames(arrayBody(section, label), label);
 }
 
 export function parseWranglerSecretRegistry(source) {
