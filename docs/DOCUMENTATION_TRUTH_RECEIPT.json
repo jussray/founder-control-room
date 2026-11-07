@@ -572,6 +572,18 @@
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
       ]
+    },
+    {
+      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "claims": [
+        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post."
+      ]
+    },
+    {
+      "path": "src/lib/xFirstPartyAdapter.ts",
+      "claims": [
+        "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
     }
   ]
 }

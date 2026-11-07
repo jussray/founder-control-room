@@ -281,6 +281,8 @@ The market's intended first receipt source is the operator relay: `src/lib/capab
 
 ### Founder-content execution
 
+The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
+
 The founder-content architecture separates story, authority, transport, and outcome:
 
 ```text
