@@ -12,6 +12,8 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
+
 ## Goal
 
 Move the authoritative product toward a truthful full app launch without replacing Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting history, leaking private sauce, or scaling an unproven path.
@@ -318,6 +320,10 @@ A deterministic witness must be produced from provider-observed PR/base/head/dif
 
 Trusted witness ignition must execute from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflows, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once integrated and exact-release-proven: it accepts only a positive PR number behind same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; derives repository/provider/PR/base/head/diff/verdict/hash/App identity from server/provider state; requires full runtime `GIT_SHA` to equal provider-resolved current `main` before and after witness publication or reconciliation; performs reconcile-before-create; and returns the complete deterministic receipt without granting merge authority. A default-branch dispatch is only an equivalent ignition surface when it preserves the same invariants. Any ignition surface, its credential boundary, producer/publisher, workflow, or runner is a deterministic-review trust root; changing it must P1-block normal self-certification and require the separately explicit exact-candidate bootstrap/constitutional path.
 
+### Founder-selected native Auto-merge
+
+If the founder clicks GitHub **Enable auto-merge** for an exact PR, leave the PR queued for GitHub to merge **only after** configured required status checks, tests, review/approval policies, and branch protections have passed. All intended load-bearing gates must be required in live provider settings; optional green/red jobs alone are not native merge requirements. PR Continuity only observes the queue status from GitHub's readback; it never merges, creates founder-final approval, or relaxes a ruleset. Conflicts, draft status, changing base/head, missing exact-candidate founder authority, or stale review block the merge. Do not call `merge_pull_request` as a substitute for waiting for native Auto-merge or claim GitHub's eventual merge proves the FCR in-app founder-final route. An explicit Auto-merge click is the queue request, not a new independent review or production deployment authorization.
+
 ## Merge gate
 
 Standing founder intent allows a merge only when all repository merge-authority conditions are satisfied. It does not waive them.
@@ -412,3 +418,10 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Execute every required test, never relabel skips
 
 During the review/verify loop, obtain the exact-head `Test` job and its machine-readable Vitest report from the existing `.github/workflows/ci.yml` gate. The job must reject skipped, pending, todo, malformed, missing, zero-test, and inconsistent assertion-level outcomes using `scripts/verify-vitest-no-skips.mjs`; the load-bearing `Required Gate` depends on that job. Verify source discovery separately. Keep production-only and cleanup workflows event-scoped, label not-applicable skips explicitly, and do not run privileged operations merely to eliminate a grey check. Never infer merge approval from the absence of skips or from a green CI panel.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.

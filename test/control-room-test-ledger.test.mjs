@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   aggregateTestLedger,
+  fetchAllCheckRuns,
   buildTestLedger,
   mapCheckState,
   selectLatestChecks,
@@ -116,4 +117,50 @@ test('reports failed native checks without becoming a duplicate merge authority'
   assert.equal(ledger.aggregate.state, 'failed');
   assert.equal(ledger.aggregate.counts.failed, 1);
   assert.equal(ledger.runner.authoritativeForMerge, false);
+});
+
+test('newer queued check attempt supersedes an older completed check on the same exact head', () => {
+  const checks = selectLatestChecks([
+    check({ id: 101, name: 'Required Gate', completed_at: '2026-08-04T20:10:00Z' }),
+    check({ id: 102, name: 'Required Gate', status: 'queued', conclusion: null, started_at: null, completed_at: null }),
+  ], SHA);
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].state, 'queued');
+  assert.equal(checks[0].id, '102');
+});
+
+test('paginates complete check-run snapshots and preserves all provider IDs', async () => {
+  const runs = Array.from({ length: 101 }, (_, i) => check({ id: i + 1 }));
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => ({
+      total_count: runs.length,
+      check_runs: url.searchParams.get('page') === '1' ? runs.slice(0, 100) : runs.slice(100),
+    }),
+  });
+  assert.equal(fetched.length, 101);
+  assert.equal(new Set(fetched.map(({ id }) => id)).size, 101);
+});
+
+test('refuses partial, duplicate, malformed, and saturated check-run snapshots', async () => {
+  const base = { repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token' };
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({ total_count: 3, check_runs: [check({ id: 1 })] }),
+  }), /incomplete/u);
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({ check_runs: [check({ id: 1 })] }),
+  }), /invalid or incomplete shape/u);
+  const first = Array.from({ length: 100 }, (_, i) => check({ id: i + 1 }));
+  await assert.rejects(fetchAllCheckRuns({
+    ...base,
+    getJson: async (url) => ({
+      total_count: 101,
+      check_runs: url.searchParams.get('page') === '1' ? first : [check({ id: 1 })],
+    }),
+  }), /duplicate IDs/u);
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({
+      total_count: 1000, check_runs: first,
+    }),
+  }), /1000-record limit/u);
 });

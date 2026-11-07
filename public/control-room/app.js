@@ -114,7 +114,9 @@ async function api(path, opts = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
+    const err = new Error(body?.error ?? `Request failed (${res.status})`);
+    err.code = body?.code;
+    throw err;
   }
 
   return body;
@@ -135,6 +137,29 @@ async function guarded(action) {
 }
 
 // ─── small utilities ─────────────────────────────────────────────────────────
+
+// Pending patch-commit intents, one per mission: the payload the key was minted
+// for. The key is a random UUID per payload — no hash, so two different payloads
+// can never share a key and collide on the server's ledger.
+const patchCommitIntents = new Map();
+
+function patchIntentFor(missionId, payload) {
+  const current = patchCommitIntents.get(missionId);
+  if (current && current.payload === payload) return current;
+  const next = { payload, key: `${missionId}-patch-${crypto.randomUUID()}` };
+  patchCommitIntents.set(missionId, next);
+  return next;
+}
+
+// Server rejection codes that permanently poison an idempotency key. A retry
+// must mint a fresh key instead of looping on the dead one.
+// ACTION_ALREADY_PENDING is deliberately absent: the reservation exists, and a
+// new key would double-commit.
+const POISONED_KEY_CODES = new Set([
+  'ACTION_PREVIOUSLY_FAILED',
+  'IDEMPOTENCY_SCOPE_MISMATCH',
+  'PATCH_COMMIT_FAILED',
+]);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => (
@@ -229,6 +254,7 @@ const TABS = [
 // they are deliberately not `.tabs button[data-tab]` so the tab router never
 // treats them as in-app tabs.
 const SURFACE_LINKS = [
+  ['Build · GitHub', '/control-room/github-workspace.html'],
   ['Content', '/control-room/content-manager.html'],
   ['Automation', '/control-room/command-bridge.html'],
   ['Integrations', '/control-room/plugin-center.html'],
@@ -569,10 +595,14 @@ function renderProjectsTab(mount) {
       <div class="card" data-slug="${escapeHtml(p.slug)}">
         <div class="meta">${escapeHtml(p.repo_provider)} · ${riskBadge(p.risk_level)} · ${escapeHtml(p.status)}</div>
         <div class="title">${escapeHtml(p.name)} <span class="muted mono">(${escapeHtml(p.slug)})</span></div>
+        <a class="link-button" href="/control-room/github-workspace.html?project=${encodeURIComponent(p.slug)}" aria-label="Open ${escapeHtml(p.name)} GitHub workspace">Open workspace ↗</a>
       </div>
     `).join('');
     list.querySelectorAll('.card').forEach((card) => {
-      card.addEventListener('click', () => selectProject(card.dataset.slug));
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        selectProject(card.dataset.slug);
+      });
     });
   }
 
@@ -617,6 +647,7 @@ function renderProjectDetail(mount) {
 
   panel.innerHTML = `
     <h2>${escapeHtml(p.project.name)} <span class="muted mono">(${escapeHtml(p.project.slug)})</span></h2>
+    <p><a href="/control-room/github-workspace.html?project=${encodeURIComponent(p.project.slug)}">Open this project's GitHub Workspace ↗</a> · <a href="/control-room/?tab=terminal">Guarded terminal</a></p>
     ${p.liveError ? `<p class="error">Live repository fetch failed: ${escapeHtml(p.liveError)}</p>` : ''}
     ${p.live ? `<p class="muted">Default branch: <span class="mono">${escapeHtml(p.live.defaultBranch)}</span></p>` : ''}
 
@@ -1014,11 +1045,23 @@ function renderMissionDetail(mount) {
     const content = panel.querySelector('#mission-file-editor').value;
     const message = panel.querySelector('#mission-commit-message').value.trim() || `Edit ${path}`;
     if (!path) { setBanner('error', 'Path is required.'); render(); return; }
+    // One idempotency key per exact payload, tracked per mission. Double-clicks
+    // and retries after a network error resend the same payload, so they reuse
+    // the same key and the server replays instead of committing twice.
+    // A changed payload mints a new key.
+    const payload = JSON.stringify({ path, message, content });
+    const intent = patchIntentFor(mission.id, payload);
     guarded(async () => {
-      await api(`/approvals/${mission.id}/patch`, {
-        method: 'POST',
-        body: JSON.stringify({ message, idempotencyKey: `${mission.id}-patch-${Date.now()}`, changes: [{ path, content }] }),
-      });
+      try {
+        await api(`/approvals/${mission.id}/patch`, {
+          method: 'POST',
+          body: JSON.stringify({ message, idempotencyKey: intent.key, changes: [{ path, content }] }),
+        });
+      } catch (err) {
+        if (POISONED_KEY_CODES.has(err.code)) patchCommitIntents.delete(mission.id);
+        throw err;
+      }
+      patchCommitIntents.delete(mission.id);
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });
   });

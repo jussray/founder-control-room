@@ -1,5 +1,7 @@
 # Founder Merge Authority
 
+Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
+
 ## Current founder decision
 
 Juss grants Founder Control Room and its governed operators the merge capability/authority class, but **does not grant standing approval to execute any specific merge**.
@@ -181,6 +183,12 @@ Merge authority and exact-candidate merge approval do not automatically authoriz
 
 Those actions still require their own exact approval unless a later founder directive explicitly grants standing authority for that category.
 
+## GitHub native Auto-merge — founder-selected queue
+
+When the founder explicitly selects **Enable auto-merge** on a specific pull request, GitHub may queue that PR for automatic integration after *all configured required* reviews, exact-head checks, tests, and branch protection or merge-queue conditions succeed. The founder should not have to perform a second manual merge click once every actual provider gate permits integration. Optional workflows are **not** implicitly required by GitHub: keep each load-bearing workflow/job wired to an authoritative required status check or required aggregate gate. Source declarations are not proof of live GitHub ruleset configuration.
+
+The queue request is **not** proof that merge happened, does not waive founder-final exact PR/base/head approval where required by the canonical FCR authority membrane, and grants no deployment or other mutation. PR Continuity may observe `auto_merge_intent: QUEUED` from provider readback, but its `merge_approved` and `authorizes_merge` fields remain false. A merge conflict, draft state, stale review, changed base/head, incomplete required check, or missing applicable approval must block integration; do not force-merge, auto-fabricate receipts, silently rebase, or downgrade rules. A new candidate requires fresh exact-head verification and approvals. GitHub's native Auto-merge machinery—not PR Continuity or an AI agent—performs any eventual merge.
+
 ## Operating rule
 
 Do not merge merely because a PR exists, because a badge looks green, because `merge_authority` is true, or because the founder asked for review/implementation. **Before every merge, ask for and obtain explicit founder approval for the exact current repository, PR, base SHA, and head SHA unless that exact approval is already present and still current.**
@@ -195,3 +203,10 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## No-silent-skips required-test gate
 
 For every exact-head PR, `.github/workflows/ci.yml` must execute its load-bearing `Test` job with machine-readable Vitest results. `scripts/verify-vitest-no-skips.mjs` must fail the Test job when any discovered test is skipped, pending, todo, failed, or missing executable assertion evidence. `Required Gate` continues to depend on Test without renaming the required status check. A skipped required test is a merge blocker, never a pass. Event-scoped production, PR-close cleanup, provider preview, and authorized deployment jobs must retain their own guards; their inapplicability cannot be promoted into test proof or merge approval.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.
+
+Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.

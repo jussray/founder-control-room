@@ -1,5 +1,7 @@
 # Founder Control Room Global AI Contract
 
+For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
+
 ## Parent operating contract
 
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
@@ -92,6 +94,7 @@ Implementation rules:
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
 - A pull-request Quality Gate must checkout and verify `github.event.pull_request.head.sha` in every job; a successful synthetic PR merge-ref run is merge-simulation evidence, never exact-head candidate proof.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
+- FCR CI must keep the workflow-file YAML parse check (`scripts/verify_workflow_yaml.py` in `python-tests`) load-bearing on the exact head; a passing parse check is syntax evidence and does not substitute for GitHub workflow acceptance or provider readback.
 - Repository branch creation through `src/http/routes/approvals.ts` must use fresh `create_branch` proof plus the authenticated exact execute request to issue a server-owned `AuthorityEnvelopeV1`, with the authority lifetime beginning at the server-observed execute request time rather than the proof receipt timestamp; FCR must reserve the idempotent execution before mutation, re-read mission state immediately before the write, and pass the original envelope through `executeAuthorizedCreateBranch()`; direct provider branch creation from that route is forbidden.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
@@ -182,6 +185,10 @@ Investor email remains separate. Never auto-send without both the applicable sta
 - Founder authorization requires both a valid session and founder allowlist. Authentication alone is not authorization.
 - Every material read, proposal, approval, integration, deployment, rollback, publication, and provider action should leave an auditable event.
 - No authority class silently grants another.
+
+## Founder-selected GitHub Auto-merge queue
+
+The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. Native queue intent is not a replacement for the canonical exact-repo/PR/base/head founder-final approval receipt; stale heads, conflicts, missing approval, or provider uncertainty remain blocked. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
 
 ## FCR merge review boundary
 
@@ -281,3 +288,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## Required executed-test evidence
 
 The required FCR `Test` job must keep `npm test` inside the existing `Required Gate` dependency and verify a machine-readable exact-head Vitest execution report before returning success. Pending, skipped, todo, malformed, missing, and zero-test reports remain nonpassing evidence, including when summary counts disagree with individual assertions. Preserve standalone runtime witnesses, production-only jobs, and PR-close cleanup event guards; an out-of-scope job does not become passed merely because it was intentionally skipped. This policy conveys no merge, deploy, or provider-write authority. The source contract is `docs/REQUIRED_TEST_EXECUTION.md`.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
