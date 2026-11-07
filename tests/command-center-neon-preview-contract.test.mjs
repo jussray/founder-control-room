@@ -21,7 +21,10 @@ test('Neon preview executes the actual migration but rolls back all fixtures', (
   assert.match(sql, /\bROLLBACK;/i);
   assert.doesNotMatch(sql, /\bCOMMIT;/i);
   for (const name of ['fcr_public_tenants','fcr_public_memberships','fcr_public_projects']) {
-    assert.match(sql, new RegExp('relname = ' + "'" + name + "'", 'i'));
+    assert.match(sql, new RegExp("'" + name + "'", 'i'));
+  }
+  assert.match(sql, /FOREACH rel_name IN ARRAY/i);
+  assert.match(sql, /format\('public\.%I', rel_name\)/i);
   }
 });
 
