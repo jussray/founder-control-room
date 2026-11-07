@@ -37,3 +37,29 @@ describe('AI Inbox observation-only routing', () => {
     expect(decision).not.toHaveProperty('archive');
   });
 });
+
+
+describe('AI Inbox response safety triage', () => {
+  it('holds possible human replies for review without claiming substantive response', () => {
+    const decision = classifyAiInboxMessage({ ...base, replySignal: true, subject: 'Re: Business proposal' });
+    expect(decision.lane).toBe('reply_candidate');
+    expect(decision.requiresHumanReview).toBe(true);
+    expect(decision.evidence).toBe('message_only');
+  });
+  it('routes unsubscribe signals before any possible reply classification', () => {
+    const decision = classifyAiInboxMessage({ ...base, replySignal: true, subject: 'Please unsubscribe' });
+    expect(decision.lane).toBe('suppression_review');
+    expect(decision.requiresHumanReview).toBe(true);
+  });
+  it('does not treat an automated notice as a substantive buyer or government reply', () => {
+    const decision = classifyAiInboxMessage({ ...base, replySignal: true, automated: true, subject: 'Re: Your request' });
+    expect(decision.lane).toBe('automated_notice');
+    expect(decision.requiresHumanReview).toBe(false);
+  });
+  it('preserves explicit project routing but does not infer another brand from subject text', () => {
+    const decision = classifyAiInboxMessage({ ...base, projectSlug: 'jbh-private', subject: 'Se’kret Bip investor question' });
+    expect(decision.projectSlug).toBe('jbh-private');
+    expect(decision.projectId).toBeNull();
+    expect(decision.lane).toBe('review');
+  });
+});
