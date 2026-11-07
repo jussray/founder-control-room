@@ -9,13 +9,13 @@ describe('QuickScan non-chargeable pilot assessment', () => {
   it('never accepts caller authorization without a server-authenticated founder', () => {
     expect(assessQuickScanSandboxPilot(false, input()).allowed).toBe(false);
   });
-  it('marks caller delivery as unverified even for authenticated founder', () => {
+  it('holds caller delivery as DELIVERY_UNVERIFIED even for authenticated founder', () => {
     const result = assessQuickScanSandboxPilot(true, input());
-    expect(result.allowed).toBe(true);
-    expect(result.allowed).toBe(true);
-    if (!result.allowed) throw new Error('expected allowed sandbox assessment');
-    expect(result.receipt.deliveryVerified).toBe(false);
-    expect(result.receipt.independentlyVerified).toBe(false);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('DELIVERY_UNVERIFIED');
+    if (!('candidate' in result)) throw new Error('expected unverified candidate');
+    expect(result.candidate.deliveryVerified).toBe(false);
+    expect(result.candidate.independentlyVerified).toBe(false);
   });
   it('cannot be used to request payment or production authority', () => {
     expect(assessQuickScanSandboxPilot(true, { ...input(), chargeRequested: true }).allowed).toBe(false);
