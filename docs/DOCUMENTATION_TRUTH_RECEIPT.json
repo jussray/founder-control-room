@@ -566,6 +566,18 @@
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
       ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` must set `FOUNDER_ALLOWED_ORIGINS` to exactly `https://foundercontrolroom.org,https://checkout.foundercontrolroom.org`, recognizing the checkout subdomain as an allowed browser origin alongside the apex; this source configuration does not prove the value is deployed or that the checkout origin serves live production traffic."
+      ]
+    },
+    {
+      "path": "scripts/verify-production-deploy-authority.mjs",
+      "claims": [
+        "`scripts/verify-production-deploy-authority.mjs` must expect `FOUNDER_ALLOWED_ORIGINS` to equal `https://foundercontrolroom.org,https://checkout.foundercontrolroom.org`, so production deploy-authority proof fails closed whenever the recognized browser origins drift from the canonical Worker configuration."
+      ]
     }
   ]
 }
