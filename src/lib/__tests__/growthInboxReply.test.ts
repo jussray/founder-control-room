@@ -3,6 +3,7 @@ import {
   growthInboxReplyStatus,
   sendGmailReply,
   gmailInboxReadStatus,
+  probeGmailInbox,
   readGmailInbox,
   sendWhatsAppReply,
 } from '../growthInboxReply.js';
@@ -269,5 +270,83 @@ describe('scoped reply compatibility', () => {
     await expect(sendGmailReply({ messageId: 'msg1', body: 'Hello' }, fetchMock))
       .rejects.toThrow('GMAIL_REPLY_LABEL_SCOPE_MISMATCH');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe('Gmail inbox provider readiness probe', () => {
+  it('checks only the pinned mailbox profile and custom label without reading messages', async () => {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_INBOX_PROJECT_SLUG = 'founder-control-room';
+    process.env.FCR_GMAIL_INBOX_LABEL_ID = 'Label_business';
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'Label_business', type: 'user' }));
+    const result = await probeGmailInbox(fetchMock);
+    expect(result).toMatchObject({
+      contract: 'fcr/gmail-inbox-probe@v1',
+      mode: 'observe_only',
+      accountId: 'founder@example.com',
+      projectSlug: 'founder-control-room',
+      labelId: 'Label_business',
+      providerObserved: true,
+    });
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels/Label_business',
+    ]);
+    expect(fetchMock.mock.calls.every(([,init]) => !init || !init.method || init.method === 'GET')).toBe(true);
+  });
+
+  it('fails closed when the Google label does not match the approved custom label', async () => {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_INBOX_PROJECT_SLUG = 'founder-control-room';
+    process.env.FCR_GMAIL_INBOX_LABEL_ID = 'Label_business';
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'INBOX', type: 'system' }));
+    await expect(probeGmailInbox(fetchMock)).rejects.toThrow('GMAIL_INBOX_LABEL_SCOPE_MISMATCH');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Gmail send uncertainty containment', () => {
+  function setup() {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_FROM_EMAIL = 'founder@example.com';
+    delete process.env.FCR_GMAIL_INBOX_LABEL_ID;
+  }
+  function inbound() {
+    return jsonResponse({
+      id: 'msg1', threadId: 'thread1',
+      payload: { headers: [
+        { name: 'From', value: 'Customer <customer@example.net>' },
+        { name: 'Subject', value: 'Question' },
+      ] },
+    });
+  }
+  it('treats network failure at the Gmail send boundary as unknown instead of safely failed', async () => {
+    setup();
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(inbound())
+      .mockRejectedValueOnce(new Error('connection reset after send'));
+    await expect(sendGmailReply({ messageId: 'msg1', body: 'Reply' }, fetchMock))
+      .rejects.toThrow('GMAIL_SEND_OUTCOME_UNKNOWN');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it('treats a provider-accepted send with failed readback as unknown', async () => {
+    setup();
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(inbound())
+      .mockResolvedValueOnce(jsonResponse({ id: 'sent1', threadId: 'thread1' }))
+      .mockRejectedValueOnce(new Error('receipt endpoint unavailable'));
+    await expect(sendGmailReply({ messageId: 'msg1', body: 'Reply' }, fetchMock))
+      .rejects.toThrow('GMAIL_SEND_OUTCOME_UNKNOWN');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
