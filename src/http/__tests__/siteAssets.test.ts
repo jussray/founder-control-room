@@ -36,7 +36,15 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).toContain('id="community-f" aria-labelledby="founder-community-title"');
     expect(landing).toContain('<h3 id="founder-community-title">Founder Community</h3>');
     expect(landing).toContain('<script src="/fcr-public-tabs.js" defer></script>');
+    // CSP remains strict: no inline script tags, including JSON-LD.
     expect(landing).not.toMatch(/<script\b(?![^>]*\bsrc=)/i);
+    expect(landing).toContain('<link rel="alternate" type="application/ld+json" href="https://www.foundercontrolroom.org/site-identity.json" />');
+    const graph = JSON.parse(read('public/site-identity.json')) as {
+      '@context': string;
+      '@graph': Array<{ '@type': string }>;
+    };
+    expect(graph['@context']).toBe('https://schema.org');
+    expect(graph['@graph'].map(item => item['@type'])).toEqual(['Organization', 'WebSite']);
     const tabController = read('public/fcr-public-tabs.js');
     expect(tabController).toContain("addEventListener('keydown'");
     expect(tabController).toContain("addEventListener('hashchange'");

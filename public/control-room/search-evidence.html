@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Private founder workspace for Google Search Console indexing observations and evidence-gap analysis.">
+<title>Search &amp; Evidence · Founder Control Room</title>
+<link rel="stylesheet" href="/control-room/styles.css">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#080e1a;color:#ecf3ff;font:16px/1.5 system-ui,-apple-system,sans-serif}
+main{width:min(1150px,calc(100% - 2rem));margin:0 auto;padding:2rem 0 4rem}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+a{color:#a5d8ff}h1{font-size:clamp(1.8rem,5vw,2.8rem);margin:.2rem 0}h2{margin:0 0 .65rem}
+.lead{color:#bac8dd;max-width:70ch}.grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.3rem}
+.card{padding:1.4rem;border:1px solid #34455f;background:#111d30;border-radius:17px;min-width:0}
+small,.muted{color:#b6c5dd}input,textarea,select{display:block;width:100%;border:1px solid #50617b;background:#071221;color:#fff;font:inherit;padding:.65rem;border-radius:9px}
+label{display:block;font-weight:700;margin:.8rem 0}label small{display:block;font-weight:400;margin:.1rem 0 .3rem}
+textarea{min-height:100px;resize:vertical}button{border:1px solid #8bafff;background:#3556ac;color:#fff;font:700 1rem system-ui;padding:.7rem 1rem;border-radius:9px;cursor:pointer}
+button:hover{background:#4168c9}button:disabled{opacity:.5;cursor:progress}
+button.secondary{background:#15243d}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #c6a8ff;outline-offset:3px}
+.status{padding:.75rem;border-radius:9px;background:#0c1728;color:#dce8ff;word-break:break-word}
+.status[data-state="blocked"]{border:1px solid #e59b86}.status[data-state="observed"]{border:1px solid #75d8ab}
+ul{padding-left:1.35rem}li{margin:.3rem 0;overflow-wrap:anywhere}
+.item{border-top:1px solid #34455f;padding:.65rem 0;overflow-wrap:anywhere}.item strong{display:block}
+.tag{display:inline-block;font-size:.74rem;padding:.1rem .42rem;border:1px solid #7f9ac6;border-radius:999px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
+.evidence-item{padding:.5rem;border:1px solid #34455f;border-radius:10px;margin:.5rem 0}
+.consent{display:flex;align-items:flex-start;gap:.6rem;font-weight:500}.consent input{width:1rem;flex:0 0 auto;margin:.35rem 0}
+@media(max-width:820px){.grid{grid-template-columns:1fr}.card{padding:1rem}} 
+</style>
+</head>
+<body>
+<nav style="padding:1rem;text-align:center"><a href="/control-room/?tab=truth-seo">Canonical Search Console panel</a> · <a href="/control-room/?tab=truth-ai-review">Canonical evidence review</a></nav>
+<main>
+<header><div><small>FOUNDER CONTROL ROOM · PRIVATE INTELLIGENCE</small><h1>Search &amp; Evidence</h1></div><a href="/control-room/">← Return to Control Room</a></header>
+<p class="lead">Check what Google Search Console actually reports for the published FCR site. Pressure-test an evidence-backed claim with Cloudflare AI Gateway. Neither panel verifies a release or acts on your project.</p>
+<div class="grid">
+<section class="card" aria-labelledby="search-heading">
+<h2 id="search-heading">Search Console monitoring</h2>
+<p class="muted">Published canonical site: <a href="https://www.foundercontrolroom.org/" rel="noreferrer">www.foundercontrolroom.org</a>. Shows submitted sitemap processing and a <strong>five-URL sample</strong> of Google indexing verdicts, not sitewide coverage.</p>
+<button id="search-refresh" type="button">Refresh live Search Console readback</button>
+<p id="search-status" class="status" role="status" aria-live="polite">Not checked. Connection status unknown.</p>
+<div id="search-results" aria-live="polite"></div>
+</section>
+<section class="card" aria-labelledby="claim-heading">
+<h2 id="claim-heading">Claim evidence review</h2>
+<p class="muted">Owner-only advisory analysis. Provide a project claim and evidence. The model identifies gaps, challenging questions, and a recommended next gate. It cannot approve or publish.</p>
+<form id="claim-form">
+<label>Registered project slug <small>Founder-controlled projects only</small><input name="projectSlug" required maxlength="90" value="founder-control-room" pattern="[a-z0-9]+(-[a-z0-9]+)*" autocomplete="off"></label>
+<label>Claim <textarea name="claim" required minlength="10" maxlength="4500" placeholder="What do you believe is true?"></textarea></label>
+<div class="row"><strong>Supporting evidence</strong><button type="button" class="secondary" id="add-evidence">Add evidence</button></div>
+<div id="evidence-list">
+<div class="evidence-item"><label>Source <input name="source" maxlength="400" placeholder="Source name, reference or URL" required></label><label>Observed fact <textarea name="observation" maxlength="1000" required placeholder="What the source directly establishes, and at what scope"></textarea></label></div>
+</div>
+<label class="consent"><input type="checkbox" name="shareEvidenceWithModel" required><span>I authorize sending this claim and evidence to the configured AI model through Cloudflare AI Gateway. I have removed secrets and personal data not needed for this analysis.</span></label>
+<button type="submit" id="claim-submit">Analyze evidence gaps</button>
+</form>
+<p id="claim-status" class="status" role="status" aria-live="polite">No claim sent. Model availability unknown.</p>
+<div id="claim-results" aria-live="polite"></div>
+</section>
+</div>
+<p class="muted">Data classifications: <strong>OBSERVED</strong> = Search Console API readback; <strong>ADVISORY</strong> = unverified model assessment; <strong>BLOCKED</strong> = credentials, permission, quota, network, or authorization not established. Private endpoints use no-store.</p>
+</main>
+<script type="module" src="/control-room/search-evidence.js"></script>
+</body></html>

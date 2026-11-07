@@ -98,10 +98,14 @@ export async function renderEvidenceIntelligence(root){
    if(fields.length===12)add.disabled=true;
  };
  add.addEventListener('click',addField);addField();
+ const consentLabel=node('label','I explicitly authorize sending this claim and evidence to the configured AI model. I have removed secrets and unrelated personal data.');
+ const consent=node('input');
+ consent.type='checkbox';consent.required=true;consent.setAttribute('aria-label','Authorize evidence transfer to AI Gateway');
+ consentLabel.prepend(consent);
  const status=node('p','FCR does not save or publish this submission. Your claim and evidence are sent through Cloudflare AI Gateway to the configured model provider, which may process them under its policies. Do not enter secrets or private customer data.','muted');
  status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const result=node('section');
- form.append(group,add,submit,status);
+ form.append(group,add,consentLabel,submit,status);
  view.append(form,result);
  form.addEventListener('submit',async ev=>{
    ev.preventDefault();submit.disabled=true;result.replaceChildren();
@@ -112,7 +116,7 @@ export async function renderEvidenceIntelligence(root){
      text:field.querySelector('[name=text]').value
    })).filter(x=>x.source.trim()&&x.text.trim());
    try{
-     const data=await request(BASE+'/review',{claim:claim.value,evidence});
+     const data=await request(BASE+'/review',{claim:claim.value,evidence,shareEvidenceWithModel:consent.checked});
      status.textContent='Advisory result · '+String(data.checkedAt??'unknown')+
        ' · '+String(data.model??'model unavailable');
      list(result,'Evidence gaps',(data.gaps??[]).map(x=>String(x.issue)+' · refs: '+

@@ -28,13 +28,15 @@
     "/robots.txt",
     "/sitemap.xml",
     "/llms.txt",
-    "/crawlers.json"
+    "/crawlers.json",
+    "/site-identity.json"
   ],
   "public_truth": {
     "sitemap": "https://www.foundercontrolroom.org/sitemap.xml",
     "llms": "https://www.foundercontrolroom.org/llms.txt",
     "founder_profile": "https://www.foundercontrolroom.org/juss-rayy/",
-    "work_directory": "https://www.foundercontrolroom.org/work.html"
+    "work_directory": "https://www.foundercontrolroom.org/work.html",
+    "site_identity": "https://www.foundercontrolroom.org/site-identity.json"
   },
   "attribution": {
     "requested": true,
