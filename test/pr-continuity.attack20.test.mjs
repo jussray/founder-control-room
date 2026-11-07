@@ -91,12 +91,15 @@ test('auto-merge intent distinguishes queued, not queued, and provider-unknown w
   }
 });
 
-test('auto-merge click or cancellation triggers authoritative continuity metadata refresh', () => {
-  const workflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-  assert.match(workflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
-  assert.match(workflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
-  assert.match(workflow, /permissions: \{\}/);
-  assert.match(workflow, /name: PR Continuity Metadata Receipt/);
+test('auto-merge click or cancellation triggers event-separated continuity audit and trusted metadata refresh', () => {
+  const auditWorkflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+  const metadataWorkflow = readFileSync('.github/workflows/pr-continuity-metadata.yml', 'utf8');
+  assert.match(metadataWorkflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(auditWorkflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(auditWorkflow, /permissions: \{\}/);
+  assert.match(metadataWorkflow, /permissions: \{\}/);
+  assert.match(metadataWorkflow, /name: PR Continuity Metadata Receipt/);
+  assert.doesNotMatch(auditWorkflow, /pull_request_target:/);
 });
 
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
@@ -187,22 +190,36 @@ function assertExactJobSkipGuard(source, name, expected) {
   assert.deepEqual(conditions, ['    if: ' + expected], 'Unsafe or missing job-level if on ' + name);
   return job;
 }
-test('CI-SKIP FCR01 exact-head and privileged metadata retain separated events', () => {
-  const source = skipPolicyWorkflow('pr-continuity.yml');
-  const audit = assertExactJobSkipGuard(source, 'exact-head-audit', "github.event_name == 'pull_request'");
-  const metadata = assertExactJobSkipGuard(source, 'metadata-receipt', "github.event_name == 'pull_request_target'");
+test('CI-SKIP FCR01 exact-head and privileged metadata use separate event workflows', () => {
+  const auditSource = skipPolicyWorkflow('pr-continuity.yml');
+  const metadataSource = skipPolicyWorkflow('pr-continuity-metadata.yml');
+  assert.match(auditSource, /^  pull_request:/m);
+  assert.doesNotMatch(auditSource, /^  (pull_request_target|push|workflow_dispatch):/m);
+  const audit = skipPolicyJob(auditSource, 'exact-head-audit');
+  assert.doesNotMatch(audit, /^    if:/m, 'PR-only audit must execute, not skip');
   assert.match(audit, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.doesNotMatch(auditSource, /^  metadata-receipt:/m);
+
+  assert.match(metadataSource, /^  pull_request_target:/m);
+  assert.doesNotMatch(metadataSource, /^  (pull_request|push|workflow_dispatch):/m);
+  const metadata = skipPolicyJob(metadataSource, 'metadata-receipt');
+  assert.doesNotMatch(metadata, /^    if:/m, 'target-only metadata job must execute, not skip');
   assert.match(metadata, /ref:.*github\.sha/);
   assert.doesNotMatch(metadata, /ref:.*github\.event\.pull_request\.head\.sha/);
   assert.match(metadata, /^    permissions:\n      contents: read\n      pull-requests: write$/m);
+  assert.doesNotMatch(metadataSource, /^  exact-head-audit:/m);
 });
-test('CI-SKIP FCR02 rollover remains restricted to main events', () => {
-  assertExactJobSkipGuard(
-    skipPolicyWorkflow('pr-continuity.yml'),
-    'rollover',
-    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')",
-  );
+
+test('CI-SKIP FCR02 rollover remains in a main-scoped workflow', () => {
+  const source = skipPolicyWorkflow('pr-continuity-rollover.yml');
+  assert.match(source, /^  push:\n    branches: \[main\]$/m);
+  assert.match(source, /^  workflow_dispatch:/m);
+  assert.doesNotMatch(source, /^  pull_request(_target)?:/m);
+  const rollover = assertExactJobSkipGuard(source, 'rollover', "github.ref == 'refs/heads/main'");
+  assert.match(rollover, /^    permissions:\n      contents: write\n      pull-requests: write$/m);
+  assert.match(rollover, /node scripts\/pr-continuity-rollover-observation\.mjs/);
 });
+
 test('CI-SKIP FCR03 production witness needs successful main deploy event', () => {
   const workflow = skipPolicyWorkflow('playwright.yml');
   assertExactJobSkipGuard(workflow, 'playwright', "github.event_name != 'workflow_run'");
@@ -213,37 +230,54 @@ test('CI-SKIP FCR03 production witness needs successful main deploy event', () =
   );
   assert.match(production, /^    environment: production$/m);
 });
-test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
-  const workflow = skipPolicyWorkflow('neon-pr-branches.yml');
-  const create = skipPolicyJob(workflow, 'create_neon_branch');
-  const cleanup = skipPolicyJob(workflow, 'delete_neon_branch');
-  assert.match(create, /github\.event\.action == 'opened'/);
-  assert.match(create, /github\.event\.action == 'synchronize'/);
-  assert.match(cleanup, /github\.event\.action == 'closed'/);
-  assert.match(cleanup, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(cleanup, /^    if: \|$/m);
-  assert.doesNotMatch(cleanup, /if: always\(\)/);
+test('CI-SKIP FCR04 Neon creation and deletion are event-specific, without broadening cleanup authority', () => {
+  const creation = skipPolicyWorkflow('neon-pr-branches.yml');
+  const cleanup = skipPolicyWorkflow('neon-pr-close-cleanup.yml');
+  assert.match(creation, /^  pull_request:\n    types: \[opened, reopened, synchronize\]$/m);
+  assert.match(cleanup, /^  pull_request:\n    types: \[closed\]$/m);
+  assert.doesNotMatch(creation, /^  delete_neon_branch:/m);
+  assert.doesNotMatch(cleanup, /^  create_neon_branch:/m);
+  const createJob = skipPolicyJob(creation, 'create_neon_branch');
+  const deleteJob = skipPolicyJob(cleanup, 'delete_neon_branch');
+  assert.match(createJob, /github\.event\.action == 'opened'/);
+  assert.match(createJob, /github\.event\.action == 'synchronize'/);
+  assert.match(deleteJob, /github\.event\.action == 'closed'/);
+  assert.match(deleteJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(deleteJob, /^    if: \|$/m);
+  assert.doesNotMatch(deleteJob, /if: always\(\)/);
 });
-test('CI-SKIP FCR05 release contract is PR-tested, provenance is gated', () => {
-  const workflow = skipPolicyWorkflow('main-release-provenance.yml');
-  assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
-  const provenance = assertExactJobSkipGuard(workflow, 'provenance', "${{ github.event_name != 'pull_request' }}");
+test('CI-SKIP FCR05 separates PR contract from privileged main provenance without fake passes', () => {
+  const main = skipPolicyWorkflow('main-release-provenance.yml');
+  const pr = skipPolicyWorkflow('main-release-provenance-pr.yml');
+
+  assert.match(main, /^  push:\n    branches: \[main\]$/m);
+  assert.match(main, /^  workflow_dispatch:/m);
+  assert.doesNotMatch(main, /^  pull_request:/m);
+  assert.match(skipPolicyJob(main, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  const provenance = skipPolicyJob(main, 'provenance');
+  assert.doesNotMatch(provenance, /^    if:/m, 'main-only provenance must not create skipped PR checks');
   assert.match(provenance, /^    needs: contract$/m);
+
+  assert.match(pr, /^  pull_request:\n    branches: \[main\]$/m);
+  assert.doesNotMatch(pr, /^  push:|^  workflow_dispatch:|^  pull_request_target:/m);
+  assert.match(pr, /TARGET_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const prContract = skipPolicyJob(pr, 'contract');
+  assert.match(prContract, /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  assert.match(prContract, /ref: \$\{\{ env\.TARGET_SHA \}\}/);
+  assert.doesNotMatch(pr, /^  provenance:/m, 'PR validation must never run main release provenance');
 });
-test('CI-SKIP FCR06 reject unconditional and widened metadata expressions', () => {
-  const source = skipPolicyWorkflow('pr-continuity.yml');
-  const original = "if: github.event_name == 'pull_request_target'";
-  for (const replacement of [
-    'if: always()',
-    original + ' || true',
-    original + " || github.event_name == 'pull_request'",
-    'if: >',
-  ]) {
-    const mutant = source.replace(original, replacement);
+
+test('CI-SKIP FCR06 metadata workflow refuses PR-head code and any untrusted event', () => {
+  const source = skipPolicyWorkflow('pr-continuity-metadata.yml');
+  assert.match(source, /^  pull_request_target:/m);
+  assert.doesNotMatch(source, /^  pull_request:|^  push:|^  workflow_dispatch:/m);
+  const metadata = skipPolicyJob(source, 'metadata-receipt');
+  assert.match(metadata, /ref:.*github\.sha/);
+  assert.doesNotMatch(metadata, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.doesNotMatch(source, /^  exact-head-audit:|^  rollover:/m);
+  for (const unsafe of ['  pull_request:', '  push:', '  workflow_dispatch:']) {
+    const mutant = source.replace('  pull_request_target:', unsafe);
     assert.notEqual(mutant, source);
-    assert.throws(
-      () => assertExactJobSkipGuard(mutant, 'metadata-receipt', "github.event_name == 'pull_request_target'"),
-      /Unsafe or missing job-level if/,
-    );
+    assert.doesNotMatch(mutant, /^  pull_request_target:/m);
   }
 });

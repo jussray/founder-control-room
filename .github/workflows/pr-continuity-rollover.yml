@@ -1,0 +1,43 @@
+name: PR Continuity Main Rollover
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pr-continuity-rollover-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rollover:
+    name: Roll Current Main Through Open PR Graph
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: "${{ github.sha }}"
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: node --test test/pr-continuity.attack20.test.mjs test/pr-continuity.rollover-observation.test.mjs
+      - env:
+          GITHUB_TOKEN: "${{ github.token }}"
+          GITHUB_REPOSITORY: "${{ github.repository }}"
+          ROOT_BASE_REF: main
+        run: node scripts/pr-continuity-rollover-observation.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: "pr-continuity-rollover-${{ github.sha }}"
+          path: artifacts/pr-continuity.json
+          if-no-files-found: ignore
+          retention-days: 14

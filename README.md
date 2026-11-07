@@ -579,6 +579,10 @@ StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902f
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+## Mandatory Vitest execution proof
+
+The required GitHub Actions `Test` job in `.github/workflows/ci.yml` must run every test discovered by the default Vitest suite, emit an exact-head JSON report, and fail when any unit/integration test is skipped, pending, todo, failed, missing, or not backed by assertion-level execution. The existing `Required Gate` depends on this Test job. The test-discovery ratchet prevents hidden test files; discovery alone does not prove execution. CI results and JSON artifacts do not grant merge or deployment authority. Conditional cleanup and production-only workflows retain their separate authorization and event conditions; their skipped states never become passing proof. See `docs/REQUIRED_TEST_EXECUTION.md`.
+
 
 ## Portfolio conversion tracking contract
 

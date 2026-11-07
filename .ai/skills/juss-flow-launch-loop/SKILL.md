@@ -415,6 +415,10 @@ A committed regression test is source evidence only until the exact-head workflo
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
 
+## Execute every required test, never relabel skips
+
+During the review/verify loop, obtain the exact-head `Test` job and its machine-readable Vitest report from the existing `.github/workflows/ci.yml` gate. The job must reject skipped, pending, todo, malformed, missing, zero-test, and inconsistent assertion-level outcomes using `scripts/verify-vitest-no-skips.mjs`; the load-bearing `Required Gate` depends on that job. Verify source discovery separately. Keep production-only and cleanup workflows event-scoped, label not-applicable skips explicitly, and do not run privileged operations merely to eliminate a grey check. Never infer merge approval from the absence of skips or from a green CI panel.
+
 
 ## CI lockfile determinism — current exact-head source contract
 
