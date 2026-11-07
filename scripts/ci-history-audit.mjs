@@ -13,7 +13,7 @@ export function auditLedger(rows, runs, expectedSha) {
   const errors = [];
   const observed = runs.filter(r => r.head_sha === expectedSha && ['failure', 'cancelled'].includes(r.conclusion));
   for (const run of observed) {
-    const entry = rows.find(r => r.sha === expectedSha && r.runId === r.id && r.name === r.name);
+    const entry = rows.find(r => r.sha === expectedSha && r.runId === run.id && r.name === run.name);
     if (!entry) errors.push(`MISSING ${run.name} run ${run.id} (${run.conclusion})`);
     else if (entry.outcome !== run.conclusion) errors.push(`OUTCOME_MISMATCH ${run.id}`);
   }
