@@ -12,8 +12,11 @@ This contract applies before publishing, scheduling, sending, announcing, promot
 → Evidence check
 → Accounting-control check
 → Authorization check
+→ Temporal reuse check
 → Draft
 → Review or approved automation
+→ Issue exact-copy approval when the active route requires it
+→ Atomically claim that stored approval at execution
 → Publish or hold
 → Capture the published artifact
 → Record outcome evidence
@@ -47,6 +50,32 @@ One layer does not prove another. Do not describe committed code as deployed, a 
 
 A publication claim requires an observable platform artifact. A draft, scheduler acceptance, workflow trigger, or model response is not that artifact.
 
+Founder-content orchestration readiness is a separate preflight truth layer. An authenticated status surface may report whether n8n founder-content orchestration is enabled, whether required webhook/token configuration is present, which bounded providers are allowlisted, and whether Buffer is ready for one controlled probe. It must expose presence/state only, never secret values. Configuration alone does not prove a webhook executed, Buffer accepted a schedule, a post published, or provider readback succeeded. For the canonical conveyor, `enabled-live-verified` is allowed only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; if the runtime SHA moves, the receipt remains historical evidence but its live authority expires and readiness returns to a non-live proof-needed state. Missing runtime identity or receipt readback also fails closed.
+
+Founder-content orchestration must not reuse the generic conveyor activation receipt as Buffer proof. A founder-content `enabled-live-verified` state requires enabled/configured transport, a valid provider allowlist, Buffer enabled, and proof explicitly bound to `buffer` with a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. This source contract does not claim the live route currently has a Buffer proof reader.
+
+### Current Founder Content n8n source activation boundary
+
+The governed Founder Content rescue may set `N8N_FOUNDER_CONTENT_ENABLED=true` in candidate source, restrict the enabled provider to Buffer, and pin the expected workflow/runtime identity. That is **source intent only**. It does not prove the canonical Worker carrying those bindings was deployed, that the production n8n workflow was published, that the Supabase migrations were applied, that Buffer accepted a schedule, or that a public artifact exists. A successful isolated n8n runtime proof or webhook `202` remains execution-plane evidence; present-tense `live`, `used`, `scheduled`, or `published` language requires the corresponding exact deployed runtime and provider-native readback.
+
+### Postiz readback boundary
+
+The current Postiz MCP integration is a **readback lane**, not a publication actuator. FCR may use server-held Postiz authentication to list connected provider accounts and read Postiz-reported post status, but the bounded lifecycle adapter does not expose `schedulePostTool`, `publish_now`, or any other Postiz provider-write operation.
+
+A Postiz `PUBLISHED` state without a destination-native permalink or equivalent independently verified terminal platform artifact is provider-reported state only. It must not be used to tell the public, a collaborator, or another control surface that publication is proven. Any future Postiz scheduling or publication path must pass FCR's exact Current You approval, execution-time authority and temporal checks, durable reservation, provider mutation, and terminal provider readback rather than inheriting authority from the readback adapter. Componecat catalog/context evidence is likewise non-authorizing and cannot prove project execution, deployment, or publication.
+
+### YouTube growth evaluation boundary
+
+The authenticated `fcr/youtube-growth-evaluation@v1` route may evaluate fresh founder-supplied YouTube measurements and return `HOLD` or `ADVANCE` for the internal `TEST_AND_VALIDATE -> DOUBLE_DOWN -> SCALE` strategy loop. That result is observation and recommendation only. It cannot authorize publication, scheduling, spend, provider mutation, scale execution, merge, deploy, or a public claim that a YouTube outcome occurred.
+
+Malformed measurements, experiments, continuity fingerprints, thresholds, targets, unknown fields, and duplicate repeatability receipts must fail closed before evaluation. A growth recommendation is not proof that a video published, a channel reached YPP eligibility, revenue was earned, a Short converted to long-form viewing, or any provider-side state changed. Those claims require fresh authoritative provider or outcome evidence at the applicable use boundary.
+
+### Imported founder-content metric observations
+
+The authenticated founder-content CSV-import route is an observation intake boundary, not a metric-truth mint. Every normalized row must retain explicit content fingerprint, provider, account, page, audience segment, metric name, unit, measurement window, observation time, source, source reference, and row provenance. Blank metric values remain unknown evidence rather than synthetic zeroes. Exact duplicate rows may be idempotent; conflicting duplicate identities must fail closed instead of selecting a convenient value.
+
+Imported rows must be bound to the stored founder-content post identity before persistence. Raw CSV is not durable evidence. A database receipt is treated as untrusted input at the application boundary and must preserve `observation_only` authority with publication, freshness, and strategy-mutation authority all false. A parsed CSV, accepted database write, historical import, or stored observation proves only what it directly observed; a current numerical claim still requires fresh authoritative metric evidence at the use boundary.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -61,6 +90,21 @@ Still needing verification
 ```
 
 Corrections must be direct. Do not bury a mistake beneath promotional language or silently edit history when a public correction is warranted.
+
+## Temporal reuse and truth decay
+
+A claim that was true when verified is not automatically safe to reuse later. Preserve the original observation as history, but re-check any fact whose truth depends on current repository, provider, runtime, metric, or human-outcome state.
+
+Founder-content claims use these temporal classes:
+
+- `historical_version`: an explicitly historical statement bound to the exact source version. It remains eligible for deferred scheduling because a later main SHA does not rewrite what was built, merged, tested, or verified at that recorded version.
+- `current_repo_state`: a present-tense repository claim. It requires execution-time FCR revalidation against the then-current authoritative repository version.
+- `current_runtime`: a present-tense provider/runtime claim. It requires a fresh live verifier at use time.
+- `metric`: a current numerical/analytics claim. It requires a fresh authoritative metric read at use time.
+
+A deferred provider queue cannot freeze current truth. Scheduled n8n/provider routes therefore accept only exact-version `historical_version` claims with explicit historical wording. Current repository, runtime, and metric claims must use a path that revalidates truth at the execution boundary. Scheduler acceptance is not a truth lease.
+
+When a newer trustworthy observation contradicts an earlier current-state claim, preserve the earlier observation as historical evidence and classify its current use as superseded, stale, invalidated, or unknown. Never rewrite the historical fact merely because its current-use authority expired.
 
 ## Accounting-control principles for automated posting
 
@@ -79,11 +123,35 @@ The founder authorizes automated publication only when the post and its workflow
 
 This is an internal control framework inspired by sound accounting practice. It is not a representation that a post, workflow, or repository has received an external audit or formal GAAP opinion.
 
-## Standing founder authorization
+## Founder authorization
 
-The founder has approved automated posting as a class when, and only when, the workflow passes this contract and the accounting-control principles above.
+An approved automated publishing class defines the maximum class of communication that automation may handle. It does **not** weaken a more specific executable authority contract.
 
-This standing authorization removes the need for per-post founder approval for compliant posts inside the approved class. It does not authorize:
+Current first-party founder-content execution uses exact Current You authority and an FCR-owned approval store. Caller-supplied approval JSON is not publication authority. For the authoritative first-party route, an authenticated founder first confirms the exact copy; FCR then issues and persists a one-shot approval bound to the exact proposal hash, public-payload hash, authorization hash, channel, source repository/SHA, founder identity, approval time, and expiry. Execution must atomically claim the matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation and provider mutation.
+
+The active route therefore separates approval issuance from publication:
+
+```text
+exact public-safe proposal
+→ authenticated founder + confirm_exact_copy
+→ FCR issues and stores exact one-shot approval
+→ publish request references the exact authorization_hash
+→ FCR atomically claims the matching stored approval
+→ temporal claim revalidation
+→ provider mutation
+→ provider readback
+→ durable publication receipt
+```
+
+Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
+
+Provider-neutral contract placement does not change publication authority or prove a provider migration. Canonical founder-content contracts live under `tools/founder-content-contracts/`; legacy `tools/zapier/` compatibility exports may remain for provider-specific callers, but core approval storage, direct publication, and temporal revalidation must import the canonical provider-neutral authority directly rather than making Zapier structurally load-bearing. n8n, Zapier, Buffer, or any later adapter remains a provider boundary: it may not create founder authority, it may not turn configuration or scheduler acceptance into publication truth, and it still requires the same exact approval, temporal revalidation, provider mutation, readback, and durable receipt.
+
+A source-level move away from Zapier ownership is not an n8n cutover. A generic FCR stage-conveyor activation receipt is also not a founder-content cutover receipt. Until the checked founder-content n8n workflow is activated through its protected live path and returns canonical persisted evidence plus applicable downstream provider readback for the exact current-main target, Zapier remains an available provider-specific compatibility/fallback path and public language must not say that n8n has replaced it.
+
+A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
+
+This class boundary does not authorize:
 
 - invented, estimated, or unsupported financial results;
 - claims of revenue, profit, valuation, funding, customers, users, partnerships, endorsements, deployment, or impact without evidence;
@@ -92,8 +160,7 @@ This standing authorization removes the need for per-post founder approval for c
 - crisis communications, admissions of liability, political statements, or other high-consequence communications not explicitly approved as a separate class;
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
-Fresh approval is still required for any post outside these boundaries.
-Any post outside these boundaries requires fresh founder approval. Fresh approval is still required whenever the post is outside the approved automated publishing class or crosses a high-consequence boundary.
+Fresh approval is required whenever the active executable route requires exact Current You approval, whenever the proposal or approved copy changes, whenever the stored approval no longer exactly matches execution identity, or whenever the post falls outside the approved class or crosses a high-consequence boundary.
 
 ## Posting requirements
 
@@ -102,10 +169,12 @@ Every material post must have:
 - a clear purpose and intended audience;
 - evidence supporting each execution or outcome claim;
 - honest status language;
+- a temporal classification that matches the wording and evidence lifetime;
 - disclosure of material uncertainty or limitation;
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
-- a reviewable draft or an approved automated publishing class;
+- a reviewable draft or an approved automated publishing class plus every stricter route-specific authority requirement;
+- an exact stored approval claim when the active first-party route requires one;
 - a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
@@ -122,20 +191,36 @@ Prefer precise language:
 - "live" only with runtime evidence at the public destination;
 - "used" or "helped" only with evidence of human use or outcome.
 
+For deferred founder-progress posts, prefer durable historical wording such as "I shipped," "I merged," "I tested," or "I found and fixed" when exact-version evidence supports it. Present-tense operational language belongs on an execution-time revalidated path.
+
+## Sauce boundary
+
+Public communication should explain the product change, user value, lesson, or verified progress without publishing the private recipe. Keep proprietary prompts, routing mechanics, raw diffs, credentials, private provider payloads, private metrics, unreleased roadmap details, customer data, internal evidence references, and security-sensitive implementation details out of the public payload.
+
+The public story and the private proof are separate objects. Internal evidence may prove the story without being attached to the post.
+
 ## Hold conditions
 
 Hold the post when:
 
 - a key claim cannot be traced to evidence;
 - the accounting-control check does not pass;
-- the post falls outside the approved automated publishing class;
+- temporal classification is missing, mismatched to the wording, or no longer valid at the use boundary;
+- a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
+- configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
+- a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
+- a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
+- a Postiz-reported `PUBLISHED` state without a destination-native permalink or equivalent terminal artifact is being used as publication proof;
+- a YouTube growth `ADVANCE` or diagnostic recommendation is being used as publication, YPP, revenue, conversion, or provider-outcome proof;
+- the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
+- the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;
-- private, sensitive, or security-relevant information could be exposed;
+- private, sensitive, proprietary, or security-relevant information could be exposed;
 - urgency is being used to bypass truth or review;
 - the post would make a reasonable reader believe more was completed than the evidence proves.
 
 ## Completion standard
 
-A posting workflow is not complete when a draft exists, a scheduler accepted it, or an automation was triggered.
+A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
-It is complete only when the intended publication artifact is observable, its claims remain accurate, the platform result is reconciled, and the evidence is recorded.
+It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.

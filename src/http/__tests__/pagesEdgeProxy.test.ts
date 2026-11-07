@@ -7,12 +7,17 @@ const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const SERVICE_HEADER = 'x-founder-control-room-service';
 const SERVICE_IDENTITY = 'founder-control-room';
 
-type AssetBinding = {
+type FetchBinding = {
   fetch(request: Request): Promise<Response>;
 };
 
+type PagesEnv = {
+  ASSETS: FetchBinding;
+  FCR_API?: FetchBinding;
+};
+
 type PagesHandler = {
-  fetch(request: Request, env: { ASSETS: AssetBinding }): Promise<Response>;
+  fetch(request: Request, env: PagesEnv): Promise<Response>;
 };
 
 async function loadHandler(): Promise<PagesHandler> {
@@ -29,7 +34,6 @@ function identifiedResponse(body: string | null, init: ResponseInit = {}): Respo
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -37,56 +41,237 @@ describe('Cloudflare Pages edge proxy', () => {
   it('serves an existing browser asset without calling the API Worker', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('asset', { status: 200 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
-    vi.stubGlobal('fetch', upstreamFetch);
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/control-room/app.js'),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('asset');
     expect(assetFetch).toHaveBeenCalledOnce();
-    expect(upstreamFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('proxies consent from Pages to FCR_API while retaining the browser host and session', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('API-rendered consent', { status: 200 }));
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/oauth/consent?authorization_id=request_12345678', {
+        headers: { Cookie: '__Host-fcr_session=synthetic-session' },
+      }),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('API-rendered consent');
+    expect(response.headers.get('location')).toBeNull();
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledOnce();
+    const forwarded = api.mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678');
+    expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
+    expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+  });
+
+  it('keeps the browser Origin and founder cookie for a proxied consent decision', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/auth/oauth/authorizations/request_12345678/consent', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://foundercontrolroom.org',
+          Cookie: '__Host-fcr_session=synthetic-session',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'approve' }),
+      }),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(200);
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledOnce();
+    const forwarded = api.mock.calls[0]?.[0];
+    expect(forwarded?.headers.get('origin')).toBe('https://foundercontrolroom.org');
+    expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
+    expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+    expect(await forwarded?.text()).toBe(JSON.stringify({ action: 'approve' }));
+  });
+
+  it('normalizes www consent navigation to the apex founder session origin', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('unreachable'));
+    const api = vi.fn(async () => identifiedResponse('unreachable'));
+    const response = await handler.fetch(
+      new Request('https://www.foundercontrolroom.org/oauth/consent?authorization_id=request_12345678'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://foundercontrolroom.org/oauth/consent?authorization_id=request_12345678',
+    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('routes consent JavaScript/CSS assets to API even when requested through Pages', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('wrong asset'));
+    const api = vi.fn(async () => identifiedResponse('api asset', { status: 200 }));
+    for (const path of ['/assets/oauth-consent.js', '/assets/oauth-consent.css']) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('api asset');
+    }
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(assets).not.toHaveBeenCalled();
   });
 
   it('serves the portable founder console directory from Pages', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('portable console', { status: 200 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
-    vi.stubGlobal('fetch', upstreamFetch);
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/portable-founder-console/'),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('portable console');
     expect(assetFetch).toHaveBeenCalledOnce();
-    expect(upstreamFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
-  it('forwards dynamic GET routes without allowing Pages SPA fallback to intercept them', async () => {
+  it('serves the public work page from Pages when the edge redirect strips the extension', async () => {
+    const handler = await loadHandler();
+    // Model the real Pages asset layer: the /work.html filename is not
+    // served; it canonicalizes to /work with a 308. Only the canonical
+    // extensionless URL returns the page. A mock that answers 200 for the
+    // filename hides the production /work -> /work redirect loop.
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/work'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('work page');
+    expect(assetFetch).toHaveBeenCalledOnce();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    expect(requested).toBeInstanceOf(Request);
+    expect(new URL(requested?.url).pathname).toBe('/work');
+  });
+
+  it('serves the public work page with trailing slash and preserves query strings', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/work.html') {
+        return new Response(null, { status: 308, headers: { Location: '/work' } });
+      }
+      return new Response('work page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/work/?ref=homepage'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    const url = new URL(requested?.url);
+    expect(url.pathname).toBe('/work');
+    expect(url.search).toBe('?ref=homepage');
+  });
+
+  it('serves the public welcome page from Pages instead of the API proxy', async () => {
+    const handler = await loadHandler();
+    // Model the real Pages asset layer: the /welcome.html filename is not
+    // served; it canonicalizes to /welcome with a 308. Only the canonical
+    // extensionless URL returns the page. A mock that answers 200 for the
+    // filename would hide the production fall-through to the API proxy.
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/welcome.html') {
+        return new Response(null, { status: 308, headers: { Location: '/welcome' } });
+      }
+      return new Response('welcome page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/welcome'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('welcome page');
+    expect(assetFetch).toHaveBeenCalledOnce();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    expect(requested).toBeInstanceOf(Request);
+    expect(new URL(requested?.url).pathname).toBe('/welcome');
+  });
+
+  it('serves the public welcome page with trailing slash and preserves query strings', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === '/welcome.html') {
+        return new Response(null, { status: 308, headers: { Location: '/welcome' } });
+      }
+      return new Response('welcome page', { status: 200 });
+    });
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/welcome/?ref=homepage'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+    const requested = assetFetch.mock.calls[0]?.[0];
+    const url = new URL(requested?.url);
+    expect(url.pathname).toBe('/welcome');
+    expect(url.search).toBe('?ref=homepage');
+  });
+
+  it('forwards dynamic GET routes through the FCR_API service binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 200 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', {
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/health?source=pages'),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(200);
     expect(response.headers.get(SERVICE_HEADER)).toBe(SERVICE_IDENTITY);
     expect(assetFetch).not.toHaveBeenCalled();
-    expect(upstreamFetch).toHaveBeenCalledOnce();
-    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+    const forwarded = fcrApiFetch.mock.calls[0]?.[0];
     expect(forwarded).toBeInstanceOf(Request);
     expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/health?source=pages');
     expect(forwarded?.redirect).toBe('manual');
@@ -94,65 +279,86 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.headers.get('x-forwarded-proto')).toBe('https');
   });
 
-  it('forwards auth callbacks rather than serving the Pages landing page', async () => {
+  it('forwards auth callbacks through the FCR_API binding rather than serving Pages', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('landing', { status: 200 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => identifiedResponse(null, {
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse(null, {
       status: 303,
       headers: { location: '/control-room/#verified' },
     }));
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/auth/callback?token_hash=verified'),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(303);
     expect(response.headers.get('location')).toBe('/control-room/#verified');
     expect(assetFetch).not.toHaveBeenCalled();
-    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    const forwarded = fcrApiFetch.mock.calls[0]?.[0];
     expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/auth/callback?token_hash=verified');
   });
 
-  it('sends mutations directly to the API Worker without probing static assets', async () => {
+  it('sends mutations directly through the FCR_API binding without probing static assets', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => identifiedResponse(null, { status: 202 }));
-    vi.stubGlobal('fetch', upstreamFetch);
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse(null, { status: 202 }));
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/auth/magic-link', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
       }),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(202);
     expect(assetFetch).not.toHaveBeenCalled();
-    expect(upstreamFetch).toHaveBeenCalledOnce();
-    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+    const forwarded = fcrApiFetch.mock.calls[0]?.[0];
     expect(forwarded).toBeInstanceOf(Request);
     expect(forwarded?.method).toBe('POST');
     expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/auth/magic-link');
     expect(forwarded?.headers.get('x-founder-control-room-edge')).toBe('cloudflare-pages');
   });
 
-  it('rejects a false 200 response from the wrong API service', async () => {
+  it('fails closed when the FCR_API service binding is unavailable', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => new Response('Hello world', {
-      status: 200,
-      headers: { 'content-type': 'text/plain' },
-    }));
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/health', {
         headers: { accept: 'application/json' },
       }),
       { ASSETS: { fetch: assetFetch } },
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('120');
+    expect(response.headers.get('x-founder-control-room-degraded')).toBe(
+      'API_SERVICE_BINDING_UNAVAILABLE',
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'API_SERVICE_BINDING_UNAVAILABLE',
+      requestOutcome: 'unknown',
+      safeToRetry: true,
+    });
+  });
+
+  it('rejects a false 200 response from the wrong API service', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response('Hello world', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/health', {
+        headers: { accept: 'application/json' },
+      }),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(503);
@@ -173,16 +379,15 @@ describe('Cloudflare Pages edge proxy', () => {
   it('renders conservative recovery guidance for a one-time auth callback during a Cloudflare 52x', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => new Response('Connection timed out', {
+    const fcrApiFetch = vi.fn(async (_request: Request) => new Response('Connection timed out', {
       status: 522,
     }));
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/auth/callback?type=magiclink', {
         headers: { accept: 'text/html' },
       }),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(503);
@@ -203,10 +408,9 @@ describe('Cloudflare Pages edge proxy', () => {
   it('marks a failed mutation outcome unknown without advertising automatic retry', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => {
-      throw new Error('network unavailable');
+    const fcrApiFetch = vi.fn(async (_request: Request) => {
+      throw new Error('service binding unavailable');
     });
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/auth/magic-link', {
@@ -217,7 +421,7 @@ describe('Cloudflare Pages edge proxy', () => {
         },
         body: JSON.stringify({ email: 'synthetic@example.com' }),
       }),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(503);
@@ -232,19 +436,18 @@ describe('Cloudflare Pages edge proxy', () => {
     });
   });
 
-  it('returns a fail-closed JSON response when the API Worker cannot be reached', async () => {
+  it('returns a fail-closed JSON response when the API Worker cannot be reached through the binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
-    const upstreamFetch = vi.fn(async (_request: Request) => {
-      throw new Error('network unavailable');
+    const fcrApiFetch = vi.fn(async (_request: Request) => {
+      throw new Error('service binding unavailable');
     });
-    vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
       new Request('https://foundercontrolroom.org/version', {
         headers: { accept: 'application/json' },
       }),
-      { ASSETS: { fetch: assetFetch } },
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
     );
 
     expect(response.status).toBe(503);

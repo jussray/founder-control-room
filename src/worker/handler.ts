@@ -1,12 +1,25 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
+import {
+  FCR_EMAIL_FROM,
+  isProjectEmailBinding,
+  type ProjectEmailBinding,
+} from './projectEmail.js';
+
+export interface ChiefAiEvidenceServiceBinding {
+  version(): Promise<unknown>;
+  ingestBipEvidence(input: unknown): Promise<unknown>;
+  /** Optional until the paired Chief runtime carrying the public-command RPC is deployed. */
+  acceptPromptOSCommandIntent?(input: unknown): Promise<unknown>;
+}
 
 export interface ControlRoomWorkerEnv {
   SUPABASE_URL: string;
   SUPABASE_PROJECT_REF: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_PUBLISHABLE_KEY: string;
+  FOUNDER_SESSION_ENCRYPTION_KEY: string;
   GITHUB_WEBHOOK_SECRET: string;
   /** Preferred production GitHub authentication. Must be configured as a pair. */
   GITHUB_APP_ID?: string;
@@ -15,6 +28,10 @@ export interface ControlRoomWorkerEnv {
   GITHUB_TOKEN?: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
+  FCR_EMAIL: ProjectEmailBinding;
+  FCR_EMAIL_FROM: string;
+  /** Private same-account RPC binding to Chief AI's evidence-only entrypoint. */
+  CHIEF_AI: ChiefAiEvidenceServiceBinding;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
   FCR_V10_CONVEYOR_CONTRACT: string;
   FCR_V10_MAX_RUNTIME_AUTHORITY: string;
@@ -30,14 +47,16 @@ interface ReconcilerModule {
 
 type ReconcilerLoader = () => Promise<ReconcilerModule>;
 
-const REQUIRED_BINDINGS = [
+const REQUIRED_STRING_BINDINGS = [
   'SUPABASE_URL',
   'SUPABASE_PROJECT_REF',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
   'GITHUB_WEBHOOK_SECRET',
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
+  'FCR_EMAIL_FROM',
   'FCR_V10_CAPABILITY_PLAN_CONTRACT',
   'FCR_V10_CONVEYOR_CONTRACT',
   'FCR_V10_MAX_RUNTIME_AUTHORITY',
@@ -49,34 +68,49 @@ function hasNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+function isChiefAiEvidenceServiceBinding(value: unknown): value is ChiefAiEvidenceServiceBinding {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ChiefAiEvidenceServiceBinding>;
+  return typeof candidate.version === 'function' && typeof candidate.ingestBipEvidence === 'function';
+}
+
 /** Fail closed before importing environment-backed application modules. */
 export function validateWorkerEnv(
   env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
 ): asserts env is ControlRoomWorkerEnv {
-  const missing = REQUIRED_BINDINGS.filter((name) => !hasNonEmptyString(env[name]));
+  const missing = REQUIRED_STRING_BINDINGS.filter((name) => !hasNonEmptyString(env[name]));
 
   if (missing.length) {
     throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
   }
 
-  const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
-  const hasGitHubAppId = hasNonEmptyString(env.GITHUB_APP_ID);
-  const hasGitHubPrivateKey = hasNonEmptyString(env.GITHUB_PRIVATE_KEY);
+  if (!isProjectEmailBinding(env.FCR_EMAIL)) {
+    throw new Error('Missing required Worker binding: FCR_EMAIL');
+  }
+  if (!isChiefAiEvidenceServiceBinding(env.CHIEF_AI)) {
+    throw new Error('Missing required Worker binding: CHIEF_AI');
+  }
 
-  if (!hasGitHubToken && !hasGitHubAppId && !hasGitHubPrivateKey) {
+  // External repository credentials are capability-scoped, not core startup dependencies.
+  // FCR GitHub operations still require the complete trusted App pair in providerFactory.
+
+  // TypeScript cannot derive these nonempty guarantees from dynamic iteration,
+  // so narrow the validated core bindings once at this boundary.
+  const validated = env as ControlRoomWorkerEnv;
+
+  const founderSessionKey = validated.FOUNDER_SESSION_ENCRYPTION_KEY.trim();
+  if (!/^[A-Za-z0-9_-]{43}$/.test(founderSessionKey)) {
     throw new Error(
-      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
+      'FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url',
     );
   }
-
-  if (hasGitHubAppId !== hasGitHubPrivateKey) {
-    throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+  if (Buffer.from(founderSessionKey, 'base64url').length !== 32) {
+    throw new Error('FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes');
   }
 
-  // The complete-key check above is runtime proof that every required value is
-  // a non-empty string. TypeScript cannot derive that fact through the dynamic
-  // key iteration, so narrow once at this boundary.
-  const validated = env as ControlRoomWorkerEnv;
+  if (validated.FCR_EMAIL_FROM !== FCR_EMAIL_FROM) {
+    throw new Error('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
+  }
 
   let supabaseUrl: URL;
   try {

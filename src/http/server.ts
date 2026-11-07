@@ -1,18 +1,25 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
+import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
+import { productBuildRouter } from './routes/productBuild.js';
+import { handleProductBuildReceiptIngest } from './routes/productBuildReceipts.js';
 import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
+import { createPromptOSCommandIntakeRouter } from './routes/promptOsCommandIntake.js';
+import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
 import { agentsRouter } from './routes/agents.js';
 import { capabilitiesRouter } from './routes/capabilities.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
@@ -21,18 +28,24 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
+import { publicMcpRouter } from './routes/publicMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
+import { quickScanRouter } from './routes/quickscan.js';
 import { switchboardRouter } from './routes/switchboard.js';
 import { securityPostureRouter } from './routes/securityPosture.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
+import { handleXEngagementSignalMcp } from './routes/xEngagementSignalMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
+import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
   handleProofOfShipReceiptIngest,
@@ -45,10 +58,13 @@ import {
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
+import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
+import { providerForProject } from '../providers/providerFactory.js';
+import { publishDeterministicReviewWitness } from '../review/deterministicReviewWitnessPublisher.js';
 import {
   corsMiddleware,
   helmetMiddleware,
@@ -63,12 +79,27 @@ import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 import { requireFounder } from './middleware/requireFounder.js';
 import { requirePortfolioSwitchOn } from './middleware/requirePortfolioSwitchOn.js';
 import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
+import { requireV10DecisionFounderBinding } from './middleware/v10DecisionFounderBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
+import { requireFounderSignalReadMcpToken } from './middleware/founderSignalReadMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
+import type { ChiefAiEvidenceServiceBinding } from '../worker/handler.js';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
 const SERVICE_IDENTITY = 'founder-control-room';
+const rateLimitJiraWorkAutomationIngress = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded.' },
+});
+const FCR_REVIEW_PROJECT = {
+  repo_provider: 'github',
+  slug: 'founder-control-room',
+  repo_identifier: 'jussray/founder-control-room',
+} as const;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -122,6 +153,8 @@ export interface CreateServerOptions {
    * separately, not this Worker's filesystem.
    */
   serveStatic?: boolean;
+  /** Private Cloudflare service binding used only for proposal-only PromptOS -> Chief intake. */
+  chiefAiBinding?: ChiefAiEvidenceServiceBinding;
 }
 
 export function createServer(options: CreateServerOptions = {}) {
@@ -144,7 +177,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
   // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
   // receipts, downstream publication receipts, review contexts, and signed
-  // review-email receipts do not use browser cookies. Mount them before the
+  // service receipts do not use browser cookies. Mount them before the
   // browser same-origin mutation gate and give each endpoint strict parser/auth rules.
   app.post(
     '/webhooks/github',
@@ -152,9 +185,20 @@ export function createServer(options: CreateServerOptions = {}) {
     handleGitHubWebhook,
   );
   app.post(
+    '/webhooks/stripe-quickscan',
+    express.raw({ type: 'application/json', limit: '64kb' }),
+    handleStripeQuickScanWebhook,
+  );
+  app.post(
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
+  );
+  app.post(
+    '/ingest/build-events/:slug',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleBuildEventReceiptIngest,
   );
   app.post(
     '/ingest/hair-commerce-receipts',
@@ -191,6 +235,24 @@ export function createServer(options: CreateServerOptions = {}) {
     handleFounderSignalReviewEmailIngest,
   );
   app.post(
+    '/ingest/jira-work-automation',
+    rateLimitJiraWorkAutomationIngress,
+    express.raw({ type: 'application/json', limit: '16kb' }),
+    handleJiraWorkAutomationIngress,
+  );
+  app.post(
+    '/ingest/product-build-receipts/storyengine',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleProductBuildReceiptIngest,
+  );
+  app.post(
+    '/api/federated-relay/v3',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    handleFederatedRelayV3,
+  );
+  app.post(
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
@@ -198,6 +260,26 @@ export function createServer(options: CreateServerOptions = {}) {
     requireFounderSignalEngineReviewOnly,
     handleFounderSignalEngineMcp,
   );
+  app.post(
+    '/mcp/founder-signal-x-engagement',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '16kb' }),
+    requireFounderSignalReadMcpToken,
+    handleXEngagementSignalMcp,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource',
+    handleRemoteMcpProtectedResourceMetadata,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource/mcp',
+    handleRemoteMcpProtectedResourceMetadata,
+  );
+
+  // Separate OAuth-scoped customer MCP. Parsing is limited to this path;
+  // existing founder-cookie/browser-CSRF routes remain unchanged.
+  app.use('/mcp/public', express.json({ type: 'application/json', limit: '64kb' }));
+  app.use(publicMcpRouter);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
@@ -238,6 +320,67 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use(rateLimitGeneral);
 
+  app.post(
+    '/review/deterministic-witness/:pullRequestNumber',
+    requireFounder,
+    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+    async (req, res, next) => {
+      const pullRequestNumber = Number(req.params.pullRequestNumber);
+      if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+        return res.status(400).json({ error: 'pullRequestNumber must be a positive integer' });
+      }
+
+      try {
+        const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
+        if (!EXACT_COMMIT_SHA.test(runtimeSha)) {
+          return res.status(503).json({ error: 'deterministic review witness requires the exact current main runtime' });
+        }
+
+        const provider = providerForProject(FCR_REVIEW_PROJECT);
+        const currentMainSha = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+        if (currentMainSha.toLowerCase() !== runtimeSha.toLowerCase()) {
+          return res.status(409).json({ error: 'deterministic review witness requires the exact current main runtime' });
+        }
+
+        const { production, signal } = await publishDeterministicReviewWitness({
+          provider,
+          projectId: FCR_REVIEW_PROJECT.slug,
+          pullRequestNumber,
+        });
+
+        const currentMainAfter = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+        if (currentMainAfter.toLowerCase() !== runtimeSha.toLowerCase()) {
+          throw new Error('Deterministic review witness main moved during publication; emitted signal is historical');
+        }
+
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(200).json({
+          contract: 'fcr/deterministic-review-witness-trigger@v1',
+          witnessPublished: true,
+          proposalOnly: true,
+          mergeAuthorized: false,
+          executionAuthorized: false,
+          receipt: production.receipt,
+          pullRequestNumber: production.receipt.pullRequestNumber,
+          baseSha: production.receipt.baseSha,
+          headSha: production.receipt.headSha,
+          reviewHash: production.receipt.reviewHash,
+          verdict: production.receipt.verdict,
+          findingCount: production.receipt.findings.length,
+          signal: {
+            name: signal.name,
+            status: signal.status,
+            commitSha: signal.commitSha,
+            evidenceFingerprint: signal.evidenceFingerprint ?? null,
+            issuer: signal.issuer ?? null,
+          },
+        });
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
@@ -247,19 +390,22 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
+  app.use('/projects', requireProjectReadAudit, projectShellStateRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
-  // plan/registry/exact-head binding before the route may reserve an
-  // approval_executions row.
+  // plan/registry/exact-head binding + portable Chief/PromptOS/founder
+  // decision binding before the route may reserve an approval_executions row.
   app.post(
     '/approvals/:missionId/execute',
     requireFounder,
     requirePortfolioSwitchOn('fcr-privileged-execution-master'),
     requireV10PrivilegedApprovalBinding,
+    requireV10DecisionFounderBinding,
   );
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
+  app.use('/l99/product-build', productBuildRouter);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
@@ -267,13 +413,16 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
+  app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));
   app.use('/promptos', promptosRouter);
+  app.use('/prompt-workflows', builderPromptWorkflowRouter);
   app.use('/agents', agentsRouter);
   app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);
   app.use('/plugin-center', pluginCenterRouter);
   app.use('/command-bridge', commandBridgeRouter);
   app.use('/automation/conveyor', n8nConveyorRouter);
+  app.use('/quickscan', quickScanRouter);
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);

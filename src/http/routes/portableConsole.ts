@@ -58,18 +58,52 @@ portableConsoleRouter.post("/repo/:operation", async (req, res) => {
     return res.status(400).json({ error: `Unknown operation "${operation}".` });
   }
   const { target_branch, expected_head_sha } = req.body ?? {};
+  const requestedBranch = String(target_branch || "main");
+  const requestedHeadSha = typeof expected_head_sha === "string" ? expected_head_sha.trim() : "";
 
   try {
     const gh = octokit(req.app.locals.env);
+    const branch = await gh.repos.getBranch({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      branch: requestedBranch,
+    });
+    const liveHeadSha = branch.data.commit.sha;
+
+    if (operation === "merge_gate") {
+      if (!requestedHeadSha) {
+        return res.status(400).json({
+          error: "merge_gate requires expected_head_sha bound to the founder approval.",
+          current: liveHeadSha,
+        });
+      }
+      if (requestedHeadSha !== liveHeadSha) {
+        return res.status(409).json({
+          error: "Approved head is stale — re-approve against the current branch head.",
+          expected: requestedHeadSha,
+          current: liveHeadSha,
+          target_branch: requestedBranch,
+        });
+      }
+    }
+
+    // Evidence-only operations always bind to the current branch tip. A stale
+    // caller-provided SHA is treated as predecessor evidence, never current proof.
+    // merge_gate is different: its exact founder-approved SHA must remain unchanged.
+    const resolvedHeadSha = operation === "merge_gate" ? requestedHeadSha : liveHeadSha;
+    const rolledForward = Boolean(
+      operation !== "merge_gate" && requestedHeadSha && requestedHeadSha !== resolvedHeadSha,
+    );
+
     await gh.actions.createWorkflowDispatch({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       workflow_id: WORKFLOW_FILE,
-      ref: target_branch || "main",
+      ref: requestedBranch,
       inputs: {
         operation,
-        target_branch: target_branch ?? "",
-        expected_head_sha: expected_head_sha ?? "",
+        target_branch: requestedBranch,
+        expected_head_sha: resolvedHeadSha,
       },
     });
     res.status(202).json({
@@ -77,7 +111,11 @@ portableConsoleRouter.post("/repo/:operation", async (req, res) => {
       operation,
       repository: `${REPO_OWNER}/${REPO_NAME}`,
       workflow: WORKFLOW_FILE,
-      poll: `/v1/repo/status?branch=${encodeURIComponent(target_branch || "main")}`,
+      target_branch: requestedBranch,
+      expected_head_sha: resolvedHeadSha,
+      requested_head_sha: requestedHeadSha || null,
+      rolled_forward: rolledForward,
+      poll: `/v1/repo/status?branch=${encodeURIComponent(requestedBranch)}`,
     });
   } catch (err) {
     res.status(502).json({ error: "GitHub Actions dispatch failed.", detail: String(err) });

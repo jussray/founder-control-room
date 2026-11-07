@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import {
   bearerToken,
   readFounderSession,
-  writeFounderSession,
+  rotateFounderSession,
 } from '../../auth/founderSession.js';
 
 export interface FounderRequest extends Request {
@@ -30,19 +30,29 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   return email && userId ? { email, userId } : null;
 }
 
+async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
+  const { data: allowRow, error: allowError } = await supabase
+    .from('founder_users')
+    .select('email')
+    .eq('email', identity.email)
+    .maybeSingle();
+
+  if (allowError) return 'error';
+  return allowRow ? 'allowed' : 'denied';
+}
+
 /**
  * Founder authorization has two independent gates:
  *
  * 1. A valid Supabase Auth session, supplied either as a Bearer token for API
- *    clients or as the HttpOnly Control Room browser session cookie.
+ *    clients or resolved server-side from the opaque HttpOnly Control Room
+ *    browser session capability.
  * 2. The authenticated email must still exist in the service-role-only
  *    `founder_users` allowlist.
  *
- * Cookie sessions may refresh once with their refresh token. Bearer sessions
+ * Cookie sessions may refresh once with their server-held refresh token. A
+ * successful refresh rotates the opaque browser capability; Bearer sessions
  * never receive implicit refresh behavior so automated clients remain explicit.
- * A refreshed cookie is not written until the refreshed identity passes the
- * founder allowlist, preventing authenticated nonfounders from receiving a
- * renewed cookie labelled as a Founder Control Room session.
  */
 export async function requireFounder(
   req: FounderRequest,
@@ -50,7 +60,7 @@ export async function requireFounder(
   next: NextFunction,
 ) {
   const explicitBearer = bearerToken(req);
-  const cookieSession = explicitBearer ? null : readFounderSession(req);
+  const cookieSession = explicitBearer ? null : await readFounderSession(req);
   let accessToken = explicitBearer ?? cookieSession?.accessToken ?? null;
 
   if (!accessToken) {
@@ -81,20 +91,63 @@ export async function requireFounder(
     return res.status(401).json({ error: 'Invalid or expired founder session' });
   }
 
-  const { data: allowRow, error: allowError } = await supabase
-    .from('founder_users')
-    .select('email')
-    .eq('email', identity.email)
-    .maybeSingle();
-
-  if (allowError) {
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
     return res.status(500).json({ error: 'Founder allowlist check failed' });
   }
-  if (!allowRow) {
+  if (allowState === 'denied') {
     return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
 
-  if (refreshedSession) writeFounderSession(res, refreshedSession);
+  if (refreshedSession) {
+    try {
+      await rotateFounderSession(req, res, refreshedSession);
+    } catch {
+      return res.status(503).json({ error: 'Founder browser session rotation failed' });
+    }
+  }
+
+  req.founder = identity;
+  next();
+}
+
+/**
+ * High-consequence interactive founder decisions must authenticate the opaque
+ * browser capability itself. An Authorization bearer header is deliberately
+ * ignored here, so bearer automation cannot borrow a browser session as proof
+ * of a current founder interaction.
+ *
+ * The Supabase access token held in server-side session state must still be
+ * current at decision time. We do not silently refresh it in this path: an
+ * expired interactive identity must return through the normal authenticated UI
+ * flow before it can decide authority.
+ */
+export async function requireInteractiveFounder(
+  req: FounderRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const cookieSession = await readFounderSession(req);
+  if (!cookieSession) {
+    return res.status(401).json({ error: 'Interactive founder session required' });
+  }
+  if (typeof cookieSession.expiresAt === 'number' && cookieSession.expiresAt <= Math.floor(Date.now() / 1000)) {
+    return res.status(401).json({ error: 'Interactive founder session expired' });
+  }
+
+  const { data: userData, error: userError } = await supabaseAuth.auth.getUser(cookieSession.accessToken);
+  const identity = authenticatedIdentity(userData?.user);
+  if (userError || !identity) {
+    return res.status(401).json({ error: 'Invalid or expired interactive founder session' });
+  }
+
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
+    return res.status(500).json({ error: 'Founder allowlist check failed' });
+  }
+  if (allowState === 'denied') {
+    return res.status(403).json({ error: 'Not on the founder allowlist' });
+  }
 
   req.founder = identity;
   next();

@@ -1,4 +1,5 @@
 import type { FirstPartySocialPostInput } from '../lib/firstPartySocialPublisher.js';
+import type { UntrustedArtifact } from '../security/untrustedArtifactBoundary.js';
 import type { V10CapabilityPlan } from './capabilityKernel.js';
 
 export const FOUNDER_OS_LAB_VERSION = 'founder-os-lab-v1' as const;
@@ -17,6 +18,7 @@ export type FounderOsLabSkillId =
   | 'juss-chief-ai'
   | 'goalfix'
   | 'repo-truth'
+  | 'truth-decay-audit'
   | 'proof-led-publishing'
   | 'review-verify-merge';
 
@@ -56,7 +58,7 @@ export type FounderOsLabProviderId =
   | 'openai-platform'
   | 'hubspot';
 
-export type FounderOsLabProjectAdapterId = 'sekret-bip';
+export type FounderOsLabProjectAdapterId = 'sekret-bip' | 'chief-ai-machine';
 export type FounderOsLabProjectAudience = 'teen' | 'bip-jr';
 
 export type FounderOsLabCapabilityId =
@@ -73,6 +75,7 @@ export type FounderOsLabCapabilityId =
   | 'merge-readiness-preview'
   | 'deployment-readiness-preview'
   | 'outreach-readiness-preview'
+  | 'project-contract-validation'
   | 'project-canon-validation'
   | 'editable-design-preview';
 
@@ -83,7 +86,8 @@ export type FounderOsLabAdapterId =
   | 'merge-preview'
   | 'deployment-preview'
   | 'email-preview'
-  | 'sekret-bip-project-preview';
+  | 'sekret-bip-project-preview'
+  | 'chief-ai-machine-project-preview';
 
 export type FounderOsLabReadiness =
   | 'ready_for_review'
@@ -140,6 +144,7 @@ export interface FounderOsLabRequest {
   project?: FounderOsLabProjectContext;
   capabilityPlan?: V10CapabilityPlan;
   socialPost?: FirstPartySocialPostInput;
+  untrustedArtifacts?: UntrustedArtifact[];
 }
 
 export interface FounderOsLabProviderRoute {
@@ -172,6 +177,7 @@ export interface FounderOsLabProjectRoute {
   contractPathsRequired: string[];
   contractPathsObserved: string[];
   contractPathsMissing: string[];
+  rules: string[];
   canonicalDisplayNames: string[];
   forbiddenDisplayNames: string[];
   legacyInternalIdsPreserved: boolean;

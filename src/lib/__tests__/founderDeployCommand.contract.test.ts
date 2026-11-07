@@ -5,6 +5,10 @@ const commandWorkflow = readFileSync(
   new URL('../../../.github/workflows/founder-deploy-command.yml', import.meta.url),
   'utf8',
 );
+const deployWorkflow = readFileSync(
+  new URL('../../../.github/workflows/deploy.yml', import.meta.url),
+  'utf8',
+);
 const reconcileWorkflow = readFileSync(
   new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
   'utf8',
@@ -24,8 +28,15 @@ function configuredWorkerSecretNames() {
   return Array.from(secretBlock![1].matchAll(/"([A-Z0-9_]+)"/g), ([, name]) => name);
 }
 
+function commandJobBlock(name: string, nextName: string) {
+  const pattern = new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)(?=\\n  ${nextName}:\\n)`);
+  const block = commandWorkflow.match(pattern);
+  expect(block).not.toBeNull();
+  return block![1];
+}
+
 describe('Founder deploy command authority contract', () => {
-  it('accepts only the founder command on canonical issue 182', () => {
+  it('accepts only the founder Worker command on canonical issue 182', () => {
     expect(commandWorkflow).toContain('issue_comment:');
     expect(commandWorkflow).toContain("github.event.issue.number == 182");
     expect(commandWorkflow).toContain("github.event.comment.user.login == 'jussray'");
@@ -34,23 +45,55 @@ describe('Founder deploy command authority contract', () => {
     expect(commandWorkflow).toContain("re.fullmatch(r'[0-9a-f]{40}', sha)");
   });
 
-  it('requires the requested SHA to equal current main before dispatch', () => {
+  it('requires requested SHAs to equal current main before any dispatch', () => {
     expect(commandWorkflow).toContain('/git/ref/heads/main');
-    expect(commandWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
+    expect(commandWorkflow.match(/test \"\$CURRENT_MAIN_SHA\" = \"\$EXPECTED_HEAD_SHA\"/g)).toHaveLength(3);
   });
 
-  it('delegates the canonical command only to the bounded Worker reconciliation workflow', () => {
+  it('keeps the canonical /deploy-fcr command Worker-only', () => {
+    const workerDispatch = commandJobBlock('dispatch', 'dispatch-production');
     expect(commandWorkflow).toContain('actions: write');
-    expect(commandWorkflow).toContain('/actions/workflows/worker-reconcile.yml/dispatches');
-    expect(commandWorkflow).toContain('expected_head_sha: $sha');
-    expect(commandWorkflow).toContain('deployment_approval_id: $approval');
-    expect(commandWorkflow).not.toContain('/actions/workflows/deploy.yml/dispatches');
+    expect(workerDispatch).toContain('/actions/workflows/worker-reconcile.yml/dispatches');
+    expect(workerDispatch).toContain('expected_head_sha: $sha');
+    expect(workerDispatch).toContain('deployment_approval_id: $approval');
+    expect(workerDispatch).not.toContain('/actions/workflows/deploy.yml/dispatches');
+    expect(workerDispatch).not.toContain('wrangler deploy');
+    expect(workerDispatch).not.toContain('supabase db push');
+    expect(workerDispatch).not.toContain('CLOUDFLARE_API_TOKEN');
+    expect(workerDispatch).not.toContain('CLOUDFLARE_ACCOUNT_ID');
+    expect(workerDispatch).not.toContain('secrets.');
+  });
 
-    expect(commandWorkflow).not.toContain('wrangler deploy');
-    expect(commandWorkflow).not.toContain('supabase db push');
-    expect(commandWorkflow).not.toContain('CLOUDFLARE_API_TOKEN');
-    expect(commandWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID');
-    expect(commandWorkflow).not.toContain('secrets.');
+  it('accepts a distinct founder production command only on Supabase incident 247', () => {
+    const productionDispatch = commandJobBlock('dispatch-production', 'dispatch-review-email');
+    expect(productionDispatch).toContain("github.event.issue.number == 247");
+    expect(productionDispatch).toContain("github.event.comment.user.login == 'jussray'");
+    expect(productionDispatch).toContain("startsWith(github.event.comment.body, '/deploy-fcr-production ')");
+    expect(productionDispatch).toContain(
+      'Expected exactly: /deploy-fcr-production <40-char-main-sha> <approval-reference>',
+    );
+    expect(productionDispatch).toContain('/actions/workflows/deploy.yml/dispatches');
+    expect(productionDispatch).toContain('expected_head_sha: $sha');
+    expect(productionDispatch).toContain('deployment_approval_id: $approval');
+    expect(productionDispatch).not.toContain('/actions/workflows/worker-reconcile.yml/dispatches');
+  });
+
+  it('keeps the production bridge provider-blind and delegates mutation to canonical Deploy', () => {
+    const productionDispatch = commandJobBlock('dispatch-production', 'dispatch-review-email');
+    expect(productionDispatch).not.toContain('wrangler deploy');
+    expect(productionDispatch).not.toContain('supabase db push');
+    expect(productionDispatch).not.toContain('SUPABASE_DB_URL');
+    expect(productionDispatch).not.toContain('CLOUDFLARE_API_TOKEN');
+    expect(productionDispatch).not.toContain('CLOUDFLARE_ACCOUNT_ID');
+    expect(productionDispatch).not.toContain('secrets.');
+    expect(deployWorkflow).toContain('workflow_dispatch:');
+    expect(deployWorkflow).toContain('expected_head_sha:');
+    expect(deployWorkflow).toContain('deployment_approval_id:');
+    expect(deployWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
+    expect(deployWorkflow).toContain('supabase db push');
+    expect(deployWorkflow).toContain('--dry-run');
+    expect(deployWorkflow).toContain('--include-all');
+    expect(deployWorkflow).toContain('Verify post-push migration ledger');
   });
 
   it('accepts a separate founder-only review-email command only on issue 395', () => {
@@ -66,17 +109,16 @@ describe('Founder deploy command authority contract', () => {
     );
   });
 
-  it('keeps the review-email dispatch bridge provider-blind and targets only its bounded reconcile', () => {
+  it('keeps every issue-comment dispatch bridge provider-blind', () => {
     expect(commandWorkflow).not.toContain('wrangler deploy');
     expect(commandWorkflow).not.toContain('supabase db push');
     expect(commandWorkflow).not.toContain('CLOUDFLARE_API_TOKEN');
     expect(commandWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID');
     expect(commandWorkflow).not.toContain('secrets.');
-
     expect(reviewEmailReconcileWorkflow).toContain('workflow_dispatch:');
     expect(reviewEmailReconcileWorkflow).toContain('environment: production');
     expect(reviewEmailReconcileWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
-    expect(reviewEmailReconcileWorkflow).toContain('wrangler deploy --config wrangler.email.toml');
+    expect(reviewEmailReconcileWorkflow).toContain('npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml');
     expect(reviewEmailReconcileWorkflow).toContain("'FOUNDER_CONTROL_ROOM_API (founder-control-room)'");
     expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.worker.toml');
     expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.deletion-queue.toml');
@@ -94,7 +136,6 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).toContain('x-founder-control-room-service');
     expect(reconcileWorkflow).toContain('.service == "founder-control-room" and .gitSha == $expected');
     expect(reconcileWorkflow).toContain('.founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false');
-
     expect(reconcileWorkflow).not.toContain('supabase db push');
     expect(reconcileWorkflow).not.toContain('SUPABASE_DB_URL');
     expect(reconcileWorkflow).not.toContain('proof-of-ship');
@@ -102,7 +143,65 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
-  it('preserves required Worker bindings while forcing the publication grant disabled through the canonical config', () => {
+  it('uses the bounded plaintext repair exception only before canonical deploy and proves strict cleanup afterward', () => {
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
+    const runtimeJob = reconcileWorkflow.indexOf('  runtime-proof:');
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    const workerDeploy = reconcileWorkflow.slice(workerJob, runtimeJob);
+    const strictProof = workerDeploy.slice(workerDeploy.indexOf('Verify repaired Worker binding types'));
+
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(workerDeploy).toContain('Verify repaired Worker binding types');
+    expect(strictProof).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(strictProof).not.toContain('FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL');
+  });
+
+  it('proves direct API and public Pages version headers and bodies against the exact release SHA', () => {
+    const runtimeProof = reconcileWorkflow.slice(reconcileWorkflow.indexOf('  runtime-proof:'));
+    expect(runtimeProof).toContain('API_ORIGIN: https://api.foundercontrolroom.org');
+    expect(runtimeProof).toContain('PAGES_ORIGIN: https://foundercontrolroom.org');
+    expect(runtimeProof).toContain('--dump-header "$version_headers"');
+    expect(runtimeProof).toContain('--dump-header "$pages_headers"');
+    expect(runtimeProof).toContain('"$API_ORIGIN/version"');
+    expect(runtimeProof).toContain('"$PAGES_ORIGIN/version"');
+    expect(runtimeProof).toContain('< "$version_headers" | grep -Eiq');
+    expect(runtimeProof).toContain('< "$pages_headers" | grep -Eiq');
+    expect(runtimeProof).toContain('.gitSha == $expected');
+    expect(runtimeProof).toContain('public_proxy_version_verified: true');
+    expect(runtimeProof).toContain('test-results/fcr-pages-proxy-proof.json');
+    expect(runtimeProof).not.toContain('wrangler secret put');
+    expect(runtimeProof).not.toContain('wrangler deploy');
+  });
+
+  it('fails closed on missing provider-held Worker bindings before any reconciliation mutation', () => {
+    const preflight = reconcileWorkflow.indexOf('Verify provider-held Worker secret names before reconciliation');
+    const receipt = reconcileWorkflow.indexOf('Record bounded authority receipt');
+    const workerJob = reconcileWorkflow.indexOf('  worker-deploy:');
+    const firstMutation = reconcileWorkflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON');
+    const deploy = reconcileWorkflow.indexOf('command: deploy --config wrangler.worker.toml');
+
+    expect(preflight).toBeGreaterThan(0);
+    expect(preflight).toBeLessThan(receipt);
+    expect(receipt).toBeLessThan(workerJob);
+    expect(workerJob).toBeLessThan(firstMutation);
+    expect(firstMutation).toBeLessThan(deploy);
+
+    const authorityGate = reconcileWorkflow.slice(0, workerJob);
+    expect(authorityGate).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(authorityGate).toContain('--config wrangler.worker.toml');
+    expect(authorityGate).toContain("config.get('secrets', {}).get('required')");
+    expect(authorityGate).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(authorityGate).toContain('missing = sorted(required - present)');
+    expect(authorityGate).toContain('sys.exit(1)');
+    expect(authorityGate).toContain('trap \'rm -f "$secret_receipt"\' EXIT');
+    expect(authorityGate).toContain("FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'");
+    expect(authorityGate).toContain('CF_API_TOKEN must remain absent from wrangler.worker.toml');
+    expect(authorityGate).not.toContain('wrangler secret put');
+    expect(authorityGate).not.toContain('wrangler deploy');
+    expect(authorityGate).not.toContain('supabase db push');
+  });
+
+  it('preserves every declared Worker secret name while forcing the publication grant disabled through the canonical config', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(reconcileWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
@@ -110,17 +209,22 @@ describe('Founder deploy command authority contract', () => {
     expect(workerConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
     expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(reconcileWorkflow).not.toContain('FCR_SHOPIFY_WEBHOOK_SECRET: ${{ secrets.FCR_SHOPIFY_WEBHOOK_SECRET }}');
+    expect(reconcileWorkflow).not.toContain('FCR_COMMERCE_HASH_SALT: ${{ secrets.FCR_COMMERCE_HASH_SALT }}');
+    expect(reconcileWorkflow).not.toContain('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
+    // Founder Path B ruling (2026-10-30): [secrets].required is the
+    // boot/deploy-essential set only. Feature secrets live in
+    // [secrets].optional and are installed before feature activation.
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
       'SUPABASE_PUBLISHABLE_KEY',
+      'FOUNDER_SESSION_ENCRYPTION_KEY',
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
-      'GITHUB_PRIVATE_KEY',
+      'OPENAI_API_KEY',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-      'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-      'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');

@@ -39,7 +39,7 @@ jobs:
       DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
     steps:
       - name: Checkout exact approved commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -74,34 +74,16 @@ jobs:
       - name: Validate required production configuration
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
 
           required=(
             SUPABASE_DB_URL
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             CLOUDFLARE_API_TOKEN
             CLOUDFLARE_ACCOUNT_ID
-            DEPLOY_URL
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
           )
           missing=()
 
@@ -112,11 +94,89 @@ jobs:
           done
 
           if (( ${#missing[@]} > 0 )); then
-            printf '::error title=Missing production configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
+            printf '::error title=Missing production deployment configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
             exit 1
           fi
 
-          echo "All required production configuration names are present."
+          echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
+
+      - name: Verify provider-held Worker secret names before mutation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          credential_receipt="$RUNNER_TEMP/fcr-deploy-credential-shape.json"
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id-env CLOUDFLARE_ACCOUNT_ID \
+            --require-account-id true \
+            --purpose fcr-production-deploy-authority \
+            --output "$credential_receipt"
+
+          secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$secret_receipt"
+
+          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import tomllib
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+
+          required = set(config.get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required:
+              print('::error title=Missing Worker secret contract::wrangler.worker.toml must declare [secrets].required before production deployment.')
+              sys.exit(1)
+          if not workflow_written <= required:
+              print('::error title=Worker secret contract drift::The workflow-written Founder Signal grant must remain declared in [secrets].required.')
+              sys.exit(1)
+
+          provider_required = sorted(required - workflow_written)
+          with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
+              receipt_text = handle.read()
+          # wrangler may write human progress lines to stdout ahead of the JSON
+          # list (seen with env-var token auth); extract the JSON array instead
+          # of assuming the receipt is pure JSON. Fail closed, with evidence.
+          array_start = receipt_text.find('[')
+          array_end = receipt_text.rfind(']')
+          if array_start == -1 or array_end < array_start:
+            print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+            print(f'Receipt begins: {receipt_text[:200]!r}')
+            sys.exit(1)
+          receipt = json.loads(receipt_text[array_start:array_end + 1])
+
+          if not isinstance(receipt, list):
+              print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+              sys.exit(1)
+
+          present = {
+              entry.get('name')
+              for entry in receipt
+              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
+          }
+          missing = [name for name in provider_required if name not in present]
+          if missing:
+              for name in missing:
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on founder-control-room.')
+              sys.exit(1)
+
+          print(
+              f'Provider-held Worker secret names verified: {len(provider_required)} names present; '
+              'values were not read.'
+          )
+          PY
+
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
 
       - name: Record authority receipt
         shell: bash
@@ -128,6 +188,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
+            echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -140,12 +201,12 @@ jobs:
     environment: production
     needs: authority-gate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -253,6 +314,7 @@ jobs:
           REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
         run: |
           set -euo pipefail
+          mkdir -p test-results
           supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
           node scripts/verify-production-migration-ledger.mjs
 
@@ -273,7 +335,7 @@ jobs:
 
       - name: Upload migration ledger receipts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: supabase-migration-ledger-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -291,12 +353,12 @@ jobs:
     environment: production
     needs: supabase-migrate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
@@ -313,39 +375,31 @@ jobs:
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
-          CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Canonical deploy preserves provider-held Worker secrets. The only
+          # runtime secret this workflow actively writes is the fail-closed
+          # publication grant below.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
+
+  pages-release:
+    name: Cloudflare Pages Production Release
+    needs: worker-deploy
+    uses: ./.github/workflows/pages-production-release.yml
+    with:
+      expected_head_sha: ${{ inputs.expected_head_sha }}
+    secrets: inherit
 
   # ── 3. Post-deploy exact-SHA and fail-closed broad grant proof ───────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
-    needs: worker-deploy
+    needs: pages-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
@@ -367,7 +421,7 @@ jobs:
               raise SystemExit(f'unexpected health payload: {body!r}')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify exact deployed commit and disabled broad automation grant
         run: |
@@ -396,7 +450,7 @@ jobs:
               raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public guardrail surface
         run: |
@@ -414,7 +468,7 @@ jobs:
               raise SystemExit('standing merge authority is not active')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public Pages shell and exact API proxy
         run: |
@@ -461,7 +515,7 @@ jobs:
     if: needs.smoke-test.result == 'success'
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
@@ -471,7 +525,7 @@ jobs:
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
       - name: Check out the exact deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -825,7 +879,7 @@ jobs:
 
       - name: Upload founder-review proof artifact
         if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: proof-of-ship-founder-review-${{ inputs.expected_head_sha }}
           path: proof-review.json
@@ -1060,14 +1114,14 @@ jobs:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
     needs: smoke-test
-    continue-on-error: true
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'

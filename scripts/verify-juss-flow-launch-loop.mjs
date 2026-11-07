@@ -4,7 +4,9 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillPath = path.join(root, '.ai/skills/juss-flow-launch-loop/SKILL.md');
+const founderSkillPath = path.join(root, '.ai/skills/juss-founder-os/SKILL.md');
 const skill = await readFile(skillPath, 'utf8');
+const founderSkill = await readFile(founderSkillPath, 'utf8');
 
 const requiredSkillTokens = [
   'ULTRATHINK',
@@ -30,6 +32,32 @@ const missingSkillTokens = requiredSkillTokens.filter(
 if (missingSkillTokens.length > 0) {
   throw new Error(
     `Juss Flow launch-loop skill is missing: ${missingSkillTokens.join(', ')}`,
+  );
+}
+
+const requiredFounderGovernanceTokens = [
+  '## Founder governance kernel',
+  '### Opportunity-cost receipts',
+  '### Decision invalidation',
+  '### Contradiction receipts and domain authority',
+  '### Evidence lineage and independence',
+  '### Uncertainty classes',
+  '### Founder override without truth override',
+  'SUPERSEDED/INVALIDATED',
+  '`Deployable` does not mean `should deploy`',
+  'Multiple agents repeating one source are not multiple independent witnesses.',
+  '`security_uncertainty`',
+  'It may not make missing evidence exist',
+  'production fully verified',
+];
+
+const missingFounderGovernanceTokens = requiredFounderGovernanceTokens.filter(
+  (token) => !founderSkill.includes(token),
+);
+
+if (missingFounderGovernanceTokens.length > 0) {
+  throw new Error(
+    `Juss Founder OS governance kernel is missing: ${missingFounderGovernanceTokens.join(', ')}`,
   );
 }
 
@@ -65,4 +93,4 @@ if (!skill.includes('Never quietly shrink `full app launch`')) {
   throw new Error('GoalFix must preserve the full-app-launch objective.');
 }
 
-console.log('Juss Flow launch-loop contract verified.');
+console.log('Juss Flow launch-loop and Founder governance contracts verified.');

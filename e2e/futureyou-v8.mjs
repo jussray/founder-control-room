@@ -8,6 +8,8 @@ const PORT = 8810;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const CONTROL_ROOM_DIR = fileURLToPath(new URL('../public/control-room/', import.meta.url));
 const ARTIFACT_DIR = fileURLToPath(new URL('../artifacts/', import.meta.url));
+const SESSION_COOKIE_NAME = '__Host-fcr_session';
+const SESSION_COOKIE_VALUE = `v1.${'a'.repeat(43)}`;
 
 const brief = {
   version: 'futureyou-v8',
@@ -31,34 +33,32 @@ const brief = {
     invalidObservationTimes: 1,
     futureObservationTimes: 0,
   },
-  priorities: [
-    {
-      id: 'mission:proof-1',
-      source: 'mission',
-      project: { slug: 'founder-control-room', name: 'Founder Control Room' },
-      title: 'Review payment automation proof',
-      domain: 'risk',
-      score: 100,
-      confidence: 'high',
-      observationState: 'fresh',
-      reason: 'in review mission · high risk',
-      nextAction: 'Decide: inspect the diff, unresolved risks, and proof gate before approving or requesting changes.',
-      evidence: [
-        'mission status: in_review',
-        'risk level: high',
-        'last updated: 2026-07-24T18:00:00.000Z',
-        'observation state: fresh',
-        'project: founder-control-room',
-      ],
-      authority: {
-        level: 'L3',
-        mode: 'decide',
-        requiresExplicitApproval: true,
-        boundary: 'Review and founder decision only; no merge, send, publish, deploy, or spend action is implied.',
-      },
-      observedAt: '2026-07-24T18:00:00.000Z',
+  priorities: [{
+    id: 'mission:proof-1',
+    source: 'mission',
+    project: { slug: 'founder-control-room', name: 'Founder Control Room' },
+    title: 'Review payment automation proof',
+    domain: 'risk',
+    score: 100,
+    confidence: 'high',
+    observationState: 'fresh',
+    reason: 'in review mission · high risk',
+    nextAction: 'Decide: inspect the diff, unresolved risks, and proof gate before approving or requesting changes.',
+    evidence: [
+      'mission status: in_review',
+      'risk level: high',
+      'last updated: 2026-07-24T18:00:00.000Z',
+      'observation state: fresh',
+      'project: founder-control-room',
+    ],
+    authority: {
+      level: 'L3',
+      mode: 'decide',
+      requiresExplicitApproval: true,
+      boundary: 'Review and founder decision only; no merge, send, publish, deploy, or spend action is implied.',
     },
-  ],
+    observedAt: '2026-07-24T18:00:00.000Z',
+  }],
   blindSpots: [
     '1 observation is at least 3 days old and cannot count as fresh decision evidence.',
     '1 record has an invalid observation time; machine confidence is forced low.',
@@ -70,53 +70,27 @@ const pluginCenter = {
   contract: {
     enforcementNote: 'Plugin Center is inventory and authority declaration. High-risk execution remains enforced by proof gates, approval execution, provider adapters, and auditable grants.',
   },
-  summary: {
-    activeTemporaryGrants: 1,
-  },
+  summary: { activeTemporaryGrants: 1 },
   connections: [
     {
-      id: 'fcr-github',
-      projectId: 'project-fcr',
-      projectSlug: 'founder-control-room',
-      projectName: 'Founder Control Room',
-      type: 'github',
-      status: 'active',
-      authorityLevel: 'L5',
-      capabilities: ['inspect_repos', 'create_branch', 'integrate_main'],
-      secretRef: 'github/fcr/builder-secret-ref',
+      id: 'fcr-github', projectId: 'project-fcr', projectSlug: 'founder-control-room', projectName: 'Founder Control Room',
+      type: 'github', status: 'active', authorityLevel: 'L5',
+      capabilities: ['inspect_repos', 'create_branch', 'integrate_main'], secretRef: 'github/fcr/builder-secret-ref',
     },
     {
-      id: 'fcr-cloudflare',
-      projectId: 'project-fcr',
-      projectSlug: 'founder-control-room',
-      projectName: 'Founder Control Room',
-      type: 'cloudflare',
-      status: 'active',
-      authorityLevel: 'L6',
-      capabilities: ['inspect_operational_data', 'deploy'],
-      secretRef: 'cloudflare/fcr/provider-secret-ref',
+      id: 'fcr-cloudflare', projectId: 'project-fcr', projectSlug: 'founder-control-room', projectName: 'Founder Control Room',
+      type: 'cloudflare', status: 'active', authorityLevel: 'L6',
+      capabilities: ['inspect_operational_data', 'deploy'], secretRef: 'cloudflare/fcr/provider-secret-ref',
     },
     {
-      id: 'bip-github',
-      projectId: 'project-bip',
-      projectSlug: 'sekret-bip',
-      projectName: 'Se’kret Bip',
-      type: 'github',
-      status: 'active',
-      authorityLevel: 'L4',
-      capabilities: ['inspect_repos', 'create_branch'],
-      secretRef: 'github/bip/builder-secret-ref',
+      id: 'bip-github', projectId: 'project-bip', projectSlug: 'sekret-bip', projectName: 'Se’kret Bip',
+      type: 'github', status: 'active', authorityLevel: 'L4',
+      capabilities: ['inspect_repos', 'create_branch'], secretRef: 'github/bip/builder-secret-ref',
     },
     {
-      id: 'bip-cloudflare',
-      projectId: 'project-bip',
-      projectSlug: 'sekret-bip',
-      projectName: 'Se’kret Bip',
-      type: 'cloudflare',
-      status: 'active',
-      authorityLevel: 'L6',
-      capabilities: ['inspect_operational_data', 'deploy'],
-      secretRef: 'cloudflare/bip/provider-secret-ref',
+      id: 'bip-cloudflare', projectId: 'project-bip', projectSlug: 'sekret-bip', projectName: 'Se’kret Bip',
+      type: 'cloudflare', status: 'active', authorityLevel: 'L6',
+      capabilities: ['inspect_operational_data', 'deploy'], secretRef: 'cloudflare/bip/provider-secret-ref',
     },
   ],
 };
@@ -132,10 +106,15 @@ function assert(condition, message) {
   console.log(`ok: ${message}`);
 }
 
+function hasOpaqueFounderCookie(request) {
+  const cookie = request.headers.cookie ?? '';
+  return cookie.split(';').some((part) => part.trim() === `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`);
+}
+
 const server = createServer(async (request, response) => {
   try {
     if (request.url === '/futureyou/v8/brief' || request.url === '/plugin-center') {
-      if (!request.headers.authorization?.startsWith('Bearer ')) {
+      if (!hasOpaqueFounderCookie(request) || request.headers.authorization) {
         response.writeHead(401, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify({ error: 'Founder session required' }));
         return;
@@ -150,16 +129,18 @@ const server = createServer(async (request, response) => {
       response.writeHead(404).end('Not found');
       return;
     }
-
     const relativePath = normalize(pathname.slice('/control-room/'.length));
     if (relativePath.startsWith('..')) {
       response.writeHead(400).end('Invalid path');
       return;
     }
-
     const filePath = join(CONTROL_ROOM_DIR, relativePath);
     const content = await readFile(filePath);
-    response.writeHead(200, { 'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream' });
+    const headers = { 'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream' };
+    if (pathname === '/control-room/futureyou-v8.html') {
+      headers['Set-Cookie'] = `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}; Path=/; Secure; HttpOnly; SameSite=Strict`;
+    }
+    response.writeHead(200, headers);
     response.end(content);
   } catch {
     response.writeHead(404).end('Not found');
@@ -176,14 +157,15 @@ try {
     { name: 'desktop', width: 1440, height: 1100 },
     { name: 'mobile', width: 390, height: 844 },
   ]) {
-    const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+    const page = await context.newPage();
     const pageErrors = [];
+    const authHeaders = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
-    await page.addInitScript(() => {
-      sessionStorage.setItem('fcr_session', JSON.stringify({
-        access_token: 'futureyou-v8-proof-token',
-        email: 'founder@example.com',
-      }));
+    page.on('request', (request) => {
+      if (request.url().endsWith('/futureyou/v8/brief') || request.url().endsWith('/plugin-center')) {
+        authHeaders.push(request.headers().authorization ?? null);
+      }
     });
 
     await page.goto(`${BASE_URL}/control-room/futureyou-v8.html`, { waitUntil: 'networkidle' });
@@ -228,6 +210,8 @@ try {
       assert(!visibleText.includes(secretRef), `${viewport.name}: secret reference value is not rendered`);
     }
     assert(pageErrors.length === 0, `${viewport.name}: no page errors`);
+    assert(authHeaders.every((value) => value === null), `${viewport.name}: opaque session sends no browser bearer header`);
+    assert(await page.evaluate(() => !sessionStorage.getItem('fcr_session')), `${viewport.name}: no browser-readable founder token is required`);
 
     const screenshot = join(ARTIFACT_DIR, `futureyou-v8-cockpit-${viewport.name}.png`);
     await page.screenshot({ path: screenshot, fullPage: true });
@@ -241,17 +225,18 @@ try {
       integrationReadyProjects: 1,
       providerReadyProjects: 2,
       secretRefsRendered: false,
+      browserBearerHeaderSent: false,
       pageErrors,
     });
-    await page.close();
+    await context.close();
   }
 
   await writeFile(
     join(ARTIFACT_DIR, 'futureyou-v8-autonomy-receipt.json'),
-    `${JSON.stringify({ schemaVersion: 2, result: 'passed', viewports: receipts }, null, 2)}\n`,
+    `${JSON.stringify({ schemaVersion: 3, result: 'passed', auth: 'opaque-http-only-cookie', viewports: receipts }, null, 2)}\n`,
     'utf8',
   );
-  console.log('FutureYou V8 observation-trust and autonomy readiness rendered proof passed.');
+  console.log('FutureYou V8 observation-trust, autonomy readiness, and opaque-session rendered proof passed.');
 } finally {
   await browser.close();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

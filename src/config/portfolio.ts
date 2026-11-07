@@ -1,6 +1,6 @@
 import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
 
-export type PortfolioProjectStatus = "active" | "quarantined";
+export type PortfolioProjectStatus = "active" | "external" | "continuity-only";
 
 export interface PortfolioProject {
   slug: string;
@@ -11,16 +11,13 @@ export interface PortfolioProject {
 }
 
 /**
- * Founder-owned portfolio registry.
+ * Projects that currently carry FCR portfolio/MCP authority.
  *
- * This is a bootstrap registry for provider discovery and MCP policy. The
- * Control Room database remains the runtime source of truth once a project is
- * registered there. Legacy and duplicate repositories are explicitly kept out
- * of every MCP allowlist.
- *
- * Slugs intentionally match the existing Control Room database registry. Do
- * not rename a product here without an explicit data migration; a second slug
- * would create a second project identity and split evidence provenance.
+ * Keep this collection active-only. Existing consumers historically treated
+ * PORTFOLIO_PROJECTS as an authority-bearing allowlist, so known external
+ * repositories must never be added here merely for discovery or continuity.
+ * The Control Room database remains the runtime source of truth once a project
+ * is registered there. Slugs intentionally match that existing registry.
  */
 export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   {
@@ -38,7 +35,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["commerce", "storefront", "playwright"],
   },
   {
-    slug: "jbh-private",
+    slug: "juss-beautiful-hair-private",
     name: "Juss Beautiful Hair Private Operations",
     repository: "jussray/jbh-private",
     status: "active",
@@ -66,6 +63,13 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["shopify", "story-commerce", "playwright"],
   },
   {
+    slug: "sync-party",
+    name: "SYNC Party Game",
+    repository: "jussray/sync-party-game",
+    status: "active",
+    capabilities: ["multiplayer-game", "control-room", "playwright", "continuity"],
+  },
+  {
     slug: "founder-control-room",
     name: "Founder Control Room",
     repository: "jussray/founder-control-room",
@@ -81,8 +85,66 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   },
 ] as const;
 
+/**
+ * Founder-owned repositories whose ordered Founder Intelligence challenge stack
+ * has been re-observed on their current main branch. These remain identity /
+ * continuity metadata only and grant no FCR execution authority.
+ */
+export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
+  {
+    slug: "think-tank",
+    name: "Think Tank",
+    repository: "jussray/THINK-TANK",
+    status: "external",
+    capabilities: ["idea-memory", "scorecards", "continuity"],
+  },
+  {
+    slug: "solcontinuity",
+    name: "SolContinuity",
+    repository: "jussray/solcontinuity",
+    status: "external",
+    capabilities: ["continuity", "evidence-history", "resilience"],
+  },
+  {
+    slug: "sleepwealth-agent",
+    name: "SleepWealth Agent",
+    repository: "jussray/SleepWealth-Agent",
+    status: "external",
+    capabilities: ["agent-runtime", "audit", "risk-gates"],
+  },
+  {
+    slug: "sweats",
+    name: "SWEATS",
+    repository: "jussray/Sweats",
+    status: "external",
+    capabilities: ["product", "continuity"],
+  },
+  {
+    slug: "truth-compass",
+    name: "Truth Compass",
+    repository: "jussray/truth-compass",
+    status: "external",
+    capabilities: ["truth-analysis", "evidence", "continuity"],
+  },
+  {
+    slug: "truth-weaver",
+    name: "Truth Weaver Counsel",
+    repository: "jussray/truth-weaver",
+    status: "external",
+    capabilities: ["legal-knowledge", "decision-support", "evidence", "continuity"],
+  },
+  {
+    slug: "alexa-commerce-engine",
+    name: "Alexa Commerce Engine",
+    repository: "jussray/alexa-commerce-engine-",
+    status: "external",
+    capabilities: ["commerce-agent", "continuity"],
+  },
+] as const;
+
 export const QUARANTINED_REPOSITORIES = new Set([
   "jussray/do-not-use",
+  "jussray/don-t-touch-this-one",
   "jussray/SekretBip_refactor_start",
   "jussray/Se-kretBip",
   "jussray/sekret-bip-demo",
@@ -90,12 +152,57 @@ export const QUARANTINED_REPOSITORIES = new Set([
   "jussray/jussbeautifulhair1",
 ]);
 
+/**
+ * Founder-owned repositories that should participate in portfolio continuity,
+ * provenance, and TRUE-first observation, but whose canonical Founder
+ * Intelligence challenge-stack inheritance has not yet been proven on current
+ * main. This is deliberately weaker than EXTERNAL_PROJECTS and carries zero
+ * merge, deploy, MCP, provider, publication, payment, or mutation authority.
+ */
+export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
+  {
+    slug: "bip-jr",
+    name: "Bip Jr",
+    repository: "jussray/Bip-Jr",
+    status: "continuity-only",
+    capabilities: ["bip-universe", "continuity"],
+  },
+  {
+    slug: "exact-match-engine",
+    name: "Exact Match Engine",
+    repository: "jussray/exact-match-engine",
+    status: "continuity-only",
+    capabilities: ["claim-reconciliation", "evidence-provenance", "continuity"],
+  },
+  {
+    slug: "ayure",
+    name: "AYURE",
+    repository: "jussray/Ayure-",
+    status: "continuity-only",
+    capabilities: ["property-network", "intent-matching", "cloudflare-d1", "playwright", "continuity"],
+  },
+] as const;
+
 export const ACTIVE_PROJECT_SLUGS = new Set(
-  PORTFOLIO_PROJECTS.filter((project) => project.status === "active").map(
-    (project) => project.slug,
-  ),
+  PORTFOLIO_PROJECTS.map((project) => project.slug),
 );
 
+export const EXTERNAL_PROJECT_SLUGS = new Set(
+  EXTERNAL_PROJECTS.map((project) => project.slug),
+);
+
+export const CONTINUITY_ONLY_PROJECT_SLUGS = new Set(
+  CONTINUITY_ONLY_PROJECTS.map((project) => project.slug),
+);
+
+/** Authority-bearing lookup. Non-active identities are intentionally invisible. */
 export function getPortfolioProject(slug: string): PortfolioProject | undefined {
   return PORTFOLIO_PROJECTS.find((project) => project.slug === slug);
+}
+
+/** Read-only identity lookup for continuity/provenance code. Never an allowlist. */
+export function getKnownProject(slug: string): PortfolioProject | undefined {
+  return getPortfolioProject(slug)
+    ?? EXTERNAL_PROJECTS.find((project) => project.slug === slug)
+    ?? CONTINUITY_ONLY_PROJECTS.find((project) => project.slug === slug);
 }

@@ -1,0 +1,92 @@
+name: AI Company Cloudflare Sandbox
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'labs/ai-company/cloudflare-sandbox/**'
+      - 'labs/ai-company/process-sandbox/**'
+      - '.github/workflows/ai-company-cloudflare-sandbox.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-company-cloudflare-sandbox-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  EXPECTED_SANDBOX_VERSION: 0.13.0-next.738.2
+
+jobs:
+  verify-cloudflare-sandbox:
+    name: Verify Cloudflare Sandbox substrate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify Cloudflare and local sandbox contracts
+        run: node --test labs/ai-company/cloudflare-sandbox/test/contract.test.mjs
+
+      - name: Generate proof lockfile from pinned manifest
+        working-directory: labs/ai-company/cloudflare-sandbox
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install isolated Cloudflare Sandbox dependencies
+        working-directory: labs/ai-company/cloudflare-sandbox
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify and record exact Sandbox SDK version
+        working-directory: labs/ai-company/cloudflare-sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node - <<'NODE' | tee artifacts/sandbox-version.json
+          const p = require('./node_modules/@cloudflare/sandbox/package.json');
+          const expected = process.env.EXPECTED_SANDBOX_VERSION;
+          if (p.version !== expected) {
+            throw new Error(`Sandbox package drift: expected ${expected}, got ${p.version}`);
+          }
+          console.log(JSON.stringify({
+            sandboxPackage: p.version,
+            dockerImage: `cloudflare/sandbox:${expected}`,
+            head: process.env.TARGET_SHA,
+            deploymentPerformed: false,
+          }, null, 2));
+          NODE
+
+      - name: Wrangler container dry-run only
+        working-directory: labs/ai-company/cloudflare-sandbox
+        run: npm run check
+
+      - name: Upload Cloudflare Sandbox proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-company-cloudflare-sandbox-${{ env.TARGET_SHA }}
+          path: |
+            labs/ai-company/cloudflare-sandbox/artifacts/
+            labs/ai-company/cloudflare-sandbox/package-lock.json
+          if-no-files-found: error
+          retention-days: 14

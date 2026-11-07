@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  createAppAwareRepositoryProvider,
   createRepositoryProvider,
   normalizeRepositoryConnection,
 } from "./RepositoryProviderFactory.js";
@@ -63,5 +64,59 @@ describe("RepositoryProviderFactory", () => {
         { GITHUB_TOKEN: "test-only-token" },
       ).name,
     ).toBe("github");
+  });
+
+  it("exposes genealogy only through the mapped repository provider and rejects cross-project reads", async () => {
+    const provider = createRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      { GITHUB_TOKEN: "test-only-token" },
+    );
+
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
+    await expect(provider.readChangeGenealogyEvidence?.("founder-control-room"))
+      .rejects.toThrow('no repo mapped for projectId "founder-control-room"');
+  });
+
+  it("prefers a repository-scoped GitHub App installation token when production credentials exist", async () => {
+    const getInstallationToken = vi.fn().mockResolvedValue("installation-token");
+    const provider = await createAppAwareRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_PRIVATE_KEY: "test-private-key",
+        GITHUB_TOKEN: "local-fallback-that-must-not-win",
+      },
+      { getInstallationToken },
+    );
+
+    expect(getInstallationToken).toHaveBeenCalledWith(
+      "123456",
+      "test-private-key",
+      "jussray/Sekret-Bip",
+    );
+    expect(provider.name).toBe("github");
+    expect(provider.readChangeGenealogyEvidence).toBeTypeOf("function");
+  });
+
+  it("fails closed for a partial GitHub App configuration instead of silently using a fallback token", async () => {
+    await expect(createAppAwareRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_TOKEN: "local-fallback-that-must-not-win",
+      },
+    )).rejects.toThrow("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together");
   });
 });

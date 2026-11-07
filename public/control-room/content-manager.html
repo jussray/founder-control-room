@@ -7,10 +7,11 @@
 <title>Content Manager | Founder Control Room</title>
 <style>
 :root{color-scheme:dark;--bg:#070910;--panel:#101522;--panel2:#151c2b;--line:#2c374b;--text:#f5f7fb;--muted:#a8b2c4;--accent:#c084fc;--good:#67e8a5;--warn:#ffd166;--bad:#ff7d8b}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#251342 0,transparent 31rem),var(--bg);color:var(--text);font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{width:min(1180px,100%);margin:auto;padding:clamp(16px,4vw,34px)}a{color:inherit}.back{display:inline-flex;align-items:center;gap:.45rem;color:var(--muted);text-decoration:none;font-weight:750}.back:focus-visible,.action:focus-visible{outline:3px solid #fff;outline-offset:4px}.hero{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.8fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,rgba(21,28,43,.97),rgba(11,15,25,.98));box-shadow:0 24px 80px rgba(0,0,0,.34);padding:clamp(20px,4vw,34px)}.eyebrow{margin:0;color:var(--accent);font-size:.76rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase}h1{max-width:12ch;margin:.45rem 0 1rem;font-size:clamp(2.35rem,7vw,5rem);line-height:.94;letter-spacing:-.055em}h2{margin:0;font-size:1rem}.lede{max-width:60ch;margin:0;color:#d8dfeb;font-size:clamp(1rem,2vw,1.15rem)}.status-row{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1.25rem}.pill{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .68rem;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dce4f2;font-size:.73rem;font-weight:850}.pill::before{content:"";width:.48rem;height:.48rem;border-radius:999px;background:var(--muted)}.pill.good::before{background:var(--good)}.pill.warn::before{background:var(--warn)}.truth{display:grid;gap:1rem}.truth-card{padding:1rem;border:1px solid rgba(192,132,252,.28);border-radius:15px;background:rgba(192,132,252,.07)}.truth-card strong{display:block;margin-bottom:.3rem}.truth-card p{margin:0;color:var(--muted)}.founder-lane{margin-top:1.25rem;border-color:rgba(103,232,165,.35);background:linear-gradient(145deg,rgba(24,54,51,.48),rgba(16,21,34,.98) 52%)}.founder-lane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1.25rem}.founder-lane-head h2{margin:.35rem 0 .55rem;font-size:clamp(1.35rem,3vw,2rem)}.founder-lane-head p{max-width:70ch;margin:0;color:#d8dfeb}.founder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem;margin-top:1.1rem}.founder-card{padding:1rem;border:1px solid rgba(103,232,165,.18);border-radius:16px;background:rgba(7,12,20,.58)}.founder-card h3{margin:0 0 .55rem;font-size:.95rem}.founder-card p{margin:0;color:var(--muted);font-size:.88rem}.founder-card ul{margin:.65rem 0 0;padding-left:1rem;color:var(--muted);font-size:.84rem}.founder-card li+li{margin-top:.35rem}.gate-note{margin-top:1rem;padding:.85rem 1rem;border-left:3px solid var(--warn);border-radius:0 12px 12px 0;background:rgba(255,209,102,.07);color:#e8dfc2;font-size:.88rem}.flow-heading{display:flex;align-items:end;justify-content:space-between;gap:1rem;margin:2rem 0 .85rem}.flow-heading p{max-width:58ch;margin:0;color:var(--muted)}.flow{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:.75rem;overflow-x:auto;padding:.2rem 0 .65rem;scrollbar-width:thin}.flow-step{position:relative;min-height:210px;padding:1rem;border:1px solid color-mix(in srgb,var(--step-color) 42%,var(--line));border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--step-color) 9%,var(--panel2)),var(--panel));box-shadow:inset 0 0 30px color-mix(in srgb,var(--step-color) 5%,transparent)}.flow-step:not(:last-child)::after{content:"→";position:absolute;top:50%;right:-.72rem;z-index:2;display:grid;place-items:center;width:1.35rem;height:1.35rem;border-radius:999px;background:var(--bg);color:var(--step-color);font-weight:950}.flow-step:nth-child(1){--step-color:#67e8f9}.flow-step:nth-child(2){--step-color:#c084fc}.flow-step:nth-child(3){--step-color:#e879f9}.flow-step:nth-child(4){--step-color:#f472b6}.flow-step:nth-child(5){--step-color:#fb7185}.flow-step:nth-child(6){--step-color:#fbbf24}.flow-step:nth-child(7){--step-color:#67e8a5}.step-number{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--step-color);border-radius:999px;color:var(--step-color);font-size:.78rem;font-weight:950}.flow-step h2{margin:.75rem 0 .45rem;font-size:1.05rem}.flow-step p{margin:0;color:var(--muted);font-size:.86rem}.flow-step code{display:block;margin-top:.85rem;padding:.48rem .55rem;border-radius:.65rem;background:#080c15;color:var(--step-color);font:700 .72rem/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}.authority{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.25rem}.authority h2{font-size:1.1rem}.authority ul{margin:.75rem 0 0;padding-left:1.15rem;color:var(--muted)}.authority li+li{margin-top:.45rem}.blocker{margin-top:1.25rem;border-color:rgba(255,125,139,.52);background:linear-gradient(180deg,rgba(255,125,139,.09),rgba(17,13,21,.96))}.blocker strong{color:#ffd8dc}.blocker p{margin:.45rem 0 0;color:#d9b8bd}.actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.2rem}.action{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--line);border-radius:999px;background:#121a2a;text-decoration:none;font-weight:850}.action.primary{border-color:rgba(192,132,252,.65);background:var(--accent);color:#180b23}.footer{margin:1.4rem 0 0;color:var(--muted);font-size:.82rem;text-align:center}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#251342 0,transparent 31rem),var(--bg);color:var(--text);font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{width:min(1180px,100%);margin:auto;padding:clamp(16px,4vw,34px)}a{color:inherit}.back{display:inline-flex;align-items:center;gap:.45rem;color:var(--muted);text-decoration:none;font-weight:750}.back:focus-visible,.action:focus-visible{outline:3px solid #fff;outline-offset:4px}.hero{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.8fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,rgba(21,28,43,.97),rgba(11,15,25,.98));box-shadow:0 24px 80px rgba(0,0,0,.34);padding:clamp(20px,4vw,34px)}.eyebrow{margin:0;color:var(--accent);font-size:.76rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase}h1{max-width:12ch;margin:.45rem 0 1rem;font-size:clamp(2.35rem,7vw,5rem);line-height:.94;letter-spacing:-.055em}h2{margin:0;font-size:1rem}.lede{max-width:60ch;margin:0;color:#d8dfeb;font-size:clamp(1rem,2vw,1.15rem)}.status-row{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1.25rem}.pill{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .68rem;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dce4f2;font-size:.73rem;font-weight:850}.pill::before{content:"";width:.48rem;height:.48rem;border-radius:999px;background:var(--muted)}.pill.good::before{background:var(--good)}.pill.warn::before{background:var(--warn)}.truth{display:grid;gap:1rem}.truth-card{padding:1rem;border:1px solid rgba(192,132,252,.28);border-radius:15px;background:rgba(192,132,252,.07)}.truth-card strong{display:block;margin-bottom:.3rem}.truth-card p{margin:0;color:var(--muted)}.founder-lane{margin-top:1.25rem;border-color:rgba(103,232,165,.35);background:linear-gradient(145deg,rgba(24,54,51,.48),rgba(16,21,34,.98) 52%)}.learning-loop{margin-top:1.25rem;border-color:rgba(192,132,252,.4);background:linear-gradient(145deg,rgba(58,32,84,.42),rgba(16,21,34,.98) 54%)}.founder-lane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1.25rem}.founder-lane-head h2{margin:.35rem 0 .55rem;font-size:clamp(1.35rem,3vw,2rem)}.founder-lane-head p{max-width:70ch;margin:0;color:#d8dfeb}.founder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem;margin-top:1.1rem}.founder-card{padding:1rem;border:1px solid rgba(103,232,165,.18);border-radius:16px;background:rgba(7,12,20,.58)}.learning-loop .founder-card{border-color:rgba(192,132,252,.22)}.founder-card h3{margin:0 0 .55rem;font-size:.95rem}.founder-card p{margin:0;color:var(--muted);font-size:.88rem}.founder-card ul{margin:.65rem 0 0;padding-left:1rem;color:var(--muted);font-size:.84rem}.founder-card li+li{margin-top:.35rem}.gate-note{margin-top:1rem;padding:.85rem 1rem;border-left:3px solid var(--warn);border-radius:0 12px 12px 0;background:rgba(255,209,102,.07);color:#e8dfc2;font-size:.88rem}.flow-heading{display:flex;align-items:end;justify-content:space-between;gap:1rem;margin:2rem 0 .85rem}.flow-heading p{max-width:58ch;margin:0;color:var(--muted)}.flow{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:.75rem;overflow-x:auto;padding:.2rem 0 .65rem;scrollbar-width:thin}.flow-step{position:relative;min-height:210px;padding:1rem;border:1px solid color-mix(in srgb,var(--step-color) 42%,var(--line));border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--step-color) 9%,var(--panel2)),var(--panel));box-shadow:inset 0 0 30px color-mix(in srgb,var(--step-color) 5%,transparent)}.flow-step:not(:last-child)::after{content:"→";position:absolute;top:50%;right:-.72rem;z-index:2;display:grid;place-items:center;width:1.35rem;height:1.35rem;border-radius:999px;background:var(--bg);color:var(--step-color);font-weight:950}.flow-step:nth-child(1){--step-color:#67e8f9}.flow-step:nth-child(2){--step-color:#c084fc}.flow-step:nth-child(3){--step-color:#e879f9}.flow-step:nth-child(4){--step-color:#f472b6}.flow-step:nth-child(5){--step-color:#fb7185}.flow-step:nth-child(6){--step-color:#fbbf24}.flow-step:nth-child(7){--step-color:#67e8a5}.step-number{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--step-color);border-radius:999px;color:var(--step-color);font-size:.78rem;font-weight:950}.flow-step h2{margin:.75rem 0 .45rem;font-size:1.05rem}.flow-step p{margin:0;color:var(--muted);font-size:.86rem}.flow-step code{display:block;margin-top:.85rem;padding:.48rem .55rem;border-radius:.65rem;background:#080c15;color:var(--step-color);font:700 .72rem/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}.authority{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.25rem}.authority h2{font-size:1.1rem}.authority ul{margin:.75rem 0 0;padding-left:1.15rem;color:var(--muted)}.authority li+li{margin-top:.45rem}.blocker{margin-top:1.25rem;border-color:rgba(255,125,139,.52);background:linear-gradient(180deg,rgba(255,125,139,.09),rgba(17,13,21,.96))}.blocker strong{color:#ffd8dc}.blocker p{margin:.45rem 0 0;color:#d9b8bd}.actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.2rem}.action{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--line);border-radius:999px;background:#121a2a;text-decoration:none;font-weight:850}.action.primary{border-color:rgba(192,132,252,.65);background:var(--accent);color:#180b23}.footer{margin:1.4rem 0 0;color:var(--muted);font-size:.82rem;text-align:center}
 @media(max-width:850px){.hero,.authority,.founder-grid{grid-template-columns:1fr}.founder-lane-head,.flow-heading{align-items:flex-start;flex-direction:column}.flow{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(78vw,1fr)}.flow-step{min-height:190px}.flow-step:not(:last-child)::after{right:-.72rem}}
 @media(max-width:480px){.shell{padding:14px}.panel{border-radius:18px;padding:19px}.flow{grid-auto-columns:minmax(82vw,1fr)}h1{font-size:2.65rem}}
 </style>
+<link rel="stylesheet" href="/control-room/content-manager-lifecycle.css" />
 </head>
 <body>
 <main class="shell">
@@ -97,6 +98,55 @@
     </div>
   </section>
 
+  <section class="panel learning-loop" data-content-learning-loop data-analytics-authority="observation-only" data-private-metrics-state="withheld" data-metric-claim-state="fresh-verifier-required">
+    <div class="founder-lane-head">
+      <div>
+        <p class="eyebrow">Private analytics learning loop</p>
+        <h2>Learn from attention without turning analytics into authority.</h2>
+        <p>Content performance can change what Chief proposes next. It cannot make a product claim true, renew stale proof, authorize publication, or expose the private analytics snapshot in the public payload.</p>
+      </div>
+      <span class="pill warn">Metrics stay private by default</span>
+    </div>
+
+    <div class="founder-grid" aria-label="Content learning dimensions">
+      <article class="founder-card" data-learning-axis="distribution">
+        <h3>Distribution</h3>
+        <p>Track whether strong founder stories are reaching enough people. Use the trend to improve hooks and delivery, not to invent stronger product claims.</p>
+      </article>
+      <article class="founder-card" data-learning-axis="resonance">
+        <h3>Resonance</h3>
+        <p>Prefer stories where a clear founder thesis, correction, or proof lesson earns deeper response than a generic progress update.</p>
+      </article>
+      <article class="founder-card" data-learning-axis="compounding">
+        <h3>Compounding</h3>
+        <p>Watch whether recurring readers and followers grow across snapshots. The signal shapes future drafts but remains observation-only.</p>
+      </article>
+    </div>
+
+    <div class="founder-grid" aria-label="Preferred founder story archetypes">
+      <article class="founder-card" data-story-archetype="founder-thesis">
+        <h3>Founder thesis</h3>
+        <p>Lead with the thing you now believe because building the product forced a sharper conclusion.</p>
+      </article>
+      <article class="founder-card" data-story-archetype="build-correct">
+        <h3>Build → correct</h3>
+        <p>Show what you believed, what the real system disproved, and what changed without exposing the private implementation recipe.</p>
+      </article>
+      <article class="founder-card" data-story-archetype="proof-lesson">
+        <h3>Proof + lesson</h3>
+        <p>Use a public-safe artifact or evidence class to support the lesson while raw diffs, prompts, credentials, and private proof stay withheld.</p>
+      </article>
+      <article class="founder-card" data-story-archetype="human-product-stake">
+        <h3>Human product stake</h3>
+        <p>Explain why the product behavior matters to a real person. Keep sensitive customer, family, and security details out of the public story.</p>
+      </article>
+    </div>
+
+    <div class="gate-note" role="note" data-learning-truth-boundary>
+      <strong>Truth boundary:</strong> repository proof may support repository claims, not analytics claims. A follower, impression, user, sales, or conversion number remains a metric claim even when written in past tense. Until a fresh analytics verifier is implemented, those claims stay BLOCKED for first-party publication. The private snapshot may still guide which public-safe story shape Chief proposes next.
+    </div>
+  </section>
+
   <div class="flow-heading">
     <div>
       <p class="eyebrow">Output becomes the next gate</p>
@@ -150,6 +200,120 @@
     </li>
   </ol>
 
+  <section class="panel lifecycle-control" data-lifecycle-control-plane data-api-base="/automation/conveyor/founder-content/lifecycle">
+    <div class="lifecycle-head">
+      <div>
+        <p class="eyebrow">Operational control plane</p>
+        <h2>Run the lifecycle without collapsing the truth gates.</h2>
+        <p>Draft, review, schedule intent, provider readback, and publication are separate operations. Live mutations require the authenticated Founder Control Room runtime.</p>
+      </div>
+      <span class="pill lifecycle-runtime" data-lifecycle-runtime data-state="blocked">Checking runtime…</span>
+    </div>
+
+    <div class="lifecycle-toolbar">
+      <button class="control-button primary" type="button" data-refresh-lifecycle data-live-only>Refresh lifecycle</button>
+      <span class="field-note">Reads are automatic. External account connection and publication require explicit buttons below.</span>
+    </div>
+    <div class="adapter-note" data-adapter-note>Provider adapter state is UNKNOWN until runtime readback.</div>
+
+    <div class="lifecycle-analytics" aria-label="Lifecycle analytics">
+      <div class="metric-card"><strong data-metric-total>0</strong><span>Total posts</span></div>
+      <div class="metric-card"><strong data-metric-posted>0</strong><span>Provider-verified posted</span></div>
+      <div class="metric-card"><strong data-metric-scheduled>0</strong><span>Editorial schedule intent</span></div>
+      <div class="metric-card"><strong data-metric-failures>0</strong><span>Failed or ambiguous</span></div>
+    </div>
+
+    <div class="control-grid">
+      <form class="control-card" data-create-draft-form>
+        <h3>Create reviewable draft</h3>
+        <p>This stores public draft state only. It does not approve, schedule at a provider, or publish.</p>
+        <div class="field-grid">
+          <div class="field">
+            <label for="lifecycle-provider">Provider lane</label>
+            <select class="control-select" id="lifecycle-provider" name="provider">
+              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lifecycle-platform">Platform</label>
+            <select class="control-select" id="lifecycle-platform" name="platform">
+              <option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+            </select>
+          </div>
+          <div class="field full"><label for="lifecycle-account">Destination account ID</label><input class="control-input" id="lifecycle-account" name="account_id" autocomplete="off" placeholder="Provider-owned account identifier" required /></div>
+          <div class="field full"><label for="lifecycle-title">Internal title</label><input class="control-input" id="lifecycle-title" name="title" maxlength="240" placeholder="What this post is about" /></div>
+          <div class="field full"><label for="lifecycle-draft">Public draft text</label><textarea class="control-textarea" id="lifecycle-draft" name="draft_text" placeholder="Exact public-safe copy for review" required></textarea></div>
+        </div>
+        <div class="lifecycle-toolbar"><button class="control-button primary" type="submit" data-live-only>Store draft</button></div>
+        <p class="field-note" data-postiz-readback-note>Use provider=linkedin only for the current first-party direct publish path. Postiz is account/status readback only; it does not expose scheduling or publication authority here. Other provider lanes remain adapter-gated until activated.</p>
+      </form>
+
+      <div class="control-card">
+        <h3>Provider account gate</h3>
+        <p>Account discovery and OAuth connection stay provider-owned. No account connection grants publication authority.</p>
+        <div class="field-grid">
+          <div class="field"><label for="account-provider">Provider</label><select class="control-select" id="account-provider" data-account-provider><option value="buffer">Buffer</option><option value="linkedin">LinkedIn</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
+          <div class="field"><label for="account-platform">Platform</label><select class="control-select" id="account-platform" data-account-platform><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
+          <div class="field full"><label for="account-name">Optional account label</label><input class="control-input" id="account-name" data-account-name placeholder="Account label for provider connection flow" /></div>
+        </div>
+        <div class="lifecycle-toolbar"><button class="control-button" type="button" data-account-list data-live-only>List accounts</button><button class="control-button" type="button" data-account-connect data-live-only>Connect account</button></div>
+        <p class="field-note">Postiz supports account listing/status readback in this FCR lane. Postiz account connection and provider writes are not enabled here and fail closed.</p>
+      </div>
+    </div>
+
+    <div class="control-card" style="margin-top:1rem">
+      <h3>Bulk schedule intent</h3>
+      <p>Select posts below, then set an editorial schedule sequence. This does not claim provider scheduling succeeded.</p>
+      <div class="field-grid">
+        <div class="field"><label for="bulk-start">Start</label><input class="control-input" id="bulk-start" type="datetime-local" data-bulk-start /></div>
+        <div class="field"><label for="bulk-interval">Minutes between posts</label><input class="control-input" id="bulk-interval" type="number" min="1" max="10080" value="30" data-bulk-interval /></div>
+      </div>
+      <div class="lifecycle-toolbar"><button class="control-button" type="button" data-bulk-schedule data-live-only>Store bulk schedule intent</button></div>
+    </div>
+
+    <div class="posts-head"><div><p class="eyebrow">Durable post ledger</p><h3>Posts</h3></div><span class="field-note">Open one post to review its exact state and authority package.</span></div>
+    <div class="post-list" data-post-list aria-live="polite"></div>
+
+    <section class="control-card selected-console" data-selected-console hidden>
+      <div class="posts-head"><div><p class="eyebrow">Selected post</p><h3 data-selected-title>Selected post</h3></div><span class="mini-pill" data-selected-status>UNKNOWN</span></div>
+      <div class="selected-summary">
+        <div><strong>Provider / platform</strong><span data-selected-provider>UNKNOWN</span></div>
+        <div><strong>Provider write</strong><span data-selected-write-state>UNKNOWN</span></div>
+        <div><strong>Exact public payload hash</strong><span data-selected-hash>UNKNOWN</span></div>
+        <div><strong>Publication truth</strong><span>Provider readback only</span></div>
+      </div>
+
+      <div class="control-grid">
+        <div class="control-card">
+          <h3>Review + reversible state</h3>
+          <div class="field"><label for="review-comment">Review comment</label><textarea class="control-textarea" id="review-comment" data-review-comment placeholder="What should change or what was verified"></textarea></div>
+          <div class="console-actions"><button class="control-button" type="button" data-add-comment data-live-only>Add comment</button><button class="control-button" type="button" data-selected-action="comments" data-live-only>Read comments</button><button class="control-button" type="button" data-selected-action="logs" data-live-only>Read logs</button><button class="control-button" type="button" data-selected-action="status" data-live-only>Read provider status</button><button class="control-button" type="button" data-selected-action="metrics" data-live-only>Sync metrics</button></div>
+          <div class="field" style="margin-top:.8rem"><label for="reschedule-at">New editorial schedule time</label><input class="control-input" id="reschedule-at" type="datetime-local" data-reschedule-at /></div>
+          <div class="console-actions"><button class="control-button" type="button" data-selected-action="reschedule" data-live-only>Reschedule intent</button></div>
+          <div class="field" style="margin-top:.8rem"><label for="reject-reason">Reject reason</label><input class="control-input" id="reject-reason" data-reject-reason placeholder="Why this post should stop" /></div>
+          <div class="console-actions"><button class="control-button danger" type="button" data-selected-action="reject" data-live-only>Reject post</button><button class="control-button" type="button" data-selected-action="retry" data-live-only>Reset failed post for retry</button></div>
+        </div>
+
+        <div class="control-card">
+          <h3>Exact authority package</h3>
+          <p>Paste the exact Chief/FCR proposal. Approval issuance binds this proposal to the authenticated Current You and expires independently of the post ledger.</p>
+          <div class="field"><label for="proposal-json">Proposal JSON</label><textarea class="control-textarea code" id="proposal-json" data-proposal-json placeholder='{"proposal_hash":"…","public_payload":{"draft_text":"…"}}'></textarea></div>
+          <div class="field-grid" style="margin-top:.7rem">
+            <div class="field full"><label for="approval-id">Approval ID</label><input class="control-input" id="approval-id" data-approval-id autocomplete="off" /></div>
+            <div class="field full"><label for="authorization-hash">Authorization hash</label><input class="control-input" id="authorization-hash" data-authorization-hash autocomplete="off" /></div>
+            <div class="field full"><label for="public-payload-hash">Public payload hash</label><input class="control-input" id="public-payload-hash" data-public-payload-hash readonly /></div>
+          </div>
+          <div class="console-actions"><button class="control-button" type="button" data-issue-approval data-live-only>Issue exact-copy approval</button><button class="control-button primary" type="button" data-bind-approval data-live-only>Bind approval to post</button></div>
+          <label class="inline-check"><input type="checkbox" data-publish-confirm data-live-only /><span>I confirm this exact approved copy should publish now. I understand provider publication is irreversible even if lifecycle receipt synchronization later fails.</span></label>
+          <div class="console-actions"><button class="control-button publish" type="button" data-selected-action="publish" data-live-only>Publish exact copy now</button></div>
+          <p class="field-note">Current direct publish is LinkedIn-only and still requires configured server-owned LinkedIn authority, temporal revalidation, one-shot execution reservation, provider write, and provider readback.</p>
+        </div>
+      </div>
+    </section>
+
+    <pre class="console-output" data-console-output data-tone="neutral" aria-live="polite">Lifecycle console ready. No provider mutation has been performed.</pre>
+  </section>
+
   <section class="authority">
     <article class="panel">
       <p class="eyebrow">Founder Control Room owns</p>
@@ -185,5 +349,6 @@
 
   <p class="footer">Every output becomes the next gate. Capability, authorization, dispatch, and publication remain separate truths.</p>
 </main>
+<script src="/control-room/content-manager-lifecycle.js" defer></script>
 </body>
 </html>

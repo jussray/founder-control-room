@@ -66,7 +66,12 @@ interface ExistingExecution {
 
 interface RouteOptions {
   existingExecution?: ExistingExecution | null;
-  applyResult?: { id: string; name: string; enforcement: string };
+  applyResult?: {
+    id: string;
+    name: string;
+    enforcement: string;
+    components?: Array<{ purpose: string; id: string; name: string; enforcement: string }>;
+  };
   applyError?: Error;
   providerSupportsRuleset?: boolean;
 }
@@ -195,6 +200,30 @@ describe("POST /projects/:slug/ruleset", () => {
     );
     expect(updateMock).toHaveBeenCalledWith(
       expect.objectContaining({ status: "succeeded", success: true }),
+    );
+  });
+
+  it("persists composite provider component receipts in the execution result", async () => {
+    const components = [
+      { purpose: "review", id: "1", name: "protect-main", enforcement: "active" },
+      { purpose: "strict_freshness", id: "2", name: "protect-main [strict freshness]", enforcement: "active" },
+    ];
+    const { updateMock } = stubRoute({
+      applyResult: { id: "1", name: "protect-main", enforcement: "active", components },
+    });
+    const res = await request(buildApp())
+      .post(`/projects/${PROJECT_SLUG}/ruleset`)
+      .set("Authorization", BEARER)
+      .send(validBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.result.components).toEqual(components);
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "succeeded",
+        result: expect.objectContaining({ components }),
+        success: true,
+      }),
     );
   });
 

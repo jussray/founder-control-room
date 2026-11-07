@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   ExecutionAuthorization,
   GovernedActionRequest,
@@ -5,6 +6,12 @@ import type {
   IntentSource,
   MemorySource,
 } from './governedIntelligence.js';
+import {
+  evaluateTruthLeaseAtUse,
+  type TruthDependencyObservation,
+  type TruthLease,
+  type TruthUseBoundary,
+} from '../lib/truthLease.js';
 
 export interface DecisionContextSnapshot {
   intent: {
@@ -27,10 +34,14 @@ export interface DecisionContextSnapshot {
 
 export type ContextBoundExecutionAuthorization = ExecutionAuthorization & {
   decisionContext?: DecisionContextSnapshot | null;
+  truthLeaseHash?: string | null;
 };
 
 export type ContextBoundGovernedActionRequest = Omit<GovernedActionRequest, 'authorization'> & {
   authorization?: ContextBoundExecutionAuthorization | null;
+  truthLease?: TruthLease | null;
+  truthObservations?: TruthDependencyObservation[];
+  truthUseBoundary?: TruthUseBoundary | null;
 };
 
 function normalizeSnapshot(snapshot: DecisionContextSnapshot): DecisionContextSnapshot {
@@ -50,8 +61,23 @@ function normalizeSnapshot(snapshot: DecisionContextSnapshot): DecisionContextSn
   };
 }
 
+export function decisionContextHash(snapshot: DecisionContextSnapshot): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ kind: 'fcr/governed-decision-context@v1', context: normalizeSnapshot(snapshot) }))
+    .digest('hex');
+}
+
 function reasonsBeforeContextGate(verdict: GovernedActionVerdict): string[] {
   return verdict.reasons.filter((reason) => reason !== 'Governed action contract satisfied.');
+}
+
+function reconfirmBinding(verdict: GovernedActionVerdict, reason: string): GovernedActionVerdict {
+  return {
+    ...verdict,
+    decision: 'reconfirm',
+    reasons: [...reasonsBeforeContextGate(verdict), reason],
+    reasonCodes: ['execution_authorization_binding'],
+  };
 }
 
 export function decisionContextFromVerdict(
@@ -105,30 +131,67 @@ export function enforceConsequentialDecisionContext(
 
   const approved = request.authorization?.decisionContext ?? null;
   const current = decisionContextFromVerdict(request, verdict);
-  const baseReasons = reasonsBeforeContextGate(verdict);
 
   if (!approved || !current) {
-    return {
-      ...verdict,
-      decision: 'reconfirm',
-      reasons: [
-        ...baseReasons,
-        'Consequential portfolio action requires execution authorization bound to the exact decision context.',
-      ],
-      reasonCodes: ['execution_authorization_binding'],
-    };
+    return reconfirmBinding(
+      verdict,
+      'Consequential portfolio action requires execution authorization bound to the exact decision context.',
+    );
   }
 
   if (!decisionContextsMatch(approved, current)) {
-    return {
-      ...verdict,
-      decision: 'reconfirm',
-      reasons: [
-        ...baseReasons,
-        'Execution authorization decision context no longer matches current intent, memory, proof, or exact version; regenerate the proposal or re-confirm it against current state.',
-      ],
-      reasonCodes: ['execution_authorization_binding'],
-    };
+    return reconfirmBinding(
+      verdict,
+      'Execution authorization decision context no longer matches current intent, memory, proof, or exact version; regenerate the proposal or re-confirm it against current state.',
+    );
+  }
+
+  const dependsOnObservedTruth = current.memories.length > 0 || current.proofs.length > 0;
+  if (!dependsOnObservedTruth) return verdict;
+
+  const lease = request.truthLease ?? null;
+  const useBoundary = request.truthUseBoundary ?? null;
+  if (!lease || !useBoundary) {
+    return reconfirmBinding(
+      verdict,
+      'Evidence-dependent consequential action requires a Truth Lease revalidated at the exact use boundary.',
+    );
+  }
+
+  const currentContextHash = decisionContextHash(current);
+  if (lease.claimHash.toLowerCase() !== currentContextHash) {
+    return reconfirmBinding(
+      verdict,
+      'Truth Lease does not bind the exact current decision context; rebuild the lease from current evidence.',
+    );
+  }
+
+  const authorizedLeaseHash = request.authorization?.truthLeaseHash?.trim().toLowerCase() ?? null;
+  if (authorizedLeaseHash !== lease.leaseHash.toLowerCase()) {
+    return reconfirmBinding(
+      verdict,
+      'Execution authorization is bound to a different Truth Lease.',
+    );
+  }
+
+  try {
+    const leaseEvaluation = evaluateTruthLeaseAtUse({
+      lease,
+      observations: request.truthObservations ?? [],
+      useBoundary,
+      now: verdict.lineage.evaluatedAt,
+    });
+    if (!leaseEvaluation.mayUseClaim) {
+      return reconfirmBinding(
+        verdict,
+        `Truth Lease is ${leaseEvaluation.state} at ${useBoundary}; ${leaseEvaluation.reasons.join('; ')}`,
+      );
+    }
+  } catch {
+    return reconfirmBinding(
+      verdict,
+      'Truth Lease could not be validated at the use boundary.',
+    );
   }
 
   return verdict;

@@ -1,0 +1,366 @@
+name: FCR Access Front Door Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: 'Exact current main SHA approved for FCR front-door inspection or recovery'
+        required: true
+        type: string
+      apply:
+        description: 'Detach FCR browser-facing destinations from Cloudflare Access while preserving private Worker destinations'
+        required: true
+        type: boolean
+        default: false
+      approval_reference:
+        description: 'Auditable founder approval reference; required when apply=true'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fcr-access-front-door-recovery-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+  CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
+
+jobs:
+  recover:
+    name: Remove Cloudflare Access from the FCR browser doorway
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Check out exact approved current main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify exact current main and mutation approval
+        env:
+          APPLY: ${{ inputs.apply }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA.'
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+          approval_reference_receipt='not-required-for-read-only'
+          if [[ "$APPLY" == 'true' ]]; then
+            if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
+              exit 1
+            fi
+            approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
+          elif [[ -n "${APPROVAL_REFERENCE:-}" ]]; then
+            echo '::error title=Unexpected mutation approval::apply=false must not carry approval_reference.'
+            exit 1
+          fi
+
+          {
+            echo '## FCR front-door authority gate'
+            echo
+            echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Apply requested: \`$APPLY\`"
+            echo "- Approval reference receipt: \`$approval_reference_receipt\`"
+            echo '- Product auth: FCR founder sign-in, not Cloudflare Access'
+            echo '- Browser doorway invariant: Cloudflare Access owns zero public destinations on foundercontrolroom.org or www.foundercontrolroom.org'
+            echo '- Mutation scope: remove only browser-facing public destinations from one uniquely identified mixed Access application'
+            echo '- Preserved scope: all non-browser destinations and all existing policies remain unchanged'
+            echo '- Public-only or ambiguous Access applications: fail closed for separately reviewed deletion'
+            echo '- DNS mutation: none'
+            echo '- Worker route mutation: none'
+            echo '- Database mutation: none'
+            echo '- Browser/runtime failure after a successful detach does not automatically reintroduce the Access screen'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove credential and bounded recovery contracts
+        id: contracts
+        run: |
+          node --test scripts/provider-credential-contract.node-test.mjs
+          node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/fcr-stranger-front-door-contract.node-test.mjs
+
+      - name: Inspect live browser Access ownership without mutation
+        id: access_inspect
+        if: inputs.apply != true
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
+
+      - name: Detach browser-facing FCR destinations with dedicated admin authority
+        id: access_apply
+        if: inputs.apply == true
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply >/dev/null 2>&1
+
+      - name: Roll back only an incomplete provider apply
+        id: rollback
+        if: always() && inputs.apply == true && steps.access_apply.outcome == 'failure'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --rollback >/dev/null 2>&1
+
+      - name: Install Chromium for stranger front-door proof
+        id: chromium
+        if: always() && steps.contracts.outcome == 'success'
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify FCR-owned sign-in and no Cloudflare Access screen
+        id: stranger_browser
+        if: always() && steps.contracts.outcome == 'success' && steps.chromium.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
+
+      - name: Evaluate provider detachment and stranger evidence
+        id: evidence_gate
+        if: always()
+        continue-on-error: true
+        env:
+          APPLY: ${{ inputs.apply }}
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          ACCESS_INSPECT_OUTCOME: ${{ steps.access_inspect.outcome }}
+          ACCESS_APPLY_OUTCOME: ${{ steps.access_apply.outcome }}
+          CHROMIUM_OUTCOME: ${{ steps.chromium.outcome }}
+          STRANGER_BROWSER_OUTCOME: ${{ steps.stranger_browser.outcome }}
+          ROLLBACK_OUTCOME: ${{ steps.rollback.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          provider_outcome="$ACCESS_INSPECT_OUTCOME"
+          if [[ "$APPLY" == 'true' ]]; then
+            provider_outcome="$ACCESS_APPLY_OUTCOME"
+          fi
+
+          printf 'contracts=%s\nprovider=%s\nchromium=%s\nstranger_browser=%s\nrollback=%s\n' \
+            "$CONTRACTS_OUTCOME" \
+            "$provider_outcome" \
+            "$CHROMIUM_OUTCOME" \
+            "$STRANGER_BROWSER_OUTCOME" \
+            "$ROLLBACK_OUTCOME"
+
+          test "$CONTRACTS_OUTCOME" = 'success'
+          test "$provider_outcome" = 'success'
+          test "$CHROMIUM_OUTCOME" = 'success'
+          test "$STRANGER_BROWSER_OUTCOME" = 'success'
+
+          if [[ "$APPLY" == 'true' && "$ACCESS_APPLY_OUTCOME" == 'failure' && "$ROLLBACK_OUTCOME" == 'failure' ]]; then
+            echo '::error title=Rollback failed::The bounded Access destination mutation has an unresolved provider outcome.'
+            exit 1
+          fi
+
+      - name: Return sanitized recovery receipt to founder control issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
+          EVIDENCE_GATE_OUTCOME: ${{ steps.evidence_gate.outcome }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          access_receipt='test-results/fcr-access-front-door-recovery.json'
+          browser_receipt='test-results/fcr-access-front-door-browser-proof.json'
+          public_receipt='test-results/fcr-access-front-door-public-receipt.md'
+          mkdir -p test-results
+
+          safe_expected_head_sha='UNKNOWN'
+          if [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            safe_expected_head_sha="$EXPECTED_HEAD_SHA"
+          fi
+
+          {
+            echo '## FCR Access-screen removal + stranger-path receipt'
+            echo
+            echo "- Exact head: \`$safe_expected_head_sha\`"
+            echo "- Workflow run: $WORKFLOW_RUN_URL"
+            echo "- Evidence gate: \`$EVIDENCE_GATE_OUTCOME\`"
+
+            if [[ ! -f "$access_receipt" ]]; then
+              echo '- Access provider receipt: `missing`'
+              echo '- Provider truth: `UNKNOWN` because no structured detachment receipt was produced.'
+            elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
+              --arg expectedHeadSha "$safe_expected_head_sha" \
+              --arg accountId "$CLOUDFLARE_ACCOUNT_ID" '
+                def iso8601:
+                  type == "string"
+                  and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+                def digits_or_null:
+                  . == null or (type == "string" and test("^[0-9]+$"));
+                def credential_source:
+                  . == null
+                  or . == "CLOUDFLARE_ACCESS_API_TOKEN"
+                  or . == "CLOUDFLARE_ACCESS_ADMIN_API_TOKEN";
+                length == 1
+                and (
+                  .[0]
+                  | type == "object"
+                  and .schemaVersion == 3
+                  and .scope == "fcr-access-front-door-recovery"
+                  and .desiredState == "fcr-product-auth-without-cloudflare-access-screen"
+                  and (.observedAt | iso8601)
+                  and (.workflowRunId | digits_or_null)
+                  and (.workflowRunAttempt | digits_or_null)
+                  and .expectedHeadSha == $expectedHeadSha
+                  and .accountId == $accountId
+                  and .zone == "foundercontrolroom.org"
+                  and (.applyRequested | type == "boolean")
+                  and (.mutationPerformed | type == "boolean")
+                  and (.rollbackPerformed | type == "boolean")
+                  and (.credentialSource | credential_source)
+                  and (.matchingApplicationCount == null or (.matchingApplicationCount | type == "number" and floor == . and . >= 0))
+                  and (.browserAccessDestinationCount == null or (.browserAccessDestinationCount | type == "number" and floor == . and . >= 0))
+                  and (.preservedNonBrowserDestinationCount == null or (.preservedNonBrowserDestinationCount | type == "number" and floor == . and . >= 0))
+                  and (
+                    .action == "none"
+                    or .action == "browser-access-already-detached"
+                    or .action == "would-detach-browser-access"
+                    or .action == "detached-browser-access"
+                    or .action == "restored-browser-access-after-failed-provider-apply"
+                  )
+                )
+              ' "$access_receipt" >/dev/null 2>&1; then
+              echo '- Access provider receipt: `malformed`'
+              echo '- Provider truth: `UNKNOWN` because the structured receipt failed the public schema allowlist.'
+            else
+              echo '- Access provider receipt: `present`'
+              echo
+              echo '```json'
+              jq -s '.[0] | {
+                schemaVersion,
+                scope,
+                desiredState,
+                observedAt,
+                expectedHeadSha,
+                state,
+                applyRequested,
+                mutationPerformed,
+                rollbackPerformed,
+                credentialSource,
+                matchingApplicationCount,
+                browserAccessDestinationCount,
+                preservedNonBrowserDestinationCount,
+                action,
+                classification
+              }' "$access_receipt"
+              echo '```'
+            fi
+
+            if [[ ! -f "$browser_receipt" ]]; then
+              echo
+              echo '- Browser proof receipt: `missing` (stranger-path)'
+            elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
+              --arg expectedHeadSha "$safe_expected_head_sha" '
+                def iso8601:
+                  type == "string"
+                  and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+                def status_or_null:
+                  . == null or (type == "number" and floor == . and . >= 100 and . <= 599);
+                def origin_or_null:
+                  . == null or (type == "string" and test("^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$"));
+                length == 1
+                and (
+                  .[0]
+                  | type == "object"
+                  and .schemaVersion == 1
+                  and .scope == "fcr-access-front-door-browser-proof"
+                  and (.observedAt | iso8601)
+                  and .expectedHeadSha == $expectedHeadSha
+                  and .audience == "random-stranger"
+                  and .requestedOrigin == "https://foundercontrolroom.org"
+                  and .publicOrigin == "https://www.foundercontrolroom.org"
+                  and (.finalOrigin | origin_or_null)
+                  and (.navigationStatus | status_or_null)
+                  and (.controlRoomStatus | status_or_null)
+                  and (.founderSignInVisible | type == "boolean")
+                  and (.founderShellVisible | type == "boolean")
+                  and (.authMeStatus | status_or_null)
+                  and (.founderAuthorityContained | type == "boolean")
+                  and (.apiVersionStatus | status_or_null)
+                  and (.apiVersionMatchesExpectedSha | type == "boolean")
+                  and (.state == "unknown" or .state == "proven" or .state == "failed")
+                  and ((has("error") | not) or .error == null or (.error | type == "string" and length <= 2000))
+                )
+              ' "$browser_receipt" >/dev/null 2>&1; then
+              echo
+              echo '- Browser proof receipt: `malformed` (stranger-path)'
+              echo '- Browser proof: `UNKNOWN` because the structured stranger-path receipt failed the single-document public schema allowlist.'
+            else
+              echo
+              echo '- Browser proof receipt: `present` (stranger-path)'
+              echo
+              echo '```json'
+              jq -s '.[0] | {
+                schemaVersion,
+                scope,
+                observedAt,
+                expectedHeadSha,
+                audience,
+                finalOriginIsFcr: (.finalOrigin != null and (.finalOrigin == .requestedOrigin or .finalOrigin == .publicOrigin)),
+                accessInterceptDetected: (((.finalOrigin // "") | test("cloudflareaccess\\.com"; "i")) or ((.error // "") | test("Cloudflare Access"; "i"))),
+                navigationStatus,
+                controlRoomStatus,
+                founderSignInVisible,
+                founderShellVisible,
+                authMeStatus,
+                founderAuthorityContained,
+                apiVersionStatus,
+                apiVersionMatchesExpectedSha,
+                state,
+                errorPresent: (((.error // "") | length) > 0)
+              }' "$browser_receipt"
+              echo '```'
+            fi
+          } > "$public_receipt"
+
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$public_receipt"
+          cat "$public_receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-access-front-door-public-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/fcr-access-front-door-public-receipt.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Fail closed after retaining provider and stranger evidence
+        if: always() && steps.evidence_gate.outcome != 'success'
+        shell: bash
+        run: |
+          echo '::error title=FCR front-door truth not fully proven::Provider detachment and stranger-path evidence were retained; at least one required witness is not green.'
+          exit 1

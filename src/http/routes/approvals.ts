@@ -5,6 +5,11 @@
  *   1. a fresh founder-approved proof_gate_results record; and
  *   2. complete machine evidence bound to the exact current head SHA.
  *
+ * Founder Control Room merges additionally require provider-backed exact-PR
+ * review evidence. The canonical founder-final mode requires deterministic
+ * independent review first, then an authenticated founder approval bound to
+ * the exact PR/base/head before provider integration.
+ *
  * Every external mutation is reserved in approval_executions BEFORE the
  * provider call. A pending reservation blocks replay if the provider succeeds
  * but the final audit update is interrupted.
@@ -26,6 +31,20 @@ import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
+import {
+  createBranchAuthorityContext,
+  issueCreateBranchAuthority,
+  type IssuedCreateBranchAuthority,
+} from '../../founder-os-lab/authorityIssuance.js';
+import { executeAuthorizedCreateBranch } from '../../providers/authorizedRepositoryMutation.js';
+import {
+  FCR_FOUNDER_FINAL_REVIEW_POLICY,
+  evaluateIndependentReviewGate,
+  independentReviewDiffHash,
+  independentReviewPolicyHash,
+  type IndependentReviewPolicy,
+  type IndependentReviewReceipt,
+} from '../../review/independentReviewGate.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
 const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
@@ -38,6 +57,10 @@ function isSafeRepoPath(path: string): boolean {
 
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
+const FCR_REPOSITORY = 'jussray/founder-control-room';
+const FOUNDER_FINAL_REVIEW_CONTRACT = 'juss-v10/founder-final-merge@v1' as const;
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
 
 interface ExecutionRecord {
   id: string;
@@ -55,8 +78,157 @@ interface RepositoryProjectRow {
   repo_identifier: string | null;
 }
 
+interface FounderPinnedIndependentReview {
+  pullRequestNumber: number;
+  baseSha: string;
+  authorIdentity: string;
+  policy: IndependentReviewPolicy;
+  policyHash: string;
+}
+
 export const approvalsRouter = Router();
 approvalsRouter.use(requireFounder);
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function lower(value: unknown): string {
+  return text(value).toLowerCase();
+}
+
+function isFounderControlRoomRepository(project: RepositoryProjectRow): boolean {
+  return lower(project.repo_identifier) === FCR_REPOSITORY;
+}
+
+function validateIndependentReviewPolicy(
+  value: unknown,
+): { ok: true; policy: IndependentReviewPolicy } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'independentReview.policy must be an object' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const founderFinalApprovalRequired = candidate['founderFinalApprovalRequired'] === true;
+  const requiredSemanticReviews = candidate['requiredSemanticReviews'];
+  const minimumSemanticReviews = founderFinalApprovalRequired ? 0 : 1;
+  if (!Number.isInteger(requiredSemanticReviews)
+    || Number(requiredSemanticReviews) < minimumSemanticReviews
+    || Number(requiredSemanticReviews) > 4) {
+    return {
+      ok: false,
+      error: founderFinalApprovalRequired
+        ? 'founder-final review policy requires requiredSemanticReviews from 0 to 4'
+        : 'independentReview.policy.requiredSemanticReviews must be an integer from 1 to 4',
+    };
+  }
+  if (candidate['requireDeterministicReview'] !== true) {
+    return { ok: false, error: 'FCR independent review policy must require deterministic review' };
+  }
+  if (candidate['blockOnP2'] !== true) {
+    return { ok: false, error: 'FCR independent review policy must keep P2 findings merge-blocking' };
+  }
+  const rawTrusted = candidate['trustedSemanticReviewerIds'];
+  if (!Array.isArray(rawTrusted)
+    || rawTrusted.some((reviewer) => !text(reviewer))
+    || (!founderFinalApprovalRequired && rawTrusted.length === 0)) {
+    return {
+      ok: false,
+      error: founderFinalApprovalRequired
+        ? 'founder-final review policy trustedSemanticReviewerIds must be an array'
+        : 'independentReview.policy.trustedSemanticReviewerIds must contain reviewer identities',
+    };
+  }
+  const trustedSemanticReviewerIds = rawTrusted.map((reviewer) => text(reviewer));
+  const normalized = trustedSemanticReviewerIds.map((reviewer) => reviewer.toLowerCase());
+  if (new Set(normalized).size !== normalized.length) {
+    return { ok: false, error: 'independentReview.policy.trustedSemanticReviewerIds must be unique' };
+  }
+  if (trustedSemanticReviewerIds.length < Number(requiredSemanticReviews)) {
+    return { ok: false, error: 'independentReview policy has fewer trusted reviewers than required semantic reviews' };
+  }
+
+  return {
+    ok: true,
+    policy: {
+      requiredSemanticReviews: Number(requiredSemanticReviews),
+      requireDeterministicReview: true,
+      blockOnP2: true,
+      trustedSemanticReviewerIds,
+      ...(founderFinalApprovalRequired ? { founderFinalApprovalRequired: true as const } : {}),
+    },
+  };
+}
+
+function validateIndependentReviewApproval(
+  value: unknown,
+): { ok: true; pullRequestNumber: number; policy: IndependentReviewPolicy } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'FCR merge approval requires independentReview metadata' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'independentReview.pullRequestNumber must be a positive integer' };
+  }
+  const policyResult = validateIndependentReviewPolicy(candidate['policy']);
+  if (!policyResult.ok) return policyResult;
+  return {
+    ok: true,
+    pullRequestNumber: Number(pullRequestNumber),
+    policy: policyResult.policy,
+  };
+}
+
+function validateFounderFinalReviewApproval(
+  value: unknown,
+): { ok: true; pullRequestNumber: number } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'FCR founder-final merge approval requires founderFinalReview metadata' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'founderFinalReview.pullRequestNumber must be a positive integer' };
+  }
+  if (candidate['confirmExactCandidate'] !== true) {
+    return { ok: false, error: 'founderFinalReview.confirmExactCandidate must be true' };
+  }
+  if (candidate['policy'] !== undefined || candidate['trustedSemanticReviewerIds'] !== undefined) {
+    return { ok: false, error: 'founder-final review policy is server-owned and cannot be redefined by the caller' };
+  }
+  return { ok: true, pullRequestNumber: Number(pullRequestNumber) };
+}
+
+function readPinnedIndependentReview(
+  value: unknown,
+): { ok: true; review: FounderPinnedIndependentReview } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'Mission has no founder-pinned independent review policy' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  const baseSha = lower(candidate['baseSha']);
+  const authorIdentity = text(candidate['authorIdentity']);
+  const policyHash = lower(candidate['policyHash']);
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'Pinned independent review PR number is invalid' };
+  }
+  if (!FULL_SHA.test(baseSha)) return { ok: false, error: 'Pinned independent review base SHA is invalid' };
+  if (!authorIdentity) return { ok: false, error: 'Pinned independent review author identity is missing' };
+  if (!SHA256.test(policyHash)) return { ok: false, error: 'Pinned independent review policy hash is invalid' };
+  const policyResult = validateIndependentReviewPolicy(candidate['policy']);
+  if (!policyResult.ok) return policyResult;
+  return {
+    ok: true,
+    review: {
+      pullRequestNumber: Number(pullRequestNumber),
+      baseSha,
+      authorIdentity,
+      policy: policyResult.policy,
+      policyHash,
+    },
+  };
+}
 
 function configuredRepositoryProvider(
   project: RepositoryProjectRow,
@@ -207,7 +379,7 @@ approvalsRouter.post(
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status, branch_ref, policy_snapshot')
+      .select('id, project_id, status, branch_ref, base_ref, policy_snapshot')
       .eq('id', missionId)
       .single();
 
@@ -237,15 +409,9 @@ approvalsRouter.post(
     }
 
     if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
-      // Nothing in this codebase ever wrote policy_snapshot.expectedHeadSha,
-      // which the merge-execution route (below) unconditionally requires to
-      // match before it will merge anything — meaning no mission could ever
-      // actually reach a completable merge, regardless of proof-gate result.
-      // This is the natural point to pin it: the founder is approving merge
-      // of the branch's CURRENT exact commit, resolved fresh right now, not
-      // whatever it drifts to later (the execute route separately re-checks
-      // this hasn't moved since).
       let expectedHeadSha: string | null = null;
+      let independentReview: FounderPinnedIndependentReview | null = null;
+
       if (mission.branch_ref) {
         const { data: project } = await supabase
           .from('projects')
@@ -254,7 +420,8 @@ approvalsRouter.post(
           .maybeSingle();
 
         if (project?.repo_identifier) {
-          const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+          const projectRow = project as RepositoryProjectRow;
+          const configured = configuredRepositoryProvider(projectRow);
           if ('error' in configured) {
             return res.status(502).json({
               ok: false,
@@ -271,6 +438,101 @@ approvalsRouter.post(
               detail: err instanceof Error ? err.message : String(err),
             });
           }
+
+          if (isFounderControlRoomRepository(projectRow)) {
+            const founderFinalCandidate = body['founderFinalReview'];
+            const founderFinalApproval = founderFinalCandidate === undefined
+              ? null
+              : validateFounderFinalReviewApproval(founderFinalCandidate);
+            const legacyReviewApproval = founderFinalCandidate === undefined
+              ? validateIndependentReviewApproval(body['independentReview'])
+              : null;
+
+            if (founderFinalApproval && !founderFinalApproval.ok) {
+              return res.status(400).json({
+                ok: false,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: founderFinalApproval.error,
+              });
+            }
+            if (legacyReviewApproval && !legacyReviewApproval.ok) {
+              return res.status(400).json({
+                ok: false,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: `${legacyReviewApproval.error}. Canonical FCR flow uses founderFinalReview.confirmExactCandidate=true.`,
+              });
+            }
+
+            const pullRequestNumber = founderFinalApproval?.ok
+              ? founderFinalApproval.pullRequestNumber
+              : legacyReviewApproval?.ok
+                ? legacyReviewApproval.pullRequestNumber
+                : null;
+            const reviewPolicy = founderFinalApproval?.ok
+              ? FCR_FOUNDER_FINAL_REVIEW_POLICY
+              : legacyReviewApproval?.ok
+                ? legacyReviewApproval.policy
+                : null;
+            if (!pullRequestNumber || !reviewPolicy) {
+              return res.status(400).json({
+                ok: false,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: 'FCR merge approval requires founderFinalReview metadata bound to the exact candidate.',
+              });
+            }
+            if (typeof configured.provider.getPullRequestReviewContext !== 'function') {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PROVIDER_UNAVAILABLE',
+                error: 'Repository provider cannot supply exact pull request review context.',
+              });
+            }
+
+            let pullRequest;
+            try {
+              pullRequest = await configured.provider.getPullRequestReviewContext(
+                project.slug,
+                pullRequestNumber,
+              );
+            } catch (err) {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_READ_FAILED',
+                error: 'Proof passed but exact pull request identity could not be read — approval not persisted.',
+                detail: err instanceof Error ? err.message : String(err),
+              });
+            }
+
+            const expectedBaseRef = text(mission.base_ref) || 'main';
+            const prMismatch =
+              lower(pullRequest.repository) !== FCR_REPOSITORY
+              || lower(pullRequest.headRepository) !== FCR_REPOSITORY
+              || pullRequest.baseRef !== expectedBaseRef
+              || pullRequest.headRef !== mission.branch_ref
+              || lower(pullRequest.headSha) !== lower(expectedHeadSha);
+            if (prMismatch) {
+              return res.status(409).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_MISMATCH',
+                error: 'Founder approval PR does not match the exact FCR branch/base/head being approved.',
+              });
+            }
+            if (!FULL_SHA.test(text(pullRequest.baseSha)) || !text(pullRequest.authorIdentity)) {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_IDENTITY_INCOMPLETE',
+                error: 'Provider PR identity is missing an exact base SHA or author identity.',
+              });
+            }
+
+            independentReview = {
+              pullRequestNumber,
+              baseSha: lower(pullRequest.baseSha),
+              authorIdentity: text(pullRequest.authorIdentity),
+              policy: reviewPolicy,
+              policyHash: independentReviewPolicyHash(reviewPolicy),
+            };
+          }
         }
       }
 
@@ -280,7 +542,13 @@ approvalsRouter.post(
           status: 'approved',
           updated_at: new Date().toISOString(),
           ...(expectedHeadSha
-            ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+            ? {
+                policy_snapshot: {
+                  ...(mission.policy_snapshot as Record<string, unknown> ?? {}),
+                  expectedHeadSha,
+                  ...(independentReview ? { independentReview } : {}),
+                },
+              }
             : {}),
         })
         .eq('id', missionId)
@@ -309,6 +577,7 @@ approvalsRouter.post(
 approvalsRouter.post(
   '/:missionId/execute',
   async (req: FounderRequest, res: Response) => {
+    const observedRequestTime = new Date().toISOString();
     const { missionId } = req.params as { missionId: string };
     const { actionType, idempotencyKey, payload = {} } = req.body as {
       actionType: string;
@@ -403,7 +672,8 @@ approvalsRouter.post(
       return res.status(500).json({ error: 'Project repository configuration not found.' });
     }
 
-    const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+    const projectRow = project as RepositoryProjectRow;
+    const configured = configuredRepositoryProvider(projectRow);
     if ('error' in configured) {
       return res.status(503).json({
         error: 'Repository provider is not configured.',
@@ -412,6 +682,48 @@ approvalsRouter.post(
       });
     }
     const provider = configured.provider;
+
+    let createBranchAuthority: IssuedCreateBranchAuthority | null = null;
+    let createBranchArgs: { branchName: string; baseRef: string } | null = null;
+    if (actionType === 'create_branch') {
+      if (mission.status !== 'proposed') {
+        return res.status(409).json({
+          ok: false,
+          code: 'MISSION_NOT_PROPOSED',
+          error: `Mission must be proposed before branch creation; current status is ${mission.status}.`,
+        });
+      }
+      const branchName = text(payload['branchName']) || `mission/${missionId.slice(0, 8)}`;
+      const baseRef = text(payload['baseRef']) || 'main';
+      createBranchArgs = { branchName, baseRef };
+      try {
+        createBranchAuthority = issueCreateBranchAuthority({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef,
+          branchName,
+          state: {
+            missionStatus: mission.status,
+            policySnapshot: (mission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+          now: observedRequestTime,
+        });
+      } catch (error) {
+        return res.status(409).json({
+          ok: false,
+          code: 'AUTHORITY_ISSUANCE_FAILED',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     // Reserve before external mutation. The unique idempotency key is the final
     // race barrier if two requests pass the preceding lookup concurrently.
@@ -424,7 +736,9 @@ approvalsRouter.post(
         idempotency_key: idempotencyKey,
         executed_by: req.founder!.email,
         status: 'pending',
-        request: payload,
+        request: createBranchAuthority
+          ? { ...payload, authorityEnvelope: createBranchAuthority.envelope }
+          : payload,
         result: {},
         success: null,
         started_at: new Date().toISOString(),
@@ -465,40 +779,72 @@ approvalsRouter.post(
 
     try {
       if (actionType === 'create_branch') {
-        if (mission.status !== 'proposed') {
-          throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
+        if (!createBranchAuthority || !createBranchArgs) {
+          throw new Error('Create-branch authority was not issued for this execution.');
         }
-        const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
-        const baseRef = (payload['baseRef'] as string) ?? 'main';
-        await provider.createBranch(project.slug, baseRef, branchName);
 
-        // Pin the exact commit this mission's sandbox now stands on. Without
-        // this, policy_snapshot.expectedHeadSha never exists while the
-        // mission is sandboxed/in_review — MissionController's wrongHead
-        // check against it is permanently vacuous, and the guarded terminal
-        // (which hard-requires this pin at those exact statuses) can never
-        // run for any mission. A failure here doesn't roll back the branch,
-        // which already exists — it's reported as a warning, same as a
-        // failed mission-state update below.
+        const { data: freshMission, error: freshMissionError } = await supabase
+          .from('missions')
+          .select('status, policy_snapshot')
+          .eq('id', missionId)
+          .single();
+        if (freshMissionError || !freshMission) {
+          throw new Error('Create-branch authority could not reacquire current mission state.');
+        }
+
+        const freshContext = createBranchAuthorityContext({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          state: {
+            missionStatus: freshMission.status,
+            policySnapshot: (freshMission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+          now: new Date().toISOString(),
+          toolCallId: createBranchAuthority.envelope.toolCallId,
+        });
+
+        await executeAuthorizedCreateBranch(provider, {
+          projectId: project.slug,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          idempotencyKey,
+          envelope: createBranchAuthority.envelope,
+          context: freshContext,
+        });
+
         let expectedHeadSha: string | null = null;
         try {
-          expectedHeadSha = await provider.resolveRef(project.slug, branchName);
+          expectedHeadSha = await provider.resolveRef(project.slug, createBranchArgs.branchName);
         } catch (resolveError) {
           warnings.push(
             `Branch was created, but its head commit could not be resolved and pinned: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
           );
         }
 
-        executionResult = { branchName, baseRef, ...(expectedHeadSha ? { expectedHeadSha } : {}) };
+        executionResult = {
+          branchName: createBranchArgs.branchName,
+          baseRef: createBranchArgs.baseRef,
+          ...(expectedHeadSha ? { expectedHeadSha } : {}),
+        };
 
         const { error: missionUpdateError } = await supabase
           .from('missions')
           .update({
-            branch_ref: branchName,
+            branch_ref: createBranchArgs.branchName,
             status: 'sandboxed',
             updated_at: new Date().toISOString(),
             ...(expectedHeadSha
-              ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+              ? { policy_snapshot: { ...(freshMission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
               : {}),
           })
           .eq('id', missionId)
@@ -517,7 +863,7 @@ approvalsRouter.post(
           ? payload['expectedHeadSha'].toLowerCase()
           : '';
         if (!head) throw new Error('No head branch to merge');
-        if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+        if (!FULL_SHA.test(expectedHeadSha)) {
           throw new Error('Merge requires expectedHeadSha as a full 40-character commit SHA.');
         }
 
@@ -537,6 +883,103 @@ approvalsRouter.post(
           throw new Error(`${evidenceResult.error} ${JSON.stringify(evidenceResult.details ?? {})}`);
         }
 
+        let independentReviewEvidence: Record<string, unknown> | null = null;
+        let founderFinalReviewEvidence: Record<string, unknown> | null = null;
+        if (isFounderControlRoomRepository(projectRow)) {
+          const pinnedResult = readPinnedIndependentReview(mission.policy_snapshot?.independentReview);
+          if (!pinnedResult.ok) {
+            throw new Error(`Independent review gate blocked: ${pinnedResult.error}`);
+          }
+          const pinned = pinnedResult.review;
+          const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
+
+          if (typeof provider.getPullRequestReviewContext !== 'function') {
+            throw new Error('Independent review gate blocked: repository provider cannot supply pull request context');
+          }
+
+          const pullRequest = await provider.getPullRequestReviewContext(project.slug, pinned.pullRequestNumber);
+          const providerIdentityMatches =
+            lower(pullRequest.repository) === FCR_REPOSITORY
+            && lower(pullRequest.headRepository) === FCR_REPOSITORY
+            && pullRequest.baseRef === base
+            && pullRequest.headRef === head
+            && lower(pullRequest.baseSha) === pinned.baseSha
+            && lower(pullRequest.headSha) === expectedHeadSha
+            && lower(pullRequest.authorIdentity) === lower(pinned.authorIdentity);
+          if (!providerIdentityMatches) {
+            throw new Error('Independent review gate blocked: provider PR identity changed after founder approval');
+          }
+
+          const currentPolicyHash = independentReviewPolicyHash(pinned.policy);
+          if (currentPolicyHash !== pinned.policyHash) {
+            throw new Error('Independent review gate blocked: founder-pinned policy hash does not match policy content');
+          }
+
+          const diff = await provider.compare(project.slug, pinned.baseSha, expectedHeadSha);
+          if (diff.behindBy !== 0 || diff.aheadBy < 1) {
+            throw new Error(
+              `Independent review gate blocked: reviewed head must be current with approved base (ahead=${diff.aheadBy}, behind=${diff.behindBy})`,
+            );
+          }
+          const diffHash = independentReviewDiffHash(diff);
+          const reviews = Array.isArray(payload['independentReviews'])
+            ? payload['independentReviews'] as IndependentReviewReceipt[]
+            : [];
+          const reviewGate = await evaluateIndependentReviewGate(
+            provider,
+            {
+              projectId: project.slug,
+              repository: project.repo_identifier,
+              pullRequestNumber: pinned.pullRequestNumber,
+              baseSha: pinned.baseSha,
+              headSha: expectedHeadSha,
+              diffHash,
+              policyHash: pinned.policyHash,
+              authorIdentity: pinned.authorIdentity,
+            },
+            reviews,
+            pinned.policy,
+          );
+          if (!reviewGate.reviewGateSatisfied) {
+            throw new Error(`Independent review gate blocked: ${reviewGate.blockers.join('; ')}`);
+          }
+          independentReviewEvidence = {
+            pullRequestNumber: pinned.pullRequestNumber,
+            baseSha: pinned.baseSha,
+            headSha: expectedHeadSha,
+            diffHash,
+            policyHash: pinned.policyHash,
+            witnessedReviewHashes: reviewGate.witnessedReviewHashes,
+            semanticClearCount: reviewGate.semanticClearCount,
+            deterministicClearCount: reviewGate.deterministicClearCount,
+            authorityMode: founderFinalMode ? 'deterministic-review-then-founder-final' : 'legacy-independent-human-review',
+          };
+
+          // Founder-final is deliberately consumed only after independent
+          // deterministic review has passed. This is the final human authority
+          // for this exact candidate, not another independent review receipt.
+          if (founderFinalMode) {
+            const finalApproval = validateFounderFinalReviewApproval(payload['founderFinalReview']);
+            if (!finalApproval.ok) {
+              throw new Error(`Founder-final review gate blocked: ${finalApproval.error}`);
+            }
+            if (finalApproval.pullRequestNumber !== pinned.pullRequestNumber) {
+              throw new Error('Founder-final review gate blocked: founder confirmation does not match the reviewed pull request');
+            }
+            founderFinalReviewEvidence = {
+              contract: FOUNDER_FINAL_REVIEW_CONTRACT,
+              pullRequestNumber: pinned.pullRequestNumber,
+              baseSha: pinned.baseSha,
+              headSha: expectedHeadSha,
+              founderIdentity: req.founder!.email,
+              approvedAt: new Date().toISOString(),
+            };
+          }
+        }
+
+        // This is deliberately after review/founder-final validation. Provider
+        // reads may take time; the mutable head must still equal the approved
+        // SHA at the last possible moment before integration.
         const currentHeadSha = await provider.resolveRef(project.slug, head);
         if (currentHeadSha !== expectedHeadSha) {
           throw new Error(
@@ -551,6 +994,8 @@ approvalsRouter.post(
           base,
           expectedHeadSha,
           evidence: evidenceResult.summary,
+          ...(independentReviewEvidence ? { independentReview: independentReviewEvidence } : {}),
+          ...(founderFinalReviewEvidence ? { founderFinalReview: founderFinalReviewEvidence } : {}),
         };
 
         const { error: missionUpdateError } = await supabase
@@ -665,6 +1110,51 @@ approvalsRouter.post(
       });
     }
 
+    // Patch-path ledger: same idempotency contract as the execute route.
+    // A patch commit is a provider mutation; it must not execute twice.
+    const idempotencyKey = text((req.body as Record<string, unknown>)['idempotencyKey']);
+    if (!idempotencyKey) {
+      return res.status(400).json({ ok: false, code: 'IDEMPOTENCY_KEY_REQUIRED', error: 'idempotencyKey is required for patch commits.' });
+    }
+    const patchScope = {
+      missionId,
+      projectId: mission.project_id as string,
+      actionType: 'patch',
+    };
+    const existingPatch = await findExecution(idempotencyKey);
+    if (existingPatch.error) {
+      return res.status(500).json({
+        error: 'Unable to inspect the action idempotency ledger.',
+        detail: existingPatch.error.message,
+      });
+    }
+    if (existingPatch.data) {
+      if (!executionScopeMatches(existingPatch.data, patchScope)) {
+        return res.status(409).json({
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          error: 'This idempotency key belongs to a different mission, project, or action.',
+        });
+      }
+      if (existingPatch.data.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, idempotencyKey, result: existingPatch.data.result });
+      }
+      if (existingPatch.data.status === 'pending') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'This patch action is already reserved or may have executed. Reconcile it before retrying.',
+          executionId: existingPatch.data.id,
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        code: 'ACTION_PREVIOUSLY_FAILED',
+        error: 'This idempotency key is bound to a prior failed patch. Use a new key after review.',
+        result: existingPatch.data.result,
+      });
+    }
+
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, slug, repo_provider, repo_identifier')
@@ -685,6 +1175,42 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    // Reserve before the provider mutation. The globally unique idempotency
+    // key is the final race barrier if two requests pass the lookup above
+    // concurrently.
+    const { data: patchReservation, error: patchReservationError } = await supabase
+      .from('approval_executions')
+      .insert({
+        mission_id: missionId,
+        project_id: mission.project_id,
+        action_type: 'patch',
+        idempotency_key: idempotencyKey,
+        executed_by: req.founder!.email,
+        status: 'pending',
+        request: { message, changes, branch: mission.branch_ref },
+        result: {},
+        success: null,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (patchReservationError || !patchReservation) {
+      if ((patchReservationError as { code?: string } | null)?.code === '23505') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'A concurrent request reserved this patch action first. Reconcile it before retrying.',
+        });
+      }
+      return res.status(500).json({
+        ok: false,
+        code: 'PATCH_RESERVATION_FAILED',
+        error: 'Unable to reserve the patch action.',
+        detail: patchReservationError?.message ?? 'Reservation insert returned no record.',
+      });
+    }
+
     let commitSha: string;
     try {
       commitSha = await provider.commitPatch(project.slug, mission.branch_ref, {
@@ -693,10 +1219,29 @@ approvalsRouter.post(
         authorName: 'founder-control-room',
       });
     } catch (error) {
+      await supabase
+        .from('approval_executions')
+        .update({ status: 'failed', result: { error: error instanceof Error ? error.message : String(error) }, success: false, executed_at: new Date().toISOString() })
+        .eq('id', patchReservation.id)
+        .eq('status', 'pending');
       return res.status(502).json({
         error: error instanceof Error ? error.message : 'Patch commit failed',
         code: 'PATCH_COMMIT_FAILED',
       });
+    }
+
+    const { error: finalizeError } = await supabase
+      .from('approval_executions')
+      .update({
+        status: 'succeeded',
+        result: { commitSha, branch: mission.branch_ref },
+        success: true,
+        executed_at: new Date().toISOString(),
+      })
+      .eq('id', patchReservation.id)
+      .eq('status', 'pending');
+    if (finalizeError) {
+      console.error('patch ledger finalize failed; row left pending for reconciliation', { executionId: patchReservation.id, commitSha, error: finalizeError.message });
     }
 
     await supabase.from('project_events').insert({
@@ -733,6 +1278,6 @@ approvalsRouter.post(
       warning = `Commit succeeded, but expectedHeadSha could not be re-pinned: ${pinUpdateError.message}`;
     }
 
-    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
+    return res.status(201).json({ ok: true, idempotencyKey, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
   },
 );

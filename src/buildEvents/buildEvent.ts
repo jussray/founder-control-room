@@ -76,6 +76,40 @@ export interface BuildEventRuntimeRef {
   versionId?: string;
 }
 
+export type BuildReleaseCoverageSampleSource =
+  | 'analytics-engine'
+  | 'provider-logs'
+  | 'synthetic-probe';
+
+export type BuildReleaseCoverageTailReason =
+  | 'cached-edge-response'
+  | 'long-lived-connection'
+  | 'provider-rollout'
+  | 'unknown';
+
+export interface BuildReleaseCoverageRouteClass {
+  name: string;
+  requestCount: number;
+  currentReleaseRequestCount: number;
+  priorReleaseRequestCount: number;
+  unclassifiedRequestCount: number;
+}
+
+export interface BuildReleaseCoverageRef {
+  service: string;
+  environment: BuildRuntimeEnvironment;
+  releaseSha: string;
+  windowStartedAt: string;
+  windowEndedAt: string;
+  sampleSource: BuildReleaseCoverageSampleSource;
+  requestCount: number;
+  currentReleaseRequestCount: number;
+  priorReleaseRequestCount: number;
+  unclassifiedRequestCount: number;
+  routeClasses: BuildReleaseCoverageRouteClass[];
+  tailReasons?: BuildReleaseCoverageTailReason[];
+}
+
 export interface BuildEventVerificationRef {
   kind: string;
   status: BuildEventStatus;
@@ -102,6 +136,7 @@ export interface BuildEventInput {
   repository?: BuildEventRepositoryRef;
   provider?: BuildEventProviderRef;
   runtime?: BuildEventRuntimeRef;
+  coverage?: BuildReleaseCoverageRef;
   verification?: BuildEventVerificationRef;
   decision?: BuildEventDecisionRef;
   evidenceUrls?: string[];
@@ -118,6 +153,8 @@ export interface BuildEvent extends Omit<BuildEventInput, 'privacy' | 'evidenceU
 const EXACT_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const EVENT_ID = /^[A-Za-z0-9._:@/-]{1,200}$/;
+const ROUTE_CLASS = /^[a-z][a-z0-9-]{0,79}$/;
+const MAX_COVERAGE_COUNT = 1_000_000_000;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
 const SOURCES: readonly BuildEventSource[] = [
   'founder', 'chatgpt', 'github', 'supabase', 'cloudflare', 'product-design',
@@ -136,6 +173,12 @@ const STATUSES: readonly BuildEventStatus[] = [
 ];
 const REPOSITORY_REF_KINDS: readonly BuildEventRepositoryRefKind[] = [
   'branch-head', 'proposal-head', 'detached',
+];
+const COVERAGE_SAMPLE_SOURCES: readonly BuildReleaseCoverageSampleSource[] = [
+  'analytics-engine', 'provider-logs', 'synthetic-probe',
+];
+const COVERAGE_TAIL_REASONS: readonly BuildReleaseCoverageTailReason[] = [
+  'cached-edge-response', 'long-lived-connection', 'provider-rollout', 'unknown',
 ];
 
 function boundedText(value: unknown, maximumLength: number): string {
@@ -182,6 +225,13 @@ function normalizeEvidenceUrls(values: readonly unknown[] | undefined): string[]
 function validTimestamp(value: unknown): boolean {
   const candidate = boundedText(value, 80);
   return Boolean(candidate) && !Number.isNaN(Date.parse(candidate));
+}
+
+function validCoverageCount(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isSafeInteger(value)
+    && value >= 0
+    && value <= MAX_COVERAGE_COUNT;
 }
 
 function validStatus(value: unknown): value is BuildEventStatus {
@@ -256,6 +306,127 @@ export function validateBuildEvent(input: BuildEventInput): string[] {
     }
     if (input.runtime.versionId !== undefined && !boundedText(input.runtime.versionId, 200)) {
       errors.push('runtime.versionId is invalid');
+    }
+  }
+
+
+  if (input.coverage !== undefined) {
+    const coverage = input.coverage;
+    if (!coverage || typeof coverage !== 'object') {
+      errors.push('coverage payload is invalid');
+    } else {
+      if (input.category !== 'analytics') errors.push('coverage payload requires category=analytics');
+      if (input.phase !== 'observe') errors.push('coverage payload requires phase=observe');
+      if (!boundedText(coverage.service, 160)) errors.push('coverage.service is invalid');
+      if (!['production', 'preview', 'staging', 'development', 'unknown'].includes(coverage.environment)) {
+        errors.push('coverage.environment is invalid');
+      }
+      if (!normalizedSha(coverage.releaseSha)) {
+        errors.push('coverage.releaseSha must be an exact 40-character SHA');
+      }
+      if (!validTimestamp(coverage.windowStartedAt) || !validTimestamp(coverage.windowEndedAt)) {
+        errors.push('coverage window timestamps must be ISO-compatible');
+      } else if (Date.parse(coverage.windowEndedAt) <= Date.parse(coverage.windowStartedAt)) {
+        errors.push('coverage.windowEndedAt must be after coverage.windowStartedAt');
+      }
+      if (!COVERAGE_SAMPLE_SOURCES.includes(coverage.sampleSource)) {
+        errors.push('coverage.sampleSource is invalid');
+      }
+
+      const counts = [
+        coverage.requestCount,
+        coverage.currentReleaseRequestCount,
+        coverage.priorReleaseRequestCount,
+        coverage.unclassifiedRequestCount,
+      ];
+      if (!counts.every(validCoverageCount)) {
+        errors.push('coverage counts must be bounded non-negative integers');
+      } else if (
+        coverage.currentReleaseRequestCount
+        + coverage.priorReleaseRequestCount
+        + coverage.unclassifiedRequestCount
+        !== coverage.requestCount
+      ) {
+        errors.push('coverage release counts must sum to coverage.requestCount');
+      }
+
+      if (!Array.isArray(coverage.routeClasses) || coverage.routeClasses.length === 0 || coverage.routeClasses.length > 20) {
+        errors.push('coverage.routeClasses must contain 1 to 20 aggregate route classes');
+      } else {
+        const names = new Set<string>();
+        let routeRequestCount = 0;
+        let routeCurrentReleaseRequestCount = 0;
+        let routePriorReleaseRequestCount = 0;
+        let routeUnclassifiedRequestCount = 0;
+
+        coverage.routeClasses.forEach((routeClass, index) => {
+          const name = boundedText(routeClass?.name, 80);
+          if (!ROUTE_CLASS.test(name) || names.has(name)) {
+            errors.push(`coverage.routeClasses[${index}].name is invalid`);
+          }
+          names.add(name);
+
+          const routeCounts = [
+            routeClass?.requestCount,
+            routeClass?.currentReleaseRequestCount,
+            routeClass?.priorReleaseRequestCount,
+            routeClass?.unclassifiedRequestCount,
+          ];
+          if (!routeCounts.every(validCoverageCount)) {
+            errors.push(`coverage.routeClasses[${index}] counts must be bounded non-negative integers`);
+            return;
+          }
+          if (
+            routeClass.currentReleaseRequestCount
+            + routeClass.priorReleaseRequestCount
+            + routeClass.unclassifiedRequestCount
+            !== routeClass.requestCount
+          ) {
+            errors.push(`coverage.routeClasses[${index}] release counts must sum to route requestCount`);
+          }
+          routeRequestCount += routeClass.requestCount;
+          routeCurrentReleaseRequestCount += routeClass.currentReleaseRequestCount;
+          routePriorReleaseRequestCount += routeClass.priorReleaseRequestCount;
+          routeUnclassifiedRequestCount += routeClass.unclassifiedRequestCount;
+        });
+
+        if (counts.every(validCoverageCount) && (
+          routeRequestCount !== coverage.requestCount
+          || routeCurrentReleaseRequestCount !== coverage.currentReleaseRequestCount
+          || routePriorReleaseRequestCount !== coverage.priorReleaseRequestCount
+          || routeUnclassifiedRequestCount !== coverage.unclassifiedRequestCount
+        )) {
+          errors.push('coverage.routeClasses must sum to aggregate coverage counts');
+        }
+      }
+
+      const tailReasons = Array.isArray(coverage.tailReasons) ? coverage.tailReasons : [];
+      if (coverage.tailReasons !== undefined && !Array.isArray(coverage.tailReasons)) {
+        errors.push('coverage.tailReasons is invalid');
+      }
+      if (tailReasons.length > 4 || new Set(tailReasons).size !== tailReasons.length) {
+        errors.push('coverage.tailReasons must be unique and limited to four entries');
+      }
+      if (tailReasons.some((reason) => !COVERAGE_TAIL_REASONS.includes(reason))) {
+        errors.push('coverage.tailReasons contains an invalid reason');
+      }
+      if (validCoverageCount(coverage.priorReleaseRequestCount)
+        && coverage.priorReleaseRequestCount > 0
+        && tailReasons.length === 0) {
+        errors.push('coverage prior-release traffic requires a tail reason');
+      }
+      if (coverage.sampleSource === 'synthetic-probe' && input.truth === 'verified') {
+        errors.push('synthetic coverage cannot be verified');
+      }
+      if (input.status === 'passed' && input.truth !== 'verified') {
+        errors.push('passed coverage requires verified truth');
+      }
+      if (input.status === 'passed' && coverage.sampleSource === 'synthetic-probe') {
+        errors.push('synthetic coverage cannot pass');
+      }
+      if (input.status === 'passed' && tailReasons.includes('unknown')) {
+        errors.push('passed coverage cannot retain an unknown tail');
+      }
     }
   }
 
@@ -360,6 +531,32 @@ export function createBuildEvent(input: BuildEventInput): BuildEvent {
       }
     : undefined;
 
+
+  const coverage = input.coverage
+    ? {
+        service: boundedText(input.coverage.service, 160),
+        environment: input.coverage.environment,
+        releaseSha: normalizedSha(input.coverage.releaseSha)!,
+        windowStartedAt: new Date(input.coverage.windowStartedAt).toISOString(),
+        windowEndedAt: new Date(input.coverage.windowEndedAt).toISOString(),
+        sampleSource: input.coverage.sampleSource,
+        requestCount: input.coverage.requestCount,
+        currentReleaseRequestCount: input.coverage.currentReleaseRequestCount,
+        priorReleaseRequestCount: input.coverage.priorReleaseRequestCount,
+        unclassifiedRequestCount: input.coverage.unclassifiedRequestCount,
+        routeClasses: input.coverage.routeClasses.map((routeClass) => ({
+          name: boundedText(routeClass.name, 80),
+          requestCount: routeClass.requestCount,
+          currentReleaseRequestCount: routeClass.currentReleaseRequestCount,
+          priorReleaseRequestCount: routeClass.priorReleaseRequestCount,
+          unclassifiedRequestCount: routeClass.unclassifiedRequestCount,
+        })),
+        ...(input.coverage.tailReasons && input.coverage.tailReasons.length > 0
+          ? { tailReasons: [...input.coverage.tailReasons].sort() }
+          : {}),
+      }
+    : undefined;
+
   const verification = input.verification
     ? {
         kind: boundedText(input.verification.kind, 200),
@@ -395,6 +592,7 @@ export function createBuildEvent(input: BuildEventInput): BuildEvent {
     ...(repository ? { repository } : {}),
     ...(provider ? { provider } : {}),
     ...(runtime ? { runtime } : {}),
+    ...(coverage ? { coverage } : {}),
     ...(verification ? { verification } : {}),
     ...(decision ? { decision } : {}),
     evidenceUrls: normalizeEvidenceUrls(input.evidenceUrls),

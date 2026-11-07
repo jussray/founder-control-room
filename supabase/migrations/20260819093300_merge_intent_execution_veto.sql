@@ -1,0 +1,155 @@
+-- =============================================================================
+-- Merge-intent deny-only execution veto
+--
+-- merge_intents is NOT approval authority. It can never make a merge eligible.
+-- It can, however, preserve observed historical drift by refusing the existing
+-- approval_executions reservation until the read-only reconciler has proved the
+-- exact approved candidate REVALIDATED (or a future stronger READY projection).
+-- The guarded /execute path must still pass every proof, evidence, review,
+-- provider-identity, diff, and exact-head gate afterwards.
+--
+-- REVALIDATED/READY is leased, not permanent. The fallback sweep runs every two
+-- minutes; execution requires a reconciliation witness no older than three
+-- minutes so a stalled reconciler fails closed.
+-- =============================================================================
+
+begin;
+
+create or replace function enforce_fcr_merge_intent_execution_veto()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_repository text;
+  v_state text;
+  v_proof_expires_at timestamptz;
+  v_diff_hash text;
+  v_last_reconciled_at timestamptz;
+begin
+  if new.action_type <> 'merge' or new.mission_id is null then
+    return new;
+  end if;
+
+  select lower(coalesce(p.repo_identifier, ''))
+    into v_repository
+    from missions m
+    join projects p on p.id = m.project_id
+   where m.id = new.mission_id;
+
+  if v_repository <> 'jussray/founder-control-room' then
+    return new;
+  end if;
+
+  -- Lock the current approval projection for the duration of the reservation
+  -- insert. A concurrent reconciler cannot overwrite it between veto and the
+  -- AFTER INSERT lifecycle projection.
+  select state, proof_expires_at, approved_diff_hash, last_reconciled_at
+    into v_state, v_proof_expires_at, v_diff_hash, v_last_reconciled_at
+    from merge_intents
+   where mission_id = new.mission_id
+   for update;
+
+  if v_state is null then
+    raise exception
+      'FCR merge execution vetoed: approved mission has no durable merge intent';
+  end if;
+
+  -- REVALIDATED/READY only remove this liveness veto. Neither authorizes merge.
+  -- The existing /execute evidence/review/provider gates remain authoritative.
+  if v_state not in ('revalidated', 'ready') then
+    raise exception
+      'FCR merge execution vetoed: merge intent state % is not REVALIDATED/READY and requires reconciliation/reapproval',
+      v_state;
+  end if;
+
+  if v_diff_hash is null or v_diff_hash !~ '^[0-9a-f]{64}$' then
+    raise exception
+      'FCR merge execution vetoed: merge intent has no canonical approved diff witness';
+  end if;
+
+  if v_last_reconciled_at is null
+     or v_last_reconciled_at < now() - interval '3 minutes' then
+    raise exception
+      'FCR merge execution vetoed: merge-intent revalidation lease is stale';
+  end if;
+
+  if v_proof_expires_at is null or v_proof_expires_at <= now() then
+    raise exception
+      'FCR merge execution vetoed: merge intent founder proof lease expired';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function enforce_fcr_merge_intent_execution_veto() from public;
+
+drop trigger if exists approval_executions_fcr_merge_intent_veto on approval_executions;
+create trigger approval_executions_fcr_merge_intent_veto
+  before insert on approval_executions
+  for each row
+  when (new.action_type = 'merge')
+  execute function enforce_fcr_merge_intent_execution_veto();
+
+-- Tighten the lifecycle projector installed in 20260819093000. A failed
+-- execution may only rewrite the intent that this execution itself moved to
+-- EXECUTING. It must never erase a sticky stale/needs-review/cancelled state.
+create or replace function project_merge_intent_execution_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_merge_sha text;
+begin
+  if new.action_type <> 'merge' or new.mission_id is null then
+    return new;
+  end if;
+
+  if new.status = 'pending' then
+    update merge_intents
+       set state = 'executing',
+           execution_id = new.id,
+           stale_reason = null,
+           updated_at = now()
+     where mission_id = new.mission_id
+       and state in ('revalidated', 'ready');
+    return new;
+  end if;
+
+  if new.status = 'succeeded' then
+    v_merge_sha := lower(coalesce(new.result ->> 'mergeCommitSha', ''));
+    update merge_intents
+       set state = 'merged',
+           execution_id = new.id,
+           merge_commit_sha = case when v_merge_sha ~ '^[0-9a-f]{40}$' then v_merge_sha else merge_commit_sha end,
+           stale_reason = null,
+           last_reconciled_at = now(),
+           updated_at = now()
+     where mission_id = new.mission_id
+       and (execution_id = new.id or state = 'merged');
+    return new;
+  end if;
+
+  if new.status = 'failed' then
+    update merge_intents
+       set state = 'blocked',
+           stale_reason = 'guarded merge execution failed; explicit reapproval/reconciliation is required',
+           failure_count = failure_count + 1,
+           last_reconciled_at = now(),
+           updated_at = now()
+     where mission_id = new.mission_id
+       and execution_id = new.id
+       and state = 'executing';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function project_merge_intent_execution_lifecycle() from public;
+
+commit;

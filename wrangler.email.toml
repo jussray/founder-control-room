@@ -6,6 +6,15 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 preview_urls = false
 
+# Canonical inbound Email Routing desired state.
+# Wrangler 4.113+ reconciles Worker Email Routing rules declared by top-level
+# `addresses` during deploy. This declaration authorizes only the literal
+# review@ route; it is not proof that the live provider rule exists.
+addresses = ["review@foundercontrolroom.org"]
+# Cloudflare provider readback must independently verify the rule after deploy.
+# Subaddressing is a separate zone setting and must be enabled provider-side
+# before review+<context-uuid>@foundercontrolroom.org can match this base rule.
+
 [observability]
 enabled = true
 
@@ -16,9 +25,8 @@ enabled = true
 binding = "FOUNDER_CONTROL_ROOM_API"
 service = "founder-control-room"
 
-# Non-secret values only. This Worker receives mail only after a separately
-# approved Cloudflare Email Routing rule is created. This file creates no DNS,
-# route, destination address, or live email binding.
+# Non-secret values only. Email Routing must already be enabled for the domain,
+# and subaddressing must be enabled provider-side before review+UUID replies are live.
 [vars]
 FOUNDER_REVIEW_EMAIL_DOMAIN = "foundercontrolroom.org"
 FOUNDER_REVIEW_INGEST_URL = "https://api.foundercontrolroom.org/ingest/founder-review-email"

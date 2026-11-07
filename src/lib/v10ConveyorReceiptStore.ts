@@ -17,8 +17,16 @@ export interface V10ConveyorReceiptRecord {
   evidenceDigest: string | null;
 }
 
+export interface V10ConveyorActivationProbeRecord extends V10ConveyorReceiptRecord {
+  createdAt: string;
+}
+
 export interface V10ConveyorReceiptStore {
   store(receipt: V10ConveyorReceiptRecord): Promise<V10ConveyorReceiptStoreDisposition>;
+}
+
+export interface V10ConveyorReceiptReader {
+  latestActivationProbe(projectSlug: string): Promise<V10ConveyorActivationProbeRecord | null>;
 }
 
 type StoredRow = Record<string, unknown>;
@@ -36,6 +44,8 @@ const RECEIPT_COLUMNS = [
   'execution_status',
   'evidence_digest',
 ].join(',');
+
+const ACTIVATION_PROBE_COLUMNS = `${RECEIPT_COLUMNS},created_at`;
 
 function normalizedEvidenceUrls(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
@@ -62,9 +72,52 @@ function rowMatchesReceipt(row: StoredRow | null, receipt: V10ConveyorReceiptRec
     && (row.evidence_digest ?? null) === receipt.evidenceDigest;
 }
 
+function activationProbeFromRow(row: StoredRow | null): V10ConveyorActivationProbeRecord | null {
+  if (!row) return null;
+  const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+  const receiptId = typeof row.receipt_id === 'string' ? row.receipt_id : '';
+  const runId = typeof row.run_id === 'string' ? row.run_id : '';
+  const projectSlug = typeof row.project_slug === 'string' ? row.project_slug : '';
+  const expectedHeadSha = typeof row.expected_head_sha === 'string' ? row.expected_head_sha : '';
+  const capabilityPlanHash = typeof row.capability_plan_hash === 'string' ? row.capability_plan_hash : '';
+  const registryHash = typeof row.registry_hash === 'string' ? row.registry_hash : '';
+  const fromStage = typeof row.from_stage === 'string' ? row.from_stage : '';
+  const toStage = typeof row.to_stage === 'string' ? row.to_stage : '';
+  const requestedAuthority = typeof row.requested_authority === 'string' ? row.requested_authority : '';
+
+  if (
+    !createdAt
+    || !receiptId
+    || !runId
+    || !projectSlug
+    || !expectedHeadSha
+    || !capabilityPlanHash
+    || !registryHash
+    || fromStage !== 'chat'
+    || toStage !== 'workflows'
+    || row.execution_status !== 'accepted'
+    || !['reason', 'draft', 'reversible', 'privileged'].includes(requestedAuthority)
+  ) {
+    return null;
+  }
+
+  return {
+    receiptId,
+    runId,
+    projectSlug,
+    expectedHeadSha,
+    capabilityPlanHash,
+    registryHash,
+    fromStage,
+    toStage,
+    requestedAuthority: requestedAuthority as V10CapabilityAuthority,
+    executionStatus: 'accepted',
+    evidenceDigest: typeof row.evidence_digest === 'string' ? row.evidence_digest : null,
+    createdAt,
+  };
+}
+
 async function findStoredReceipt(receiptId: string): Promise<StoredRow | null> {
-  // Dynamic import keeps local/unit callers free from privileged Supabase env
-  // requirements until production receipt persistence is actually requested.
   const { supabase } = await import('./supabaseClient.js');
   const { data, error } = await supabase
     .from('capability_execution_receipts')
@@ -75,6 +128,31 @@ async function findStoredReceipt(receiptId: string): Promise<StoredRow | null> {
   if (error) throw new Error('v10_conveyor_receipt_lookup_failed');
   return data as StoredRow | null;
 }
+
+async function findLatestActivationProbe(projectSlug: string): Promise<V10ConveyorActivationProbeRecord | null> {
+  const normalizedProjectSlug = projectSlug.trim();
+  if (!normalizedProjectSlug) return null;
+
+  const { supabase } = await import('./supabaseClient.js');
+  const { data, error } = await supabase
+    .from('capability_execution_receipts')
+    .select(ACTIVATION_PROBE_COLUMNS)
+    .eq('project_slug', normalizedProjectSlug)
+    .like('run_id', 'n8n-live-probe-%')
+    .eq('from_stage', 'chat')
+    .eq('to_stage', 'workflows')
+    .eq('execution_status', 'accepted')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error('v10_conveyor_activation_probe_lookup_failed');
+  return activationProbeFromRow(data as StoredRow | null);
+}
+
+export const supabaseV10ConveyorReceiptReader: V10ConveyorReceiptReader = {
+  latestActivationProbe: findLatestActivationProbe,
+};
 
 export const supabaseV10ConveyorReceiptStore: V10ConveyorReceiptStore = {
   async store(receipt) {

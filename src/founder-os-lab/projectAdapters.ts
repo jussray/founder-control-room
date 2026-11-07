@@ -13,6 +13,7 @@ import type {
 
 interface FounderOsLabProjectAdapterDescriptor {
   id: FounderOsLabProjectAdapterId;
+  adapterId: FounderOsLabAdapterId;
   name: string;
   repository: string;
   auditedSourceHead: string;
@@ -22,13 +23,16 @@ interface FounderOsLabProjectAdapterDescriptor {
   executionAllowed: false;
   allowedActions: readonly FounderOsLabAction[];
   allowedProviders: readonly FounderOsLabProviderId[];
+  allowedAudiences: readonly FounderOsLabProjectAudience[];
+  capabilities: readonly FounderOsLabCapabilityId[];
   requiredContractPaths: readonly string[];
+  rules: readonly string[];
   canonicalDisplayNames: readonly string[];
   forbiddenDisplayNames: readonly string[];
-  legacyInternalIdsPreserved: true;
-  editableOutputRequired: true;
-  sourceTraceRequired: true;
-  factualAiIdentityRequired: true;
+  legacyInternalIdsPreserved: boolean;
+  editableOutputRequired: boolean;
+  sourceTraceRequired: boolean;
+  factualAiIdentityRequired: boolean;
   rollback: string;
 }
 
@@ -46,21 +50,30 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '90d350a22cbdde1f1d5aa2ced1453a62fa298193';
+const SEKRET_BIP_AUDITED_HEAD = 'e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
-  'app/index.tsx': '46e73c816a392f289c377d5610243d8ef8189f7c',
-  'screens/WebWelcomeScreen.tsx': '2520c10810593ebcab93e2d3be2a14cff6bd32ce',
-  'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
+  'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
+  'screens/WebWelcomeScreen.tsx': '9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c',
+  'constants/frontDoorTheme.ts': '8e296dc2a546766c1a4fbefafdd4e11e7ad73dc2',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
   'docs/FRONT_DOOR_VARIANTS.md': '171db3a64822a46d052b290b55ebc890dc7a8d76',
   'implementation-ledger.extensions/human-ai-identity-contract.json': '2266fb7f8bf51506011d976f5907e9656da5a67b',
-  'test/dual-front-door-contract.test.mjs': '6f4a3743a6accf9064877d3759ecb006f35a1b98',
+  'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
 } as const;
-const PROJECT_AUDIENCES: ReadonlySet<FounderOsLabProjectAudience> = new Set(['teen', 'bip-jr']);
+const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
+const CHIEF_AI_AUDITED_HEAD = '0d1106424802fa21d37c6a05fc3e6f6422cc989a';
+const CHIEF_AI_AUDITED_CONTRACT_BLOBS = {
+  'src/domain/capability-plan.js': '7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5',
+  'src/domain/capability-registry.js': 'abb2daf0ee7ce85442cd4b04588b4881cc4b9b53',
+  'src/domain/merge-intent.js': 'ba7b3d1ff4dbc846d79489ec9ffb0c346597b559',
+  'config/founder-chief-pair.contract.json': 'dd008420e1a91e78516b45d9e27de89344abf432',
+  'e2e/chief-capability-plan.pw.mjs': 'ad41d9f614dc94df7d5ebde3d9b3a8cefd96e39b',
+} as const;
 
 export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapterDescriptor[] = [
   {
     id: 'sekret-bip',
+    adapterId: 'sekret-bip-project-preview',
     name: 'Se’kret Bip',
     repository: SEKRET_BIP_REPOSITORY,
     auditedSourceHead: SEKRET_BIP_AUDITED_HEAD,
@@ -70,7 +83,15 @@ export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapte
     executionAllowed: false,
     allowedActions: ['inspect', 'plan'],
     allowedProviders: ['chatgpt', 'claude', 'codex', 'github', 'figma'],
+    allowedAudiences: ['teen', 'bip-jr'],
+    capabilities: ['project-canon-validation', 'editable-design-preview'],
     requiredContractPaths: Object.keys(SEKRET_BIP_AUDITED_CONTRACT_BLOBS),
+    rules: [
+      'Display canon remains Night, Suhana, Sy, and Cloud; Suhanna is forbidden.',
+      'Teen and Bip Jr are presentation audiences, not account roles.',
+      'Legacy internal companion identifiers remain preserved unless separately migrated.',
+      'Editable output, source trace, and factual AI identity boundaries remain required.',
+    ],
     canonicalDisplayNames: ['Night', 'Suhana', 'Sy', 'Cloud'],
     forbiddenDisplayNames: ['Suhanna'],
     legacyInternalIdsPreserved: true,
@@ -78,6 +99,39 @@ export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapte
     sourceTraceRequired: true,
     factualAiIdentityRequired: true,
     rollback: 'Discard the project preview; no Se’kret Bip repository, design, provider, account, or runtime state changes.',
+  },
+  {
+    id: 'chief-ai-machine',
+    adapterId: 'chief-ai-machine-project-preview',
+    name: 'Chief AI Prompt Machine',
+    repository: CHIEF_AI_REPOSITORY,
+    auditedSourceHead: CHIEF_AI_AUDITED_HEAD,
+    auditedContractBlobs: CHIEF_AI_AUDITED_CONTRACT_BLOBS,
+    authorityOwner: 'founder-control-room',
+    mode: 'preview',
+    executionAllowed: false,
+    allowedActions: ['inspect', 'plan'],
+    allowedProviders: ['chatgpt', 'claude', 'codex', 'github'],
+    allowedAudiences: [],
+    capabilities: [
+      'project-contract-validation',
+      'capability-plan-validation',
+      'authority-boundary-validation',
+    ],
+    requiredContractPaths: Object.keys(CHIEF_AI_AUDITED_CONTRACT_BLOBS),
+    rules: [
+      'Chief AI owns reasoning, synthesis, capability composition, recommendations, and executive judgment; Founder Control Room owns governance, evidence, coordination, and execution authority.',
+      'Capability plans must remain exact-head, registry-hash, provenance, and authority-ceiling bound.',
+      'Merge intent may block a candidate but never authorize merge by itself.',
+      'Chief AI proposals remain non-executing until Founder Control Room validates evidence and founder authority.',
+    ],
+    canonicalDisplayNames: [],
+    forbiddenDisplayNames: [],
+    legacyInternalIdsPreserved: false,
+    editableOutputRequired: false,
+    sourceTraceRequired: true,
+    factualAiIdentityRequired: false,
+    rollback: 'Discard the Chief AI project preview; no Chief AI repository, provider, capability registry, merge intent, or runtime state changes.',
   },
 ] as const;
 
@@ -97,9 +151,13 @@ function normalizedSha(value: unknown): string | null {
   return EXACT_COMMIT_SHA.test(normalized) ? normalized : null;
 }
 
-function normalizedAudience(value: unknown): FounderOsLabProjectAudience | null {
+function normalizedAudience(
+  value: unknown,
+  allowedAudiences: readonly FounderOsLabProjectAudience[],
+): FounderOsLabProjectAudience | null {
   if (value === undefined || value === null) return null;
-  return typeof value === 'string' && PROJECT_AUDIENCES.has(value as FounderOsLabProjectAudience)
+  return typeof value === 'string'
+    && allowedAudiences.includes(value as FounderOsLabProjectAudience)
     ? value as FounderOsLabProjectAudience
     : null;
 }
@@ -232,7 +290,11 @@ function projectAdapterErrors(
     errors.push(`${descriptor.id} contractUrls must contain 1 to 20 unique bounded HTTPS URL strings.`);
   }
   if (project.audience !== undefined && audience === null) {
-    errors.push(`${descriptor.id} audience must be teen or bip-jr when supplied.`);
+    errors.push(
+      descriptor.allowedAudiences.length === 0
+        ? `${descriptor.id} does not accept an audience context.`
+        : `${descriptor.id} audience must be one of: ${descriptor.allowedAudiences.join(', ')}.`,
+    );
   }
   if (!descriptor.allowedActions.includes(request.action)) {
     errors.push(`${descriptor.id} adapter supports only inspect and plan previews in V1.`);
@@ -240,7 +302,7 @@ function projectAdapterErrors(
   if (!descriptor.allowedProviders.includes(providerId)) {
     errors.push(`${providerId} is not an allowed ${descriptor.id} preview provider.`);
   }
-  if (providerId === 'figma') {
+  if (descriptor.id === 'sekret-bip' && providerId === 'figma') {
     if (!audience) {
       errors.push('figma Se’kret Bip previews require an explicit teen or bip-jr presentation audience.');
     }
@@ -252,7 +314,7 @@ function projectAdapterErrors(
   const missingPaths = descriptor.requiredContractPaths.filter((path) => !observedPaths.includes(path));
   if (missingPaths.length > 0) {
     errors.push(
-      `${descriptor.id} is missing exact-head canon contract URLs: ${missingPaths.join(', ')}.`,
+      `${descriptor.id} is missing exact-head project contract URLs: ${missingPaths.join(', ')}.`,
     );
   }
 
@@ -282,7 +344,7 @@ export function resolveFounderOsLabProject(
   const sourceRepository = normalizedRepository(project.sourceRepository) ?? '';
   const sourceCommitSha = normalizedSha(project.sourceCommitSha) ?? '';
   const contractUrls = normalizedContractUrls(project.contractUrls);
-  const audience = normalizedAudience(project.audience);
+  const audience = normalizedAudience(project.audience, descriptor.allowedAudiences);
   const observedPaths = observedContractPaths(
     contractUrls.values,
     descriptor.repository,
@@ -318,6 +380,7 @@ export function resolveFounderOsLabProject(
       contractPathsRequired: [...descriptor.requiredContractPaths],
       contractPathsObserved: observedPaths,
       contractPathsMissing: missingPaths,
+      rules: [...descriptor.rules],
       canonicalDisplayNames: [...descriptor.canonicalDisplayNames],
       forbiddenDisplayNames: [...descriptor.forbiddenDisplayNames],
       legacyInternalIdsPreserved: descriptor.legacyInternalIdsPreserved,
@@ -327,7 +390,7 @@ export function resolveFounderOsLabProject(
       rollback: descriptor.rollback,
     },
     errors,
-    capabilities: ['project-canon-validation', 'editable-design-preview'],
-    adapters: ['sekret-bip-project-preview'],
+    capabilities: [...descriptor.capabilities],
+    adapters: [descriptor.adapterId],
   };
 }

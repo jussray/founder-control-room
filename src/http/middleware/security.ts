@@ -28,6 +28,7 @@
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { FounderRequest } from './requireFounder.js';
 
 const IS_PRODUCTION = process.env['NODE_ENV'] === 'production';
@@ -218,12 +219,49 @@ export const rateLimitMagicLink = createRateLimiter(
   { error: 'Too many magic-link requests, please try again later.' },
 );
 
-/** 60 requests per minute per process/IP for general API routes. */
-export const rateLimitGeneral = createRateLimiter(
+/**
+ * 120 requests per minute per process/IP for every HTTP request.
+ *
+ * The broad baseline must leave headroom for a normal founder workflow, which
+ * can combine UI navigation, dashboard refreshes, and signed server ingress in
+ * one minute. Sensitive or expensive routes keep their stricter local limits.
+ * requestAudit applies this baseline before server.ts mounts any public route.
+ * Some routes also reference rateLimitGeneral explicitly, so the wrapper is
+ * idempotent for the lifetime of a single Express Request and counts it once.
+ */
+const generalRateLimitCore = createRateLimiter(
   60 * 1_000,
-  60,
+  120,
   { error: 'Rate limit exceeded.' },
 );
+const generalRateLimitedRequests = new WeakSet<Request>();
+
+export const rateLimitGeneral: RequestHandler = (req, res, next): void => {
+  if (generalRateLimitedRequests.has(req)) {
+    next();
+    return;
+  }
+
+  generalRateLimitedRequests.add(req);
+  generalRateLimitCore(req, res, next);
+};
+
+/**
+ * 60 founder-permission requests per minute per process/IP.
+ *
+ * This route-local limiter intentionally owns a store separate from the global
+ * rateLimitGeneral middleware. It uses the repository's existing
+ * express-rate-limit dependency so security analysis can recognize the
+ * authorization routes as explicitly rate-limited without double-counting the
+ * global limiter's in-memory bucket.
+ */
+export const rateLimitFounderPermissions = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded.' },
+});
 
 // ---------------------------------------------------------------------------
 // Request audit log
@@ -251,11 +289,11 @@ export function requestAudit(
     );
   });
 
-  next();
+  rateLimitGeneral(req, res, next);
 }
 
 // ---------------------------------------------------------------------------
-// Centralized error handler — must be last in server.ts
+// Centralized error handler - must be last in server.ts
 // ---------------------------------------------------------------------------
 export function errorHandler(
   err: unknown,

@@ -1,0 +1,83 @@
+name: Public Portfolio Demo Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/demo/**'
+      - 'public/_headers'
+      - 'src/http/__tests__/portfolioDemoAssets.test.ts'
+      - 'e2e/portfolio-demo-proof.mjs'
+      - '.github/workflows/portfolio-demo-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/demo/**'
+      - 'public/_headers'
+      - 'src/http/__tests__/portfolioDemoAssets.test.ts'
+      - 'e2e/portfolio-demo-proof.mjs'
+      - '.github/workflows/portfolio-demo-proof.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  portfolio-demo:
+    name: Public demo exact-head witness
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove static demo contract
+        run: npx vitest run src/http/__tests__/portfolioDemoAssets.test.ts
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Prove public demo in desktop and mobile browsers
+        shell: bash
+        run: |
+          mkdir -p logs
+          set +e
+          node e2e/portfolio-demo-proof.mjs 2>&1 | tee logs/portfolio-demo-proof.log
+          status=${PIPESTATUS[0]}
+          echo "Portfolio demo proof exit status: ${status}" | tee -a logs/portfolio-demo-proof.log
+          exit "${status}"
+
+      - name: Upload public demo evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-portfolio-demo-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            test-results/portfolio-demo/
+            logs/portfolio-demo-proof.log
+          if-no-files-found: warn
+          retention-days: 30

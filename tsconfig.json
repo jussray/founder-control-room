@@ -14,7 +14,7 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src"],
+  "include": ["src", ".wrangler/types/worker-configuration.d.ts"],
   "exclude": [
     "src/app/**/*",
     "src/components/**/*",

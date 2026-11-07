@@ -25,6 +25,7 @@ describe('public guardrail contract', () => {
     expect(res.text).toContain('data-guardrail-id="FCR-RLS-001"');
     expect(res.text).toContain('sensitiveFieldsIncluded=false');
     expect(res.text).toContain('standingMergeAuthority=true');
+    expect(res.text).toContain('mergeApprovalAlwaysRequired=true');
     expect(res.text).toContain('approvalCarryForward=false');
   });
 
@@ -33,14 +34,19 @@ describe('public guardrail contract', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.body.version).toBe('1.7.0');
+    expect(res.body.version).toBe('1.8.0');
     expect(res.body.sensitiveFieldsIncluded).toBe(false);
     expect(res.body.standingMergeAuthority).toBe(true);
+    expect(res.body.mergeApprovalAlwaysRequired).toBe(true);
     expect(res.body.approvalCarryForward).toBe(false);
     expect(res.body.guardrails).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'FCR-AUTH-001', status: 'active' }),
-        expect.objectContaining({ id: 'FCR-APPROVAL-001', status: 'active' }),
+        expect.objectContaining({
+          id: 'FCR-APPROVAL-001',
+          status: 'active',
+          summary: expect.stringContaining('every merge requires fresh explicit founder approval'),
+        }),
         expect.objectContaining({
           id: 'FCR-AUTOMATION-001',
           status: 'partial',

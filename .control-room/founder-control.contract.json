@@ -24,5 +24,74 @@
     "executionRequiresExactProposalBinding": true,
     "executionReceiptRequired": true,
     "providerSuccessIsOutcomeProof": false
+  },
+  "workLifecycle": {
+    "authorityUnit": "obligation",
+    "retirementExecutorStatus": "not-implemented",
+    "classifications": [
+      "active",
+      "supersession-candidate",
+      "residue-audit",
+      "superseded-pending-transfer",
+      "transferred-pending-proof",
+      "supersession-verified",
+      "closed-superseded",
+      "orphaned-supersession"
+    ],
+    "requiredResidueKinds": [
+      "code",
+      "tests",
+      "migration-state",
+      "operational-context",
+      "review-decisions",
+      "dependencies",
+      "acceptance-criteria"
+    ],
+    "allowedDispositions": [
+      "integrated",
+      "superseded",
+      "carried-forward",
+      "intentionally-rejected",
+      "founder-cancelled"
+    ],
+    "rules": {
+      "staleDoesNotImplySuperseded": true,
+      "similarityMayOnlyCreateCandidate": true,
+      "commitAncestryIsMovementNotSemanticProof": true,
+      "closureRequiresExplicitReplacementRelation": true,
+      "replacementGraphMustBeAcyclic": true,
+      "closureRequiresProviderInventory": true,
+      "inventoryCoverageMustBeComplete": true,
+      "inventoryCoverageMustBeSingleDisposition": true,
+      "closureRequiresCompleteResidueAudit": true,
+      "closureRequiresZeroUnresolvedRequiredResidue": true,
+      "closureRequiresEnumerableReplacementObligation": true,
+      "closureRequiresPreservedOutcomeOrAuthorizedCancellation": true,
+      "runtimeSensitiveClosureRequiresCurrentHeadProof": true,
+      "closedHistoricalEvidenceMustRemainRecoverable": true,
+      "orphanedSupersessionReactivatesObligation": true,
+      "structuralReceiptValidationIsNotProviderProof": true,
+      "closureExecutorMustAcquireProviderEvidenceInternally": true,
+      "untrustedCallerReceiptCannotAuthorizeClosure": true,
+      "directBranchDeletionExposed": false,
+      "branchDeletionRequiresReceiptAwareReconciler": true
+    },
+    "inventorySource": "provider-compare-plus-pr-readback",
+    "replacementEvidenceSource": "provider-readback",
+    "requiredReceiptFields": [
+      "repository",
+      "sourceRef",
+      "sourceHeadSha",
+      "currentMainSha",
+      "classification",
+      "inventoryEvidence",
+      "replacement",
+      "residue",
+      "unresolvedRequiredResidue",
+      "unresolvedReviewFindings",
+      "currentProof",
+      "historicalEvidence",
+      "safeToClose"
+    ]
   }
 }

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "zone": "foundercontrolroom.org",
+  "maxTraceHosts": 100,
+  "reviewedHosts": [
+    {
+      "hostname": "foundercontrolroom.org",
+      "required": true,
+      "expectedEdgeProxy": true
+    },
+    {
+      "hostname": "www.foundercontrolroom.org",
+      "required": false,
+      "expectedEdgeProxy": true
+    },
+    {
+      "hostname": "api.foundercontrolroom.org",
+      "required": true,
+      "expectedEdgeProxy": true
+    }
+  ]
+}

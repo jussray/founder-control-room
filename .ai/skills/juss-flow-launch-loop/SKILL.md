@@ -2,30 +2,46 @@
 name: juss-flow-launch-loop
 description: >
   Canonical execution controller for Juss-directed implementation, review, merge,
-  release, and full-app-launch work. Converts ULTRATHINK, steal, Lindy, OODA,
-  L99, Bill Gates, Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
-version: 1.0
+  release, documentation truth, and full-app-launch work. Converts ULTRATHINK,
+  Product Design, Data Analytics, Redteam, Lindy, L99, OODA, Hormozi, Bill Gates,
+  Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
+version: 1.2
 visibility: private
 owner: Juss
 ---
 
 # Juss Flow Launch Loop
 
+When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
+
 ## Goal
 
-Move the authoritative product toward a truthful full app launch without replacing
-Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting
-history, or scaling an unproven path.
+Move the authoritative product toward a truthful full app launch without replacing Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting history, leaking private sauce, or scaling an unproven path.
 
-`/goal full app launch` is a durable mission, not permission to claim launch before
-runtime, product, privacy, provider, release, and rollback evidence exists.
+`/goal full app launch` is a durable mission, not permission to claim launch before runtime, product, privacy, provider, review, release, documentation, and rollback evidence exists.
 
 ## Voice and intent
 
-Keep Juss's flow: direct, founder-readable, energetic, plainspoken, and outcome-first.
-Do not bury the decision in corporate language. Preserve canon names, product intent,
-brand tone, and the reason the feature exists. Translate shorthand into explicit
-engineering contracts without sanding off the founder's actual objective.
+Keep Juss's flow direct, founder-readable, outcome-first, and evidence-aware. Preserve canon names, product intent, brand direction, and the reason the feature exists. Translate shorthand into explicit engineering contracts without sanding off the founder's actual objective.
+
+## Parallel lenses, serialized authority
+
+Reasoning lenses may run in parallel when that reduces blind spots. Mutations, approvals, merges, deployments, publication, credentials, spending, and destructive actions remain serialized behind the applicable authority gate.
+
+Parallel analysis may include:
+
+- ULTRATHINK system decomposition;
+- Product Design user-state review;
+- Data Analytics measurement/truth review;
+- Redteam premise and solution attacks;
+- Lindy durability review;
+- L99 authority/state mapping;
+- OODA re-observation;
+- Hormozi value compression;
+- Bill Gates bottleneck/leverage review; and
+- Elon Musk requirement/deletion/simplification review.
+
+Parallel thinking never means parallel authority expansion or parallel merge candidates that make each other's exact-head proof stale by construction.
 
 ## Canonical reasoning sequence
 
@@ -33,98 +49,90 @@ engineering contracts without sanding off the founder's actual objective.
 Goal
 -> Reality
 -> ULTRATHINK
--> Steal pass
+-> Product Design + Data Analytics
 -> Redteam I
 -> Lindy
 -> L99
--> Redteam II
 -> OODA
+-> Hormozi
 -> Bill Gates
 -> Elon Musk
 -> Implement
 -> Proof
+-> Redteam II
+-> Documentation truth gate
 -> Review
 -> Merge gate
+-> Post-merge re-observation
 -> Release truth
 -> Rollback
 -> Next loop
 ```
 
-The sequence continues during implementation. It is not decorative prose added after
-a diff.
+The sequence continues during implementation. It is not decorative prose added after a diff.
 
 ## Method contracts
 
 ### ULTRATHINK
 
-Use deeper analysis where the work crosses repositories, providers, auth, privacy,
-security, money, brand, user state, production, or irreversible actions. Decompose the
-system, identify hidden dependencies, separate verified facts from inference, and
-surface the bottleneck early.
+Use deeper analysis where the work crosses repositories, providers, auth, privacy, security, money, brand, user state, production, documentation authority, temporal truth, or irreversible actions. Decompose the system, identify hidden dependencies, separate verified facts from inference, and surface the bottleneck early.
 
-ULTRATHINK does not authorize endless analysis. Stop when the highest-leverage safe
-next action is clear and its proof contract is defined.
+Stop when the highest-leverage safe next action is clear and its proof contract is defined. ULTRATHINK is not permission for endless analysis.
 
 ### Steal
 
-Steal principles, structures, and durable mechanisms. Do not copy protected expression,
-private implementation, credentials, branding, or proprietary assets.
+Steal principles, structures, and durable mechanisms. Do not copy protected expression, private implementation, credentials, branding, or proprietary assets.
 
-For every borrowed pattern record:
+For borrowed patterns record the principle, why it fits, what is deliberately different, risk, and proof that the adapted mechanism works here.
 
-- source or inspiration;
-- principle being adopted;
-- why it fits this product;
-- what is deliberately different;
-- legal, brand, privacy, and maintenance risk;
-- proof that the adapted mechanism works here.
+`steal me too` means capture Juss's repeatable judgment and proven workflows as versioned internal skills. It does not mean impersonating Juss publicly or inventing approval.
 
-`steal me too` means capture Juss's own repeatable judgment, language patterns,
-decision rules, and proven workflows as versioned internal skills. It does not mean
-impersonating Juss publicly or inventing approval.
+### Redteam
+
+Redteam I attacks the premise: whether the requested action should exist, whether the claimed problem is real, and whether the evidence supports it.
+
+Redteam II attacks the selected solution: false greens, stale truth, privilege expansion, provider drift, sauce/secret leakage, duplicate execution, stale-branch overwrite, rollback gaps, missing negative tests, and ways a future agent could misread yesterday's truth as today's.
+
+Do not collapse the two passes.
 
 ### Lindy
 
-Prefer mechanisms that survive provider swaps, team changes, scale, and time:
+Prefer mechanisms that survive provider swaps, team changes, scale, and time: open formats, explicit contracts, portable data, reversible migrations, observable state, small interfaces, documented ownership, and boring infrastructure where boring wins.
 
-- open formats;
-- explicit contracts;
-- portable data;
-- reversible migrations;
-- observable state;
-- small interfaces;
-- documented ownership;
-- boring infrastructure where boring wins.
-
-Reject temporary cleverness that hides authority or creates future lock-in without a
-material near-term advantage.
+Reject temporary cleverness that hides authority or creates lock-in without a material advantage.
 
 ### L99
 
 Map the complete system before broad mutation:
 
 - who has authority;
-- what state exists;
-- where state is stored;
-- when transitions occur;
-- why the transition is allowed;
-- how it is executed;
-- provenance;
-- evidence;
-- privacy boundary;
-- cost;
-- failure modes;
-- rollback;
-- compounding value;
-- next authority gate.
+- what state exists and where it lives;
+- when/why/how transitions occur;
+- provenance and evidence;
+- temporal validity / Truth Lease;
+- privacy and Sauce Guard boundaries;
+- cost and operational burden;
+- failure modes and rollback;
+- compounding value; and
+- the next authority gate.
 
 No important state transition may exist only in agent memory.
 
 ### OODA
 
-Observe the actual repo, branch, providers, tests, runtime, designs, and user flow.
-Orient around the founder goal and current bottleneck. Decide one reversible path.
-Act minimally. Re-observe after every meaningful edit, test, review, merge, and deploy.
+Observe the actual repo, branch, providers, tests, runtime, designs, docs, and user flow. Orient around the founder goal and current bottleneck. Decide one reversible path. Act minimally. Re-observe after every meaningful edit, test, review, merge, deploy, provider write, or documentation transition.
+
+### Hormozi pass
+
+Pressure-test whether the selected action creates enough founder/customer value to justify its complexity:
+
+1. desired outcome;
+2. evidence-backed likelihood of achieving it;
+3. time delay before value;
+4. effort, sacrifice, cognitive load, and maintenance burden; and
+5. whether proof can increase trust without exposing the private recipe.
+
+Prefer changes that increase outcome clarity/proof while reducing delay and operational drag. Never invent demand, traction, revenue, users, or conversion evidence.
 
 ### Bill Gates pass
 
@@ -140,47 +148,124 @@ Ask:
 
 In this order:
 
-1. Question each requirement and its owner.
+1. Question each requirement and its evidence/owner.
 2. Delete unnecessary steps, code, providers, and abstractions.
 3. Simplify and optimize what remains.
-4. Shorten the feedback and proof cycle.
+4. Shorten the feedback/proof cycle.
 5. Automate only the stable path.
 
-Automation before deletion and simplification is a defect multiplier.
+Automation before deletion/simplification multiplies defects. Never delete a safety, privacy, authority, independent-review, audit, evidence, temporal-truth, Sauce Guard, or rollback boundary merely because it is inconvenient.
 
 ## GoalFix
 
-When the literal request conflicts with the actual launch goal:
+When the literal request conflicts with the durable launch goal:
 
 1. state the requested action;
-2. state the inferred durable goal;
+2. state the durable goal;
 3. identify the mismatch;
 4. preserve the goal;
-5. choose the smallest action that advances it;
+5. choose the smallest action that advances it; and
 6. name what remains blocked.
 
 Never quietly shrink `full app launch` into documentation-only completion.
 
 ## Product Design gate
 
-For new product surfaces:
+For new or changed product surfaces:
 
-1. define the user and intended outcome;
-2. inspect existing visual and product truth;
+1. define the user and outcome;
+2. inspect existing visual/product truth;
 3. create exactly three genuinely distinct directions when no target exists;
 4. record the selected target;
 5. implement responsively;
-6. verify loading, empty, partial, error, blocked, stale, and success states;
-7. verify keyboard, screen reader, contrast, motion, and touch behavior;
+6. verify loading, empty, partial, error, denied, offline, blocked, stale, superseded, unknown, and success states as applicable;
+7. verify keyboard, screen-reader naming, focus, contrast, motion, and touch behavior;
 8. compare source visual to rendered output;
-9. capture Playwright screenshots and traces tied to the exact SHA.
+9. capture Playwright evidence tied to the exact SHA; and
+10. make the next gate visible instead of collapsing all truth into one green badge.
 
-Design evidence proves UX and visual behavior only. It does not prove auth, RLS,
-database, provider, deployment, or production safety.
+Design evidence proves UX/visual behavior only. It does not prove auth, RLS, database, provider, deployment, publication, or production safety.
+
+## Data Analytics gate
+
+Analytics is observation-only. Define measurements that distinguish:
+
+- capability from configuration;
+- configuration from execution;
+- execution from provider outcome;
+- current truth from historical/stale/superseded truth;
+- distribution failure from content failure from conversion failure; and
+- product value from vanity activity.
+
+Prefer sanitized counts, rates, comparable windows, state transitions, elapsed time, and proof coverage. Do not store/export credentials, raw private evidence, private prompts, raw diffs, private customer data, private metrics, or proprietary sauce merely to enrich a dashboard.
+
+Analytics may observe and inform the next proposal. It never renews truth, approves an action, or expands authority.
+
+## Truth Lease and FutureYou / ME safety
+
+A fact can be true when checked and unsafe when reused later. Treat consequential present-tense claims as leased truth, not permanent memory.
+
+At merge, deploy, schedule, publish, completion-claim, provider, and launch boundaries:
+
+1. identify the exact claim and dependencies;
+2. re-observe the authoritative repository/provider/runtime/human-outcome state;
+3. classify current, historical, stale, superseded/invalidated, or unknown;
+4. use present-tense operational language only while current;
+5. preserve historical truth without promoting it back into current authority;
+6. never let Current You preference override contradictory objective evidence; and
+7. never let FutureYou guidance become evidence or approval.
+
+`Truth Lease` is the reusable contract for this failure class. Domain-specific gates may be stricter, including exact-head repository proof and founder-content execution-time revalidation.
+
+## Documentation truth gate
+
+Documentation is part of the control plane when humans or agents use it to make current decisions.
+
+For every truth-sensitive change to architecture, authority, publishing, provider ownership, capability, deployment, workflow, or launch semantics:
+
+1. update `README.md` and applicable current-state docs in the same bounded change;
+2. when a freshly verified fingerprint proves that a current-state assertion is superseded, delete or replace the stale assertion in the same bounded change rather than leaving competing present-tense instructions;
+3. preserve historical commits, receipts, exact SHAs, and evidence as provenance; mint a bounded continuity cookie that names predecessor fingerprint, replacement base/head/scope, proof, and next gate without treating the cookie as approval or permanent truth;
+4. mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `STALE`, or point it to newer authority when it remains useful for provenance;
+5. run `Documentation Truth` on the exact PR head;
+6. require Documentation Truth in CI / Required Gate;
+7. for default test discovery, bind existing excluded-test debt to the exact base and reject both candidate-added and stale ledger entries;
+8. run the same verifier on the merged-main transition; and
+9. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
+
+A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes the transition; it does not create an infinite requirement to rewrite itself again.
+
+Do not hard-code a durable “current main SHA” into prose. Exact SHAs belong in evidence/provenance; resolve current identity at use time.
+
+## Founder product publishing / Sauce Guard
+
+Founder Control Room should be able to publish verified progress about Juss's own products from Juss's own product without giving away the private implementation recipe.
+
+Canonical separation:
+
+```text
+verified product progress
+-> Chief proposes public-safe story
+-> Sauce Guard removes private machinery
+-> temporal truth revalidation
+-> exact Current You authority for the executable route
+-> FCR direct adapter or bounded n8n/Zapier orchestration
+-> provider readback
+-> FCR outcome receipt
+-> observation-only analytics
+```
+
+Public-safe story may explain what changed, why it matters, what was learned, and approved public proof. Keep private prompts, raw diffs, credentials, customer/security data, internal proof references, unreleased roadmap, private metrics, provider payloads, and proprietary mechanics behind the curtain.
+
+## Governed repository mutation gate
+
+Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The envelope's lifetime must begin at the server-observed execute request time rather than the proof receipt timestamp; proof freshness and authority expiry are separate fail-closed windows.
+
+The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
 
 ## Implementation contract
 
-Before mutation, record:
+Before mutation record:
 
 ```text
 Goal:
@@ -191,7 +276,9 @@ Critical bottleneck:
 Smallest coherent slice:
 Definition of done:
 Required tests:
-Runtime proof:
+Runtime/provider proof:
+Documentation impact:
+Truth Lease / freshness boundary:
 Rollback:
 Next founder gate:
 ```
@@ -199,55 +286,79 @@ Next founder gate:
 Implementation rules:
 
 - audit before edit;
-- preserve unrelated work;
-- prefer surgical, reversible changes;
+- preserve unrelated work/history;
+- prefer surgical reversible changes;
 - do not remove behavior merely to make tests pass;
-- do not expose or hardcode secrets;
+- do not expose/hardcode secrets;
 - add behavior tests for changed contracts;
 - add Playwright for changed user-facing paths;
-- keep mock, fallback, fixture, and production paths visibly distinct;
-- attach evidence to the exact branch and SHA;
-- report verified, inferred, blocked, and untested separately.
+- keep mock/fallback/fixture/production paths visibly distinct;
+- attach evidence to exact branch/SHA;
+- update current README/docs when truth-sensitive behavior changes; and
+- report verified, inferred, blocked, stale, superseded, unknown, and untested separately.
 
 ## Review loop
 
 Review is a fresh attack, not self-congratulation.
 
 1. Compare base and head.
-2. Read every changed file in context.
+2. Read changed files in context.
 3. Reconstruct user-visible and state-transition behavior.
-4. Run Redteam II on the selected implementation.
-5. Inspect tests for false confidence and missing negative cases.
-6. Inspect security, privacy, accessibility, cost, observability, and rollback.
-7. Resolve material review threads.
-8. Rerun required checks on the exact head SHA.
-9. Re-observe runtime and design evidence.
+4. Run Redteam II.
+5. Inspect tests for false confidence and missing negatives.
+6. Inspect security, privacy, accessibility, cost, observability, temporal truth, Documentation Truth, and rollback.
+7. Inspect whether an old PR/doc/issue is being treated as current authority.
+8. Resolve material review threads.
+9. Rerun required checks on the exact head.
+10. Re-observe runtime/provider/design/analytics/docs evidence.
 
-Do not approve merely because the author and reviewer are the same agent.
+For pull-request Quality Gate evidence, every job must checkout `github.event.pull_request.head.sha` and verify `git rev-parse HEAD` equals that expected head before running tests. A green workflow against GitHub's synthetic merge commit is useful merge-simulation evidence only and cannot be promoted to exact-head proof.
+
+Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
+
+A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
+
+Trusted witness ignition must execute from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflows, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once integrated and exact-release-proven: it accepts only a positive PR number behind same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; derives repository/provider/PR/base/head/diff/verdict/hash/App identity from server/provider state; requires full runtime `GIT_SHA` to equal provider-resolved current `main` before and after witness publication or reconciliation; performs reconcile-before-create; and returns the complete deterministic receipt without granting merge authority. A default-branch dispatch is only an equivalent ignition surface when it preserves the same invariants. Any ignition surface, its credential boundary, producer/publisher, workflow, or runner is a deterministic-review trust root; changing it must P1-block normal self-certification and require the separately explicit exact-candidate bootstrap/constitutional path.
+
+### Founder-selected native Auto-merge
+
+If the founder clicks GitHub **Enable auto-merge** for an exact PR, leave the PR queued for GitHub to merge **only after** configured required status checks, tests, review/approval policies, and branch protections have passed. All intended load-bearing gates must be required in live provider settings; optional green/red jobs alone are not native merge requirements. PR Continuity only observes the queue status from GitHub's readback; it never merges, creates founder-final approval, or relaxes a ruleset. Conflicts, draft status, changing base/head, missing exact-candidate founder authority, or stale review block the merge. Do not call `merge_pull_request` as a substitute for waiting for native Auto-merge or claim GitHub's eventual merge proves the FCR in-app founder-final route. An explicit Auto-merge click is the queue request, not a new independent review or production deployment authorization.
 
 ## Merge gate
 
-Standing founder intent allows a merge only when all repository merge-authority
-conditions are satisfied. It does not waive them.
+Standing founder intent allows a merge only when all repository merge-authority conditions are satisfied. It does not waive them.
 
 Merge only when:
 
 - scope and intent match;
-- the head SHA has not moved since verification;
-- required checks are genuinely green;
-- user-facing paths have current Playwright proof when relevant;
+- exact head/base remain current;
+- required checks genuinely executed and passed;
+- FCR `Required Gate` includes and successfully enforces the secret-free exact-head Cloudflare bridge authority contract; this is repository CI evidence, not live-provider proof;
+- user-facing changes have current Playwright proof when relevant;
+- Documentation Truth is green when applicable;
+- required independent review is genuinely satisfied by the repository's current authority membrane;
+- for canonical FCR in-app merges, deterministic exact-head review is green **before** an authenticated founder-final approval bound to the exact PR/base/head is accepted;
 - no unresolved critical review thread remains;
 - runtime/provider evidence is sufficient for the claim;
-- privacy, security, brand, and data boundaries pass;
-- rollback is understood;
+- privacy, security, brand, data, and Sauce Guard boundaries pass;
+- rollback is understood; and
 - the PR does not mix unrelated risky work.
 
-Use the repository's preferred merge method. Pass the expected head SHA when the API
-supports it. If the head moves, stop and verify again.
+Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness.
+
+FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
+
+### Chief candidate-proof producer trust
+
+A Chief pre-merge required-check name plus GitHub Actions integration `15368` does not authenticate the exact workflow file or event that produced that check. A PR-authored workflow can otherwise counterfeit the expected context under the same GitHub Actions App.
+
+When reconciling Chief governance, fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that PR-authored Chief Actions cannot mint. Also reject `Cloudflare Production` as a pre-merge required deployment because it is a post-merge production plane. Do not mutate the live rulesets, grant merge authority, or call the candidate proof trusted while either producer provenance or deployment-phase separation is unresolved.
+
+Use expected-head protection when supported. If `main` or the candidate head moves, prior green becomes historical and the candidate must be re-observed/reacquired.
 
 ## Release and launch truth
 
-Distinguish these states:
+Distinguish:
 
 ```text
 specified
@@ -265,47 +376,48 @@ launched
 
 Never collapse them into one green badge.
 
-A full app launch requires at minimum:
-
-- the intended public or approved user entry point works;
-- authentication and authorization are verified;
-- data and privacy boundaries are verified;
-- primary user journeys pass in a production-like environment;
-- provider dependencies and failure states are understood;
-- monitoring and incident ownership exist;
-- rollback is executable;
-- accessibility blockers are resolved;
-- legal, safety, or minor-user gates relevant to the product are satisfied;
-- release evidence is tied to the deployed artifact;
-- Juss retains final control over publication and irreversible launch actions.
+A full app launch requires the intended entry point, auth/authorization, data/privacy boundaries, primary journeys, provider dependencies/failure states, monitoring/ownership, rollback, accessibility, applicable safety/legal gates, exact deployed-artifact evidence, current documentation, and final founder control over irreversible actions.
 
 ## Loop behavior
 
 After each merge or blocked attempt:
 
-1. Observe current release truth.
-2. Select the next launch bottleneck.
-3. Open or update one bounded mission.
-4. Implement the smallest coherent slice.
-5. Verify and review.
-6. Merge only if green.
-7. Record proof, rollback, and the next gate.
+1. Observe current `main`, release truth, provider state, and documentation truth.
+2. If a merge occurred, inspect the post-merge Documentation Truth receipt.
+3. Mark stale/superseded PRs/docs/evidence so they cannot masquerade as current authority.
+4. Select the next launch bottleneck.
+5. Open/update one bounded mission/candidate.
+6. Implement the smallest coherent slice.
+7. Verify and review.
+8. Merge only if the current authority membrane is satisfied.
+9. Record proof, rollback, documentation state, truth age, and next gate.
 
-Do not run an uncontrolled autonomous merge loop. Each iteration must remain bounded by
-current evidence, repository rules, provider permissions, and explicit irreversible
-action gates.
+Do not run an uncontrolled autonomous merge loop. Each iteration remains bounded by current evidence, repository rules, independent review, founder-final authority where applicable, provider permissions, temporal/documentation truth, and explicit irreversible-action gates.
 
 ## Completion report
-
-End material work with:
 
 ```text
 Changed:
 Proven:
 Not proven:
+Truth age / superseded state:
+Documentation state:
 Risks:
 Rollback:
 Release state:
 Next exact action:
 Next founder gate:
 ```
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.

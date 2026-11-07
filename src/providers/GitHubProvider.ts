@@ -9,12 +9,35 @@ import type {
   VerificationSignalStatus,
   ReviewSignal,
   ReviewSignalState,
+  PullRequestReviewContext,
   Diff,
   DiffFile,
   Patch,
   RulesetConfig,
   RulesetResult,
 } from "./RepositoryProvider.js";
+
+const FCR_CODE_SCANNING_TOOL = "CodeQL";
+const FCR_CODE_SCANNING_SECURITY_THRESHOLD = "high_or_higher";
+const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "errors";
+const FCR_REVIEW_OWNED_RULE_TYPES = new Set([
+  "pull_request",
+  "required_status_checks",
+  "code_scanning",
+  "non_fast_forward",
+  "deletion",
+  // Legacy pre-merge deployment gates are FCR-owned policy. They must not be
+  // carried into the canonical review membrane because production deployment
+  // is authorized only for exact current main after merge.
+  "required_deployments",
+]);
+const FCR_REVIEW_PRESERVABLE_RULE_TYPES = new Set([
+  "required_linear_history",
+  "code_quality",
+  "copilot_code_review",
+  // Preserve the live signed-commit requirement across governance migration.
+  "required_signatures",
+]);
 
 export interface GitHubProviderConfig {
   token: string;
@@ -39,6 +62,7 @@ export class GitHubProvider implements RepositoryProvider {
   private octokit: Octokit;
   private projectMap: Record<string, string>;
   private readonly resolvedRefs = new Map<string, string>();
+  private readonly pullRequestContextByProject = new Map<string, PullRequestReviewContext>();
 
   constructor(config: GitHubProviderConfig) {
     this.octokit = new Octokit({ auth: config.token, ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}) });
@@ -154,6 +178,13 @@ export class GitHubProvider implements RepositoryProvider {
       status: mapCheckStatus(run.status, run.conclusion),
       commitSha: run.head_sha,
       provider: this.name,
+      issuer: run.app?.id != null
+        ? {
+            kind: "app" as const,
+            id: String(run.app.id),
+            name: run.app.slug ?? undefined,
+          }
+        : undefined,
       startedAt: run.started_at ?? undefined,
       completedAt: run.completed_at ?? undefined,
       detailsUrl: run.details_url ?? undefined,
@@ -186,6 +217,41 @@ export class GitHubProvider implements RepositoryProvider {
       submittedAt: review.submitted_at ?? undefined,
       detailsUrl: review._links?.html?.href ?? undefined,
     }));
+  }
+
+  async getPullRequestReviewContext(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext> {
+    const { owner, repo } = this.locate(projectId);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error("GitHubProvider: pullRequestNumber must be a positive integer");
+    }
+
+    const { data } = await this.octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: pullRequestNumber,
+    });
+    if (data.state !== "open") {
+      throw new Error(`GitHubProvider: pull request #${pullRequestNumber} must be open for independent review`);
+    }
+    if (data.draft === true) {
+      throw new Error(`GitHubProvider: pull request #${pullRequestNumber} must be ready for review, not draft`);
+    }
+
+    const context: PullRequestReviewContext = {
+      number: data.number,
+      repository: `${owner}/${repo}`,
+      headRepository: data.head.repo?.full_name ?? "",
+      baseRef: data.base.ref,
+      headRef: data.head.ref,
+      baseSha: data.base.sha,
+      headSha: data.head.sha,
+      authorIdentity: data.user?.login ?? "",
+    };
+    this.pullRequestContextByProject.set(projectId, context);
+    return context;
   }
 
   async createBranch(
@@ -304,18 +370,65 @@ export class GitHubProvider implements RepositoryProvider {
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
     const { owner, repo } = this.locate(projectId);
-    const key = this.resolvedRefKey(projectId, head);
+    const headKey = this.resolvedRefKey(projectId, head);
     const exactHeadSha = /^[0-9a-f]{40}$/i.test(head)
       ? head.toLowerCase()
-      : this.resolvedRefs.get(key);
+      : this.resolvedRefs.get(headKey);
 
     if (!exactHeadSha) {
       throw new Error(
-        `GitHubProvider: integrate(${base}, ${head}) requires resolveRef(${head}) immediately beforehand`
+        `GitHubProvider: integrate(${base}, ${head}) requires resolveRef(${head}) immediately beforehand`,
       );
     }
 
-    this.resolvedRefs.delete(key);
+    if (projectId === "founder-control-room") {
+      const context = this.pullRequestContextByProject.get(projectId);
+      if (!context) {
+        throw new Error("GitHubProvider: FCR integration requires provider-backed pull-request context");
+      }
+      if (context.baseRef !== base || context.headRef !== head) {
+        throw new Error(
+          `GitHubProvider: FCR integration refs changed after review context: expected ${context.baseRef}<-${context.headRef}, received ${base}<-${head}`,
+        );
+      }
+
+      const baseKey = this.resolvedRefKey(projectId, base);
+      const exactBaseSha = this.resolvedRefs.get(baseKey);
+      if (!exactBaseSha) {
+        throw new Error(
+          `GitHubProvider: FCR integrate(${base}, ${head}) requires resolveRef(${base}) immediately beforehand`,
+        );
+      }
+      if (exactBaseSha !== context.baseSha.toLowerCase()) {
+        throw new Error(
+          `GitHubProvider: FCR base moved after review context: current ${exactBaseSha}, reviewed ${context.baseSha}`,
+        );
+      }
+      if (exactHeadSha !== context.headSha.toLowerCase()) {
+        throw new Error(
+          `GitHubProvider: FCR head moved after review context: current ${exactHeadSha}, reviewed ${context.headSha}`,
+        );
+      }
+
+      this.resolvedRefs.delete(baseKey);
+      this.resolvedRefs.delete(headKey);
+      this.pullRequestContextByProject.delete(projectId);
+
+      const { data } = await this.octokit.pulls.merge({
+        owner,
+        repo,
+        pull_number: context.number,
+        sha: exactHeadSha,
+      });
+      if (!data.merged || !data.sha) {
+        throw new Error(
+          `GitHubProvider: pull request #${context.number} did not merge: ${data.message ?? "provider returned no merge SHA"}`,
+        );
+      }
+      return data.sha;
+    }
+
+    this.resolvedRefs.delete(headKey);
 
     const { data } = await this.octokit.repos.merge({
       owner,
@@ -349,27 +462,13 @@ export class GitHubProvider implements RepositoryProvider {
       projectId === "founder-control-room"
       && config.enforcement === "active"
       && config.targetRefs.includes("main");
+    const requireNativeHumanReview =
+      hardenFounderControlRoomMainReview && config.requiredApprovingReviewCount > 0;
 
     if (hardenFounderControlRoomMainReview) {
       const errors = fcrMainRulesetConfigErrors(config);
       if (errors.length > 0) {
         throw new Error(`GitHubProvider: FCR main ruleset config rejected: ${errors.join("; ")}`);
-      }
-
-      const { data: collaborators } = await this.octokit.repos.listCollaborators({
-        owner,
-        repo,
-        affiliation: "all",
-        per_page: 100,
-      });
-      const ownerLogin = owner.toLowerCase();
-      const independentReviewerReady = collaborators.some((collaborator) =>
-        collaborator.login.toLowerCase() !== ownerLogin
-        && collaborator.permissions?.push === true);
-      if (!independentReviewerReady) {
-        throw new Error(
-          "GitHubProvider: FCR main independent-review policy cannot be activated until a non-owner collaborator with write authority is available",
-        );
       }
     }
 
@@ -378,21 +477,37 @@ export class GitHubProvider implements RepositoryProvider {
     >["rules"] extends (infer R)[] | undefined
       ? R
       : never;
-    const rules: RepoRule[] = [];
+
+    const reviewRules: RepoRule[] = [];
     if (config.requirePullRequest) {
-      rules.push({
+      reviewRules.push({
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
-          require_code_owner_review: false,
-          require_last_push_approval: hardenFounderControlRoomMainReview,
+          require_code_owner_review: requireNativeHumanReview,
+          require_last_push_approval: requireNativeHumanReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
         },
       });
     }
-    if (config.requiredStatusCheckNames.length > 0) {
-      rules.push({
+    if (hardenFounderControlRoomMainReview) {
+      reviewRules.push({
+        type: "code_scanning",
+        parameters: {
+          code_scanning_tools: [{
+            tool: FCR_CODE_SCANNING_TOOL,
+            security_alerts_threshold: FCR_CODE_SCANNING_SECURITY_THRESHOLD,
+            alerts_threshold: FCR_CODE_SCANNING_ALERTS_THRESHOLD,
+          }],
+        },
+      });
+    }
+    // For FCR main, strict status/base-freshness is deliberately moved to a
+    // second no-bypass ruleset below. Other projects retain the prior single
+    // ruleset behavior.
+    if (config.requiredStatusCheckNames.length > 0 && !hardenFounderControlRoomMainReview) {
+      reviewRules.push({
         type: "required_status_checks",
         parameters: {
           do_not_enforce_on_create: false,
@@ -401,15 +516,54 @@ export class GitHubProvider implements RepositoryProvider {
         },
       });
     }
-    if (config.blockForcePushes) rules.push({ type: "non_fast_forward" });
-    if (config.blockDeletion) rules.push({ type: "deletion" });
+    if (config.blockForcePushes) reviewRules.push({ type: "non_fast_forward" });
+    if (config.blockDeletion) reviewRules.push({ type: "deletion" });
 
     const bypassActors = (config.bypassActors ?? []).map((actor) => {
       if (actor.kind === "app") {
-        return { actor_type: "Integration" as const, actor_id: Number(actor.id), bypass_mode: "always" as const };
+        return {
+          actor_type: "Integration" as const,
+          actor_id: Number(actor.id),
+          bypass_mode: hardenFounderControlRoomMainReview ? "pull_request" as const : "always" as const,
+        };
       }
       throw new Error(`GitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
     });
+
+    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+    const reviewMatch = existing.find((ruleset) => ruleset.name === config.name);
+    let preservedReviewRuleSnapshot: NonNullable<RulesetReadback["rules"]> = [];
+
+    if (hardenFounderControlRoomMainReview && reviewMatch) {
+      // The governance reconciler owns PR/review, CodeQL, force-push/deletion,
+      // strict-status freshness, and legacy pre-merge deployment gates.
+      // Required deployments are intentionally removed because FCR production
+      // release authority is exact-current-main/post-merge. Other known live
+      // security policy survives the topology split byte-for-byte.
+      const { data: existingReviewReadback } = await this.octokit.repos.getRepoRuleset({
+        owner,
+        repo,
+        ruleset_id: reviewMatch.id,
+      });
+      const existingReviewRules = Array.isArray(existingReviewReadback.rules)
+        ? existingReviewReadback.rules
+        : [];
+      const unsupportedUnowned = existingReviewRules
+        .map((rule) => String(rule.type ?? ""))
+        .filter((type) => type && !FCR_REVIEW_OWNED_RULE_TYPES.has(type) && !FCR_REVIEW_PRESERVABLE_RULE_TYPES.has(type));
+      if (unsupportedUnowned.length > 0) {
+        throw new Error(
+          `GitHubProvider: FCR review ruleset contains unowned rule types that cannot be safely preserved: ${unsupportedUnowned.sort().join(", ")}`,
+        );
+      }
+      preservedReviewRuleSnapshot = existingReviewRules
+        .filter((rule) => FCR_REVIEW_PRESERVABLE_RULE_TYPES.has(String(rule.type ?? "")))
+        .map((rule) => ({
+          type: String(rule.type ?? ""),
+          ...("parameters" in rule && rule.parameters != null ? { parameters: structuredClone(rule.parameters) } : {}),
+        }));
+      reviewRules.push(...(preservedReviewRuleSnapshot as RepoRule[]));
+    }
 
     const payload = {
       owner,
@@ -424,29 +578,122 @@ export class GitHubProvider implements RepositoryProvider {
           exclude: [],
         },
       },
-      rules,
+      rules: reviewRules,
     };
 
-    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
-    const match = existing.find((ruleset) => ruleset.name === config.name);
-
-    const { data } = match
-      ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
-      : await this.octokit.repos.createRepoRuleset(payload);
+    let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
+    let reviewComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
 
     if (hardenFounderControlRoomMainReview) {
-      const { data: readback } = await this.octokit.repos.getRepoRuleset({
+      // Apply and verify the no-bypass freshness membrane FIRST. If any provider
+      // call or readback fails, the review membrane is left untouched rather
+      // than creating a transient weakening while migrating the topology.
+      const freshnessName = fcrMainFreshnessRulesetName(config.name);
+      const freshnessRules: RepoRule[] = [{
+        type: "required_status_checks",
+        parameters: {
+          do_not_enforce_on_create: false,
+          required_status_checks: config.requiredStatusCheckNames.map((context) => ({ context })),
+          strict_required_status_checks_policy: true,
+        },
+      }];
+      const freshnessPayload = {
         owner,
         repo,
-        ruleset_id: data.id,
+        name: freshnessName,
+        target: "branch" as const,
+        enforcement: config.enforcement,
+        bypass_actors: [],
+        conditions: {
+          ref_name: {
+            include: config.targetRefs.map((ref) => `refs/heads/${ref}`),
+            exclude: [],
+          },
+        },
+        rules: freshnessRules,
+      };
+      const freshnessMatch = existing.find((ruleset) => ruleset.name === freshnessName);
+      const { data: freshnessData } = freshnessMatch
+        ? await this.octokit.repos.updateRepoRuleset({ ...freshnessPayload, ruleset_id: freshnessMatch.id })
+        : await this.octokit.repos.createRepoRuleset(freshnessPayload);
+      const { data: freshnessReadback } = await this.octokit.repos.getRepoRuleset({
+        owner,
+        repo,
+        ruleset_id: freshnessData.id,
       });
-      const errors = fcrMainRulesetReadbackErrors(config, readback);
-      if (errors.length > 0) {
-        throw new Error(`GitHubProvider: FCR main ruleset read-back mismatch: ${errors.join("; ")}`);
+      const freshnessErrors = fcrMainFreshnessRulesetReadbackErrors(
+        config,
+        freshnessName,
+        freshnessReadback,
+      );
+      if (freshnessErrors.length > 0) {
+        throw new Error(
+          `GitHubProvider: FCR strict-freshness ruleset ${freshnessData.id} read-back mismatch: ${freshnessErrors.join("; ")}`,
+        );
       }
+      freshnessComponent = {
+        purpose: "strict_freshness",
+        id: String(freshnessData.id),
+        name: freshnessData.name,
+        enforcement: freshnessData.enforcement,
+      };
     }
 
-    return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    const applyReviewMembrane = async () => {
+      const { data } = reviewMatch
+        ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: reviewMatch.id })
+        : await this.octokit.repos.createRepoRuleset(payload);
+
+      reviewComponent = {
+        purpose: "review",
+        id: String(data.id),
+        name: data.name,
+        enforcement: data.enforcement,
+      };
+
+      if (hardenFounderControlRoomMainReview) {
+        const { data: readback } = await this.octokit.repos.getRepoRuleset({
+          owner,
+          repo,
+          ruleset_id: data.id,
+        });
+        const errors = fcrMainReviewRulesetReadbackErrors(config, readback, preservedReviewRuleSnapshot);
+        if (errors.length > 0) {
+          throw new Error(`GitHubProvider: FCR review ruleset ${data.id} read-back mismatch: ${errors.join("; ")}`);
+        }
+      }
+      return data;
+    };
+
+    const data = await applyReviewMembrane().catch((error: unknown) => {
+      if (!freshnessComponent) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      const reviewMutation = reviewComponent
+        ? `; mutated review ruleset ${reviewComponent.name} (${reviewComponent.id}) also requires reconciliation`
+        : "";
+      throw new Error(
+        `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id})${reviewMutation}: ${message}`,
+      );
+    });
+
+    return {
+      id: String(data.id),
+      name: data.name,
+      enforcement: data.enforcement,
+      ...(freshnessComponent
+        ? {
+            components: [
+              reviewComponent ?? {
+                purpose: "review",
+                id: String(data.id),
+                name: data.name,
+                enforcement: data.enforcement,
+              },
+              freshnessComponent,
+            ],
+          }
+        : {}),
+    };
   }
 }
 
@@ -456,6 +703,7 @@ type RulesetReadback = {
   bypass_actors?: Array<{
     actor_type?: string;
     actor_id?: number;
+    bypass_mode?: string;
   }>;
   conditions?: {
     ref_name?: {
@@ -471,16 +719,38 @@ type RulesetReadback = {
 function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
   if (!config.requirePullRequest) errors.push("pull requests must be required");
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    errors.push("at least one approving review is required");
+  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 0) {
+    errors.push("approving review count must be a non-negative integer");
+  }
+  const requiredChecks = config.requiredStatusCheckNames.map((name) => name.trim());
+  if (requiredChecks.length === 0) {
+    errors.push("at least one required status check is required for the no-bypass freshness membrane");
+  }
+  if (requiredChecks.some((name) => name.length === 0)) {
+    errors.push("required status check names must be non-empty");
+  }
+  if (new Set(requiredChecks).size !== requiredChecks.length) {
+    errors.push("required status check names must be unique");
+  }
+  const bypassActors = config.bypassActors ?? [];
+  if (
+    bypassActors.length !== 1
+    || bypassActors[0]?.kind !== "app"
+    || !/^\d+$/.test(bypassActors[0].id.trim())
+  ) {
+    errors.push("exactly one numeric GitHub App bypass actor is required");
   }
   return errors;
+}
+
+function fcrMainFreshnessRulesetName(reviewRulesetName: string): string {
+  return `${reviewRulesetName} [strict freshness]`;
 }
 
 function expectedBypassIdentities(config: RulesetConfig): string[] {
   return (config.bypassActors ?? [])
     .map((actor) => {
-      if (actor.kind === "app") return `Integration:${Number(actor.id)}`;
+      if (actor.kind === "app") return `Integration:${Number(actor.id)}:pull_request`;
       return `unsupported:${actor.kind}:${actor.id}`;
     })
     .sort();
@@ -488,11 +758,44 @@ function expectedBypassIdentities(config: RulesetConfig): string[] {
 
 function observedBypassIdentities(readback: RulesetReadback): string[] {
   return (readback.bypass_actors ?? [])
-    .map((actor) => `${String(actor.actor_type ?? "")}:${Number(actor.actor_id)}`)
+    .map((actor) => `${String(actor.actor_type ?? "")}:${Number(actor.actor_id)}:${String(actor.bypass_mode ?? "")}`)
     .sort();
 }
 
-function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
+function observedStatusCheckNames(readback: RulesetReadback): string[] {
+  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+  const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
+  const statusParameters = statusChecks?.parameters ?? {};
+  return (Array.isArray(statusParameters.required_status_checks)
+    ? statusParameters.required_status_checks
+        .map((entry) => entry && typeof entry === "object" && "context" in entry
+          ? String((entry as { context?: unknown }).context ?? "").trim()
+          : "")
+        .filter(Boolean)
+    : [])
+    .sort();
+}
+
+function stableRuleJson(value: unknown): string {
+  const normalize = (input: unknown): unknown => {
+    if (Array.isArray(input)) return input.map(normalize);
+    if (input && typeof input === "object") {
+      return Object.fromEntries(
+        Object.entries(input as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, nested]) => [key, normalize(nested)]),
+      );
+    }
+    return input;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+function fcrMainReviewRulesetReadbackErrors(
+  config: RulesetConfig,
+  value: unknown,
+  preservedRules: NonNullable<RulesetReadback["rules"]> = [],
+): string[] {
   const readback = (value && typeof value === "object" && !Array.isArray(value))
     ? value as RulesetReadback
     : {};
@@ -515,27 +818,39 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   const rules = Array.isArray(readback.rules) ? readback.rules : [];
   const pullRequest = rules.find((rule) => rule.type === "pull_request");
   const pullParameters = pullRequest?.parameters ?? {};
+  const requireNativeHumanReview = config.requiredApprovingReviewCount > 0;
   if (!pullRequest) errors.push("pull request rule is missing");
   if (pullParameters.required_approving_review_count !== config.requiredApprovingReviewCount) {
     errors.push("approving review count does not match requested policy");
   }
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
-  if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
+  if (pullParameters.require_code_owner_review !== requireNativeHumanReview) {
+    errors.push("Code Owner review requirement does not match the requested native-review phase");
+  }
+  if (pullParameters.require_last_push_approval !== requireNativeHumanReview) {
+    errors.push("last-push approval requirement does not match the requested native-review phase");
+  }
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
+  if (rules.some((rule) => rule.type === "required_status_checks")) {
+    errors.push("review membrane must not own bypassable required-status freshness");
+  }
 
-  if (config.requiredStatusCheckNames.length > 0) {
-    const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
-    const statusParameters = statusChecks?.parameters ?? {};
-    if (!statusChecks) errors.push("required status checks rule is missing");
-    if (statusParameters.strict_required_status_checks_policy !== true) errors.push("required status checks are not strict");
-    const requiredChecks = Array.isArray(statusParameters.required_status_checks)
-      ? statusParameters.required_status_checks
-          .map((entry) => entry && typeof entry === "object" && "context" in entry ? String((entry as { context?: unknown }).context ?? "") : "")
-          .filter(Boolean)
+  const codeScanningRules = rules.filter((rule) => rule.type === "code_scanning");
+  if (codeScanningRules.length !== 1) {
+    errors.push("review membrane must contain exactly one CodeQL code-scanning rule");
+  } else {
+    const codeScanningTools = Array.isArray(codeScanningRules[0]?.parameters?.code_scanning_tools)
+      ? codeScanningRules[0].parameters.code_scanning_tools
       : [];
-    for (const required of config.requiredStatusCheckNames) {
-      if (!requiredChecks.includes(required)) errors.push(`provider read-back is missing requested check: ${required}`);
-    }
+    const exactCodeQL = codeScanningTools.length === 1
+      && codeScanningTools[0]
+      && typeof codeScanningTools[0] === "object"
+      && (codeScanningTools[0] as { tool?: unknown }).tool === FCR_CODE_SCANNING_TOOL
+      && (codeScanningTools[0] as { security_alerts_threshold?: unknown }).security_alerts_threshold
+        === FCR_CODE_SCANNING_SECURITY_THRESHOLD
+      && (codeScanningTools[0] as { alerts_threshold?: unknown }).alerts_threshold
+        === FCR_CODE_SCANNING_ALERTS_THRESHOLD;
+    if (!exactCodeQL) errors.push("CodeQL code-scanning thresholds do not match the constitutional floor");
   }
 
   if (config.blockForcePushes && !rules.some((rule) => rule.type === "non_fast_forward")) {
@@ -543,6 +858,75 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   }
   if (config.blockDeletion && !rules.some((rule) => rule.type === "deletion")) {
     errors.push("deletion protection is missing");
+  }
+
+  for (const preserved of preservedRules) {
+    const preservedType = String(preserved.type ?? "");
+    const matches = rules.filter((rule) => rule.type === preservedType);
+    if (matches.length !== 1) {
+      errors.push(`preserved review rule ${preservedType} did not round-trip exactly once`);
+      continue;
+    }
+    if (stableRuleJson(matches[0]?.parameters ?? {}) !== stableRuleJson(preserved.parameters ?? {})) {
+      errors.push(`preserved review rule ${preservedType} parameters changed during reconciliation`);
+    }
+  }
+
+  const expectedRuleTypes = [
+    "pull_request",
+    "code_scanning",
+    ...(config.blockForcePushes ? ["non_fast_forward"] : []),
+    ...(config.blockDeletion ? ["deletion"] : []),
+    ...preservedRules.map((rule) => String(rule.type ?? "")).filter(Boolean),
+  ].sort();
+  const observedRuleTypes = rules.map((rule) => String(rule.type ?? "")).filter(Boolean).sort();
+  if (JSON.stringify(observedRuleTypes) !== JSON.stringify(expectedRuleTypes)) {
+    errors.push("review membrane contains unexpected or missing rule types");
+  }
+  return errors;
+}
+
+function fcrMainFreshnessRulesetReadbackErrors(
+  config: RulesetConfig,
+  expectedName: string,
+  value: unknown,
+): string[] {
+  const readback = (value && typeof value === "object" && !Array.isArray(value))
+    ? value as RulesetReadback
+    : {};
+  const errors: string[] = [];
+  if (readback.name !== expectedName) errors.push("freshness ruleset name did not round-trip");
+  if (readback.enforcement !== config.enforcement) errors.push("freshness enforcement did not round-trip");
+
+  const observedTargets = readback.conditions?.ref_name?.include ?? [];
+  for (const target of config.targetRefs) {
+    const qualified = `refs/heads/${target}`;
+    if (!observedTargets.includes(qualified)) {
+      errors.push(`freshness provider read-back is missing requested target: ${qualified}`);
+    }
+  }
+
+  if (observedBypassIdentities(readback).length !== 0) {
+    errors.push("strict freshness ruleset must have zero bypass actors");
+  }
+
+  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+  const statusRules = rules.filter((rule) => rule.type === "required_status_checks");
+  if (statusRules.length !== 1) errors.push("strict freshness ruleset must contain exactly one required-status rule");
+  const statusParameters = statusRules[0]?.parameters ?? {};
+  if (statusParameters.strict_required_status_checks_policy !== true) {
+    errors.push("strict freshness required status checks are not strict");
+  }
+  const expectedChecks = config.requiredStatusCheckNames.map((name) => name.trim()).sort();
+  const observedChecks = observedStatusCheckNames(readback);
+  if (JSON.stringify(observedChecks) !== JSON.stringify(expectedChecks)) {
+    errors.push("strict freshness required status checks do not exactly match the requested policy");
+  }
+  const unexpectedRuleTypes = rules
+    .map((rule) => String(rule.type ?? ""))
+    .filter((type) => type !== "required_status_checks");
+  if (unexpectedRuleTypes.length > 0) {
+    errors.push(`strict freshness ruleset contains unexpected rules: ${unexpectedRuleTypes.join(", ")}`);
   }
   return errors;
 }

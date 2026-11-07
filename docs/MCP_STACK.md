@@ -1,47 +1,131 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-07-19
+Last reviewed: 2026-10-03
 
-This file governs which MCP servers an AI agent (e.g. Claude Code) may use
-while **developing this repository**. It is a different thing from the
-Control Room's own **MCP / Connector Hub** (`project_connections` +
-`GET /agents` + `GET /authority-levels`), which is a data registry of
-connectors for the PROJECTS the Control Room manages (Se'kret Bip and
-future projects) — inventory and authority-level bookkeeping, not a live
-tool connection. Don't conflate the two: this file is about what tools help
-build the Control Room; the Connector Hub is about what the Control Room
-records regarding each managed project's own tool surface.
+This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
-The Control Room is a private, repository-agnostic governance service. Its default MCP stack supports repository inspection, current implementation documentation, its own database schema, and its own Cloudflare deployment evidence.
+The Control Room is a private, repository-agnostic governance service. Its standing repository MCP stack supports repository inspection, current implementation documentation, browser proof, design context, its own database schema, and Cloudflare provider/deployment evidence.
 
-## Connected servers
+## External governed MCP for eligible AI clients
+
+The Control Room source defines one provider-neutral external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
+
+- canonical resource: `https://api.foundercontrolroom.org/mcp`;
+- protected-resource metadata: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`;
+- transport: stateless Streamable HTTP with MCP `2026-07-28`, plus initialization-based `2025-11-25`, `2025-06-18`, and `2025-03-26` compatibility;
+- canonical auth: Supabase OAuth 2.1 access tokens using PKCE/DCR, standard audience `authenticated`, standard scope `email`, a non-empty `client_id`, current Supabase user validity, and the server-side `founder_users` allowlist;
+- project authority: the server-owned FCR portfolio registry is the maximum external project grant. An optional `mcp_projects` claim may narrow that grant when present but is never required and can never widen it;
+- client registration: OAuth 2.1 dynamic registration may create a client identity at the provider, but a registered client receives no MCP authority until its exact client ID is independently admitted to both the consent and external-tool server-held allowlists;
+- compatibility auth: `/mcp/read` is an auto-dynamic compatibility alias. An exact timing-safe match to `FCR_REMOTE_MCP_READ_TOKEN` retains the legacy bounded static path; every other credential shape receives a 307 POST-preserving redirect to canonical `/mcp`, where the shared OAuth/DCR verifier applies. Failed OAuth never downgrades to static auth;
+- resource identity: `/mcp` remains the canonical protected OAuth resource. `/mcp/read` is a compatibility alias, not a second authorization server or independent authority root;
+- evidence: every successful external tool call must persist a redacted `mcp_tool_calls` receipt or the call fails closed.
+
+The external tool catalog is intentionally small and deterministic:
+
+1. `chief_audit_repository`
+2. `chief_list_capabilities`
+3. `chief_preview_capability_plan`
+4. `fcr_list_projects`
+5. `fcr_get_current_truth`
+6. `fcr_audit_change_genealogy`
+7. `fcr_preview_skill_route`
+8. `fcr_relay_operator`
+
+`fcr_audit_change_genealogy` is read-only and project-grant bound. The caller selects a granted `projectId`; the server resolves that project's registered GitHub repository rather than trusting an arbitrary caller-supplied repository. It defaults to ten recent PRs with bounded comments/reviews and file-level diff evidence, indexes every commit identity in each PR, scans recent default-branch commits, asks GitHub for commit-to-PR associations, preserves squash/merge boundaries, and returns separate failure receipts. Raw patch bodies are not returned. The window can be narrowed or expanded only within the bounded 1–20 range. See `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`.
+
+There is no external generic `invoke_read_tool`. Callers cannot choose an arbitrary nested provider, tool name, mission, approval, credential, mutation action, or project outside the server-owned grant. An optional OAuth `mcp_projects` claim can only narrow that grant. Skill content remains private: capability results expose metadata/evidence only, never raw `SKILL.md` prompt text.
+
+MCP identity uses the validated subject, OAuth client ID, JSON-RPC request ID, exact project, and redacted request/result hashes. It uses no browser session cookie, tracking cookie, device fingerprint, or probabilistic fingerprint. Raw MCP arguments and results are not written to the evidence ledger.
+
+### Activation gate
+
+Source readiness is not production readiness. Before deployment, all of the following must be verified at the same exact commit:
+
+- reconcile the live Supabase migration ledger so `mcp_servers`, `mcp_project_policies`, and `mcp_tool_calls` actually exist with the checked-in RLS/grant contract;
+- enable Supabase OAuth 2.1 and dynamic client registration for MCP, using the current supported standard access-token audience/scope contract (`authenticated` + `email`);
+- preserve explicit founder consent and validate every issued token against the current Supabase user plus an FCR `founder_users` allowlist row whose immutable `user_id` exactly matches that user (email alone or NULL binding grants no authority);
+- use DCR only where the OAuth provider and client actually support it; after any registration, verify the exact callback URI and explicitly allowlist the resulting client ID before enabling consent or MCP tools. Unlisted clients fail closed;
+- configure `FCR_REMOTE_MCP_*` and `CHIEF_AI_BASE_URL` without reusing provider/deploy credentials;
+- prove the Chief URL/binding and FCR Worker SHA, then run the Attack Ten auth/scope/replay/header/evidence/client matrix;
+- prove both compatibility branches on `/mcp/read`: a 307 redirect of non-legacy credentials to the canonical OAuth resource plus exact legacy-token tool discovery without downgrade from failed OAuth;
+- connect an eligible AI client only after provider evidence proves the canonical `/mcp` resource metadata, OAuth flow, tools list, and calls from the deployed exact head.
+
+The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_TEN.md`.
+
+No migration, OAuth dashboard change, Worker secret/binding change, merge, or deployment is authorized merely by this document or by source tests.
+
+## Connected repository-agent servers
 
 | Server | Purpose | Boundary |
 | --- | --- | --- |
 | `github` | Repository, PR, Actions, code-security, and secret-protection context | Selected toolsets only; no committed PAT or Authorization header |
-| `context7` | Current documentation for Octokit, Supabase JS, Express, TypeScript, Vitest, Wrangler, and related libraries | Documentation only; no private project payloads or secrets |
+| `context7` | Current implementation/library documentation | Documentation only; no private project payloads or secrets |
+| `playwright` | Browser-visible verification and recovery-path proof | Browser/runtime evidence; it does not authorize code or provider mutations |
+| `figma` | Design context and implementation handoff | Design evidence only; no deploy, migration, spending, or external-action authority |
 | `supabase` | Inspect the Control Room's own schema and Supabase documentation | Project `oojzfmmywbvficgybaxd`, read-only, `database,docs` only |
+| `cloudflare` | Official Cloudflare API MCP at `https://mcp.cloudflare.com/mcp` | Provider-supported OAuth/API-token connection. Read by default; mutations remain separately approved |
 | `cloudflare-docs` | Current Cloudflare product documentation | Documentation only |
-| `cloudflare-builds` | Inspect Control Room Worker build evidence | OAuth; no deploy or setting changes without separate approval |
+| `cloudflare-bindings` | Inspect Worker bindings and project wiring | Binding mutations remain separately approved |
+| `cloudflare-builds` | Inspect Control Room Worker build evidence | No deploy or setting changes without separate approval |
 | `cloudflare-observability` | Inspect sanitized runtime logs and analytics | Never query or paste access tokens, service-role keys, founder sessions, or raw project payloads |
+
+`cloudflare-stack` / `https://stack.mcp.cloudflare.com/mcp` is intentionally **not installed** in standing repository-agent configuration because it is not present in Cloudflare's current documented agent-setup fleet. `scripts/verify-mcp-config.mjs` rejects it so stale client configuration cannot silently reintroduce it.
+
+## Served remote compatibility MCP boundary
+
+Founder Control Room also serves `POST https://api.foundercontrolroom.org/mcp/read` for backward compatibility with existing server-held-token clients. For every request that does not present the exact legacy token, it redirects with 307 to the canonical HTTPS `/mcp` resource, avoiding a resource-metadata mismatch; OAuth validation then occurs on that resource.
+
+- `FCR_REMOTE_MCP_READ_TOKEN` is legacy compatibility authority only. Keep it distinct from write-capable MCP tokens and provider credentials.
+- Static selection requires an exact timing-safe Bearer-token match. Missing, malformed, or non-matching credentials are routed to OAuth/DCR rather than static auth.
+- A token that fails OAuth validation is rejected. It is never retried or downgraded as a static credential.
+- The two public MCP POST entrypoints share one route-local `express-rate-limit` bucket of 60 requests/minute per IP/per Worker process, before static-token comparison or OAuth verification. This complements the server's existing baseline of 120 requests/minute per IP/per process. `/mcp` and `/mcp/read` must not each receive separate 60-request allowances. A rate-limit response is HTTP 429; it does not grant, revoke, or change identity authority. These process-local budgets are not claims of globally distributed Cloudflare enforcement.
+- Exact unauthenticated `POST /mcp/read` may reach only its bounded compatibility handler, which redirects to `/mcp` so an OAuth-capable client discovers the canonical protected-resource challenge at the matching resource URL. The CSRF exemption does not extend to `/mcp/read/*` or neighboring mutation routes.
+- The complete active-portfolio compatibility read scope is documented as `FCR_REMOTE_MCP_READ_PROJECTS=sekret-bip,juss-beautiful-hair,juss-beautiful-hair-private,l99,chief-ai-machine,untold-stories,sync-party,founder-control-room,promptos`. This is a maximum server-owned scope, not a client entitlement; founder validation and project grants still narrow each call.
+- Production project scope remains server-held. The route cannot widen beyond `PORTFOLIO_PROJECTS`; optional token project claims may only narrow the scope.
+- The compatibility alias advertises the same bounded eight-tool catalog as canonical `/mcp`; it does not expose a generic nested provider invocation surface.
+- Provider tools still have to pass the configured server allowlist/denylist. Create/update/delete/merge/write authority remains blocked by underlying FCR policy unless a separate governed execution path explicitly permits it.
+- Mission IDs, approval IDs, bearer tokens, and other authority-bearing fields are not accepted as tool arguments. Nested secret-bearing arguments are rejected before the provider boundary.
+- If server-held project scope is absent, the endpoint fails closed. If the static token is absent, the legacy static branch is unavailable but OAuth/DCR remains independently governed.
+- The static secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.
+
+The operator posture is deliberately asymmetric: external consoles may read/inspect only their bounded active portfolio grant, while mutations still require the separate Ask-Founder / Founder Permission / execution-receipt path. A static read token, OAuth client registration, optional project claim, messenger link, fingerprint, proof cookie, genealogy receipt, or model vote grants no merge, deploy, provider, database, publication, billing, deletion, or arbitrary command authority.
+
+## In-app Control Room MCP Hub boundary
+
+The repository-agent configuration above does **not** automatically make a remote server callable by the running Control Room.
+
+The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault authority, server-specific allowlists, and MCP evidence receipts. For Cloudflare:
+
+- runtime provider authority is the documented `https://mcp.cloudflare.com/mcp` endpoint;
+- the bearer credential is a dedicated least-privilege read token referenced as `FCR_CLOUDFLARE_MCP_READ_TOKEN` and is never committed;
+- the normal Hub may use the provider's `search` tool for API/schema discovery;
+- generic Code Mode `execute` remains denied in normal Hub policy because its tool name alone cannot prove that the embedded request is read-only;
+- the exact-head `Cloudflare API MCP Read Diagnostic` is the only standing lane allowed to call `execute`, and the repository-owned probe hard-codes a single `GET /accounts/{account_id}` request before recording a redacted receipt;
+- the undocumented `stack.mcp.cloudflare.com` endpoint is not registered as in-app provider authority or standing repository-agent configuration;
+- provider/OAuth availability in an IDE does not prove production runtime authorization.
+
+This keeps Cloudflare provider proof useful without turning a generic code-execution tool into an accidentally privileged Control Room capability.
 
 ## Deliberately excluded
 
-- Playwright — the exclusion condition ("no frontend") is now false: `public/control-room/` is a real, tested, served frontend as of 2026-07-19. Reconsider adding it for browser-verified proof of UI changes. Not added automatically here — enabling a new MCP server for this repo's Claude Code sessions is the founder's call, not something to change unprompted.
-- Figma — still excluded. There is no active source-design implementation workflow in this repo (no Figma files, no Code Connect mapping). Reconsider once one exists.
 - DBHub and generic database MCP servers. The project-scoped read-only Supabase server covers the current schema-inspection need.
 - Netdata while the service runs on managed infrastructure without claimed persistent hosts.
 - GitHub Insiders and local Docker GitHub MCP as committed defaults.
+- `cloudflare-stack` / `stack.mcp.cloudflare.com` until Cloudflare documents it as a supported agent-setup endpoint and the repository deliberately re-evaluates it.
 - Any cross-project Supabase connection. The Control Room must never point its standing MCP configuration at Bip's database.
 
 ## Data boundary
 
-The Control Room may inspect its own operational schema and sanitized repository metadata. Do not send or retrieve raw Se'kret Bip teen/parent content, Juss Beautiful Hair customer/vendor data, Stripe payloads, production credentials, or other project secrets through this stack.
+The Control Room may inspect its own operational schema and sanitized repository/provider metadata. Do not send or retrieve raw Se'kret Bip teen/parent content, Juss Beautiful Hair customer/vendor data, Stripe payloads, production credentials, or other project secrets through this stack.
 
 ## Verification prompts
 
 ```text
 Use GitHub MCP to inspect this repository's provider boundary and report where GitHub-specific assumptions leak past RepositoryProvider. Do not change code.
+```
+
+```text
+Use the FCR genealogy audit for the granted project. Start with limit 10, include comments and diff summaries, index every PR commit, inspect recent default-branch attribution, and preserve separate failure receipts. Do not mutate the repository.
 ```
 
 ```text
@@ -53,7 +137,11 @@ Use Supabase MCP to list the configured Control Room project's tables, migration
 ```
 
 ```text
-Use Cloudflare Builds and Observability to report the latest Control Room Worker build and sanitized runtime errors. Do not deploy or change settings.
+Use Cloudflare provider MCPs to inspect current bindings, build state, Access/provider configuration, and sanitized runtime evidence. Prefer provider truth over screenshots or stale documentation. Do not mutate provider state without the separately approved authority path.
+```
+
+```text
+Use Playwright for any user-facing UI/runtime claim before merge.
 ```
 
 ## Validation

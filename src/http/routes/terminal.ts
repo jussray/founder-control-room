@@ -4,17 +4,25 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { getTerminalCommand, listTerminalCommands } from '../../terminal/registry.js';
 import { GuardedTerminalRunner } from '../../terminal/runner.js';
+import { SpriteReadOnlyRunner } from '../../terminal/spriteReadOnlyRunner.js';
 import { TerminalRunnerError } from '../../terminal/types.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 type TerminalExecutor = Pick<GuardedTerminalRunner, 'run' | 'cancel'>;
 
-let sharedRunner: GuardedTerminalRunner | null = null;
+let sharedRunner: TerminalExecutor | null = null;
 
 function resolveRunner(override?: TerminalExecutor): TerminalExecutor {
   if (override) return override;
   if (!sharedRunner) {
-    sharedRunner = new GuardedTerminalRunner(process.env['CONTROL_ROOM_WORKSPACE_ROOT'] ?? '');
+    const mode = process.env['CONTROL_ROOM_READ_ONLY_RUNNER'] ?? 'local';
+    if (mode === 'sprites') {
+      sharedRunner = new SpriteReadOnlyRunner(process.env['SPRITES_FCR_EXEC_TOKEN'] ?? '');
+    } else if (mode === 'local') {
+      sharedRunner = new GuardedTerminalRunner(process.env['CONTROL_ROOM_WORKSPACE_ROOT'] ?? '');
+    } else {
+      throw new Error('Unsupported CONTROL_ROOM_READ_ONLY_RUNNER; refusing implicit fallback.');
+    }
   }
   return sharedRunner;
 }
@@ -62,13 +70,15 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
 
     return res.json({
       project: { slug: project.slug, name: project.name },
-      commands: listTerminalCommands(projectSlug).map((command) => ({
-        id: command.id,
-        label: command.label,
-        risk: command.risk,
-        timeoutMs: command.timeoutMs,
-        evidenceKind: command.evidenceKind ?? null,
-      })),
+      commands: listTerminalCommands(projectSlug)
+        .filter((command) => command.risk === 'read')
+        .map((command) => ({
+          id: command.id,
+          label: command.label,
+          risk: command.risk,
+          timeoutMs: command.timeoutMs,
+          evidenceKind: command.evidenceKind ?? null,
+        })),
     });
   });
 
@@ -125,10 +135,15 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    if (command.risk === 'write' && body['confirmWrite'] !== true) {
+    // Repository-defined verify/build/test commands still execute code from the
+    // checked-out head. Exact SHA proves identity, not that those scripts are safe.
+    // Until the receipt-aware sandbox executor exists, the legacy terminal may run
+    // only commands explicitly classified as read-only.
+    if (command.risk !== 'read') {
       return res.status(409).json({
-        error: 'Write-risk commands require confirmWrite: true for this request.',
-        code: 'WRITE_CONFIRMATION_REQUIRED',
+        error: 'Executable non-read terminal commands are disabled on the legacy route until an exact L99 ApprovalReceipt is verified by the sandboxed executor at execution time.',
+        code: 'L99_AUTHORITY_REQUIRED',
+        authorityRequired: 'L99_APPROVAL_RECEIPT',
       });
     }
 
@@ -171,9 +186,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    const allowedStatuses = command.risk === 'write'
-      ? new Set(['sandboxed'])
-      : new Set(['sandboxed', 'in_review']);
+    const allowedStatuses = new Set(['sandboxed', 'in_review']);
     if (!allowedStatuses.has(mission.status)) {
       return res.status(409).json({
         error: `Command risk '${command.risk}' is not allowed while mission is '${mission.status}'.`,
@@ -182,8 +195,6 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    // Recover from a process crash without allowing two live runs. Fresh runs
-    // remain protected by both the DB partial unique index and the runner map.
     const staleCutoff = new Date(Date.now() - 60 * 60_000).toISOString();
     const { error: staleCleanupError } = await supabase
       .from('terminal_runs')

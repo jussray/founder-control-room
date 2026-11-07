@@ -45,6 +45,22 @@ describe('first-party founder content truth UI contract', () => {
     expect(source).not.toContain('Cambiante, Buffer, or another approved actuator owns');
   });
 
+  it('turns private analytics into draft learning without turning it into claim authority', () => {
+    expect(source).toContain('data-content-learning-loop');
+    expect(source).toContain('data-private-metrics-state="withheld"');
+    expect(source).toContain('data-metric-claim-state="fresh-verifier-required"');
+    expect(source).toContain('data-learning-axis="distribution"');
+    expect(source).toContain('data-learning-axis="resonance"');
+    expect(source).toContain('data-learning-axis="compounding"');
+    expect(source).toContain('data-story-archetype="founder-thesis"');
+    expect(source).toContain('data-story-archetype="build-correct"');
+    expect(source).toContain('data-story-archetype="proof-lesson"');
+    expect(source).toContain('data-story-archetype="human-product-stake"');
+    expect(source).toContain('Metrics stay private by default');
+    expect(source).toContain('repository proof may support repository claims, not analytics claims');
+    expect(source).toContain('those claims stay BLOCKED for first-party publication');
+  });
+
   it('states the no-lie boundary between capability, authorization, dispatch, and publication', () => {
     expect(source).toContain('Capability, authorization, dispatch, and publication remain separate truths.');
     expect(source).toContain('FCR must never translate capability, approval, dispatch, a provider request, or missing provider evidence into “published.”');
@@ -53,8 +69,8 @@ describe('first-party founder content truth UI contract', () => {
 
   it('binds browser proof to the exact reviewed head', () => {
     expect(playwrightWorkflow).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
-    expect(playwrightWorkflow).toContain('group: playwright-e2e-${{ github.event.pull_request.number || github.event.workflow_run.id || github.ref }}');
-    expect(playwrightWorkflow).toContain('cancel-in-progress: true');
+    expect(playwrightWorkflow).toContain("group: playwright-e2e-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}");
+    expect(playwrightWorkflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
     expect(playwrightWorkflow).toContain('uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262');
     expect(playwrightWorkflow).toContain('ref: ${{ env.EXPECTED_HEAD_SHA }}');
     expect(playwrightWorkflow).toContain('persist-credentials: false');

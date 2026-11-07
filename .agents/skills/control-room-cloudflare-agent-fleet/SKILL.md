@@ -5,7 +5,7 @@ description: >
   GitHub Copilot, OpenCode, Windsurf, and LM Studio Bionic in Founder Control Room.
   Use for Cloudflare documentation, API Code Mode, Workers bindings, builds,
   observability, Wrangler, preview verification, deployment review, and rollback.
-version: 1.0
+version: 1.1
 status: active
 scope: founder-control-room
 owner: Juss
@@ -92,6 +92,34 @@ Default posture:
 Grant the least Cloudflare OAuth scope that supports the task. Never commit or
 print Cloudflare tokens, account secrets, service credentials, or OAuth artifacts.
 
+## Public/private route invariant
+
+Founder Control Room can contain both public customer surfaces and protected
+operator surfaces. Cloudflare Access must be scoped to the protected surface,
+not treated as a blanket domain switch.
+
+For any public checkout, product, marketing, callback, webhook, health, or other
+customer-facing route:
+
+1. identify the exact hostname and path that must be public;
+2. identify the exact hostname and path that must remain protected;
+3. inspect the current Access application and policy before changing anything;
+4. prefer a dedicated public hostname or the narrowest path-scoped bypass/public
+   policy that preserves protection everywhere else;
+5. never disable Cloudflare Access for the whole FCR domain merely to make one
+   public route work;
+6. verify the public path in an unauthenticated browser and verify a protected
+   control-room path still requires the intended authentication;
+7. record rollback as the exact policy, hostname, or route change to reverse.
+
+A Shopify product being `ACTIVE` or published is not proof that a buyer can
+reach it. For commerce, the acceptance path is:
+
+`public URL -> product renders -> correct price -> add/buy action -> checkout`
+
+Stop and report `BLOCKED` if Cloudflare Access intercepts the public path before
+product content renders.
+
 ## Work loop
 
 1. Confirm repository, branch, goal, suspected failure area, needed evidence, and stop condition.
@@ -114,6 +142,8 @@ print Cloudflare tokens, account secrets, service credentials, or OAuth artifact
 - A local Wrangler run does not prove the deployed version.
 - Logs do not authorize a mutation.
 - A repository merge does not prove Cloudflare production changed.
+- An active Shopify product does not prove the storefront route is publicly reachable.
+- A public route does not justify weakening protection on unrelated FCR routes.
 
 ## Required report
 

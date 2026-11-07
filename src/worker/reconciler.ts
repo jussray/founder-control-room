@@ -21,6 +21,7 @@ import { BaseController } from '../controllers/base.js';
 import { CheckRunController } from '../controllers/CheckRunController.js';
 import { ChangeProposalController } from '../controllers/ChangeProposalController.js';
 import { ManifestController } from '../controllers/ManifestController.js';
+import { MergeIntentController } from '../controllers/MergeIntentController.js';
 import { MissionController } from '../controllers/MissionController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
 import { ReleaseController } from '../controllers/ReleaseController.js';
@@ -32,6 +33,7 @@ const CONTROLLERS = new Map<string, BaseController>([
   ["CheckRunController", new CheckRunController()],
   ["ChangeProposalController", new ChangeProposalController()],
   ["ManifestController", new ManifestController()],
+  ["MergeIntentController", new MergeIntentController()],
   ["MissionController", new MissionController()],
   ["ProjectController", new ProjectController()],
   ["ReleaseController", new ReleaseController()],

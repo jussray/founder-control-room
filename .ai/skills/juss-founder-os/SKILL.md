@@ -301,6 +301,96 @@ Registrations alone are not proof of revenue. Track:
 
 Report conversion ratios, not vanity totals alone.
 
+## Founder governance kernel
+
+Use these contracts when multiple projects, agents, evidence sources, or competing actions are in play. They extend the existing OODA, Redteam, L99, Truth Lease, and approval boundaries; they do not create a second authority system.
+
+### Opportunity-cost receipts
+
+For a material prioritization decision, record both the selected action and the credible alternatives deliberately deferred.
+
+For each deferred alternative capture:
+
+- why it is not the highest-leverage move now;
+- what value or risk is being preserved;
+- a concrete re-entry trigger; and
+- what evidence would change the ranking.
+
+Deferral is not deletion or abandonment. Do not let an unselected project steal execution capacity again until its re-entry trigger is met or the founder explicitly reprioritizes it.
+
+### Decision invalidation
+
+A prior decision remains usable only while its load-bearing premises remain current.
+
+For consequential decisions record:
+
+- decision and authority;
+- evidence used;
+- material assumptions;
+- repository, branch, SHA, provider, environment, or time boundary where relevant;
+- deferred alternatives and re-entry triggers; and
+- invalidation conditions.
+
+When a load-bearing premise changes, classify the old decision as `SUPERSEDED/INVALIDATED`, preserve it as provenance, and re-open the decision. Do not execute stale intent merely because it was once approved.
+
+### Contradiction receipts and domain authority
+
+When credible agents or authorities disagree, do not silently average, majority-vote, or let one specialist overrule an adjacent domain.
+
+Record:
+
+- each material claim;
+- the authority domain of the claimant;
+- evidence supporting each claim;
+- whether the claims truly conflict or answer different questions;
+- the resolution rule; and
+- the next evidence or founder decision needed.
+
+Technical correctness, Product Design acceptance, privacy/security safety, provider release proof, and founder product intent are separate authority domains. `Deployable` does not mean `should deploy`, and `technically fixed` does not mean `product accepted`.
+
+### Evidence lineage and independence
+
+Multiple agents repeating one source are not multiple independent witnesses.
+
+For consequential claims track:
+
+- source evidence;
+- derived claims;
+- which agents or checks consume the same source;
+- independent evidence paths; and
+- any shared dependency that could create correlated false confidence.
+
+Prefer independent witnesses for high-impact claims. Never inflate confidence merely because several agents interpreted the same stale artifact.
+
+### Uncertainty classes
+
+Do not treat all `UNKNOWN` states as equivalent. Classify material uncertainty as one or more of:
+
+- `evidence_gap`;
+- `provider_visibility_gap`;
+- `ordinary_business_risk`;
+- `product_decision`;
+- `security_uncertainty`;
+- `privacy_uncertainty`; or
+- `authority_uncertainty`.
+
+Ordinary business risk may be presented for explicit founder acceptance where policy permits. Security, privacy, authority, or evidence uncertainty that crosses a hard stop must remain blocking until the applicable gate is satisfied.
+
+### Founder override without truth override
+
+Founder authority may change strategy, priority, timing, or acceptance of an explicitly identified soft business risk. It may not make missing evidence exist, convert `UNKNOWN` into `VERIFIED`, renew a stale Truth Lease, or waive a higher-priority safety, legal, privacy, security, platform, or system boundary.
+
+When a founder override is permitted, record:
+
+- the exact decision being overridden;
+- what is verified;
+- what remains unknown or unproven;
+- the risk explicitly accepted;
+- claims that remain allowed; and
+- claims that remain prohibited.
+
+A founder may authorize `launching with accepted risk` where allowed. The system must not rewrite that as `production fully verified` without the required evidence.
+
 ## 5W1H preflight
 
 Before consequential work, answer:

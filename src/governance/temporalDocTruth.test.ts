@@ -1,0 +1,253 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+function read(relativePath: string): string {
+  return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+}
+
+const socialPolicy = read('docs/founder-signal-engine/social-campaign-policy-v1.md');
+const readme = read('README.md');
+const mergeAuthority = read('docs/FOUNDER_MERGE_AUTHORITY.md');
+const globalAi = read('GLOBAL_AI.md');
+const agents = read('AGENTS.md');
+const chatgpt = read('CHATGPT.md');
+const claude = read('CLAUDE.md');
+const perplexity = read('PERPLEXITY.md');
+const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
+const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
+const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
+const ci = read('.github/workflows/ci.yml');
+const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
+const documentationVerifier = read('scripts/verify-documentation-truth.mjs');
+const deploymentGuardPath = pathToFileURL(resolve(process.cwd(), 'scripts/documentation-truth-required-deployment-guard.mjs')).href;
+const documentationReceipt = JSON.parse(read('docs/DOCUMENTATION_TRUTH_RECEIPT.json')) as {
+  changes: Array<{ path: string; claims: string[] }>;
+};
+
+const FORBIDDEN_REPOSITORY_WIDE_STALE_CLAIMS = [
+  'Status: `CLASSIFICATION_ONLY_NO_GENERATION_NO_PROVIDER_CALLS`',
+  'No Perplexity, Buffer, or Zapier network calls',
+  'No live content generation',
+  'Until then, this module is available',
+] as const;
+
+const REQUIRED_TEMPORAL_BOUNDARIES = [
+  'Status: `MODULE_SCOPE_CLASSIFICATION_ONLY`',
+  '## Module boundary — not repository-wide provider truth',
+  'That is a module boundary only; it is not evidence that Founder Control Room as a whole lacks those integrations.',
+  'it must not be generalized into a repository-wide claim that Founder Control Room has no live generation capability.',
+  'must be revalidated from its authoritative code and provider/runtime evidence before reuse.',
+  'it must not be used as present-state evidence for the capabilities of Founder Control Room as a whole.',
+] as const;
+
+describe('durable social-policy temporal truth', () => {
+  it('does not preserve once-true provider/generation absence as present repository truth', () => {
+    for (const staleClaim of FORBIDDEN_REPOSITORY_WIDE_STALE_CLAIMS) {
+      expect(socialPolicy).not.toContain(staleClaim);
+    }
+  });
+
+  it('keeps module scope explicit and forces current capability claims back to authoritative evidence', () => {
+    for (const boundary of REQUIRED_TEMPORAL_BOUNDARIES) {
+      expect(socialPolicy).toContain(boundary);
+    }
+  });
+});
+
+describe('repository documentation truth control', () => {
+  it('does not let a frozen refresh date masquerade as current repository truth', () => {
+    expect(readme).not.toContain('**Last refreshed:**');
+    expect(readme).toContain('Current identity is resolved at use time');
+    expect(readme).toContain('Documentation truth gate');
+  });
+
+  it('documents current capability and founder-content authority without promoting runtime assumptions', () => {
+    expect(readme).toContain('`.control/capability.json`');
+    expect(readme).toContain('canonical capability authority');
+    expect(readme).toContain('first-party LinkedIn');
+    expect(readme).toContain('provider-neutral n8n');
+    expect(readme).toContain('provider readback');
+    expect(readme).toContain('Sauce Guard');
+  });
+
+  it('documents the current FCR independent-review membrane and keeps live GitHub separate', () => {
+    expect(mergeAuthority).toContain('Independent review');
+    expect(mergeAuthority).toContain('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS');
+    expect(mergeAuthority).toContain('live GitHub');
+    expect(mergeAuthority).toContain('separate provider gate');
+    expect(mergeAuthority).toContain('Documentation truth');
+  });
+
+  it('keeps the shared AI workflow on truth leases, docs sync, product design, analytics, and value review', () => {
+    expect(globalAi).toContain('Truth Lease');
+    expect(globalAi).toContain('Documentation truth');
+    expect(globalAi).toContain('Product Design');
+    expect(globalAi).toContain('Data Analytics');
+    expect(globalAi).toContain('Hormozi');
+    expect(globalAi).toContain('Parallel thinking never grants parallel mutation authority');
+    expect(globalAi).toContain('/garyvee lindymode redteam l99 redteam ooda');
+  });
+
+  it('keeps AGENTS on historical Day 3 provenance and current provider-neutral truth', () => {
+    expect(agents).toContain('Historical Day 3 provenance');
+    expect(agents).not.toContain('Current Day 3 source:');
+    expect(agents).toContain('provider-neutral n8n');
+    expect(agents).toContain('Truth Lease');
+    expect(agents).toContain('Documentation Truth');
+    expect(agents).not.toContain('approved automated publishing class explicitly authorized');
+  });
+
+  it('keeps ChatGPT and the launch loop on post-merge re-observation', () => {
+    expect(chatgpt).toContain('post-merge re-observation');
+    expect(chatgpt).toContain('Documentation Truth');
+    expect(chatgpt).toContain('Truth Lease');
+    expect(launchLoop).toContain('Parallel lenses, serialized authority');
+    expect(launchLoop).toContain('Documentation truth gate');
+    expect(launchLoop).toContain('Truth Lease');
+  });
+
+  it('keeps Claude on the same provider-neutral truth-aging constitution', () => {
+    expect(claude).toContain('GLOBAL_AI.md');
+    expect(claude).toContain('provider-neutral n8n');
+    expect(claude).toContain('Truth Lease');
+    expect(claude).toContain('Documentation Truth');
+    expect(claude).not.toContain('Current provider truth:');
+  });
+
+  it('keeps Perplexity research on current source freshness and Sauce Guard', () => {
+    expect(perplexity).toContain('GLOBAL_AI.md');
+    expect(perplexity).toContain('provider-neutral n8n');
+    expect(perplexity).toContain('Truth Lease');
+    expect(perplexity).toContain('Documentation Truth');
+    expect(perplexity).toContain('Sauce Guard');
+  });
+
+  it('keeps Cloudflare source binding requirements separate from live provider proof', () => {
+    expect(cloudflareTargets).toContain('FCR_API');
+    expect(cloudflareTargets).toContain('Service Binding');
+    expect(cloudflareTargets).toContain('not a claim that the current Cloudflare Pages project is configured correctly');
+  });
+
+  it('makes Documentation Truth load-bearing instead of an optional badge', () => {
+    expect(ci).toContain('documentation-truth:');
+    expect(ci).toMatch(/needs:[\s\S]*- documentation-truth/);
+    expect(ci).toContain('DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}');
+    expect(documentationWorkflow).toContain('Documentation truth gate');
+    expect(documentationWorkflow).toContain('scripts/verify-documentation-truth.mjs');
+  });
+
+  it('rejects cosmetic documentation and pathless invariant receipts', () => {
+    expect(documentationVerifier).toContain('MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH');
+    expect(documentationVerifier).toContain('visibleOutsideHtmlComments');
+    expect(documentationVerifier).toContain('meaningfulInvariant(claim, sourcePath)');
+    expect(documentationVerifier).toContain('meaningful path-bound invariant');
+    expect(documentationVerifier).toContain('founder-content-outcome-contract');
+  });
+
+  it('rejects contradictory required-deployment semantics across the executable receipt guard', () => {
+    const fullValidClaim = 'src/providers/GitHubProvider.ts must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.';
+
+    const claimFixtures = [
+      {
+        expected: true,
+        value: fullValidClaim,
+      },
+      {
+        expected: true,
+        value: 'src/providers/GitHubProvider.ts must intentionally remove legacy required_deployments and preserve required_linear_history unchanged during reconciliation.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must preserve required_deployments unchanged and must not remove this rule during two-membrane reconciliation.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must keep required_deployments while removing an unrelated legacy rule.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts may remove old docs, while required_deployments remains unchanged.',
+      },
+      {
+        expected: false,
+        value: 'src/providers/GitHubProvider.ts must remove required_deployments and required_deployments must remain unchanged.',
+      },
+      {
+        expected: true,
+        value: 'src/providers/GitHubProvider.ts must preserve required_linear_history and required_deployments must be removed.',
+      },
+    ];
+
+    for (const fixture of claimFixtures) {
+      const source = [
+        `import { claimAffirmativelyRemovesRequiredDeployments } from ${JSON.stringify(deploymentGuardPath)};`,
+        `process.stdout.write(JSON.stringify(claimAffirmativelyRemovesRequiredDeployments(${JSON.stringify(fixture.value)})));`,
+      ].join('\n');
+      const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+        encoding: 'utf8',
+      })) as boolean;
+      expect(observed).toBe(fixture.expected);
+    }
+
+    const receiptFixtures = [
+      {
+        expected: true,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider must preserve unrelated code-quality and linear-history controls.',
+        ],
+      },
+      {
+        expected: false,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider.ts must preserve required_deployments unchanged during reconciliation.',
+        ],
+      },
+      {
+        expected: false,
+        claims: [
+          fullValidClaim,
+          'GitHubProvider.ts records required_deployments provider state without stating its disposition.',
+        ],
+      },
+    ];
+
+    for (const fixture of receiptFixtures) {
+      const source = [
+        `import { receiptClaimsDescribeRequiredDeploymentRemoval } from ${JSON.stringify(deploymentGuardPath)};`,
+        `process.stdout.write(JSON.stringify(receiptClaimsDescribeRequiredDeploymentRemoval(${JSON.stringify(fixture.claims)})));`,
+      ].join('\n');
+      const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+        encoding: 'utf8',
+      })) as boolean;
+      expect(observed).toBe(fixture.expected);
+    }
+  });
+
+  it('keeps FCR deployment-rule migration truth aligned with the provider source', () => {
+    const providerEntry = documentationReceipt.changes.find(
+      (change) => change.path === 'src/providers/GitHubProvider.ts',
+    );
+    const providerClaims = providerEntry?.claims.join(' ') ?? '';
+
+    expect(documentationVerifier).toContain('githubProviderTruthChanged');
+    expect(documentationVerifier).toContain(
+      "!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval",
+    );
+    expect(documentationVerifier).toContain('ownsLegacyRequiredDeployments');
+    expect(documentationVerifier).toContain('receiptClaimsDescribeRequiredDeploymentRemoval');
+    expect(providerClaims).toMatch(/required_deployments/);
+    expect(providerClaims).toMatch(/intentionally remove/i);
+    expect(providerClaims).toMatch(/exact-current-main\/post-merge/i);
+    expect(providerClaims).not.toMatch(/preserve[^.]{0,120}required[-_ ]deployment/i);
+  });
+
+  it('keeps documentation analytics observation-only', () => {
+    expect(truthDecay).toContain('Documentation truth gate');
+    expect(truthDecay).toContain('**Analytics remains observation-only.**');
+  });
+});

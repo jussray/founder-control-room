@@ -5,9 +5,12 @@ on:
     paths:
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - docs/FIREWALL_V10.md
       - .github/workflows/firewall-v10.yml
       - src/http/server.ts
       - src/http/routes/n8nConveyor.ts
+      - src/http/routes/productBuild.ts
       - src/http/middleware/requireFounder.ts
       - src/http/middleware/csrf.ts
       - src/http/middleware/security.ts
@@ -17,9 +20,12 @@ on:
     paths:
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - test/firewall.product-build.attack10.test.mjs
+      - docs/FIREWALL_V10.md
       - .github/workflows/firewall-v10.yml
       - src/http/server.ts
       - src/http/routes/n8nConveyor.ts
+      - src/http/routes/productBuild.ts
       - src/http/middleware/requireFounder.ts
       - src/http/middleware/csrf.ts
       - src/http/middleware/security.ts
@@ -38,7 +44,7 @@ jobs:
       EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact target
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -49,15 +55,20 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
       - name: Verify policy-as-code against runtime bindings
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
         run: node scripts/verify-firewall-v10.mjs
 
+      - name: Attack product-build firewall ten ways
+        run: node --test test/firewall.product-build.attack10.test.mjs
+
       - name: Upload exact-head firewall proof
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: firewall-v10-proof-${{ github.event.pull_request.head.sha || github.sha }}
           path: artifacts/firewall-v10-proof.json

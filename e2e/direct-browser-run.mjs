@@ -6,6 +6,11 @@ import {
   v10CapabilityPlanHash,
   v10CapabilityRegistryHash,
 } from '../dist/founder-os-lab/capabilityKernel.js';
+import {
+  V10_DECISION_CYCLE_CONTRACT,
+  V10_DECISION_LENSES,
+  v10DecisionReceiptHash,
+} from '../dist/lib/v10DecisionAuthorityGate.js';
 
 const proxyEnvKeys = [
   'HTTP_PROXY',
@@ -19,6 +24,12 @@ const proxyEnvKeys = [
 for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
+
+// The real E2E server persists opaque founder sessions through the same
+// encrypted-at-rest path as production. Supply a deterministic test-only key
+// at the harness boundary so every spawned scenario proves that path without
+// adding a production fallback or requiring a repository secret.
+process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
 // Keep the public package-script contract stable while proving each long
 // journey against a fresh real server. The application correctly enforces a
@@ -79,12 +90,112 @@ function chiefPlan(projectSlug, requestedAuthority, expectedHeadSha) {
   return { ...base, planHash: v10CapabilityPlanHash(base) };
 }
 
-// run.mjs performs one privileged create_branch directly with Node fetch for
-// the guarded-terminal proof. Bind that provider-boundary call to the same
-// canonical Chief plan/approved registry used by the real browser forms.
+function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
+  const base = {
+    contract: V10_DECISION_CYCLE_CONTRACT,
+    goal: 'Authorize only the exact founder-reviewed merge after every required V10 witness is bound.',
+    workspaceId: 'e2e-workspace',
+    projectSlug,
+    expectedHeadSha: String(expectedHeadSha).trim().toLowerCase(),
+    customerOutcome: 'The intended reviewed change reaches the default branch without approval identity drift.',
+    desiredState: 'Chief recommendation, PromptOS handoff, founder approval, capability plan, and exact head resolve to one merge identity.',
+    currentState: 'The exact branch head is reviewed and proof-gated for merge.',
+    bottleneck: 'Privileged execution must prove that the founder approved the same decision that Chief and PromptOS carried.',
+    decisionClass: 'high-consequence',
+    reality: {
+      verified: ['The browser scenario has exact-head GitHub evidence and a passing founder proof gate.'],
+      inferred: ['Binding one decision identity reduces cross-surface interpretation drift.'],
+      unknown: ['No post-merge runtime claim is made by this local provider fixture.'],
+      blocked: [],
+    },
+    lensReports: V10_DECISION_LENSES.map((lens) => ({
+      lens,
+      finding: `${lens} confirms the exact merge identity must remain bounded.`,
+      recommendation: `${lens} requires the existing proof and rollback gates to remain intact.`,
+      confidence: 0.9,
+      evidenceRefs: [`e2e:${lens}`],
+      assumptions: [`fixture:${lens}`],
+      risks: [`drift:${lens}`],
+      blockers: [],
+      requestedEvidence: [`exact:${lens}`],
+      metrics: [],
+    })),
+    dissent: ['Redteam blocks any merge whose decision, founder approval, plan, or exact head diverges.'],
+    candidateOptions: ['Bind exact decision identity before merge.', 'Leave decision identity implicit.'],
+    recommendation: 'Bind the portable decision and explicit founder approval to the exact merge execution.',
+    authorityCeiling: 'reason',
+    proofRequirements: ['exact-head execution evidence', 'founder decision binding', 'independent review receipt'],
+    outcomeSignals: ['one-bound-merge-execution'],
+    rollback: 'Revert the merge commit if downstream proof fails.',
+    stopConditions: ['decision hash mismatch', 'founder decision mismatch', 'head drift'],
+    nextGate: 'Founder Control Room may resolve merge authority only after the exact founder decision validates.',
+    requiresFounderApproval: true,
+    executionAuthorized: false,
+  };
+  return { ...base, decisionHash: v10DecisionReceiptHash(base) };
+}
+
+let activeBrowserPage = null;
+
+async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
+  const headers = new Headers(init.headers ?? {});
+  const authorization = headers.get('authorization');
+  if (!authorization) return null;
+
+  if (!/^Bearer (?:undefined|null)?$/i.test(authorization.trim())) {
+    throw new Error('E2E_BROWSER_BEARER_REGRESSION: browser-readable bearer credentials must not cross the opaque-session boundary');
+  }
+  if (!activeBrowserPage) {
+    throw new Error('E2E_OPAQUE_BROWSER_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+  }
+  if (init.body !== undefined && typeof init.body !== 'string') {
+    throw new Error('E2E_OPAQUE_BROWSER_BODY_UNSUPPORTED: legacy compatibility calls must use a string body');
+  }
+
+  // The stale long-form harness still constructs a few Node-side requests as
+  // `Bearer undefined` after the browser credential cutover. Do not extract
+  // or replay the HttpOnly capability from Node. Execute only that exact stale
+  // request shape inside the already-authenticated Chromium page instead, so
+  // the real same-origin cookie, Origin semantics, and browser transport are
+  // exercised exactly as the product uses them.
+  headers.delete('authorization');
+  const request = {
+    url,
+    method: init.method ?? 'GET',
+    headers: Object.fromEntries(headers.entries()),
+    body: init.body ?? null,
+  };
+  const result = await activeBrowserPage.evaluate(async (browserRequest) => {
+    const response = await fetch(browserRequest.url, {
+      method: browserRequest.method,
+      headers: browserRequest.headers,
+      body: browserRequest.body,
+      credentials: 'same-origin',
+    });
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: [...response.headers.entries()],
+      body: await response.text(),
+    };
+  }, request);
+
+  return new Response(result.body, {
+    status: result.status,
+    statusText: result.statusText,
+    headers: result.headers,
+  });
+}
+
+// run.mjs still contains a few provider-boundary calls whose historical code
+// asks sessionStorage for an access token. After the opaque-session cutover
+// that value must be absent. Route only that explicit stale test shape through
+// the authenticated Chromium page and fail if a readable bearer token ever
+// reappears. No browser cookie is exposed to Node by this compatibility bridge.
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
   if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
     try {
       const body = JSON.parse(init.body);
@@ -96,12 +207,63 @@ globalThis.fetch = async (input, init = {}) => {
       // Preserve malformed requests unchanged so the real route can reject them.
     }
   }
+
+  const browserResponse = await runLegacyBearerCallThroughOpaqueBrowser(url, init);
+  if (browserResponse) return browserResponse;
   return originalFetch(input, init);
 };
 
 async function withV10PlanAwarePage(page) {
+  activeBrowserPage = page;
+  page.on('response', (response) => {
+    const url = response.url();
+    if (!url.includes('/approvals/') || !url.endsWith('/execute') || response.ok()) return;
+    void response.json()
+      .then((body) => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({
+          status: response.status(),
+          code: body?.code ?? null,
+          error: body?.error ?? null,
+          detail: body?.detail ?? null,
+        }));
+      })
+      .catch(() => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({ status: response.status(), code: null, error: 'non-json rejection body' }));
+      });
+  });
+
+  const originalEvaluate = page.evaluate.bind(page);
+  page.evaluate = async (...args) => {
+    const [pageFunction] = args;
+    try {
+      return await originalEvaluate(...args);
+    } catch (error) {
+      const source = typeof pageFunction === 'function' ? pageFunction.toString() : '';
+      const staleBearerRead = source.includes("JSON.parse(sessionStorage.getItem('fcr_session')).access_token");
+      if (staleBearerRead && error instanceof Error && /Cannot read properties of null/.test(error.message)) {
+        // Opaque browser sessions intentionally leave no readable fcr_session.
+        // Return undefined only for this exact historical harness read so the
+        // existing fetch bridge can exercise the authenticated HttpOnly-cookie
+        // path. Any real readable token is returned normally and then rejected
+        // by E2E_BROWSER_BEARER_REGRESSION above.
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
+      // The opaque-session callback lands on the newer root shell. The guarded
+      // terminal remains in the canonical legacy cockpit at /control-room/.
+      // Enter that real surface with the same HttpOnly founder session before
+      // continuing the historical terminal journey. Do not synthesize DOM or
+      // bypass the normal tab click.
+      await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(selector);
+    }
+
     if (selector === '#create-branch-form button[type=submit]') {
       await page.fill(
         '#create-branch-form textarea[name="capabilityPlan"]',
@@ -111,9 +273,19 @@ async function withV10PlanAwarePage(page) {
 
     if (selector === '#execute-merge-form button[type=submit]') {
       const expectedHeadSha = await page.locator('#execute-merge-form input[name="expectedHeadSha"]').inputValue();
+      const plan = chiefPlan('demo-project', 'privileged', expectedHeadSha);
+      const decisionReceipt = chiefDecisionReceipt('demo-project', expectedHeadSha);
       await page.fill(
         '#execute-merge-form textarea[name="capabilityPlan"]',
-        JSON.stringify(chiefPlan('demo-project', 'privileged', expectedHeadSha)),
+        JSON.stringify(plan),
+      );
+      await page.fill(
+        '#execute-merge-form textarea[name="decisionReceipt"]',
+        JSON.stringify(decisionReceipt),
+      );
+      await page.fill(
+        '#execute-merge-form input[name="promptOSDecisionHash"]',
+        decisionReceipt.decisionHash,
       );
     }
 

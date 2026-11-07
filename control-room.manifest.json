@@ -80,7 +80,7 @@
       {"id": "quality-gate", "name": "Quality Gate", "kind": "contract", "required": true, "status": "active"},
       {"id": "ci", "name": "CI", "kind": "integration", "required": true, "status": "active"},
       {"id": "playwright-e2e", "name": "Playwright E2E", "kind": "e2e", "required": true, "status": "active"},
-      {"id": "pr-recovery", "name": "PR Recovery Exact-Head Driver", "kind": "integration", "required": true, "status": "active"},
+      {"id": "pr-recovery", "name": "PR Recovery Exact-Head Driver", "kind": "integration", "required": true, "status": "founder-gated"},
       {"id": "parallel-preflight", "name": "Cloudflare + Local Parallel Preflight", "kind": "deployment", "required": true, "status": "active"},
       {"id": "founder-repo-cycle", "name": "Founder Repo Cycle", "kind": "contract", "required": true, "status": "active"},
       {"id": "control-room-test-catalog", "name": "Founder Control Room Test Catalog", "kind": "contract", "required": true, "status": "active"}

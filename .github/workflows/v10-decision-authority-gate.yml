@@ -4,17 +4,23 @@ on:
   pull_request:
     paths:
       - "src/lib/v10DecisionAuthorityGate.ts"
+      - "src/lib/v10RecursiveDecisionHardening.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.test.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts"
+      - "src/lib/__tests__/v10RecursiveDecisionHardening.test.ts"
       - "testdata/v10-decision-cycle-conformance.json"
+      - "testdata/v10-recursive-hardening-conformance.json"
       - ".github/workflows/v10-decision-authority-gate.yml"
   push:
     branches: [main]
     paths:
       - "src/lib/v10DecisionAuthorityGate.ts"
+      - "src/lib/v10RecursiveDecisionHardening.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.test.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts"
+      - "src/lib/__tests__/v10RecursiveDecisionHardening.test.ts"
       - "testdata/v10-decision-cycle-conformance.json"
+      - "testdata/v10-recursive-hardening-conformance.json"
       - ".github/workflows/v10-decision-authority-gate.yml"
   workflow_dispatch:
 
@@ -32,7 +38,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
@@ -42,7 +48,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
           cache: npm
@@ -53,5 +59,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Verify decision authority gate and cross-repo identity
-        run: npx vitest run src/lib/__tests__/v10DecisionAuthorityGate.test.ts src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts
+      - name: Verify decision authority gate, recursive hardening, and cross-repo identity
+        run: >-
+          npx vitest run
+          src/lib/__tests__/v10DecisionAuthorityGate.test.ts
+          src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts
+          src/lib/__tests__/v10RecursiveDecisionHardening.test.ts

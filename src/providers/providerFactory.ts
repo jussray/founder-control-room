@@ -1,13 +1,17 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
-import { GitHubProvider } from "./GitHubProvider.js";
+import { DeterministicReviewGitHubProvider } from "./DeterministicReviewGitHubProvider.js";
+import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
 import type {
+  DeterministicReviewWitnessPublication,
   Diff,
   FileEntry,
   Patch,
   ProjectRepo,
+  PullRequestReviewContext,
   RepositoryProvider,
   RepositoryRef,
+  ReviewSignal,
   RulesetConfig,
   RulesetResult,
   VerificationSignal,
@@ -20,44 +24,137 @@ export interface ProviderProjectConfig {
 }
 
 const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
+const FOUNDER_CONTROL_ROOM_REPOSITORY = "jussray/founder-control-room";
 const FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH = "main";
+export const FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME = "Founder Control Room main exact-head gate";
+export const FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS = 0;
+const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
+  "Required Gate",
+  "Verify test-ledger contract",
+] as const;
+
+function isFounderControlRoomRepository(repositoryIdentifier: string | undefined): boolean {
+  return repositoryIdentifier?.trim().toLowerCase() === FOUNDER_CONTROL_ROOM_REPOSITORY;
+}
+
+export function governanceProjectIdForRepository(
+  projectId: string,
+  repositoryIdentifier?: string,
+): string {
+  return isFounderControlRoomRepository(repositoryIdentifier)
+    ? FOUNDER_CONTROL_ROOM_PROJECT_ID
+    : projectId;
+}
+
+export function assertFounderControlRoomTrustedBypassActor(
+  config: RulesetConfig,
+  trustedGitHubAppId: string | undefined,
+): void {
+  const protectsFounderControlRoomMain =
+    config.enforcement === "active"
+    && config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+  if (!protectsFounderControlRoomMain) return;
+
+  const trustedAppId = trustedGitHubAppId?.trim() ?? "";
+  if (!/^\d+$/.test(trustedAppId)) {
+    throw new Error("Founder Control Room main governance requires a trusted GITHUB_APP_ID bypass identity");
+  }
+
+  const bypassActors = config.bypassActors ?? [];
+  if (
+    bypassActors.length !== 1
+    || bypassActors[0]?.kind !== "app"
+    || bypassActors[0].id.trim() !== trustedAppId
+  ) {
+    throw new Error("Founder Control Room main governance bypass must exactly match the trusted GitHub App identity");
+  }
+}
 
 /**
  * Founder Control Room's own merge policy must fail closed before a provider
  * mutation is attempted. Other projects retain provider-neutral flexibility,
  * including evaluate-only or zero-review rulesets when their own policy allows
- * it; FCR main is the constitutional authority surface and cannot opt out of
- * pull-request review through an omitted or zero review count.
+ * it. FCR main is the constitutional authority surface: an active policy must
+ * retain the complete minimum floor, and the canonical ruleset may not be
+ * disabled, demoted to evaluate mode, or retargeted away from main through the
+ * generic repository-administration route. Repository identity, not a mutable
+ * project slug alias, determines whether that constitutional floor applies.
  */
-export function assertRulesetGovernancePolicy(projectId: string, config: RulesetConfig): void {
-  const protectsFounderControlRoomMain =
-    projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID
-    && config.enforcement === "active"
-    && config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+export function assertRulesetGovernancePolicy(
+  projectId: string,
+  config: RulesetConfig,
+  repositoryIdentifier?: string,
+): void {
+  const governanceProjectId = governanceProjectIdForRepository(projectId, repositoryIdentifier);
+  const isFounderControlRoom = governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID;
+  const targetsFounderControlRoomMain = config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+  const isCanonicalFounderControlRoomRuleset =
+    isFounderControlRoom && config.name === FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME;
 
-  if (!protectsFounderControlRoomMain) return;
+  if (isCanonicalFounderControlRoomRuleset) {
+    if (config.enforcement !== "active") {
+      throw new Error("Founder Control Room canonical main governance must remain actively enforced");
+    }
+    if (!targetsFounderControlRoomMain) {
+      throw new Error("Founder Control Room canonical main governance must continue targeting main");
+    }
+  }
+
+  const protectsFounderControlRoomMain =
+    isFounderControlRoom
+    && config.enforcement === "active"
+    && targetsFounderControlRoomMain;
+
+  if (!protectsFounderControlRoomMain && !isCanonicalFounderControlRoomRuleset) return;
 
   if (!config.requirePullRequest) {
     throw new Error("Founder Control Room main governance requires pull-request enforcement");
   }
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    throw new Error("Founder Control Room main governance requires at least one approving review");
+  if (
+    !Number.isInteger(config.requiredApprovingReviewCount)
+    || config.requiredApprovingReviewCount !== FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS
+  ) {
+    throw new Error(
+      `Founder Control Room main governance requires exactly ${FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS} native approving reviews for the checked-in phase`,
+    );
+  }
+  for (const requiredCheck of FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS) {
+    if (!config.requiredStatusCheckNames.includes(requiredCheck)) {
+      throw new Error(`Founder Control Room main governance requires status check: ${requiredCheck}`);
+    }
+  }
+  if (!config.blockForcePushes) {
+    throw new Error("Founder Control Room main governance must block force pushes");
+  }
+  if (!config.blockDeletion) {
+    throw new Error("Founder Control Room main governance must block branch deletion");
   }
 }
 
 class LazyRepositoryProvider implements RepositoryProvider {
   readonly name: string;
   private readonly factory: () => Promise<RepositoryProvider>;
+  private readonly repositoryIdentifier: string;
   private delegatePromise: Promise<RepositoryProvider> | null = null;
+  private readonly pullRequestContextByProject = new Map<string, PullRequestReviewContext>();
 
-  constructor(name: string, factory: () => Promise<RepositoryProvider>) {
+  constructor(
+    name: string,
+    factory: () => Promise<RepositoryProvider>,
+    repositoryIdentifier: string,
+  ) {
     this.name = name;
     this.factory = factory;
+    this.repositoryIdentifier = repositoryIdentifier;
   }
 
   private delegate(): Promise<RepositoryProvider> {
     this.delegatePromise ??= this.factory();
     return this.delegatePromise;
+  }
+
+  private governanceProjectId(projectId: string): string {
+    return governanceProjectIdForRepository(projectId, this.repositoryIdentifier);
   }
 
   async getProject(projectId: string): Promise<ProjectRepo> {
@@ -84,6 +181,41 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return (await this.delegate()).listVerificationSignals(projectId, ref);
   }
 
+  async publishDeterministicReviewWitness(
+    projectId: string,
+    publication: DeterministicReviewWitnessPublication,
+  ): Promise<void> {
+    const delegate = await this.delegate();
+    if (!delegate.publishDeterministicReviewWitness) {
+      throw new Error(`${delegate.name}: deterministic review witness publication requires GitHub App authority`);
+    }
+    return delegate.publishDeterministicReviewWitness(this.governanceProjectId(projectId), publication);
+  }
+
+  async listReviewSignals(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]> {
+    const delegate = await this.delegate();
+    if (!delegate.listReviewSignals) {
+      throw new Error(`${delegate.name}: does not support provider-backed pull-request reviews`);
+    }
+    return delegate.listReviewSignals(this.governanceProjectId(projectId), pullRequestNumber);
+  }
+
+  async getPullRequestReviewContext(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext> {
+    const delegate = await this.delegate();
+    if (!delegate.getPullRequestReviewContext) {
+      throw new Error(`${delegate.name}: does not support provider-backed pull-request context`);
+    }
+    const governanceProjectId = this.governanceProjectId(projectId);
+    const context = await delegate.getPullRequestReviewContext(governanceProjectId, pullRequestNumber);
+    if (governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      this.pullRequestContextByProject.set(governanceProjectId, context);
+    }
+    return context;
+  }
+
   async createBranch(projectId: string, baseRef: string, name: string): Promise<string> {
     return (await this.delegate()).createBranch(projectId, baseRef, name);
   }
@@ -93,24 +225,64 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async compare(projectId: string, base: string, head: string): Promise<Diff> {
-    return (await this.delegate()).compare(projectId, base, head);
+    return (await this.delegate()).compare(this.governanceProjectId(projectId), base, head);
   }
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
-    return (await this.delegate()).integrate(projectId, base, head);
-  }
+    const delegate = await this.delegate();
+    const governanceProjectId = this.governanceProjectId(projectId);
+    if (governanceProjectId !== FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      return delegate.integrate(projectId, base, head);
+    }
 
-  async deleteBranch(projectId: string, branch: string): Promise<void> {
-    return (await this.delegate()).deleteBranch(projectId, branch);
+    const context = this.pullRequestContextByProject.get(governanceProjectId);
+    if (!context) {
+      throw new Error(
+        "Founder Control Room integration requires provider-backed pull-request context in the same execution",
+      );
+    }
+    if (base !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH || context.baseRef !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH) {
+      throw new Error(
+        `Founder Control Room reviewed integration authority is pinned to ${FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH}`,
+      );
+    }
+    if (base !== context.baseRef || head !== context.headRef) {
+      throw new Error(
+        `Founder Control Room integration refs changed after review context: expected ${context.baseRef}<-${context.headRef}, received ${base}<-${head}`,
+      );
+    }
+
+    // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
+    // handing control to the provider mutation. The semantic review is bound to
+    // context.baseSha/context.headSha; moving either ref invalidates that review.
+    const currentBaseSha = await delegate.resolveRef(governanceProjectId, base);
+    const currentHeadSha = await delegate.resolveRef(governanceProjectId, head);
+    if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
+      throw new Error(
+        `Founder Control Room base moved after review context: current ${currentBaseSha}, reviewed ${context.baseSha}`,
+      );
+    }
+    if (currentHeadSha.toLowerCase() !== context.headSha.toLowerCase()) {
+      throw new Error(
+        `Founder Control Room head moved after review context: current ${currentHeadSha}, reviewed ${context.headSha}`,
+      );
+    }
+
+    this.pullRequestContextByProject.delete(governanceProjectId);
+    return delegate.integrate(governanceProjectId, base, head);
   }
 
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
-    assertRulesetGovernancePolicy(projectId, config);
+    const governanceProjectId = this.governanceProjectId(projectId);
+    assertRulesetGovernancePolicy(governanceProjectId, config, this.repositoryIdentifier);
+    if (governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      assertFounderControlRoomTrustedBypassActor(config, process.env.GITHUB_APP_ID);
+    }
     const delegate = await this.delegate();
     if (!delegate.applyBranchRuleset) {
       throw new Error(`${delegate.name}: does not support applyBranchRuleset`);
     }
-    return delegate.applyBranchRuleset(projectId, config);
+    return delegate.applyBranchRuleset(governanceProjectId, config);
   }
 }
 
@@ -122,7 +294,12 @@ export function providerConfigurationError(
     const fallbackToken = env.GITHUB_TOKEN?.trim();
     const appId = env.GITHUB_APP_ID?.trim();
     const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
-    return fallbackToken || (appId && privateKey)
+    const hasAppId = Boolean(appId);
+    const hasPrivateKey = Boolean(privateKey);
+    if (hasAppId !== hasPrivateKey) {
+      return "GitHub App authentication is incomplete; set both GITHUB_APP_ID and GITHUB_PRIVATE_KEY or neither";
+    }
+    return fallbackToken || (hasAppId && hasPrivateKey)
       ? null
       : "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback";
   }
@@ -145,15 +322,25 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
   // GITHUB_TOKEN remains a local/development fallback only; production prefers
   // repository-scoped GitHub App installation credentials minted on demand.
-  const token = appId && privateKey
-    ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
+  const hasAppAuthority = Boolean(appId && privateKey);
+  const token = hasAppAuthority
+    ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)
     : fallbackToken!;
 
-  return new GitHubProvider({
+  const projectMap: Record<string, string> = { [project.slug]: project.repo_identifier };
+  if (isFounderControlRoomRepository(project.repo_identifier)) {
+    projectMap[FOUNDER_CONTROL_ROOM_PROJECT_ID] = project.repo_identifier;
+  }
+
+  const config = {
     token,
-    projectMap: { [project.slug]: project.repo_identifier },
+    projectMap,
     baseUrl: process.env.GITHUB_API_BASE_URL,
-  });
+  };
+
+  return hasAppAuthority && isFounderControlRoomRepository(project.repo_identifier)
+    ? new DeterministicReviewGitHubProvider(config)
+    : new SecurityPreservingGitHubProvider(config);
 }
 
 async function gitlabProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {
@@ -178,10 +365,10 @@ async function gitlabProvider(project: ProviderProjectConfig): Promise<Repositor
  */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
-    return new LazyRepositoryProvider("github", () => githubProvider(project));
+    return new LazyRepositoryProvider("github", () => githubProvider(project), project.repo_identifier);
   }
   if (project.repo_provider === "gitlab") {
-    return new LazyRepositoryProvider("gitlab", () => gitlabProvider(project));
+    return new LazyRepositoryProvider("gitlab", () => gitlabProvider(project), project.repo_identifier);
   }
   throw new Error(`No RepositoryProvider implementation for "${project.repo_provider}" yet`);
 }

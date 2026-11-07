@@ -267,7 +267,7 @@ for (const [relativePath, parsed] of [
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
   const servers = parsed.mcpServers ?? parsed.servers ?? parsed.mcp;
-  for (const forbidden of ['dbhub', 'netdata-cloud']) {
+  for (const forbidden of ['dbhub', 'netdata-cloud', 'cloudflare-stack']) {
     assert(!servers[forbidden], `${relativePath}:${forbidden} is not justified in the current Control Room phase`);
   }
   if (servers.supabase) {

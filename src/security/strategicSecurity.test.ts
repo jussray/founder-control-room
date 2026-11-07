@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PORTFOLIO_PROJECTS } from '../config/portfolio.js';
 import {
   DEFAULT_LANTERN_POLICY,
+  STRATEGIC_SECURITY_INVARIANTS,
   STRATEGIC_SECURITY_STAGES,
   auditPortfolioStrategicSecurity,
   strategicSecurityDecision,
@@ -18,6 +19,30 @@ describe('strategic security v10', () => {
     expect(STRATEGIC_SECURITY_STAGES[6]?.controls).toContain('artifact-attestation');
     expect(STRATEGIC_SECURITY_STAGES[7]?.controls).toContain('lantern-decoy');
     expect(STRATEGIC_SECURITY_STAGES[9]?.controls).toContain('approval-binding');
+  });
+
+  it('makes post-quantum readiness an inventory and crypto-agility obligation without claiming runtime safety', () => {
+    expect(STRATEGIC_SECURITY_STAGES[0]?.controls).toEqual(expect.arrayContaining([
+      'cryptographic-inventory',
+      'quantum-vulnerable-public-key-inventory',
+    ]));
+    expect(STRATEGIC_SECURITY_STAGES[6]?.controls).toEqual(expect.arrayContaining([
+      'cryptographic-agility',
+      'provider-cryptography-ownership',
+      'post-quantum-migration-readiness',
+    ]));
+    expect(STRATEGIC_SECURITY_INVARIANTS).toMatchObject({
+      cryptographicInventoryRequired: true,
+      cryptographicAgilityRequired: true,
+      quantumSafeClaimRequiresRuntimeEvidence: true,
+    });
+
+    const target = strategicSecurityTargetForProject(PORTFOLIO_PROJECTS.find((project) => project.slug === 'founder-control-room')!);
+    expect(target.requiredProof).toEqual(expect.arrayContaining([
+      'cryptographic inventory for security-relevant dependencies',
+      'provider ownership and migration path for quantum-vulnerable public-key cryptography',
+      'runtime or provider evidence before any quantum-safe claim',
+    ]));
   });
 
   it('audits every active portfolio project without importing quarantined repositories', () => {

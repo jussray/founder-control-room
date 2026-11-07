@@ -1,5 +1,11 @@
 import { Router } from "express";
 import {
+  DESIGN_COMMAND_DECK_CONTRACT,
+  DESIGN_COMMAND_SHARED_CAPABILITY,
+  DESIGN_COMMANDS,
+  getDesignCommand,
+} from "../../design-os/commands.js";
+import {
   buildDesignOsSummary,
   getDesignOsProject,
   PORTFOLIO_DESIGN_REGISTRY,
@@ -10,6 +16,17 @@ import { requireFounder } from "../middleware/requireFounder.js";
 export const designOsRouter = Router();
 
 designOsRouter.use(requireFounder);
+
+const DESIGN_COMMAND_CONTRACT = {
+  contract: DESIGN_COMMAND_DECK_CONTRACT,
+  count: DESIGN_COMMANDS.length,
+  sharedCapability: DESIGN_COMMAND_SHARED_CAPABILITY,
+  commandsAreOperationsNotAuthority: true,
+  mutatingCommandsRequireFounderApproval: true,
+  uiRuntimeClaimsRequireExactHeadPlaywright: true,
+  productNativeGrammarRequired: true,
+  scopeOwnershipIsExclusiveByDefault: true,
+} as const;
 
 /**
  * GET /design-os
@@ -32,6 +49,8 @@ designOsRouter.get("/", (_req, res) => {
   return res.json({
     summary: buildDesignOsSummary(),
     projects: PORTFOLIO_DESIGN_REGISTRY,
+    commands: DESIGN_COMMANDS,
+    commandContract: DESIGN_COMMAND_CONTRACT,
     truthBoundaries: {
       figmaIsNotRuntimeProof: true,
       designApprovalDoesNotAuthorizeImplementation: true,
@@ -39,6 +58,33 @@ designOsRouter.get("/", (_req, res) => {
       noApprovalCarriesAcrossProjects: true,
     },
   });
+});
+
+/**
+ * GET /design-os/commands
+ *
+ * Exposes the same 23 bounded design operations to every registered project
+ * control room. This endpoint is descriptive only: it creates no approval,
+ * mutation, deployment, or merge authority.
+ */
+designOsRouter.get("/commands", (_req, res) => {
+  return res.json({
+    commandContract: DESIGN_COMMAND_CONTRACT,
+    commands: DESIGN_COMMANDS,
+  });
+});
+
+/** GET /design-os/commands/:id — one bounded design operation. */
+designOsRouter.get("/commands/:id", (req, res) => {
+  const command = getDesignCommand(req.params.id);
+  if (!command) {
+    return res.status(404).json({
+      error: "DESIGN_COMMAND_NOT_FOUND",
+      commandId: req.params.id,
+    });
+  }
+
+  return res.json({ command, commandContract: DESIGN_COMMAND_CONTRACT });
 });
 
 /**
@@ -65,5 +111,9 @@ designOsRouter.get("/:slug", (req, res) => {
     });
   }
 
-  return res.json({ project });
+  return res.json({
+    project,
+    commands: DESIGN_COMMANDS,
+    commandContract: DESIGN_COMMAND_CONTRACT,
+  });
 });

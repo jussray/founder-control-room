@@ -42,6 +42,13 @@ export type VerificationSignalStatus =
   | "skipped"
   | "unknown";
 
+/** Provider-backed identity for the application that emitted a verification signal. */
+export interface VerificationSignalIssuer {
+  kind: "app";
+  id: string;
+  name?: string;
+}
+
 /**
  * A provider-neutral CI or verification signal attached to an exact commit.
  * GitHub check runs are one source; internal runners and Forgejo checks can
@@ -53,9 +60,26 @@ export interface VerificationSignal {
   status: VerificationSignalStatus;
   commitSha: string;
   provider: string;
+  /** Full provider-backed evidence identity when the host exposes one (GitHub Check Run external_id). */
+  evidenceFingerprint?: string;
+  /** Optional because not every provider exposes an issuer. Authority gates must fail closed when issuer identity is required. */
+  issuer?: VerificationSignalIssuer;
   startedAt?: string;
   completedAt?: string;
   detailsUrl?: string;
+}
+
+/**
+ * Narrow provider write used only to publish one already-produced deterministic
+ * review witness. It is intentionally not a generic "create check" surface:
+ * the exact head, derived signal name, full review hash, and bounded summary
+ * must all survive provider validation before a host mutation is attempted.
+ */
+export interface DeterministicReviewWitnessPublication {
+  headSha: string;
+  name: string;
+  reviewHash: string;
+  summary: string;
 }
 
 export type ReviewSignalState =
@@ -81,6 +105,28 @@ export interface ReviewSignal {
   receiptHash?: string;
   submittedAt?: string;
   detailsUrl?: string;
+}
+
+/**
+ * Provider-backed identity for one pull/merge request under review. This is
+ * intentionally read-only and exact-head aware so merge gates never have to
+ * trust caller-supplied PR metadata for author, base, or head identity.
+ */
+export interface PullRequestReviewContext {
+  number: number;
+  repository: string;
+  headRepository: string;
+  baseRef: string;
+  headRef: string;
+  baseSha: string;
+  headSha: string;
+  authorIdentity: string;
+}
+
+export interface ChangeGenealogyReadInput {
+  limit?: number;
+  includeComments?: boolean;
+  includeDiff?: boolean;
 }
 
 export interface DiffFile {
@@ -115,11 +161,10 @@ export interface Patch {
 }
 
 /**
- * An actor exempted from a ruleset's restrictions. Needed because this
- * app's own `integrate()` writes to the protected branch directly (see
- * RulesetConfig doc comment) — without an explicit bypass entry for this
- * app's own machine identity, applying a ruleset that blocks direct writes
- * would also block the app's own founder-approved merge action.
+ * A machine identity that may cross a provider ruleset under a deliberately
+ * narrower authority path. The provider implementation owns the bypass mode:
+ * FCR's trusted GitHub App is constrained to reviewed pull-request merges,
+ * while other providers/projects may retain their existing integration mode.
  */
 export interface RulesetBypassActor {
   /** "app" = this Control Room's own GitHub App installation. */
@@ -148,29 +193,54 @@ export interface RulesetConfig {
   blockForcePushes: boolean;
   blockDeletion: boolean;
   /**
-   * Actors exempt from the rules above. Must explicitly include this app's
-   * own GitHub App identity if `requirePullRequest` is true, or the app's
-   * own integrate() (a direct merge-commit write, not a PR merge) breaks.
+   * Explicit machine identities allowed to cross the host ruleset through a
+   * provider-defined scoped bypass. Callers select the identity only; the
+   * provider must choose and verify the narrowest supported bypass mode.
    */
   bypassActors?: RulesetBypassActor[];
 }
 
 export interface RulesetResult {
-  /** Provider-specific ruleset identifier, for later reference or rollback. */
+  /** Provider-specific primary ruleset identifier. */
   id: string;
   name: string;
   enforcement: string;
+  /**
+   * Composite provider mutations expose every durable component identity so
+   * caller ledgers can reconcile partial success without guessing provider state.
+   */
+  components?: Array<{
+    purpose: string;
+    id: string;
+    name: string;
+    enforcement: string;
+  }>;
 }
 
 /**
  * Provider-agnostic repository interface. All write methods correspond to
  * separately approval-gated L99 actions. Read methods may be used by Repo
  * Brain during discussion and reconciliation, but every read is still logged.
+ *
+ * Branch deletion is deliberately not ambient repository authority. A stale
+ * branch is not necessarily superseded or retirable. Deletion may return only
+ * through an obligation-aware retirement reconciler with a verified receipt.
  */
 export interface RepositoryProvider {
   readonly name: string;
 
   getProject(projectId: string): Promise<ProjectRepo>;
+
+  /**
+   * Optional bounded recent-change evidence read. The provider owns project
+   * isolation and credentials; callers must feature-detect and fail closed.
+   * The payload stays opaque here so this provider-neutral membrane does not
+   * import a host-specific evidence schema.
+   */
+  readChangeGenealogyEvidence?(
+    projectId: string,
+    input?: ChangeGenealogyReadInput,
+  ): Promise<unknown>;
 
   listFiles(projectId: string, ref: string, path?: string): Promise<FileEntry[]>;
 
@@ -186,11 +256,31 @@ export interface RepositoryProvider {
   listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]>;
 
   /**
+   * Publishes one deterministic-review verification witness. Optional because
+   * not every provider can mint a provider-backed App check. Review issuance
+   * must fail closed when this capability is unavailable.
+   */
+  publishDeterministicReviewWitness?(
+    projectId: string,
+    publication: DeterministicReviewWitnessPublication,
+  ): Promise<void>;
+
+  /**
    * Returns provider-recorded pull-request review events. Optional because
    * not every repository provider exposes a PR-review concept. Review gates
    * must fail closed when semantic review is required and this is absent.
    */
   listReviewSignals?(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]>;
+
+  /**
+   * Returns immutable provider-backed PR identity for review gating. Optional
+   * for providers that do not expose PR/MR metadata; review-gated merges fail
+   * closed when this capability is required but unavailable.
+   */
+  getPullRequestReviewContext?(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;
@@ -207,9 +297,6 @@ export interface RepositoryProvider {
    * immediately before invoking this method. Returns the resulting commit SHA.
    */
   integrate(projectId: string, base: string, head: string): Promise<string>;
-
-  /** Deletes a branch — used for "reject and delete branch". */
-  deleteBranch(projectId: string, branch: string): Promise<void>;
 
   /**
    * Applies (creates or updates, by name) a branch protection ruleset.

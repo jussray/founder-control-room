@@ -7,7 +7,10 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    // Include colocated and __tests__/ suites written in TypeScript or
+    // JavaScript. The discovery ratchet separately rejects other candidate
+    // test/spec suffixes unless they are exact-base debt.
+    include: ['src/**/*.test.{ts,js}'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

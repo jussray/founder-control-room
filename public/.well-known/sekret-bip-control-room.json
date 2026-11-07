@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.1.0",
+  "bridgeId": "sekret-bip-founder-control-room",
+  "publisher": {
+    "projectId": "founder-control-room",
+    "runtimeOrigin": "https://foundercontrolroom.org",
+    "controlRoom": "https://foundercontrolroom.org/control-room/",
+    "apiOrigin": "https://api.foundercontrolroom.org/",
+    "source": "https://github.com/jussray/founder-control-room"
+  },
+  "peer": {
+    "projectId": "sekret-bip",
+    "runtimeOrigin": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site",
+    "role": "audit-mirror",
+    "auditView": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site/control-room",
+    "legacyRouteAlias": "/control-room",
+    "manifest": "https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site/api/control-room-link"
+  },
+  "canonicalBipControlRoom": {
+    "repository": "jussray/Sekret-Bip",
+    "entry": "app/(dev)/control-room.tsx",
+    "singleton": true
+  },
+  "authority": {
+    "founderControlRoom": {
+      "actions": ["approve", "execute"]
+    },
+    "sekretBipAuditMirror": {
+      "actions": ["observe", "request"]
+    }
+  },
+  "connection": {
+    "registration": "CONFIGURED",
+    "verification": "REQUIRES_LIVE_READBACK"
+  },
+  "privacy": {
+    "allowed": ["engineering evidence", "release receipts", "decision references"],
+    "prohibited": ["journal content", "mood content", "AI conversation", "youth data"]
+  }
+}

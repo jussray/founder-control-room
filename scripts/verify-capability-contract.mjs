@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 
 const contractPath = process.argv[2] ?? '.control/capability.json';
+const legacyPointerPath = process.argv[3] ?? '.control/capability.yaml';
 const schemaPath = new URL('../schemas/capability-contract.v1.schema.json', import.meta.url);
 
 function fail(message) {
@@ -116,14 +117,48 @@ function validateAgainstSchema(value, schema, rootSchema, path = '$') {
   }
 }
 
-const [contractRaw, schemaRaw] = await Promise.all([
+function validateLegacyCapabilityPointer(raw) {
+  if (!/^\s*kind:\s*fcr\/capability-legacy-pointer@v1\s*$/m.test(raw)) {
+    fail(`${legacyPointerPath} must declare the legacy capability pointer kind`);
+  }
+  if (!/^\s*authority:\s*non-authoritative\s*$/m.test(raw)) {
+    fail(`${legacyPointerPath} must be explicitly non-authoritative`);
+  }
+  if (!/^\s*canonical_source:\s*\.control\/capability\.json\s*$/m.test(raw)) {
+    fail(`${legacyPointerPath} must point to .control/capability.json as canonical authority`);
+  }
+
+  const forbiddenStateKeys = [
+    'capabilities',
+    'verification',
+    'health',
+    'proof',
+    'deployment',
+    'rollback',
+    'security',
+    'telemetry',
+    'last_verified',
+    'blockers',
+    'next_gate',
+  ];
+
+  for (const key of forbiddenStateKeys) {
+    if (new RegExp(`^\\s*${key}\\s*:`, 'm').test(raw)) {
+      fail(`${legacyPointerPath} must not carry independent ${key} state`);
+    }
+  }
+}
+
+const [contractRaw, schemaRaw, legacyPointerRaw] = await Promise.all([
   readFile(contractPath, 'utf8'),
   readFile(schemaPath, 'utf8'),
+  readFile(legacyPointerPath, 'utf8'),
 ]);
 const contract = JSON.parse(contractRaw);
 const schema = JSON.parse(schemaRaw);
 
 validateAgainstSchema(contract, schema, schema);
+validateLegacyCapabilityPointer(legacyPointerRaw);
 
 const proofById = new Map();
 for (const proof of Array.isArray(contract.proof) ? contract.proof : []) {

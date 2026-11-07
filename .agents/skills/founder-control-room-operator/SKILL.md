@@ -37,7 +37,7 @@ This is a reviewed orientation, not permanent truth. Re-read the current README,
 
 1. Observe the exact branch, changed files, existing implementation, data boundaries, and available evidence.
 2. Complete 5W1H and identify any authority or safety gap.
-3. Red-team the premise, privacy, security, misuse, failure modes, and rollback.
+3. Red-team the premise, privacy, security, misuse, failure modes, hidden assumptions, and rollback.
 4. Choose the smallest reversible action that preserves existing work.
 5. Implement only within the confirmed repository role.
 6. Run proportionate checks on the exact head.
@@ -52,6 +52,44 @@ This is a reviewed orientation, not permanent truth. Re-read the current README,
 - `npm run verify:mcp`
 
 A command listed here is a starting point, not proof it exists or applies forever. Discover current scripts and workflows first. A skipped, stale, unstarted, or older-SHA check is not a pass.
+
+## Cross-plane contradiction gate
+
+A successful lower or narrower proof plane must never cancel, conceal, average away, or upgrade a contradictory broader proof plane.
+
+Apply this ordering whenever evidence disagrees:
+
+- unit green does not cancel integration red;
+- integration green does not cancel Playwright red;
+- Playwright green does not cancel release-provenance red;
+- deployment green does not cancel runtime-identity red;
+- runtime green does not cancel independent outcome red.
+
+When narrower evidence is green and broader evidence is red or unresolved:
+
+- preserve the narrower result as `VERIFIED` at its actual scope;
+- classify the broader claim as `HOLD`, `BLOCKED`, `UNKNOWN`, or `CONTRADICTED` according to the evidence;
+- never report the aggregate state as “mostly green” or equivalent;
+- state the exact proof planes that disagree and the one next gate capable of resolving the contradiction.
+
+Historical green evidence remains valid as historical truth. It does not become current broader proof unless that broader plane is re-observed on the required exact subject.
+
+## Divergence reconstruction gate
+
+A different answer, interpretation, reviewer conclusion, model output, or operator judgment is not automatically an error merely because it conflicts with the expected answer.
+
+Before rejecting a divergent answer, reconstruct the reasoning path that could make it true:
+
+1. state the exact disagreement;
+2. list the assumptions required by the divergent path;
+3. identify any hidden variable, alternate definition, scope, timing, authority source, or evidence interpretation that could explain it;
+4. name a falsifier that would prove that path cannot be true;
+5. compare both paths against the strongest current evidence and authority;
+6. preserve `UNKNOWN` or `CONTRADICTED` when the available evidence cannot resolve the disagreement.
+
+The purpose is discovery, not relativism. A plausible alternate path is an investigable hypothesis, not an upgraded fact. Difference alone cannot downgrade verified evidence, and plausibility alone cannot defeat stronger authority.
+
+Hard boundaries are non-negotiable: safety, privacy, founder approval, repository/provider authority, exact-SHA binding, execution permissions, and other explicit control membranes cannot be reframed as mere assumptions to make a divergent answer work. Any path that depends on crossing one of those boundaries is rejected at the boundary and recorded as such.
 
 ## Output
 

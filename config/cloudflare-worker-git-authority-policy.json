@@ -10,7 +10,7 @@
     "non-promoting"
   ],
   "currentDesiredState": "non-promoting",
-  "currentDesiredDeployCommand": "npx wrangler versions upload",
+  "currentDesiredDeployCommand": "npx wrangler versions upload --config wrangler.worker.toml",
   "policyRole": "desired-state-only",
   "canAuthorizeProviderMutation": false,
   "currentFounderIntent": {

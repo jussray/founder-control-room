@@ -1,5 +1,6 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { describe, expect, it, vi } from 'vitest';
+import { FCR_EMAIL_FROM } from '../projectEmail.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -16,11 +17,20 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   SUPABASE_PROJECT_REF: PROJECT_REF,
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
   SUPABASE_PUBLISHABLE_KEY: 'publishable-test-key',
+  FOUNDER_SESSION_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
   GITHUB_APP_ID: '123456',
   GITHUB_PRIVATE_KEY: 'private-key-test-value',
   FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
   FOUNDER_API_URL: 'https://api.control.example.com',
+  FCR_EMAIL: {
+    send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
+  },
+  FCR_EMAIL_FROM,
+  CHIEF_AI: {
+    version: vi.fn().mockResolvedValue({ ok: true }),
+    ingestBipEvidence: vi.fn().mockResolvedValue({ ok: true }),
+  },
   FCR_V10_CAPABILITY_PLAN_CONTRACT: 'juss-v10/capability-plan@v1',
   FCR_V10_CONVEYOR_CONTRACT: 'founder-control-room/n8n-conveyor@v3',
   FCR_V10_MAX_RUNTIME_AUTHORITY: 'draft',
@@ -47,23 +57,52 @@ describe('Cloudflare Worker binding validation', () => {
       .toThrow('Missing required Worker bindings: SUPABASE_PROJECT_REF');
   });
 
-  it('rejects a Worker with no GitHub authentication path', () => {
+  it('rejects a missing or malformed provider-held founder session key', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FOUNDER_SESSION_ENCRYPTION_KEY: undefined,
+    })).toThrow('Missing required Worker bindings: FOUNDER_SESSION_ENCRYPTION_KEY');
+
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FOUNDER_SESSION_ENCRYPTION_KEY: 'not-base64url',
+    })).toThrow('FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url');
+  });
+
+  it('rejects a missing outbound FCR email binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, FCR_EMAIL: undefined }))
+      .toThrow('Missing required Worker binding: FCR_EMAIL');
+  });
+
+  it('rejects a missing or malformed Chief evidence RPC binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: undefined }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: { version: vi.fn() } }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
+  });
+
+  it('rejects a sender identity that drifts away from the checked-in FCR identity', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FCR_EMAIL_FROM: 'welcome@sekretbip.net',
+    })).toThrow('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
+  });
+
+  it('boots core HTTP without any GitHub provider credentials', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
       GITHUB_APP_ID: undefined,
       GITHUB_PRIVATE_KEY: undefined,
       GITHUB_TOKEN: undefined,
-    })).toThrow(
-      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
-    );
+    })).not.toThrow();
   });
 
-  it('rejects partial GitHub App credentials instead of silently falling back', () => {
+  it('boots core HTTP with a partial GitHub App pair while the GitHub provider remains unavailable', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
       GITHUB_PRIVATE_KEY: undefined,
-      GITHUB_TOKEN: 'github-token-test-value',
-    })).toThrow('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+      GITHUB_TOKEN: undefined,
+    })).not.toThrow();
   });
 
   it('rejects malformed service and callback URLs', () => {
