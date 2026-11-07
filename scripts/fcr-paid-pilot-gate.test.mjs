@@ -11,13 +11,15 @@ const valid = () => ({
   delivery: { executionId, status: 'completed', artifactDigest: digest }
 });
 
-test('accepts a non-chargeable completed sandbox pilot with matching receipt', () => {
+test('accepts a non-chargeable sandbox evidence candidate without claiming verification', () => {
   const result = assessPilotExecution(valid());
   assert.equal(result.allowed, true);
   assert.equal(result.receipt.executionId, executionId);
   assert.equal(result.receipt.paymentStatus, 'not_charged');
   assert.equal(result.receipt.productionAuthorized, false);
   assert.equal(result.receipt.independentlyVerified, false);
+  assert.equal(result.receipt.evidenceOrigin, 'caller_supplied_unverified');
+  assert.equal(result.receipt.deliveryVerified, false);
 });
 test('rejects missing authorization', () => {
   assert.deepEqual(assessPilotExecution({ ...valid(), authorized: false }), { allowed: false, reason: 'AUTHORIZATION_REQUIRED' });
