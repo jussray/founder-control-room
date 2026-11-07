@@ -58,3 +58,22 @@ test('keeps the legacy remote MCP static token optional in the real Worker regis
   assert.equal(registry.optional.includes('FCR_REMOTE_MCP_READ_TOKEN'), true);
   assert.equal(registry.required.includes('FCR_REMOTE_MCP_READ_TOKEN'), false);
 });
+
+test('ignores closing brackets inside TOML comments while parsing secret arrays', () => {
+  const source = `
+[secrets]
+required = [
+  # explanatory comment containing a ] character must not close the array
+  "BOOT_REQUIRED",
+]
+
+optional = [
+  "LEGACY_COMPAT_TOKEN",
+]
+`;
+
+  const registry = parseWranglerSecretRegistry(source);
+
+  assert.deepEqual(registry.required, ['BOOT_REQUIRED']);
+  assert.deepEqual(registry.optional, ['LEGACY_COMPAT_TOKEN']);
+});
