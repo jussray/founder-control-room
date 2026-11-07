@@ -106,6 +106,39 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_at: ${{ env.EXPIRES_AT }}
 
+      # A failed create stays red. Read back only enough metadata to distinguish
+      # an already-present PR branch from an absent branch or provider outage.
+      - name: Diagnose rejected Neon branch create without masking failure
+        if: failure() && steps.neon_scope.outputs.needs_neon == 'true' && steps.create_neon_branch.outcome == 'failure'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          # The API response, token and connection URLs are never printed.
+          http_status="$(curl --silent --show-error --max-time 20 \
+            --output "$response_file" --write-out '%{http_code}' \
+            --header 'Accept: application/json' \
+            --header "Authorization: Bearer ${NEON_API_KEY}" \
+            "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" || true)"
+          if [ "$http_status" != 200 ]; then
+            echo "::error title=Neon branch readback unavailable::Status ${http_status}; create rejection is still blocking."
+            exit 1
+          fi
+          if jq -e --arg name "preview/pr-${PR_NUMBER}" \
+            '.branches | if type == "array" then any(.[]; .name == $name) else false end' \
+            "$response_file" >/dev/null; then
+            echo "::error title=Existing Neon preview requires reconciliation::PR branch exists; the create action failed and no migration proof has run."
+          else
+            echo "::error title=Neon preview absent after failed create::Inspect provider limits or permissions; no preview was provisioned."
+          fi
+          # No successful fallback, deletion, or secret-bearing output.
+          exit 1
+
       - name: Verify branch creation result
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
