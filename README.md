@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
+
+The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list after any human authentication notice, validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
+
+The existing exact-current-main founder approval requirement, bounded removal of the stale undeclared `CF_API_TOKEN` plaintext binding, strict post-deployment binding-type check, and direct API + public Pages identity proofs remain mandatory. No value migration or secret rotation is authorized by this candidate; the canonical Worker Reconcile workflow is the only approved execution path for legacy-binding removal.
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
