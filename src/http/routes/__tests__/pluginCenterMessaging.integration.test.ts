@@ -289,6 +289,21 @@ describe('GET /plugin-center/messaging/ai-inbox', () => {
 
 
 describe('scoped outbound Gmail replies', () => {
+  it('does not allow a partially configured business Gmail scope to fall back to an arbitrary project', async () => {
+    mockGmailReadStatus.mockReturnValue({
+      configured: false, expectedAccount: 'founder@example.com',
+      projectSlug: null, labelId: 'Label_business',
+      missing: ['FCR_GMAIL_INBOX_PROJECT_SLUG'],
+    });
+    const response = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ projectSlug: 'sekret-bip' }));
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+
+
   it('rejects an unrelated business project before reserving a send', async () => {
     const response = await request(app()).post('/plugin-center/messaging/reply')
       .send(approvedEmailRequest({ projectSlug: 'sekret-bip' }));
