@@ -48,9 +48,14 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(preflightStep).toContain('npx --yes wrangler@4.110.0 secret list');
     expect(preflightStep).toContain('--config wrangler.worker.toml');
     expect(preflightStep).toContain('--format json');
-    expect(preflightStep).toContain("config.get('secrets', {}).get('required', [])");
+    expect(preflightStep).toContain("names = config.get('secrets', {}).get('required')");
     expect(preflightStep).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
-    expect(preflightStep).toContain('missing = sorted(required - workflow_written - present)');
+    expect(preflightStep).toContain('len(set(names)) != len(names)');
+    expect(preflightStep).toContain('required = set(names) - workflow_written');
+    expect(preflightStep).toContain('missing = sorted(required - present)');
+    expect(preflightStep).toContain('contains_stale_cf_api_token(config)');
+    expect(preflightStep).toContain("if not isinstance(observed, list)");
+    expect(preflightStep).toContain('node scripts/verify-worker-binding-types.mjs');
     expect(preflightStep).toContain('sys.exit(1)');
     expect(preflightStep).not.toContain('wrangler secret get');
     expect(preflightStep).not.toContain('wrangler secret put');
