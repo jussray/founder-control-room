@@ -3,9 +3,18 @@ import {
   checkSecretRotationStatus,
   daysUntilExpiry,
   verifySecretsTableExists,
+  createSupabaseAdmin,
 } from '../secret-rotation-worker.js';
 
 describe('secret-rotation', () => {
+  it('constructs the monitoring client from the canonical FCR Worker SUPABASE_URL binding', () => {
+    const admin = createSupabaseAdmin({
+      SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'test-only-service-role',
+    });
+    expect(typeof admin.from).toBe('function');
+  });
+
   it('calculates days until expiry correctly', () => {
     const created = new Date();
     created.setDate(created.getDate() - 30);
