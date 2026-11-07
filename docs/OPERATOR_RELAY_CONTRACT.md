@@ -88,6 +88,14 @@ When the founder says, for example, `tell Claude to build this`, `ask Gemini to 
 
 If the target operator runtime is unavailable or unauthenticated, FCR must return a precise blocked state. It must never silently substitute a different provider or a different role and claim that the requested operator answered.
 
+## Restricted-context dispatch boundary (2026-10-13)
+
+`src/lib/operatorRelayDispatch.ts` must enforce `relayMayDispatch` before selecting **any** provider, injected adapter, or custom operator handler. The shared gate rejects `restricted` relay packets and malformed authority, even with a hash-valid request. The HTTP route returns `403 relay_disclosure_denied` without passing protected context to the adapter.
+
+Existing `public` and `internal` relay paths remain available subject to existing runtime and spend controls. Do **not** infer that `internal` payloads are universally safe: sensitivity is supplied by the caller, and a SHA256 request hash binds bytes, not owner consent, trusted data classification, signed NDA status, model training/retention obligations, or recipient-specific approval. Treat `CONFIDENTIAL` data as `restricted` until a separately authorized and verified release policy exists.
+
+This is defense in depth, **not** complete NDA or confidentiality enforcement. Trusted classification, release approvals, provider terms, output/log handling, and cross-tenant boundaries remain independent verification gates. Read `.claude/skills/confidentiality-gate/SKILL.md` and `docs/REPOSITORY_PRIVACY_PROGRAM.md`. Never place signed agreements, protected prompts, or proprietary source in public GitHub.
+
 ## Proof gate
 
 The bridge is not proven by packet validation alone. Completion requires:

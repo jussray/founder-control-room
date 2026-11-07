@@ -3,6 +3,8 @@ import express from 'express';
 import { chromium } from 'playwright';
 import { runCouncilRound } from '../dist/lib/councilRound.js';
 import { buildOperatorRelayResponse } from '../dist/lib/operatorRelayProviderResult.js';
+import { createOperatorRelayRouter } from '../dist/http/routes/operatorRelay.js';
+import { OPERATOR_RELAY_REQUEST_CONTRACT, operatorRelayRequestHash, relayContextFingerprint } from '../dist/lib/operatorRelay.js';
 
 const seen = [];
 const adapter = (label, evidenceRef) => async (request) => {
@@ -24,6 +26,7 @@ const adapters = {
 
 const app = express();
 app.use(express.json());
+app.use(createOperatorRelayRouter(adapters));
 app.get('/', (_req, res) => res.type('html').send('<!doctype html><title>Council relay proof</title><main>Council relay proof</main>'));
 app.post('/proof', async (req, res) => {
   const row = await runCouncilRound({
@@ -71,11 +74,72 @@ try {
   for (let i = 1; i < hops.length; i += 1) assert.equal(hops[i].inputSha256, hops[i - 1].answerSha256);
   assert.equal(hops.every((hop) => hop.liveProviderEvidence === false), true);
 
+  // Synthetic-only confidentiality attack, executed through a real Chromium
+  // fetch into the compiled FCR HTTP router. A valid hash does not authorize
+  // dispatching restricted data to even a configured/custom peer adapter.
+  const syntheticCanary = 'SYNTHETIC_RESTRICTED_DISPATCH_TEST_NOT_A_SECRET';
+  const sourceRef = 'synthetic:playwright-confidentiality-proof';
+  const now = Date.now();
+  const baseRelay = {
+    contract: OPERATOR_RELAY_REQUEST_CONTRACT,
+    relayId: 'relay-confidentiality-browser',
+    fromOperator: 'codex',
+    toOperator: 'claude-code',
+    capability: 'propose',
+    goal: 'Prove synthetic restricted material stays inside the source runtime.',
+    context: {
+      summary: syntheticCanary,
+      sourceRef,
+      sourceFingerprint: relayContextFingerprint(syntheticCanary, sourceRef),
+    },
+    authority: {
+      externalWrite: false,
+      merge: false,
+      deploy: false,
+      publish: false,
+      providerMutation: false,
+    },
+    sensitivity: 'restricted',
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 60_000).toISOString(),
+  };
+  const restricted = { ...baseRelay, requestHash: operatorRelayRequestHash(baseRelay) };
+  const beforeDenied = seen.length;
+  const blocked = await page.evaluate(async (payload) => {
+    const response = await fetch('/api/operator-relay', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { status: response.status, cacheControl: response.headers.get('cache-control'), body: await response.json() };
+  }, restricted);
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.code, 'relay_disclosure_denied');
+  assert.equal(blocked.cacheControl, 'no-store');
+  assert.equal(seen.length, beforeDenied, 'restricted content must never reach the injected peer adapter');
+  assert.equal(seen.some((entry) => entry.context.includes(syntheticCanary)), false);
+
+  const allowedBase = { ...baseRelay, relayId: 'relay-internal-browser', sensitivity: 'internal' };
+  const internal = { ...allowedBase, requestHash: operatorRelayRequestHash(allowedBase) };
+  const allowed = await page.evaluate(async (payload) => {
+    const response = await fetch('/api/operator-relay', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { status: response.status, body: await response.json() };
+  }, internal);
+  assert.equal(allowed.status, 200, 'ordinary internal relay must remain functional');
+  assert.equal(allowed.body.status, 'completed');
+  assert.equal(seen.length, beforeDenied + 1);
+
   console.log(JSON.stringify({
     contract: 'fcr/live-council-browser-proof@v1',
     status: 'PASS',
     witness: 'browser_functional',
     liveProviderProof: false,
+    restrictedRelay: { httpStatus: blocked.status, code: blocked.body.code, adapterCalls: 0 },
+    internalRelay: { httpStatus: allowed.status, adapterCalls: 1 },
     sourceRef: result.body.transcript.sourceRef,
     chain: seen.map(({ source, target }) => `${source}>${target}`),
   }, null, 2));
