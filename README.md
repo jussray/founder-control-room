@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 2, 2026: project-owned Monday founder orientation candidate
+
+Existing PR #894 is the carrier for FCR's Monday 08:00 America/New_York founder orientation. It reuses the single per-minute Cloudflare Worker scheduler and adds no ChatGPT automation slot or competing cron owner. Verification freshness is measured from the repository observation timestamp (scanned_at), not packet ingestion time, so delayed stale evidence cannot become current merely by arriving late; invalid and future observation times fail closed to UNKNOWN.
+
+This remains source-candidate truth only until exact-head CI and Playwright pass, the protected migration is applied through the normal release path, the current Worker is deployed with its project-scoped email binding, and a real scheduled receipt is observed. It grants no automatic merge, deploy, publication, provider mutation, or cross-project authority.
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
