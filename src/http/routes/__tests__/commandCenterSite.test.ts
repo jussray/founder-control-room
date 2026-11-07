@@ -30,9 +30,7 @@ const jwt = (sub: string, overrides: Record<string, unknown> = {}) =>
   'header.' + Buffer.from(JSON.stringify({
     iss: 'https://example.supabase.co/auth/v1',
     aud: 'authenticated',
-    resource: COMMAND_CENTER_SITE_RESOURCE,
     client_id: 'chatgpt-command-center',
-    scope: 'openid',
     exp: Math.floor(Date.now() / 1000) + 3600,
     sub,
     ...overrides,
@@ -74,7 +72,7 @@ beforeEach(() => {
     }
     const predicates: Array<[string, unknown]> = [];
     const rows = () => table === 'founder_users'
-      ? [{ email: 'owner@example.test' }]
+      ? [{ user_id: OWNER }]
       : table === 'fcr_public_memberships' ? state.memberships : state.projects;
     const selected = () => rows().filter(row => predicates.every(([key, value]) => (row as Record<string, unknown>)[key] === value));
     const query = {
@@ -105,8 +103,9 @@ describe('command center Site authorization membrane', () => {
   });
   it('requires resource-bound, provider-verified bearer authentication', async () => {
     expect((await request(app()).get('/site/command-center/bootstrap')).status).toBe(401);
-    expect((await get(USER_A, { resource: undefined })).status).toBe(401);
+    expect((await get(USER_A, { resource: 'https://other.example/api' })).status).toBe(401);
     expect((await get(USER_A, { client_id: 'attacker' })).status).toBe(401);
+    expect((await get(USER_A, { aud: 'some-other-api' })).status).toBe(401);
     expect(state.getUser).not.toHaveBeenCalled();
   });
   it('returns only a first-party owner link for exact owner identity plus allowlist', async () => {
@@ -118,6 +117,13 @@ describe('command center Site authorization membrane', () => {
     expect(response.body).not.toHaveProperty('workspace');
     expect(state.from).toHaveBeenCalledWith('founder_users');
     expect(response.headers['cache-control']).toContain('no-store');
+  });
+  it('owner account without immutable founder_users binding is rejected', async () => {
+    state.from.mockImplementationOnce(() => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+    }));
+    const response = await get(OWNER);
+    expect(response.status).toBe(401);
   });
   it('customer A cannot read customer B or founder projects', async () => {
     const response = await get(USER_A);
