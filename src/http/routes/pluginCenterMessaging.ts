@@ -4,6 +4,7 @@ import {
   growthInboxReplyStatus,
   gmailInboxReadStatus,
   readGmailInbox,
+  probeGmailInbox,
   sendGmailReply,
   sendWhatsAppReply,
   type GrowthInboxReplyChannel,
@@ -270,6 +271,27 @@ pluginCenterMessagingRouter.get('/ai-inbox/status', (_req: FounderRequest, res) 
 });
 
 /** On-demand read, not a background monitor or provider mutation. */
+pluginCenterMessagingRouter.get('/ai-inbox/probe', async (req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  const status = gmailInboxReadStatus();
+  if (!status.configured) {
+    return res.status(503).json({ error: 'GMAIL_INBOX_NOT_CONFIGURED', missing: status.missing });
+  }
+  if (text(req.query.projectSlug) !== status.projectSlug) {
+    return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
+  }
+  try {
+    const probe = await probeGmailInbox();
+    if (probe.accountId !== status.expectedAccount || probe.projectSlug !== status.projectSlug
+      || probe.labelId !== status.labelId) {
+      return res.status(502).json({ error: 'GMAIL_INBOX_PROVIDER_SCOPE_MISMATCH' });
+    }
+    return res.json(probe);
+  } catch (error) {
+    return res.status(502).json({ error: safeErrorCode(error) });
+  }
+});
+
 pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) => {
   res.set('Cache-Control', 'no-store');
   const status = gmailInboxReadStatus();
@@ -499,6 +521,21 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
       });
     } catch (providerError) {
       const code = safeErrorCode(providerError);
+      // Gmail may have accepted the send, even if its response or readback
+      // was lost. Database status remains pending (valid ledger state) so the
+      // exact idempotency key cannot be retried as a fresh message.
+      if (requestedChannel === 'email'
+        && (code === 'GMAIL_SEND_OUTCOME_UNKNOWN'
+          || code === 'GMAIL_SEND_RECEIPT_INVALID'
+          || code === 'GMAIL_SENDER_FINGERPRINT_MISMATCH')) {
+        return res.status(502).json({
+          error: 'GMAIL_SEND_OUTCOME_UNKNOWN',
+          status: 'unknown',
+          executionId,
+          replayBlocked: true,
+          reconciliationRequired: true,
+        });
+      }
       const audited = await finishExecution(executionId, 'failed', {
         contract: CONTRACT,
         channel: requestedChannel,
