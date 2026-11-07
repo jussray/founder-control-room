@@ -521,6 +521,10 @@ The proof lane therefore treats Cloudflare secret enumeration as an observation 
 
 The same separation applies after secret presence is observed. `MODEL_API_KEY` present is only configuration evidence. A live Muse claim additionally requires the exact deployed FCR runtime and one bounded relay whose returned evidence reference is tied to the actual provider response. Council residency, provider availability, model naming, secret-name declaration, secret presence, deployment identity, and invocation outcome are separate facts with separate freshness.
 
+## Bottleneck classification staleness
+
+A bottleneck classification is a current-state claim and can go stale. A `VERIFIED_BOTTLENECK` recorded before a proof, route, or authority change must be re-classified before it drives the next action. `HOLD` and `STOP` apply only to the dependent claim or action. Proof freshness and authority freshness are separate windows, and an old green proof must not freeze unrelated capabilities that retain current evidence.
+
 ## Rollback
 
 The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
