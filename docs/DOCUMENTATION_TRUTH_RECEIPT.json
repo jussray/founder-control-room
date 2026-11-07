@@ -385,6 +385,24 @@
       ]
     },
     {
+      "path": "src/http/routes/publicMcp.ts",
+      "claims": [
+        "`src/http/routes/publicMcp.ts` must authenticate the exact public-MCP OAuth bearer before constructing tenant data access, then execute membership/project SELECTs through a bearer-scoped publishable-key Supabase client so database RLS remains load-bearing; explicit tenant/project filters stay defense-in-depth and the service-role client must not serve public tenant reads."
+      ]
+    },
+    {
+      "path": "src/lib/supabaseAuthClient.ts",
+      "claims": [
+        "`src/lib/supabaseAuthClient.ts` may create a per-request bearer-scoped public data client only from the publishable/anon key, must reject empty or whitespace bearer values, and must never substitute or expose the service-role credential."
+      ]
+    },
+    {
+      "path": "docs/implementation/FCR_PUBLIC_MCP_PHASE1.md",
+      "claims": [
+        "`docs/implementation/FCR_PUBLIC_MCP_PHASE1.md` must keep public MCP disabled until the tenant migration, RLS matrix, OAuth client setup, deployment identity, and live client invocation are independently proven; source-level bearer-scoped reads do not prove those runtime gates."
+      ]
+    },
+    {
       "path": "wrangler.email.toml",
       "claims": [
         "`wrangler.email.toml` must declare the review-email Worker identity, account, entrypoint, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and exactly one top-level `addresses` value `review@foundercontrolroom.org`; this is desired state for Wrangler reconciliation, not proof of provider readback or runtime invocation."

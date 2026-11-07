@@ -5,8 +5,7 @@
  */
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { supabaseAuth } from '../../lib/supabaseAuthClient.js';
-import { supabase } from '../../lib/supabaseClient.js';
+import { createSupabaseBearerClient, supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { authenticatePublicMcp, FCR_PUBLIC_MCP_RESOURCE } from '../../mcp/publicMcpAuth.js';
 import {
   PublicMcpAccessDenied,
@@ -82,9 +81,13 @@ const rpcError = (id: unknown, code: number, message: string) => ({
 });
 
 // Deliberately does NOT read the founder projects table or execute providers.
-const tenantReader: PublicMcpTenantReader = {
+// Tenant SELECTs run as the verified OAuth bearer so Postgres RLS, not the
+// service-role key, is the load-bearing data-isolation membrane.
+function tenantReaderForBearer(bearer: string): PublicMcpTenantReader {
+  const publicData = createSupabaseBearerClient(bearer);
+  return {
   async listMemberships(userId) {
-    const { data, error } = await supabase.from('fcr_public_memberships')
+    const { data, error } = await publicData.from('fcr_public_memberships')
       .select('tenant_id,user_id,status')
       .eq('user_id', userId).eq('status', 'active').limit(21);
     if (error) throw new Error('public_mcp_membership_read_unavailable');
@@ -93,7 +96,7 @@ const tenantReader: PublicMcpTenantReader = {
     }));
   },
   async listProjects(tenantId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
+    const { data, error } = await publicData.from('fcr_public_projects')
       .select('id,tenant_id,name,status,observed_at')
       .eq('tenant_id', tenantId).order('id').limit(51);
     if (error) throw new Error('public_mcp_projects_read_unavailable');
@@ -103,7 +106,7 @@ const tenantReader: PublicMcpTenantReader = {
     }));
   },
   async getProject(tenantId, projectId) {
-    const { data, error } = await supabase.from('fcr_public_projects')
+    const { data, error } = await publicData.from('fcr_public_projects')
       .select('id,tenant_id,name,status,observed_at')
       .eq('tenant_id', tenantId).eq('id', projectId).maybeSingle();
     if (error) throw new Error('public_mcp_project_read_unavailable');
@@ -112,7 +115,8 @@ const tenantReader: PublicMcpTenantReader = {
       status: data.status, observedAt: data.observed_at,
     } : null;
   },
-};
+  };
+}
 
 export const publicMcpRouter = Router();
 const publicMcpRateLimit = rateLimit({
@@ -174,6 +178,7 @@ publicMcpRouter.post('/mcp/public', publicMcpRateLimit, async (req, res) => {
     return res.status(400).json(rpcError(id, -32602, 'Invalid arguments'));
   }
   try {
+    const tenantReader = tenantReaderForBearer(token);
     let output: unknown;
     if (name === 'fcr_customer_start' && Object.keys(args).length === 0) {
       output = {
