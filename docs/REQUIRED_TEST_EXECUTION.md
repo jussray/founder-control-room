@@ -20,7 +20,7 @@ Merge, deployment, and production authority remain independent and always requir
 
 ## Read-only Autoresearch CI pilot
 
-The existing CI Test and Required Gate lanes remain authoritative. The Autoresearch pilot runs \`node --test test/ci-autoresearch.test.mjs\` inside the existing test-discovery job and offers the offline evaluator \`node scripts/ci-autoresearch.mjs evidence.json\`. It does not change the branch protection, add required checks, edit source automatically, create PRs, run paid models, publish, merge, or deploy.
+The existing CI Test and Required Gate lanes remain authoritative. The Autoresearch pilot runs `node --test test/ci-autoresearch.test.mjs` inside the existing test-discovery job and offers the offline evaluator `node scripts/ci-autoresearch.mjs evidence.json`. It does not change the branch protection, add required checks, edit source automatically, create PRs, run paid models, publish, merge, or deploy.
 
 An evidence input must contain at least three complete, exact-head CI run receipts for the baseline and candidate, with comparable runner and test-suite identity, required job statuses, real execution timings, and test/security/authority gate results. A single run, missing check, skipped test, lower test count, missing witness, or incompatible runner blocks or defers the evaluation. Evaluation results are **inferences from supplied input**, not independently verified GitHub proof. The synthetic unit-test fixtures demonstrate algorithm behavior only.
 
