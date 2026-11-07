@@ -83,6 +83,7 @@ type GmailMessage = {
   threadId?: unknown;
   payload?: { headers?: GmailHeader[] };
   internalDate?: unknown;
+  labelIds?: unknown;
 };
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -313,6 +314,7 @@ export async function readGmailInbox(
   listParams.append('labelIds', status.labelId);
   if (options.pageToken) listParams.set('pageToken', options.pageToken);
   const listing = await gmailJson(fetchImpl, token, GMAIL_API + '/messages?' + listParams.toString());
+  if (listing.messages !== undefined && !Array.isArray(listing.messages)) throw new Error('GMAIL_INBOX_LIST_INVALID');
   const rows: unknown[] = Array.isArray(listing.messages) ? listing.messages : [];
   if (rows.length > maxResults) throw new Error('GMAIL_INBOX_LIST_INVALID');
 
@@ -336,6 +338,9 @@ export async function readGmailInbox(
     ) as GmailMessage;
     if (metadata.id !== id || metadata.threadId !== listedThread) {
       throw new Error('GMAIL_INBOX_MESSAGE_MISMATCH');
+    }
+    if (!Array.isArray(metadata.labelIds) || !metadata.labelIds.includes(status.labelId) || !metadata.labelIds.includes('INBOX')) {
+      throw new Error('GMAIL_INBOX_LABEL_SCOPE_MISMATCH');
     }
     const millis = typeof metadata.internalDate === 'string' && /^\d{13}$/.test(metadata.internalDate)
       ? Number(metadata.internalDate)
@@ -402,6 +407,10 @@ export async function sendGmailReply(
   const originalId = typeof original.id === 'string' ? original.id : '';
   const threadId = typeof original.threadId === 'string' ? original.threadId : '';
   if (originalId !== messageId || !threadId) throw new Error('GMAIL_REPLY_TARGET_UNVERIFIED');
+  const restrictedLabel = env('FCR_GMAIL_INBOX_LABEL_ID');
+  if (restrictedLabel && (!Array.isArray(original.labelIds) || !original.labelIds.includes(restrictedLabel))) {
+    throw new Error('GMAIL_REPLY_LABEL_SCOPE_MISMATCH');
+  }
 
   const headers = original.payload?.headers;
   const recipient = emailFromHeader(header(headers, 'Reply-To') ?? header(headers, 'From') ?? '');
