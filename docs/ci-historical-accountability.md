@@ -18,8 +18,7 @@ This record is append-only in meaning: a successor's green checks do not rewrite
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Founder Repo Cycle (run 42340569170) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Growth Opportunity Intelligence Proof (run 42340569134) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | CI (run 42340569140) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
-| `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Repo Reality Evidence (run 42340569218) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
-
+| `0684cd93a1628cb29171d5331b5e2a4bf8842400` 
 ## Agent accountability
 
 - Commit `346829f4e955381be4cbaf1ee67ed1cd81949541` attributes its QuickScan optional-candidate TypeScript fix to Claude Haiku 5.5 as co-author. This is commit metadata, not independent proof of agent execution or complete verification.
