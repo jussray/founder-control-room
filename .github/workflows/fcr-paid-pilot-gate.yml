@@ -1,0 +1,31 @@
+name: FCR Non-Chargeable Pilot Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/fcr-paid-pilot-gate.mjs'
+      - 'scripts/fcr-paid-pilot-gate.test.mjs'
+      - '.github/workflows/fcr-paid-pilot-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fcr-paid-pilot-gate.mjs'
+      - 'scripts/fcr-paid-pilot-gate.test.mjs'
+      - '.github/workflows/fcr-paid-pilot-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact event commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Run sandbox-only pilot gate tests
+        run: node --test scripts/fcr-paid-pilot-gate.test.mjs
