@@ -33,23 +33,59 @@ export function auditLedger(rows, runs, expectedSha) {
   return errors;
 }
 
+async function githubGet(path, token) {
+  const response = await fetch(`https://api.github.com${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+  });
+  if (!response.ok) throw new Error(`GitHub API ${response.status} for ${path}`);
+  return response.json();
+}
+
+async function allPages(path, token) {
+  const results = [];
+  for (let page = 1; page <= 30; page++) {
+    const separator = path.includes('?') ? '&' : '?';
+    const batch = await githubGet(`${path}${separator}per_page=100&page=${page}`, token);
+    if (!Array.isArray(batch)) throw new Error('Expected GitHub array response');
+    results.push(...batch);
+    if (batch.length < 100) return results;
+  }
+  throw new Error('Pagination limit exceeded; fail closed');
+}
+
+export function auditAllCommits(rows, history) {
+  const errors = [];
+  const report = [];
+  for (const { sha, runs } of history) {
+    const failures = runs.filter(r => ['failure', 'cancelled'].includes(r.conclusion));
+    const commitErrors = auditLedger(rows, runs, sha);
+    report.push({ sha, runs: runs.length, failures: failures.filter(r => r.conclusion === 'failure').length,
+      cancelled: failures.filter(r => r.conclusion === 'cancelled').length,
+      pending: runs.filter(r => r.status !== 'completed').length, errors: commitErrors });
+    errors.push(...commitErrors.map(error => `${sha.slice(0, 12)} ${error}`));
+  }
+  return { report, errors };
+}
+
 async function main() {
-  const sha = process.env.HISTORICAL_SHA;
   const repo = process.env.GITHUB_REPOSITORY;
   const token = process.env.GITHUB_TOKEN;
-  if (!sha || !/^[a-f0-9]{40}$/.test(sha) || !/^[\w.-]+\/[\w.-]+$/.test(repo || '') || !token) throw new Error('Missing required audit environment');
-  const markdown = readFileSync('docs/ci-historical-accountability.md', 'utf8');
-  const rows = parseLedger(markdown);
-  const url = `https://api.github.com/repos/${repo}/actions/runs?head_sha=${sha}&per_page=100`;
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
-  if (!response.ok) throw new Error(`GitHub run query failed: ${response.status}`);
-  const payload = await response.json();
-  if (payload.total_count > 100) throw new Error('Pagination required: fail closed');
-  const runs = payload.workflow_runs || [];
-  if (!runs.length) throw new Error('No historical runs returned: fail closed');
-  const errors = auditLedger(rows, runs, sha);
+  const pr = process.env.PR_NUMBER;
+  if (!/^[\\w.-]+\\/[\\w.-]+$/.test(repo || '') || !token || !/^[1-9]\\d*$/.test(pr || ''))
+    throw new Error('GITHUB_REPOSITORY, GITHUB_TOKEN and PR_NUMBER required');
+  const rows = parseLedger(readFileSync('docs/ci-historical-accountability.md', 'utf8'));
+  const commits = await allPages(`/repos/${repo}/pulls/${pr}/commits`, token);
+  if (!commits.length) throw new Error('PR commit list empty; fail closed');
+  const history = [];
+  for (const commit of commits) {
+    const sha = commit.sha;
+    if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Malformed PR commit SHA');
+    const runs = await allPages(`/repos/${repo}/actions/runs?head_sha=${sha}`, token);
+    history.push({ sha, runs: runs.filter(r => r.head_sha === sha) });
+  }
+  const { report, errors } = auditAllCommits(rows, history);
+  console.log(JSON.stringify({ pr: Number(pr), commits: report.length, report, errors: errors.length }, null, 2));
   for (const error of errors) console.error(error);
-  console.log(JSON.stringify({ historicalSha: sha, observedRuns: runs.length, failuresAndCancellations: runs.filter(r => ['failure', 'cancelled'].includes(r.conclusion)).length, errors: errors.length }));
   if (errors.length) process.exitCode = 1;
 }
 if (process.argv[1]?.endsWith('ci-history-audit.mjs')) main().catch(e => { console.error(e); process.exitCode = 1; });
