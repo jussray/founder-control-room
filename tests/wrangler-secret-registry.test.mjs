@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { parseWranglerSecretRegistry } from '../scripts/wrangler-secret-registry.mjs';
 
 test('parses required and optional Worker secret registries without crossing section boundaries', () => {
@@ -48,4 +49,12 @@ test('fails closed when either registry block is missing or malformed', () => {
     () => parseWranglerSecretRegistry('[secrets]\nrequired = ["ONLY_REQUIRED"]\n'),
     /missing \[secrets\]\.optional registry/,
   );
+});
+
+test('keeps the legacy remote MCP static token optional in the real Worker registry', () => {
+  const wrangler = readFileSync(new URL('../wrangler.worker.toml', import.meta.url), 'utf8');
+  const registry = parseWranglerSecretRegistry(wrangler);
+
+  assert.equal(registry.optional.includes('FCR_REMOTE_MCP_READ_TOKEN'), true);
+  assert.equal(registry.required.includes('FCR_REMOTE_MCP_READ_TOKEN'), false);
 });
