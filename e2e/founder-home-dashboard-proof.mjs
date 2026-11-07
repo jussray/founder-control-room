@@ -250,7 +250,9 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await page.locator('#project-list .card').count()) === FIXTURE.projects.length, 'Active projects lists every served project through the real projects module');
     assert((await page.locator('[data-home-focus] .focus-item').count()) === expectedInFlight, `Today's focus lists the ${expectedInFlight} in-flight missions`);
     assert((await page.locator('[data-home-signals] .signal').count()) === Math.min(6, LIVE_SIGNALS.length), 'Live signals shows the latest six non-audit events');
-    assert((await page.locator('.home-tiles .tile').count()) === 8, 'eight section tiles render');
+    assert((await page.locator('.home-tiles .tile').count()) === 9, 'nine section tiles render');
+    assert((await page.locator('.home-tiles a.tile[href="/control-room/?tab=truth-seo"]').count()) === 1,
+      'Search & Evidence tile routes to the founder-authenticated canonical Search Console panel');
 
     await noOverflow(page, 'desktop');
     await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop.png'), fullPage: true });
