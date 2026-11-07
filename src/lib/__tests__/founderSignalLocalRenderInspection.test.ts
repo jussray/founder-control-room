@@ -15,7 +15,7 @@ function syntheticMp4Signature(): Buffer {
   return bytes; // signature-only fixture; NOT a playable video
 }
 const sha = (value: Buffer) => createHash('sha256').update(value).digest('hex');
-function fixture(outputPath: string, bytes: Buffer): FfmpegRenderResult {
+function fixture(outputPath: string, bytes: Buffer): Extract<FfmpegRenderResult, { kind: 'RENDERED' }> {
   return {
     kind:'RENDERED',contract:FFMPEG_RENDER_CONTRACT,
     executionScope:FFMPEG_RENDER_EXECUTION_SCOPE,outputPath,
@@ -82,7 +82,7 @@ describe('FSE local FFmpeg rendered-byte readback',()=>{
     const missing='/not-a-real-dir/file.mp4';
     const mp4=syntheticMp4Signature();
     const invalid=await inspectFounderSignalLocalFfmpegRender(
-      {...fixture(missing,mp4),publishAuthority:true},{trustedOutputRoot:tmpdir()});
+      ({...fixture(missing,mp4),publishAuthority:true} as unknown as FfmpegRenderResult),{trustedOutputRoot:tmpdir()});
     expect(invalid.reason).toBe('RENDER_RECEIPT_NOT_ACCEPTABLE');
     const unrendered=await inspectFounderSignalLocalFfmpegRender(
       {kind:'CAPABILITY_UNAVAILABLE',reason:'none'},{trustedOutputRoot:tmpdir()});
