@@ -34,14 +34,16 @@ def check(r):
             for k in ("identity", "action", "authority"):
                 if not w.get(k):
                     errs.append(f"WHO.{role}: PROVEN missing {k} binding")
+            if role in ("EXECUTED", "VERIFIED") and w.get("actor") in STATUSES:
+                errs.append(f"WHO.{role}: actor {w['actor']!r} is a status word, not an identity")
 
     phase = r.get("phase", "DECLARE")
     if phase not in PHASES:
         errs.append(f"bad phase {phase}")
-    elif PHASES.index(phase) >= PHASES.index("ATTEMPT"):
+    elif PHASES.index(phase) >= PHASES.index("PERMIT"):
         pa = r.get("prospective_authority", {})
         if pa.get("status") != "PROVEN" or not pa.get("evidence"):
-            errs.append("acted (phase>=ATTEMPT) without PROVEN prospective authority -> BLOCKED")
+            errs.append("phase>=PERMIT without PROVEN prospective authority -> BLOCKED")
 
     state = r.get("state", "UNKNOWN")
     if state not in STATES:
