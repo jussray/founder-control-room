@@ -80,7 +80,7 @@ export function daysUntilExpiry(createdAt: string, rotatedAt: string | null): nu
 
 export function createSupabaseAdmin(env: SecretRotationEnv): SupabaseClient {
   return createClient(
-    requireBinding(env, 'NEXT_PUBLIC_SUPABASE_URL'),
+    requireBinding(env, 'SUPABASE_URL'),
     requireBinding(env, 'SUPABASE_SERVICE_ROLE_KEY'),
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
