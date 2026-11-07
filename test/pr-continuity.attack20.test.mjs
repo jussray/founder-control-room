@@ -227,16 +227,21 @@ test('CI-SKIP FCR03 production witness needs successful main deploy event', () =
   );
   assert.match(production, /^    environment: production$/m);
 });
-test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
-  const workflow = skipPolicyWorkflow('neon-pr-branches.yml');
-  const create = skipPolicyJob(workflow, 'create_neon_branch');
-  const cleanup = skipPolicyJob(workflow, 'delete_neon_branch');
-  assert.match(create, /github\.event\.action == 'opened'/);
-  assert.match(create, /github\.event\.action == 'synchronize'/);
-  assert.match(cleanup, /github\.event\.action == 'closed'/);
-  assert.match(cleanup, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(cleanup, /^    if: \|$/m);
-  assert.doesNotMatch(cleanup, /if: always\(\)/);
+test('CI-SKIP FCR04 Neon creation and deletion are event-specific, without broadening cleanup authority', () => {
+  const creation = skipPolicyWorkflow('neon-pr-branches.yml');
+  const cleanup = skipPolicyWorkflow('neon-pr-close-cleanup.yml');
+  assert.match(creation, /^  pull_request:\n    types: \[opened, reopened, synchronize\]$/m);
+  assert.match(cleanup, /^  pull_request:\n    types: \[closed\]$/m);
+  assert.doesNotMatch(creation, /^  delete_neon_branch:/m);
+  assert.doesNotMatch(cleanup, /^  create_neon_branch:/m);
+  const createJob = skipPolicyJob(creation, 'create_neon_branch');
+  const deleteJob = skipPolicyJob(cleanup, 'delete_neon_branch');
+  assert.match(createJob, /github\.event\.action == 'opened'/);
+  assert.match(createJob, /github\.event\.action == 'synchronize'/);
+  assert.match(deleteJob, /github\.event\.action == 'closed'/);
+  assert.match(deleteJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(deleteJob, /^    if: \|$/m);
+  assert.doesNotMatch(deleteJob, /if: always\(\)/);
 });
 test('CI-SKIP FCR05 separates PR contract from privileged main provenance without fake passes', () => {
   const main = skipPolicyWorkflow('main-release-provenance.yml');
