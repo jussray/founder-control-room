@@ -25,9 +25,10 @@ test('tenant authorization is immutable, constrained and explicitly empty by def
   assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*?to authenticated/);
 });
 
-test('migration has transactional guardrails and no public users policy', () => {
+test('migration is rollback-safe when executed inside the isolated Neon preview', () => {
   assert.match(sql.trimStart(), /^--/);
-  assert.match(sql, /\bbegin;/);
-  assert.match(sql, /\bcommit;/);
+  // Explicit COMMIT would escape the preview contract's enclosing rollback.
+  assert.doesNotMatch(sql, /^\s*begin\s*;/mi);
+  assert.doesNotMatch(sql, /^\s*commit\s*;/mi);
   assert.doesNotMatch(sql, /\bto authenticated\s+using\s*\(/);
 });
