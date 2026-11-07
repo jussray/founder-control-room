@@ -286,3 +286,15 @@ describe('GET /plugin-center/messaging/ai-inbox', () => {
     expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 });
+
+
+describe('scoped outbound Gmail replies', () => {
+  it('rejects an unrelated business project before reserving a send', async () => {
+    const response = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ projectSlug: 'sekret-bip' }));
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+});
