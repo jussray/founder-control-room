@@ -50,6 +50,15 @@ export interface GmailInboxReadStatus {
   missing: string[];
 }
 
+export interface GmailInboxProbeResult {
+  contract: 'fcr/gmail-inbox-probe@v1';
+  mode: 'observe_only';
+  providerObserved: true;
+  accountId: string;
+  projectSlug: string;
+  labelId: string;
+}
+
 export interface GmailInboxReadResult {
   accountId: string;
   projectSlug: string;
@@ -289,6 +298,36 @@ async function gmailJson(
  * A founder-triggered read of header metadata only, restricted to one explicitly
  * pinned account, project and custom business label. Never reads message bodies.
  */
+/** Checks pinned mailbox and custom label; does not read any messages. */
+export async function probeGmailInbox(
+  fetchImpl: FetchLike = fetch,
+): Promise<GmailInboxProbeResult> {
+  const status = gmailInboxReadStatus();
+  if (!status.configured || !status.expectedAccount || !status.projectSlug || !status.labelId) {
+    throw new Error('GMAIL_INBOX_NOT_CONFIGURED');
+  }
+  const token = await gmailAccessToken(fetchImpl);
+  const profile = await gmailJson(fetchImpl, token, GMAIL_API + '/profile');
+  const account = typeof profile.emailAddress === 'string'
+    ? profile.emailAddress.trim().toLowerCase()
+    : '';
+  if (account !== status.expectedAccount) throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  const label = await gmailJson(
+    fetchImpl, token, GMAIL_API + '/labels/' + encodeURIComponent(status.labelId),
+  );
+  if (label.id !== status.labelId || label.type !== 'user') {
+    throw new Error('GMAIL_INBOX_LABEL_SCOPE_MISMATCH');
+  }
+  return {
+    contract: 'fcr/gmail-inbox-probe@v1',
+    mode: 'observe_only',
+    providerObserved: true,
+    accountId: account,
+    projectSlug: status.projectSlug,
+    labelId: status.labelId,
+  };
+}
+
 export async function readGmailInbox(
   options: GmailInboxReadOptions = {},
   fetchImpl: FetchLike = fetch,
@@ -429,21 +468,33 @@ export async function sendGmailReply(
   ];
   const raw = `${rawHeaders.join('\r\n')}\r\n\r\n${body}\r\n`;
 
-  const sent = await gmailJson(fetchImpl, token, `${GMAIL_API}/messages/send`, {
-    method: 'POST',
-    body: JSON.stringify({ raw: base64Url(raw), threadId }),
-  });
+  // A failure across the send boundary may still mean Gmail accepted the
+  // message. Preserve the pending reservation until independent reconciliation.
+  let sent: Record<string, unknown>;
+  try {
+    sent = await gmailJson(fetchImpl, token, `${GMAIL_API}/messages/send`, {
+      method: 'POST',
+      body: JSON.stringify({ raw: base64Url(raw), threadId }),
+    });
+  } catch {
+    throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
+  }
   const sentId = typeof sent.id === 'string' ? sent.id : '';
   const sentThreadId = typeof sent.threadId === 'string' ? sent.threadId : '';
-  if (!sentId || sentThreadId !== threadId) throw new Error('GMAIL_SEND_RECEIPT_INVALID');
+  if (!sentId || sentThreadId !== threadId) throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
 
   const receiptParams = new URLSearchParams({ format: 'metadata' });
   receiptParams.append('metadataHeaders', 'From');
-  const receipt = await gmailJson(
-    fetchImpl,
-    token,
-    `${GMAIL_API}/messages/${encodeURIComponent(sentId)}?${receiptParams.toString()}`,
-  ) as GmailMessage;
+  let receipt: GmailMessage;
+  try {
+    receipt = await gmailJson(
+      fetchImpl,
+      token,
+      `${GMAIL_API}/messages/${encodeURIComponent(sentId)}?${receiptParams.toString()}`,
+    ) as GmailMessage;
+  } catch {
+    throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
+  }
   const receiptId = typeof receipt.id === 'string' ? receipt.id : '';
   const receiptThreadId = typeof receipt.threadId === 'string' ? receipt.threadId : '';
   const receiptSender = emailFromHeader(header(receipt.payload?.headers, 'From') ?? '');
