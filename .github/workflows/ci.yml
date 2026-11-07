@@ -154,8 +154,12 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
+      - name: Install PyYAML for workflow YAML guard
+        run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+      - name: Verify every workflow file parses as YAML
+        run: python3 scripts/verify_workflow_yaml.py .
       - name: Run Python unit tests
-        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
+        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity scripts.test_verify_workflow_yaml -v
 
   rls-contract:
     name: RLS migration contract
