@@ -4,16 +4,22 @@ const {
   mockStatus,
   mockSendGmailReply,
   mockSendWhatsAppReply,
+  mockGmailReadStatus,
+  mockReadGmailInbox,
   supabaseMock,
 } = vi.hoisted(() => ({
   mockStatus: vi.fn(),
   mockSendGmailReply: vi.fn(),
   mockSendWhatsAppReply: vi.fn(),
+  mockGmailReadStatus: vi.fn(),
+  mockReadGmailInbox: vi.fn(),
   supabaseMock: { from: vi.fn() },
 }));
 
 vi.mock('../../../lib/growthInboxReply.js', () => ({
   growthInboxReplyStatus: mockStatus,
+  gmailInboxReadStatus: mockGmailReadStatus,
+  readGmailInbox: mockReadGmailInbox,
   sendGmailReply: mockSendGmailReply,
   sendWhatsAppReply: mockSendWhatsAppReply,
 }));
@@ -74,6 +80,7 @@ function approvedEmailRequest(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGmailReadStatus.mockReturnValue({ configured: true, expectedAccount: 'founder@example.com', projectSlug: PROJECT_SLUG, labelId: 'Label_business', missing: [] });
   mockStatus.mockReturnValue({
     contract: 'fcr/growth-inbox-reply@v1',
     mode: 'draft_only',
@@ -238,5 +245,44 @@ describe('POST /plugin-center/messaging/reply', () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toContain('whatsappReplyToMessageId');
     expect(mockSendWhatsAppReply).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('GET /plugin-center/messaging/ai-inbox', () => {
+  it('never reads a mailbox when its label or account has not been explicitly configured', async () => {
+    mockGmailReadStatus.mockReturnValue({ configured: false, missing: ['FCR_GMAIL_INBOX_LABEL_ID'] });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=founder-control-room');
+    expect(response.status).toBe(503);
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+  });
+
+  it('blocks cross-project mailbox reads before provider access', async () => {
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=sekret-bip');
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+  });
+
+  it('returns metadata-only human-review decisions without dispatching an email', async () => {
+    mockReadGmailInbox.mockResolvedValue({
+      accountId: 'founder@example.com', projectSlug: PROJECT_SLUG, nextPageToken: null,
+      messages: [{
+        accountId: 'founder@example.com', projectSlug: PROJECT_SLUG,
+        providerMessageId: 'msg1', receivedAt: '2026-11-07T17:00:00Z',
+        from: 'Client <client@example.net>', subject: 'Re: Project update',
+        replySignal: true, automated: false,
+      }],
+    });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=founder-control-room&maxResults=5');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      contract: 'fcr/ai-inbox-observe@v1', mode: 'observe_only', readOnly: true,
+      decisions: [{ lane: 'reply_candidate', evidence: 'message_only', requiresHumanReview: true }],
+    });
+    expect(mockReadGmailInbox).toHaveBeenCalledWith({ maxResults: 5 });
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 });
