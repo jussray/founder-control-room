@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLedger, auditLedger } from './ci-history-audit.mjs';
+import { parseLedger, auditLedger, auditAllCommits } from './ci-history-audit.mjs';
 
 const sha = 'a'.repeat(40);
 const run = { id: 123, name: 'CI', head_sha: sha, conclusion: 'failure' };
@@ -27,4 +27,16 @@ test('duplicate ledger run IDs fail closed', () => {
 });
 test('malformed run IDs fail closed', () => {
   assert.ok(auditLedger(parseLedger(ledger.replace('run 123', 'run 0')), [run], sha).some(e => e.includes('MALFORMED_ENTRY')));
+});
+
+test('audits each PR commit independently and reports missing history', () => {
+  const otherSha = 'b'.repeat(40);
+  const history = [
+    { sha, runs: [run] },
+    { sha: otherSha, runs: [{ id: 999, name: 'Other', head_sha: otherSha, status: 'completed', conclusion: 'failure' }] }
+  ];
+  const result = auditAllCommits(parseLedger(ledger), history);
+  assert.equal(result.report.length, 2);
+  assert.ok(result.errors.some(e => e.includes('MISSING Other run 999')));
+  assert.equal(result.report[0].failures, 1);
 });
