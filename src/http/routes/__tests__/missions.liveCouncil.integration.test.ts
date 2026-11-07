@@ -102,6 +102,7 @@ describe('POST /missions/:missionId/council/run', () => {
       });
 
     expect(response.status).toBe(201);
+    expect(response.body.executionState).toBe('complete');
     expect(response.body.relay.transcript.humanRelay).toBe(false);
     expect(response.body.relay.transcript.sourceRef).toBe('founder-attested:claude-code');
     expect(runCouncilRoundMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -113,5 +114,79 @@ describe('POST /missions/:missionId/council/run', () => {
     const persisted = inserted as unknown as { transcript: { sourceRef: string; humanRelay: boolean } };
     expect(persisted.transcript.sourceRef).toBe('founder-attested:claude-code');
     expect(persisted.transcript.humanRelay).toBe(false);
+  });
+
+  it('returns 424 with a persisted receipt when a provider round is interrupted', async () => {
+    let inserted: Record<string, any> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') {
+        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }) }) }) };
+      }
+      if (table === 'missions') {
+        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: MISSION_ID, project_id: 'project-1' }, error: null }) }) }) };
+      }
+      if (table === 'council_conversations') {
+        return {
+          select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }) }) }),
+          insert: (row: Record<string, any>) => {
+            inserted = row;
+            return { select: () => ({ single: () => Promise.resolve({ data: { id: 'c-interrupted', ...row }, error: null }) }) };
+          },
+        };
+      }
+      return {};
+    });
+
+    runCouncilRoundMock.mockImplementation(async (input: any) => {
+      const row = {
+        mission_id: input.missionId,
+        round: input.round,
+        participants: ['fcr', ...input.seats.map((seat: any) => seat.operator)],
+        transcript: {
+          contract: 'fcr.council-round.v1',
+          goal: input.goal,
+          initiator: 'fcr',
+          sourceRef: input.sourceRef,
+          seedSha256: 'a'.repeat(64),
+          hops: [],
+          humanRelay: false,
+          state: 'interrupted',
+          nextSeatIndex: 0,
+          interruption: {
+            seatIndex: 0,
+            operator: 'codex',
+            reason: 'provider unavailable',
+            status: 'blocked',
+            requestHash: null,
+            responseHash: null,
+            evidenceRefs: [],
+            liveProviderEvidence: false,
+          },
+        },
+        outcome: 'interrupted at seat 0',
+      };
+      await input.persist(row);
+      return row;
+    });
+
+    const response = await request(app())
+      .post(`/missions/${MISSION_ID}/council/run`)
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        goal: 'Review the synthetic storyboard fixture.',
+        seed: 'Private review input stays behind founder authentication.',
+        capability: 'review',
+        participants: ['codex'],
+        sourceRef: 'founder-attested:bip-cloud',
+      });
+
+    expect(response.status).toBe(424);
+    expect(response.body.code).toBe('council_round_interrupted');
+    expect(response.body.executionState).toBe('interrupted');
+    expect(response.body.conversation.id).toBe('c-interrupted');
+    expect(response.body.conversation.transcript.state).toBe('interrupted');
+    expect(response.body.relay.transcript.state).toBe('interrupted');
+    expect((inserted as unknown as { transcript: { state: string } }).transcript.state).toBe('interrupted');
+    expect(runCouncilRoundMock).toHaveBeenCalledTimes(1);
   });
 });
