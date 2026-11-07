@@ -41,17 +41,23 @@ test('owner-like email never promotes another verified account', async () => {
 });
 test('resource, audience, scope, client, issuer and expiry must match exactly', async () => {
   const bad = [
-    { resource: 'https://evil.example' }, { resource: undefined },
+    { resource: 'https://evil.example' }, { aud: 'other-api' },
     { resource: COMMAND_CENTER_SITE_RESOURCE + '/extra' },
     { aud: 'authenticated', resource: 'https://evil.example' },
     { client_id: 'unknown-client' }, { exp: 999 },
-    { iss: 'https://evil.example' }, { scope: 'profile' }, { nbf: 4000 },
+    { iss: 'https://evil.example' }, { nbf: 4000 },
   ];
   for (const overrides of bad) {
     const h = harness();
     assert.equal(await resolveCommandCenterActor(token(CUSTOMER, overrides), config, h.verify, h.founderAllowlisted), null);
     assert.equal(h.calls.verified, 0);
   }
+});
+test('standard Supabase OAuth token without scope/resource is valid for exact registered client only', async () => {
+  const h = harness();
+  const actor = await resolveCommandCenterActor(token(CUSTOMER, { resource: undefined, scope: undefined }), config, h.verify, h.founderAllowlisted);
+  assert.deepEqual(actor, { role: 'customer', userId: CUSTOMER, clientId: 'command-center-site' });
+  assert.equal(h.calls.verified, 1);
 });
 test('rejects forged owner, disabled user, anonymous user, and identity provider outage', async () => {
   assert.equal(await resolveCommandCenterActor(token(OWNER), config, async () => ({ id: CUSTOMER }), async () => true), null);
