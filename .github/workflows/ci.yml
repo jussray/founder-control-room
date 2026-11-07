@@ -91,7 +91,7 @@ jobs:
         env:
           NODE_ENV: test
       - name: Verify site identity, wiring and customer tenancy defaults
-        run: node --experimental-strip-types --test tests/command-center-site-access.test.mjs tests/command-center-site-wiring.test.mjs tests/fcr-public-tenancy-migration.test.mjs
+        run: node --experimental-strip-types --test tests/command-center-site-access.test.mjs tests/command-center-site-wiring.test.mjs tests/fcr-public-tenancy-migration.test.mjs tests/command-center-neon-preview-contract.test.mjs
 
   e2e:
     name: Playwright e2e
