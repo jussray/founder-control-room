@@ -18,6 +18,7 @@
 import { Router, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { executionScopeMatches } from '../../lib/idempotencyScope.js';
 import {
@@ -90,7 +91,7 @@ interface FounderPinnedIndependentReview {
 }
 
 export const approvalsRouter = Router();
-approvalsRouter.use(requireFounder);
+approvalsRouter.use(rateLimitFounderPermissions, requireFounder);
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
