@@ -53,7 +53,7 @@ describe('incident-escalation', () => {
   it('sends REPAIR_REQUIRED to Slack', async () => {
     let capturedPayload: unknown;
     global.fetch = vi.fn(async (url, options) => {
-      if (typeof url === 'string' && url.includes('slack')) {
+      if (typeof url === 'string' && new URL(url).hostname === 'hooks.slack.com') {
         capturedPayload = JSON.parse(options?.body as string);
         return new Response('ok', { status: 200 });
       }
@@ -74,7 +74,7 @@ describe('incident-escalation', () => {
   it('escalates CONTAIN_ESCALATE to PagerDuty', async () => {
     let pdCalled = false;
     global.fetch = vi.fn(async (url) => {
-      if (typeof url === 'string' && url.includes('pagerduty')) {
+      if (typeof url === 'string' && new URL(url).hostname === 'events.pagerduty.com') {
         pdCalled = true;
         return new Response('ok', { status: 202 });
       }
@@ -100,8 +100,8 @@ describe('incident-escalation', () => {
     });
 
     const calls = (global.fetch as any).mock.calls as Array<[string, RequestInit]>;
-    const slack = calls.find(([url]) => url.includes('hooks.slack.com'));
-    const pagerDuty = calls.find(([url]) => url.includes('pagerduty.com'));
+    const slack = calls.find(([url]) => new URL(url).hostname === 'hooks.slack.com');
+    const pagerDuty = calls.find(([url]) => new URL(url).hostname === 'events.pagerduty.com');
     expect(slack).toBeDefined();
     expect(pagerDuty).toBeDefined();
     expect(JSON.parse(slack![1].body as string).text).toContain('REPAIR_REQUIRED');
@@ -266,7 +266,7 @@ describe('incident-escalation', () => {
   it('rejects Linear GraphQL errors without logging provider-controlled text', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     global.fetch = vi.fn(async (url) => {
-      if (typeof url === 'string' && url.includes('linear')) {
+      if (typeof url === 'string' && new URL(url).hostname === 'api.linear.app') {
         return new Response(
           JSON.stringify({ errors: [{ message: 'secret-looking-provider-detail' }], data: null }),
           { status: 200 },
