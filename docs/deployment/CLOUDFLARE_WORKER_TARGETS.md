@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+## October 29, 2026: Founder Proof Audit Pages destination (candidate)
+
+The Shopify FCR store declares the active offer `founder-proof-audit` at $99, SKU `FCR-PROOF-AUDIT-99`. Its extensionless storefront path `/products/founder-proof-audit` must be served by the Cloudflare Pages static `ASSETS` binding on both slash variants. Candidate source changes are limited to `public/_worker.js`, `public/products/founder-proof-audit/index.html`, and the matching focused test. The page preserves a scoped inquiry path without introducing unverified direct checkout.
+
+A Shopify draft redirect to `www.foundercontrolroom.org` exists separately; FCR's Shopify MAIN theme was observed still pointing to JBH. This repository patch does not publish that draft, modify DNS, or deploy Pages/Workers. Required runtime evidence: exact Pages deployment SHA, successful anonymous product-page GET and HEAD for both paths with correct brand/offer content, no wrong-store navigation, and a separately validated FCR checkout before any purchase claim. Rollback requires reverting only the new static page/route and selecting the prior approved Pages deployment without changing adjacent API or brand routes.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.

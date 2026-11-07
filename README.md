@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## October 29, 2026: Founder Proof Audit Shopify product-route candidate (not deployed)
+
+FCR Shopify Admin currently reports `Founder Proof Audit` as ACTIVE at $99 (SKU `FCR-PROOF-AUDIT-99`) with the product path `/products/founder-proof-audit`. Prior FCR Pages routing did not explicitly own that extensionless path. The candidate source adds a branded, inquiry-only public page under `public/products/founder-proof-audit/index.html`, routes both slash forms through `STATIC_EXACT_PATHS` in `public/_worker.js`, and adds `founderProofAuditPublicProduct.test.ts`.
+
+The inquiry page intentionally does not initiate checkout: the Shopify MAIN redirect was independently observed pointing to JBH, while the corrected FCR Shopify redirect theme targeting `www.foundercontrolroom.org` remains UNPUBLISHED. The candidate does not establish live DNS/Pages behavior, a sale, checkout, or fulfillment. Exact-head checks, browser and Cloudflare deployment proof, final reviewed merge approval, and a separate Shopify theme publication gate are outstanding. The Truthweaver store and JBH remain separate.
+
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.

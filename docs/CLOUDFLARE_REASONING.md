@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## October 29, 2026: FCR storefront product routing — source candidate only
+
+The FCR Shopify offer `founder-proof-audit` has a Shopify-declared product path `/products/founder-proof-audit` with a $99 active listing, but the previous Pages edge `STATIC_EXACT_PATHS` recognized only the QuickScan path. This candidate adds exact route ownership for both `/products/founder-proof-audit` and its trailing-slash twin, serving `public/products/founder-proof-audit/index.html` from Pages assets rather than the authenticated API proxy.
+
+The page provides honest offer scope and an inquiry CTA, never an unverified payment or delivery claim. A separate FCR Shopify draft theme corrects the wrong-store redirect to `www.foundercontrolroom.org`, but remains unpublished. A GitHub commit or passing source check does not show that Cloudflare Pages deployed this file, public DNS resolves to the intended runtime, a customer reached the page, or checkout belongs to FCR. Preserve the old Pages deployment and static path map for authorized rollback.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
