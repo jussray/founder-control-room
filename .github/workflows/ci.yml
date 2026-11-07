@@ -51,6 +51,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -69,11 +70,28 @@ jobs:
       - name: Verify founder Sauce Guard skill and logging boundary
         shell: bash
         env:
-          SAUCE_GUARD_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
         run: |
           set -euo pipefail
           node --test test/sauce-guard-egress.check.mjs
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            SAUCE_GUARD_BASE_SHA="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            SAUCE_GUARD_BASE_SHA="$PUSH_BEFORE_SHA"
+          fi
+          if ! [[ "$SAUCE_GUARD_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || [ "$SAUCE_GUARD_BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo 'SAUCE_GUARD_INVALID_LIVE_BASE' >&2
+            exit 1
+          fi
           git fetch --filter=blob:none --no-tags origin "$SAUCE_GUARD_BASE_SHA"
+          if ! git merge-base --is-ancestor "$SAUCE_GUARD_BASE_SHA" "$EXPECTED_HEAD_SHA"; then
+            echo 'SAUCE_GUARD_LIVE_BASE_NOT_ANCESTOR' >&2
+            exit 1
+          fi
           node scripts/verify-sauce-guard-egress.mjs --base="$SAUCE_GUARD_BASE_SHA"
 
   test:
