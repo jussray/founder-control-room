@@ -1,0 +1,30 @@
+name: Historical CI Accountability
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  historical-ci-evidence:
+    name: Verify historical CI evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Test evidence auditor
+        run: node --test scripts/ci-history-audit.test.mjs
+      - name: Verify historical failure coverage against GitHub
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HISTORICAL_SHA: 0684cd93a1628cb29171d5331b5e2a4bf8842400
+        run: node scripts/ci-history-audit.mjs
