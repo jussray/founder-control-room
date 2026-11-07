@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { parseWranglerSecretRegistry } from './wrangler-secret-registry.mjs';
 
 const workflowPath = new URL('../.github/workflows/deploy.yml', import.meta.url);
 const wranglerPath = new URL('../wrangler.worker.toml', import.meta.url);
@@ -7,6 +8,7 @@ const linkedinBaselinePath = new URL('../config/linkedin-rising-floor-baseline.j
 const repositoryPolicyPath = new URL('../config/proof-of-ship-repository-policy.json', import.meta.url);
 const workflow = readFileSync(workflowPath, 'utf8');
 const wrangler = readFileSync(wranglerPath, 'utf8');
+const workerSecretRegistry = parseWranglerSecretRegistry(wrangler);
 const linkedinBaseline = JSON.parse(readFileSync(linkedinBaselinePath, 'utf8'));
 const repositoryPolicy = JSON.parse(readFileSync(repositoryPolicyPath, 'utf8'));
 
@@ -349,19 +351,7 @@ for (const [name, value] of publicBindings) {
   );
 }
 
-const requiredWorkerSecrets = [
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'SUPABASE_PUBLISHABLE_KEY',
-  'FOUNDER_SESSION_ENCRYPTION_KEY',
-  'GITHUB_WEBHOOK_SECRET',
-  'GITHUB_APP_ID',
-  'GITHUB_PRIVATE_KEY',
-  'FCR_REMOTE_MCP_READ_TOKEN',
-  'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
-  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
-  'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
-];
+const requiredWorkerSecrets = workerSecretRegistry.required;
 
 assert.match(
   wrangler,
