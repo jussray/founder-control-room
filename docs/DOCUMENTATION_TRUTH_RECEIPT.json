@@ -13,6 +13,12 @@
   ],
   "changes": [
     {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+      ]
+    },
+    {
       "path": ".github/workflows/deploy.yml",
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
