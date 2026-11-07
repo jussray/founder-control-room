@@ -2,11 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import {
   growthInboxReplyStatus,
+  gmailInboxReadStatus,
+  readGmailInbox,
   sendGmailReply,
   sendWhatsAppReply,
   type GrowthInboxReplyChannel,
 } from '../../lib/growthInboxReply.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import { deduplicateAiInboxMessages } from '../../lib/aiInboxRouting.js';
 import {
   isDispatchAllowed,
   type CommunicationPurpose,
@@ -259,6 +262,57 @@ function decisionForReply(input: {
 pluginCenterMessagingRouter.get('/status', (_req: FounderRequest, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json(growthInboxReplyStatus());
+});
+
+pluginCenterMessagingRouter.get('/ai-inbox/status', (_req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(gmailInboxReadStatus());
+});
+
+/** On-demand read, not a background monitor or provider mutation. */
+pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  const status = gmailInboxReadStatus();
+  if (!status.configured) {
+    return res.status(503).json({ error: 'GMAIL_INBOX_NOT_CONFIGURED', missing: status.missing });
+  }
+  const projectSlug = text(req.query.projectSlug);
+  if (!projectSlug || projectSlug !== status.projectSlug) {
+    return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
+  }
+  const requestedLimit = req.query.maxResults;
+  const maxResults = requestedLimit === undefined ? 15
+    : typeof requestedLimit === 'string' && /^\d+$/.test(requestedLimit)
+      ? Number(requestedLimit)
+      : Number.NaN;
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 25) {
+    return res.status(400).json({ error: 'GMAIL_INBOX_LIMIT_INVALID' });
+  }
+  const pageToken = req.query.pageToken;
+  if (pageToken !== undefined && (typeof pageToken !== 'string' || !/^[A-Za-z0-9_+=/-]{1,512}$/.test(pageToken))) {
+    return res.status(400).json({ error: 'GMAIL_INBOX_PAGE_TOKEN_INVALID' });
+  }
+  try {
+    const inbox = await readGmailInbox({
+      maxResults,
+      ...(typeof pageToken === 'string' ? { pageToken } : {}),
+    });
+    if (inbox.projectSlug !== projectSlug || inbox.accountId !== status.expectedAccount) {
+      return res.status(502).json({ error: 'GMAIL_INBOX_PROVIDER_SCOPE_MISMATCH' });
+    }
+    return res.json({
+      contract: 'fcr/ai-inbox-observe@v1',
+      mode: 'observe_only',
+      readOnly: true,
+      accountId: inbox.accountId,
+      projectSlug: inbox.projectSlug,
+      nextPageToken: inbox.nextPageToken,
+      messages: inbox.messages,
+      decisions: deduplicateAiInboxMessages(inbox.messages),
+    });
+  } catch (error) {
+    return res.status(502).json({ error: safeErrorCode(error) });
+  }
 });
 
 pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
