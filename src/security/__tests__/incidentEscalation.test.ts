@@ -89,6 +89,25 @@ describe('incident-escalation', () => {
     expect(pdCalled).toBe(true);
   });
 
+  it('escalates critical Chief unit verdicts even when the perimeter verdict is HALLWAY', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 202 })) as any;
+    const verdict = createMockVerdict('HALLWAY');
+    verdict.unit!.unitVerdict = 'REPAIR_REQUIRED';
+
+    await escalateIncident(verdict, {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER',
+      PAGERDUTY_INTEGRATION_KEY: 'test-key',
+    });
+
+    const calls = (global.fetch as any).mock.calls as Array<[string, RequestInit]>;
+    const slack = calls.find(([url]) => url.includes('hooks.slack.com'));
+    const pagerDuty = calls.find(([url]) => url.includes('pagerduty.com'));
+    expect(slack).toBeDefined();
+    expect(pagerDuty).toBeDefined();
+    expect(JSON.parse(slack![1].body as string).text).toContain('REPAIR_REQUIRED');
+    expect(JSON.parse(pagerDuty![1].body as string).payload.severity).toBe('critical');
+  });
+
   it('ignores non-escalatable verdicts', async () => {
     const verdict = createMockVerdict('OBSERVE');
     const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
