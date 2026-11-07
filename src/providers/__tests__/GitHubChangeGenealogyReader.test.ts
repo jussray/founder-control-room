@@ -172,6 +172,35 @@ describe('GitHubChangeGenealogyReader', () => {
     }));
   });
 
+  it('redacts the entire JWT-shaped GitHub App token, including its final URL-safe character', async () => {
+    // Synthetic value only. Stateless installation tokens can exceed 500 characters.
+    const token = `ghs_12345_${'A'.repeat(170)}.${'B'.repeat(170)}.${'C'.repeat(169)}-`;
+    const base = fixtureFetch();
+    const fetchFn = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).includes('/issues/900/comments?')) {
+        return response([{
+          id: 2,
+          user: { login: 'reviewer' },
+          created_at: '2026-09-22T02:00:00.000Z',
+          updated_at: '2026-09-22T02:00:00.000Z',
+          body: `before ${token} after`,
+        }]);
+      }
+      return base.fetchFn(input, init);
+    }) as unknown as typeof fetch;
+    const reader = new GitHubChangeGenealogyReader(
+      'jussray/founder-control-room',
+      {},
+      { fetchFn, now: () => NOW, apiBaseUrl: 'https://api.github.test', tokenFactory: async () => 'read-only-genealogy-token' },
+    );
+
+    const evidence = await reader.readGenealogyEvidence();
+    const excerpt = evidence.pullRequests[0]?.comments[0]?.bodyExcerpt;
+    expect(token.length).toBeGreaterThan(500);
+    expect(excerpt).toBe('before [REDACTED_GITHUB_TOKEN] after');
+    expect(JSON.stringify(evidence)).not.toContain(token.slice(-80));
+  });
+
   it('redacts a multiline private key before truncating the bounded comment excerpt', async () => {
     const base = fixtureFetch();
     const privateKeyBody = [

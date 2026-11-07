@@ -10,6 +10,10 @@ At predecessor candidate `82d0e7139d3876e166844de64e17b4a770c23b90`, the isolate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
 
+## November 4, 2026: GitHub App parser parity remains source-only
+
+PR #1061 adds cryptographically validated DER, headerless-PEM, and collapsed-PEM parsing while retaining the existing `production` environment `secrets.APP_PRIVATE_KEY` binding. The latest live read-only diagnostic still classified the stored value as `unknown`, with no valid PEM boundary or RSA parse. Source tests do not prove a usable credential or authorize governance reconciliation, merge, or deployment.
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.

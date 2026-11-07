@@ -59,6 +59,10 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 
+#### November 4, 2026: parser parity is not credential proof
+
+Trusted GitHub App workflows continue to read the existing `production` environment secret `APP_PRIVATE_KEY`. PR #1061 adds bounded DER, headerless-PEM and collapsed-PEM parsing, without changing the secret's name, value or scope. The live read-only diagnostic reported `transport_class=unknown`, `pem_boundary=false`, and `rsa_parse=false` for the effective value. This does not prove a valid matching private key, authenticated GitHub App installation, merge, or deployment. Never expose key material in logs, source, issues, artifacts or chat.
+
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
 Secret input fields damage PEM text in predictable ways, so the private key is
