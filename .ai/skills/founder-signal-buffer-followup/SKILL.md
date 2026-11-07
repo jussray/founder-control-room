@@ -1,7 +1,7 @@
 ---
 name: founder-signal-buffer-followup
 description: Create a truthful build-in-public follow-up asset and hand it to the existing Founder Signal Engine Buffer draft-only review lane without publishing.
-version: 1.1.0
+version: 1.2.0
 scope: founder-control-room
 status: candidate
 ---
@@ -36,6 +36,8 @@ node --test scripts/test_free_buffer_video.mjs
 Omit `--voiceover` only when the real screen recording already has audio. Omit `--world` if the brand-approved still is not available; use the **real screen capture** as backdrop. No subscription or provider generation credit is required for this FFmpeg operation. Local compute and storage still have costs.
 
 Do not use the old synthetic Pillow/NumPy mountains, generic DejaVu title slides, faux Buffer interface, or fabricated voice bed. The FCR `FfmpegTimelineSpec` timeline renderer is for **graphic animation**, not a replacement for authentic footage. StoryEngine /LEEVIZE and other render workers remain separately governed; use them only after checking available runtime, canon, rights and cost approval. Match the previously founder-approved YouTube visual references when real assets are available; never invent the style by assertion.
+
+To add optional cinematic lower thirds, supply both **approved copy** and a **founder-approved, licensed font file** via `--intro-title`, `--screen-title`, and `--font-file /approved/brand.ttf`. The renderer never selects generic fonts automatically. It embeds text from temporary files (not filter-graph interpolation), hashes the font/text, and retains real video as the primary visual. It rejects source images/recordings that would require over 1.25× upscaling and refuses to overwrite existing files, including dangling symlinks.
 
 The renderer produces H.264/AAC MP4 with decoded output verification, file hashes, required privacy/visual/rights review, and `publish_authority: false`. Its regression tests use **synthetic fixtures solely for testing**, never as promotional footage. Do not infer brand approval from successful encoding. Publish remains blocked until native Buffer and Facebook receipt correlation, explicit founder release approval, and the current publication authority gates.
 
