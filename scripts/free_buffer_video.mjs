@@ -3,8 +3,8 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, mkdir, mkdtemp, rename, rm, writeFile, lstat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { readFile, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, all) => {
   if (v.startsWith('--')) a.push([v.slice(2), all[i + 1]]);
@@ -59,7 +59,7 @@ const main = async () => {
     if (world) {worldIdx = index++; ffargs.push('-loop','1','-framerate','30','-i',world);}
     const filters = [
       `[0:v]trim=duration=3,setpts=PTS-STARTPTS,fps=30,scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,format=yuv420p[v0]`,
-      `[1:v]trim=duration=7,setpts=PTS-STARTPTS,fps=30,setsar=1,split[sbg0][sfg0]`,
+      worldIdx >= 0 ? `[1:v]trim=duration=7,setpts=PTS-STARTPTS,fps=30,setsar=1[sfg0]` : `[1:v]trim=duration=7,setpts=PTS-STARTPTS,fps=30,setsar=1,split[sbg0][sfg0]`,
       worldIdx >= 0 ? `[${worldIdx}:v]trim=duration=7,setpts=PTS-STARTPTS,fps=30,scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},eq=brightness=-0.12[sbg]`
         : `[sbg0]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=24:1,eq=brightness=-0.18[sbg]`,
       `[sfg0]scale=${Math.round(w*0.92)}:${Math.round(h*0.78)}:force_original_aspect_ratio=decrease,format=yuva420p[sfg]`,
