@@ -64,3 +64,30 @@ test('never overwrites existing output or source footage',async()=>{
    assert.notEqual(p.status,0);assert.match(p.stderr,/overwrite|exists/i);
  }finally{await rm(d,{recursive:true,force:true})}
 });
+
+
+test('rejects upscaling small source into false high-resolution export',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4');
+  makeClip(intro,3.5);makeClip(screen,7.5);
+  const out=join(d,'big.mp4');
+  const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--output',out,'--width','1080','--height','1920']);
+  assert.notEqual(p.status,0, 'Upscaling 320px video must not be treated as production-quality 1080p');
+  assert.match(p.stderr,/upscal|resolution/i);
+  await assert.rejects(access(out));
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+
+test('refuses to replace dangling symlink output or receipt',async()=>{
+ const {symlink,lstat}=await import('node:fs/promises');
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4');
+  makeClip(intro,3.5);makeClip(screen,7.5);
+  const out=join(d,'out.mp4');
+  await symlink(join(d,'nonexistent.mp4'),out);
+  const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--output',out,'--width','270','--height','480']);
+  assert.notEqual(p.status,0);
+  assert.match(p.stderr,/exists|symlink|overwrite/i);
+  assert.ok((await lstat(out)).isSymbolicLink());
+ }finally{await rm(d,{recursive:true,force:true})}
+});
