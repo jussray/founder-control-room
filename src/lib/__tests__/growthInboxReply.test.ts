@@ -214,7 +214,7 @@ describe('readGmailInbox scoped metadata runtime', () => {
       .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
       .mockResolvedValueOnce(jsonResponse({ messages: [{ id: 'msg1', threadId: 'thread1' }], nextPageToken: 'next123' }))
       .mockResolvedValueOnce(jsonResponse({
-        id: 'msg1', threadId: 'thread1', internalDate: '1794067200000',
+        id: 'msg1', threadId: 'thread1', internalDate: '1794067200000', labelIds: ['INBOX', 'Label_approved_biz'],
         payload: { headers: [
           { name: 'From', value: 'Partner <partner@example.net>' },
           { name: 'Subject', value: 'Re: Our proposal' },
@@ -250,5 +250,24 @@ describe('readGmailInbox scoped metadata runtime', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ emailAddress: 'other@example.com' }));
     await expect(readGmailInbox({}, fetchMock)).rejects.toThrow('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('scoped reply compatibility', () => {
+  it('blocks replies to messages outside a configured business label', async () => {
+    process.env.FCR_GMAIL_ACCESS_TOKEN = 'test-token';
+    process.env.FCR_GMAIL_EXPECTED_EMAIL = 'founder@example.com';
+    process.env.FCR_GMAIL_FROM_EMAIL = 'support@example.com';
+    process.env.FCR_GMAIL_INBOX_LABEL_ID = 'Label_approved_biz';
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ emailAddress: 'founder@example.com' }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'msg1', threadId: 'thread1', labelIds: ['INBOX'],
+        payload: { headers: [{ name: 'From', value: 'Contact <contact@example.net>' }] },
+      }));
+    await expect(sendGmailReply({ messageId: 'msg1', body: 'Hello' }, fetchMock))
+      .rejects.toThrow('GMAIL_REPLY_LABEL_SCOPE_MISMATCH');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
