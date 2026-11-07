@@ -26,5 +26,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          HISTORICAL_SHA: 0684cd93a1628cb29171d5331b5e2a4bf8842400
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/ci-history-audit.mjs
