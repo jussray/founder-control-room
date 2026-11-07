@@ -91,12 +91,15 @@ test('auto-merge intent distinguishes queued, not queued, and provider-unknown w
   }
 });
 
-test('auto-merge click or cancellation triggers authoritative continuity metadata refresh', () => {
-  const workflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-  assert.match(workflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
-  assert.match(workflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
-  assert.match(workflow, /permissions: \{\}/);
-  assert.match(workflow, /name: PR Continuity Metadata Receipt/);
+test('auto-merge click or cancellation triggers event-separated continuity audit and trusted metadata refresh', () => {
+  const auditWorkflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+  const metadataWorkflow = readFileSync('.github/workflows/pr-continuity-metadata.yml', 'utf8');
+  assert.match(metadataWorkflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(auditWorkflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(auditWorkflow, /permissions: \{\}/);
+  assert.match(metadataWorkflow, /permissions: \{\}/);
+  assert.match(metadataWorkflow, /name: PR Continuity Metadata Receipt/);
+  assert.doesNotMatch(auditWorkflow, /pull_request_target:/);
 });
 
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
