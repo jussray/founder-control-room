@@ -46,6 +46,7 @@ A merge is appropriate only when:
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
 - **Quality Gate jobs on pull requests must checkout and verify the exact `github.event.pull_request.head.sha`; GitHub's synthetic PR merge ref is merge-simulation evidence and cannot satisfy exact-head proof for the candidate;**
 - FCR `Required Gate` includes the secret-free exact-head Cloudflare bridge authority contract, and that dependency must succeed whenever the required gate is used; live Cloudflare/GitHub provider state remains separate evidence;
+- FCR `Required Gate` depends on the `python-tests` job, which also runs the runtime-kernel receipt checker tests; a passing checker run is receipt-consistency evidence only and grants no merge, founder, or provider authority;
 - zero-step/no-log GitHub Actions failures are classified as `runner_startup_failure` or `workflow_no_jobs`, not as code regressions;
 - a `workflow_step_failure` is not waved away as infrastructure when logs show a real failing command, assertion, build, type, lint, or Playwright step;
 - Playwright has passed for any changed user-facing web/runtime path, or is explicitly inapplicable;
@@ -205,3 +206,5 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.
+
+Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
