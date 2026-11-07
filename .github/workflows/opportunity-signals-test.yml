@@ -1,0 +1,32 @@
+name: FCR public opportunity signals focused test
+on:
+  push:
+    branches:
+      - feat/jussco-opportunity-public-signals-20261106
+    paths:
+      - src/worker/publicOpportunityResearch.ts
+      - src/worker/__tests__/publicOpportunityResearch.test.ts
+      - src/worker/cf-entry.ts
+      - .github/workflows/opportunity-signals-test.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fcr-opportunity-signals-feature
+  cancel-in-progress: true
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test read-only public evidence boundaries
+        run: npx vitest run src/worker/__tests__/publicOpportunityResearch.test.ts
+      - name: Lint public opportunity runtime
+        run: npx eslint src/worker/publicOpportunityResearch.ts src/worker/__tests__/publicOpportunityResearch.test.ts
