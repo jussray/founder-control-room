@@ -21,3 +21,10 @@ test('unverified ledger entry is rejected', () => {
 test('a passing successor does not erase an earlier failure', () => {
   assert.deepEqual(auditLedger(parseLedger(ledger), [run, { id: 456, name: 'CI', head_sha: 'b'.repeat(40), conclusion: 'success' }], sha), []);
 });
+
+test('duplicate ledger run IDs fail closed', () => {
+  assert.ok(auditLedger(parseLedger(ledger + '\n' + ledger), [run], sha).some(e => e.includes('DUPLICATE_RUN')));
+});
+test('malformed run IDs fail closed', () => {
+  assert.ok(auditLedger(parseLedger(ledger.replace('run 123', 'run 0')), [run], sha).some(e => e.includes('MALFORMED_ENTRY')));
+});
