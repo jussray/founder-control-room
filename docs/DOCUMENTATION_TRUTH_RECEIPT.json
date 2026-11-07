@@ -133,7 +133,8 @@
     {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration.",
+        "`src/http/routes/approvals.ts` must validate the exact FCR merge candidate's StoryEngine peer pin against the configured registered provider's canonical refs/heads/main immediately before provider integration, refuse candidate-controlled alternate refs and moved peer SHAs, re-read the mutable FCR branch after the peer lookup, and never treat old CI/deterministic witness or zero native human approvals as founder-final exact-candidate authorization."
       ]
     },
     {
