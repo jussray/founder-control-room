@@ -142,6 +142,14 @@ const CAPABILITIES = Object.freeze({
     requiresEvidence: true,
     separateFounderGate: true,
   },
+  generatePaidAvatarVideo: {
+    id: 'generate_paid_avatar_video',
+    label: 'Generate a chargeable avatar video through an approved backend',
+    authorityLevel: 'L6',
+    risk: 'critical',
+    requiresEvidence: true,
+    separateFounderGate: true,
+  },
 } satisfies Record<string, PluginCapabilityDescriptor>);
 
 export const PLUGIN_CATALOG = [
@@ -189,6 +197,26 @@ export const PLUGIN_CATALOG = [
       'raw_private_content_ingest',
       'create_or_rotate_key_without_gate',
       'autonomous_provider_action',
+    ],
+  },
+  {
+    type: 'heygen',
+    label: 'HeyGen',
+    description:
+      'Optional paid speaking-avatar video provider. Provider status is not verified media, release approval, or permission to publish.',
+    defaultAuthorityLevel: 'L6',
+    defaultDataBoundary:
+      'Project-scoped, sanitized video attempt IDs, status and evidence references only. No raw media URLs, scripts containing private user data, or credentials mirrored into FCR.',
+    secretsPolicy:
+      'Provider API keys remain in the Story Engine backend secret store; FCR stores only an opaque secret reference and configured state, never credential values.',
+    capabilities: [CAPABILITIES.inspectData, CAPABILITIES.generatePaidAvatarVideo],
+    blockedByDefault: [
+      'client_side_key',
+      'generate_without_explicit_spend_gate',
+      'automatic_paid_retry',
+      'cross_project_video_access',
+      'store_raw_provider_credentials',
+      'publish_without_separate_release_approval',
     ],
   },
   {

@@ -78,7 +78,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-            echo '::error title=Missing Worker reconcile credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
+            echo '::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in this job. The repository Actions secret is a valid source. Check repository secret visibility and environment approval. Only if a same-name secret exists in the production environment can it override the repository secret; this failure does not prove the repository secret is missing. Do not expose or rotate the value based on this message.'
             exit 1
           fi
 
@@ -88,17 +88,17 @@ jobs:
 
           token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
           if not token:
-              print('::error title=Missing Worker reconcile credential::CLOUDFLARE_API_TOKEN is empty.')
+              print('::error title=Missing GitHub deployment credential::CLOUDFLARE_API_TOKEN is empty in the production job; repository Actions secret visibility and environment approval, not Worker runtime bindings. A same-name production environment secret can override the repository secret; do not assume that it exists.')
               sys.exit(1)
 
           try:
               token.encode('ascii')
           except UnicodeEncodeError:
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains non-ASCII characters and cannot be used as an HTTP Authorization value. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains non-ASCII characters and cannot be used as an HTTP Authorization value. The repository Actions secret is a valid source. A same-name production environment secret would take precedence only if one exists; this error does not establish secret scope. Do not expose or rotate the value or bypass validation.')
               sys.exit(1)
 
           if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN supplied to this production job contains whitespace or non-printable characters. The repository Actions secret is a valid source. Check for a same-name production environment override only if one is configured; do not silently trim, rotate, expose, or bypass validation.')
               sys.exit(1)
 
           if token.lower().startswith('bearer '):
@@ -128,12 +128,16 @@ jobs:
       - name: Verify provider-held Worker secret names before reconciliation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Bounded self-heal: only this exact legacy plaintext drift may pass
+          # preflight so canonical Wrangler deploy can remove the undeclared var.
+          FCR_ALLOW_STALE_CF_API_TOKEN_REMOVAL: 'true'
         shell: bash
         run: |
           set -euo pipefail
-          # This step must run in authority-gate, before the worker-deploy job
-          # writes the disabled Founder Signal grant or modifies production.
-          secret_receipt="$RUNNER_TEMP/fcr-worker-reconcile-secret-names.json"
+          # Must finish in authority-gate before secret put or deploy can run.
+          secret_receipt="$(mktemp)"
+          trap 'rm -f "$secret_receipt"' EXIT
+
           npx --yes wrangler@4.110.0 secret list \
             --config wrangler.worker.toml \
             --format json > "$secret_receipt"
@@ -147,31 +151,50 @@ jobs:
           with open('wrangler.worker.toml', 'rb') as handle:
               config = tomllib.load(handle)
 
-          required = set(config.get('secrets', {}).get('required', []))
+          def contains_stale_cf_api_token(node):
+              if isinstance(node, dict):
+                  return 'CF_API_TOKEN' in node or any(
+                      contains_stale_cf_api_token(value) for value in node.values()
+                  )
+              if isinstance(node, list):
+                  return any(contains_stale_cf_api_token(value) for value in node)
+              return node == 'CF_API_TOKEN'
+
+          if contains_stale_cf_api_token(config):
+              print('::error title=Unsafe repair contract::CF_API_TOKEN must remain absent from wrangler.worker.toml so canonical deploy removes provider drift.')
+              sys.exit(1)
+
+          names = config.get('secrets', {}).get('required')
           workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
-          if not required or not workflow_written <= required:
-              print('::error title=Invalid Worker secret contract::The required provider-held names and workflow-written grant must be declared.')
+          if not isinstance(names, list) or not names or any(
+              not isinstance(name, str) or not name for name in names
+          ) or len(set(names)) != len(names) or not workflow_written <= set(names):
+              print('::error title=Invalid Worker secret registry::Required names must be unique nonempty strings and include the workflow-written grant.')
               sys.exit(1)
 
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
-              receipt = json.load(handle)
-          if not isinstance(receipt, list):
-              print('::error title=Invalid Cloudflare secret receipt::Expected name-only secret list.')
+              observed = json.load(handle)
+          if not isinstance(observed, list) or any(
+              not isinstance(entry, dict) or not isinstance(entry.get('name'), str)
+              for entry in observed
+          ):
+              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain name-bearing entries.')
               sys.exit(1)
 
-          present = {
-              entry.get('name')
-              for entry in receipt
-              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
-          }
-          missing = sorted(required - workflow_written - present)
+          present = {entry['name'] for entry in observed}
+          required = set(names) - workflow_written
+          missing = sorted(required - present)
           if missing:
               for name in missing:
-                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on founder-control-room.')
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on the canonical Worker.')
               sys.exit(1)
 
-          print(f'Worker reconciliation preflight: {len(required - workflow_written)} required secret names present; values not read.')
+          print(f'Canonical Worker secret-name preflight passed: {len(required)} provider-held names present; no values read.')
           PY
+
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
 
       - name: Record bounded authority receipt
         shell: bash
@@ -233,10 +256,19 @@ jobs:
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
 
+      - name: Verify repaired Worker binding types
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Strict mode: the temporary repair exception is intentionally absent here.
+          node scripts/verify-worker-binding-types.mjs
+
   runtime-proof:
     name: Prove Canonical API Origin and Exact SHA
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: worker-deploy
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -249,12 +281,14 @@ jobs:
           mkdir -p test-results
 
           headers="$(mktemp)"
-          trap 'rm -f "$headers"' EXIT
+          version_headers="$(mktemp)"
+          trap 'rm -f "$headers" "$version_headers"' EXIT
 
           health_body=''
           version_body=''
           for attempt in 1 2 3 4 5 6; do
             : > "$headers"
+            : > "$version_headers"
             candidate_health="$(curl --silent --show-error --fail \
               --proto '=https' --proto-redir '=https' --max-redirs 0 \
               --connect-timeout 10 --max-time 20 \
@@ -263,9 +297,11 @@ jobs:
             candidate_version="$(curl --silent --show-error --fail \
               --proto '=https' --proto-redir '=https' --max-redirs 0 \
               --connect-timeout 10 --max-time 20 \
+              --dump-header "$version_headers" \
               "$API_ORIGIN/version" 2>/dev/null || true)"
 
             if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
+              && tr -d '\r' < "$version_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
               && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
               && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
               health_body="$candidate_health"
@@ -300,11 +336,51 @@ jobs:
 
           cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify public Pages proxy identity against the same exact SHA
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          PAGES_ORIGIN: https://foundercontrolroom.org
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          pages_headers="$(mktemp)"
+          trap 'rm -f "$pages_headers"' EXIT
+
+          pages_verified=false
+          for attempt in 1 2 3 4; do
+            : > "$pages_headers"
+            candidate_pages_version="$(curl --silent --show-error --fail \
+              --proto '=https' --proto-redir '=https' --max-redirs 0 \
+              --connect-timeout 8 --max-time 15 \
+              --dump-header "$pages_headers" \
+              "$PAGES_ORIGIN/version" 2>/dev/null || true)"
+            if tr -d '\r' < "$pages_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
+              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_pages_version" >/dev/null 2>&1; then
+              pages_verified=true
+              break
+            fi
+            sleep 8
+          done
+          if [[ "$pages_verified" != true ]]; then
+            echo '::error title=Public Pages identity proof failed::foundercontrolroom.org/version did not prove the exact canonical Worker SHA and service header.'
+            exit 1
+          fi
+
+          jq -n \
+            --arg page_origin "$PAGES_ORIGIN" \
+            --arg expected_sha "$EXPECTED_HEAD_SHA" \
+            '{public_pages_origin: $page_origin, verified_sha: $expected_sha, service_header_verified: true, public_proxy_version_verified: true, provider_mutation: false}' \
+            > test-results/fcr-pages-proxy-proof.json
+          cat test-results/fcr-pages-proxy-proof.json >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload redacted reconciliation receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/fcr-worker-reconcile.json
+          path: |
+            test-results/fcr-worker-reconcile.json
+            test-results/fcr-pages-proxy-proof.json
           if-no-files-found: warn
           retention-days: 30

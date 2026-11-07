@@ -1,0 +1,105 @@
+name: Portfolio Actions and Stale Evidence Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
+      - '.github/workflows/portfolio-actions-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
+      - '.github/workflows/portfolio-actions-audit.yml'
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PORTFOLIO_EXPECTED_MIN_REPOSITORIES: '46'
+
+concurrency:
+  group: portfolio-action-truth-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    name: Validate portfolio truth classification without credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Confirm exact checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Exercise source classifications
+        run: node scripts/portfolio-actions-audit.mjs --self-test
+      - name: Validate read-only audit token permissions without credentials
+        run: node scripts/mint-portfolio-github-app-token.mjs --self-test-token-profiles
+
+  observe:
+    name: Audit accessible installation repositories (read-only)
+    if: github.event_name != 'pull_request'
+    needs: regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out audited exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Mint read-only portfolio installation token
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          GITHUB_APP_OWNER: jussray
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-audit-token
+        run: node scripts/mint-portfolio-github-app-token.mjs --actions-audit-read-only
+      - name: Collect bounded exact-head and stale evidence
+        shell: bash
+        env:
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-audit-token
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$PORTFOLIO_SYNC_TOKEN_FILE"' EXIT
+          test -s "$PORTFOLIO_SYNC_TOKEN_FILE"
+          token="$(tr -d '\r\n' < "$PORTFOLIO_SYNC_TOKEN_FILE")"
+          echo "::add-mask::$token"
+          PORTFOLIO_AUDIT_TOKEN="$token" node scripts/portfolio-actions-audit.mjs
+      - name: Preserve BLOCKED evidence if access failed before receipt
+        if: always()
+        shell: bash
+        run: |
+          if test ! -s artifacts/portfolio-actions-audit/receipt.json; then
+            mkdir -p artifacts/portfolio-actions-audit
+            node -e "require('node:fs').writeFileSync('artifacts/portfolio-actions-audit/receipt.json',JSON.stringify({schema:'fcr/portfolio-actions-audit@v1',state:'BLOCKED',reason:'AUDIT_DID_NOT_PRODUCE_RECEIPT',operationVerified:false,productionVerified:false,mutationAuthorized:false},null,2)+'\n')"
+          fi
+      - name: Upload safe summary artifact, including failure or incomplete coverage
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: portfolio-actions-audit-${{ github.run_id }}
+          path: artifacts/portfolio-actions-audit/receipt.json
+          if-no-files-found: error
+          retention-days: 30
