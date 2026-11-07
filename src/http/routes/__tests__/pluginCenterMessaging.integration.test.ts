@@ -6,6 +6,7 @@ const {
   mockSendWhatsAppReply,
   mockGmailReadStatus,
   mockReadGmailInbox,
+  mockProbeGmailInbox,
   supabaseMock,
 } = vi.hoisted(() => ({
   mockStatus: vi.fn(),
@@ -13,6 +14,7 @@ const {
   mockSendWhatsAppReply: vi.fn(),
   mockGmailReadStatus: vi.fn(),
   mockReadGmailInbox: vi.fn(),
+  mockProbeGmailInbox: vi.fn(),
   supabaseMock: { from: vi.fn() },
 }));
 
@@ -20,6 +22,7 @@ vi.mock('../../../lib/growthInboxReply.js', () => ({
   growthInboxReplyStatus: mockStatus,
   gmailInboxReadStatus: mockGmailReadStatus,
   readGmailInbox: mockReadGmailInbox,
+  probeGmailInbox: mockProbeGmailInbox,
   sendGmailReply: mockSendGmailReply,
   sendWhatsAppReply: mockSendWhatsAppReply,
 }));
@@ -311,5 +314,73 @@ describe('scoped outbound Gmail replies', () => {
     expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
     expect(supabaseMock.from).not.toHaveBeenCalled();
     expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Gmail API authorization probe endpoint', () => {
+  it('requires an explicitly matching project before any Gmail probe', async () => {
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox/probe?projectSlug=sekret-bip');
+    expect(response.status).toBe(403);
+    expect(mockProbeGmailInbox).not.toHaveBeenCalled();
+  });
+  it('exposes only provider account and custom label readback, not inbox content', async () => {
+    mockProbeGmailInbox.mockResolvedValue({
+      contract: 'fcr/gmail-inbox-probe@v1', mode: 'observe_only',
+      providerObserved: true, accountId: 'founder@example.com',
+      projectSlug: PROJECT_SLUG, labelId: 'Label_business',
+    });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox/probe?projectSlug=founder-control-room');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({ providerObserved: true, projectSlug: PROJECT_SLUG });
+    expect(mockProbeGmailInbox).toHaveBeenCalledTimes(1);
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+});
+
+describe('uncertain Gmail send cannot be replayed by the same idempotency key', () => {
+  it('holds the execution pending when provider acceptance or receipt is unknown', async () => {
+    let pending: Record<string, unknown> | null = null;
+    let attemptedFinalization = false;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'projects') return projectLookup();
+      if (table !== 'approval_executions') return {};
+      return {
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: pending, error: null }) }) }),
+        insert: (row: Record<string, unknown>) => {
+          pending = {
+            ...row,
+            id: 'exec-pending-1',
+            result: {},
+            success: null,
+          };
+          return { select: () => ({
+            single: () => Promise.resolve({ data: pending, error: null }),
+          }) };
+        },
+        update: () => {
+          attemptedFinalization = true;
+          throw new Error('must not mark ambiguous send failed');
+        },
+      };
+    });
+    mockSendGmailReply.mockRejectedValue(new Error('GMAIL_SEND_OUTCOME_UNKNOWN'));
+
+    const first = await request(app()).post('/plugin-center/messaging/reply').send(approvedEmailRequest());
+    expect(first.status).toBe(502);
+    expect(first.body).toMatchObject({
+      error: 'GMAIL_SEND_OUTCOME_UNKNOWN',
+      status: 'unknown',
+      replayBlocked: true,
+      executionId: 'exec-pending-1',
+    });
+    expect(attemptedFinalization).toBe(false);
+    expect(pending).toMatchObject({ status: 'pending' });
+    const replay = await request(app()).post('/plugin-center/messaging/reply').send(approvedEmailRequest());
+    expect(replay.status).toBe(409);
+    expect(replay.body.error).toBe('REPLY_EXECUTION_ALREADY_PENDING');
+    expect(mockSendGmailReply).toHaveBeenCalledTimes(1);
   });
 });
