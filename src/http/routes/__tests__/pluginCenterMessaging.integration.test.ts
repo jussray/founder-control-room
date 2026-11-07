@@ -196,7 +196,7 @@ describe('POST /plugin-center/messaging/reply', () => {
     expect(reservedRequest).toMatchObject({
       project_id: PROJECT_ID,
       action_type: 'growth_inbox_reply',
-      idempotency_key: 'reply-test-002',
+      idempotency_key: expect.stringMatching(/^growth-reply:v1:[a-f0-9]{64}$/),
       executed_by: 'founder@example.com',
       status: 'pending',
       request: {
@@ -381,6 +381,14 @@ describe('uncertain Gmail send cannot be replayed by the same idempotency key', 
     const replay = await request(app()).post('/plugin-center/messaging/reply').send(approvedEmailRequest());
     expect(replay.status).toBe(409);
     expect(replay.body.error).toBe('REPLY_EXECUTION_ALREADY_PENDING');
+    const differentClientKey = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ idempotencyKey: 'another-client-key-123' }));
+    expect(differentClientKey.status).toBe(409);
+    expect(differentClientKey.body.error).toBe('REPLY_EXECUTION_ALREADY_PENDING');
+    const changedBody = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ idempotencyKey: 'third-client-key-123', body: 'A different reply' }));
+    expect(changedBody.status).toBe(409);
+    expect(changedBody.body.error).toBe('IDEMPOTENCY_KEY_SCOPE_MISMATCH');
     expect(mockSendGmailReply).toHaveBeenCalledTimes(1);
   });
 });
