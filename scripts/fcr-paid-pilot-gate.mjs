@@ -26,6 +26,8 @@ export function assessPilotExecution(input) {
       artifactDigest: delivery.artifactDigest,
       paymentStatus: 'not_charged',
       productionAuthorized: false,
+      evidenceOrigin: 'caller_supplied_unverified',
+      deliveryVerified: false,
       independentlyVerified: false
     })
   };
