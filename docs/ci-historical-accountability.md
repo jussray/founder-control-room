@@ -46,6 +46,9 @@ The following additional outcomes were directly checked against GitHub Actions j
 | `3e657ec9329b9ad601aafe7af059cd559d39e6c9` | Founder Repo Cycle (run 42346721605) | cancelled | UNKNOWN: cancellation cause not yet established | UNKNOWN: no verified corrective SHA | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42346721605); job conclusion independently observed | OPEN |
 | `e92f69de445a20c99aa4ec9bb92d7df4864070cb` | Historical CI Accountability (run 42347155567) | failure | UNKNOWN: check failed because historical evidence was incomplete; further root-cause triage remains open | UNKNOWN: no verified corrective SHA | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42347155567); job conclusion independently observed | OPEN |
 
+| `3e657ec9329b9ad601aafe7af059cd559d39e6c9` | CI (run 42346721585) | cancelled | UNKNOWN: cancellation cause not established; GitHub jobs show cancelled checks and a failed Required Gate | UNKNOWN: no verified corrective SHA | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42346721585); job outcomes observed | OPEN |
+| `43d507441a668e1632e0ec2ef3e7dc4268785aed` | Historical CI Accountability (run 42392476100) | failure | Audit reported missing historical CI run 42346721585 | UNKNOWN: ledger repair authored, not yet verified by exact-head CI | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42392476100); failing job log observed | OPEN |
+
 ## Agent accountability
 
 - Commit `346829f4e955381be4cbaf1ee67ed1cd81949541` attributes its QuickScan optional-candidate TypeScript fix to Claude Haiku 5.5 as co-author. This is commit metadata, not independent proof of agent execution or complete verification.
