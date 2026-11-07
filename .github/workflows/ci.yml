@@ -354,6 +354,8 @@ jobs:
         run: |
           node --test test/ci-performance-contract.node-test.mjs
           node --test test/ci-migration-scope.node-test.mjs
+      - name: Verify bounded CI Autoresearch evaluation
+        run: node --test test/ci-autoresearch.test.mjs
       - name: Verify no test is excluded from default discovery without base-bound debt
         run: npm run verify:test-discovery
 
