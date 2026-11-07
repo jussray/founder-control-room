@@ -2,6 +2,8 @@
 // External site snapshot: read-only Playwright evidence for a public URL.
 // No secrets, no cookies, no founder bearer. Produces screenshots + report.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +19,120 @@ export function validateTargetUrl(raw) {
   if (PRIVATE_HOST.test(url.hostname)) return { ok: false, reason: 'private or local host' };
   if (!url.hostname.includes('.')) return { ok: false, reason: 'bare hostname' };
   return { ok: true, url: url.toString(), host: url.hostname };
+}
+
+// Returns true only for addresses that are globally routable. Covers IPv4
+// private/reserved/CGNAT/link-local/multicast ranges and IPv6 loopback, unique-local,
+// link-local, multicast, and IPv4-mapped forms of the same.
+export function isPublicAddress(ip) {
+  const v = String(ip).toLowerCase();
+  const family = isIP(v);
+  if (family === 4) {
+    const [a, b] = v.split('.').map(Number);
+    if (a === 0 || a === 10 || a === 127) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && (b === 168 || (b === 0) || b === 88)) return false;
+    if (a === 198 && (b === 18 || b === 19)) return false;
+    if (a >= 224) return false;
+    return true;
+  }
+  if (family === 6) {
+    const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isPublicAddress(mapped[1]);
+    if (v === '::' || v === '::1') return false;
+    if (/^f[cd]/.test(v)) return false; // fc00::/7 unique-local
+    if (/^fe[89ab]/.test(v)) return false; // fe80::/10 link-local
+    if (/^ff/.test(v)) return false; // multicast
+    return true;
+  }
+  return false;
+}
+
+// Resolves a hostname and requires every returned address to be public.
+// `lookupFn` is injectable for tests; production uses the system resolver.
+export async function resolvePublicHost(hostname, lookupFn = dnsLookup) {
+  if (isIP(hostname)) return { ok: false, reason: 'IP literal' };
+  let addresses;
+  try {
+    addresses = await lookupFn(hostname, { all: true, verbatim: true });
+  } catch {
+    return { ok: false, reason: 'DNS resolution failed' };
+  }
+  if (!Array.isArray(addresses) || addresses.length === 0) return { ok: false, reason: 'no DNS answers' };
+  const bad = addresses.find((a) => !isPublicAddress(a.address));
+  if (bad) return { ok: false, reason: 'resolves to non-public address' };
+  return { ok: true };
+}
+
+// Applies to every request the browser makes, including redirect hops and
+// sub-resources. Literal URL checks run first; DNS is checked for each hostname.
+export async function checkRequestUrl(raw, lookupFn = dnsLookup) {
+  const literal = validateTargetUrl(raw);
+  if (!literal.ok) return literal;
+  const dns = await resolvePublicHost(literal.host, lookupFn);
+  if (!dns.ok) return { ok: false, reason: dns.reason };
+  return { ok: true, url: literal.url, host: literal.host };
+}
+
+// Walks the top-level redirect chain one hop at a time with redirect:'manual', so every
+// Location is validated before anything follows it. Returns the validated final URL the
+// browser should navigate to. Limits: sub-resource redirects and DNS rebinding between this
+// check and the browser connection are not covered here (see the URLFIX contract).
+export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsLookup, maxHops = 5 } = {}) {
+  let current = startUrl;
+  const hops = [];
+  const cookies = [];
+  for (let i = 0; i <= maxHops; i++) {
+    const verdict = await checkRequestUrl(current, lookupFn);
+    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops, cookies };
+    hops.push(verdict.url);
+    let res;
+    try {
+      res = await fetchFn(verdict.url, { redirect: 'manual', method: 'GET', signal: AbortSignal.timeout(20_000) });
+    } catch {
+      return { ok: false, reason: 'hop request failed', hops, cookies };
+    }
+    // Keep Set-Cookie from every validated hop so the browser sees the same session state
+    // a normal navigation would have produced. Values are held in memory only.
+    const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
+    for (const raw of setCookies) cookies.push({ host: verdict.host, secure: verdict.url.startsWith('https:'), raw });
+    try { await res.body?.cancel(); } catch { /* ignore */ }
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) return { ok: true, finalUrl: verdict.url, hops, cookies };
+      current = new URL(location, verdict.url).toString();
+      continue;
+    }
+    return { ok: true, finalUrl: verdict.url, hops, cookies };
+  }
+  return { ok: false, reason: 'too many redirects', hops, cookies };
+}
+
+// Converts Set-Cookie lines from the validated walk into Playwright cookie objects.
+// Host-only cookies are bound to the hop host. A Domain attribute is ignored on purpose:
+// it could widen scope beyond the validated host. Expired cookies are dropped.
+export function cookiesFromWalk(walk) {
+  const out = [];
+  for (const c of walk.cookies || []) {
+    const [pair, ...attrs] = c.raw.split(';').map((x) => x.trim());
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: c.host, path: '/', secure: c.secure, httpOnly: false };
+    let expired = false;
+    for (const a of attrs) {
+      const [k, ...rest] = a.split('=');
+      const key = k.toLowerCase();
+      const val = rest.join('=');
+      if (key === 'path' && val.startsWith('/')) cookie.path = val;
+      else if (key === 'httponly') cookie.httpOnly = true;
+      else if (key === 'secure') cookie.secure = true;
+      else if (key === 'max-age' && Number(val) <= 0) expired = true;
+    }
+    if (!expired) out.push(cookie);
+  }
+  return out;
 }
 
 export function snapshotDirName(host, now = new Date()) {
@@ -36,21 +152,42 @@ async function run() {
     console.error(`::error title=Invalid target::${target.reason}`);
     process.exit(2);
   }
+  const walk = await walkRedirects(target.url);
+  if (!walk.ok) {
+    console.error(`::error title=BLOCKED destination::${walk.reason}`);
+    process.exit(2);
+  }
+  const navigateUrl = walk.finalUrl;
+  const carriedCookies = cookiesFromWalk(walk);
   const outRoot = process.env.SNAPSHOT_OUT_DIR || 'snapshots';
   const dir = join(outRoot, snapshotDirName(target.host));
   mkdirSync(dir, { recursive: true });
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
   const report = { target: target.url, capturedAt: new Date().toISOString(), viewports: {} };
+  const blockedDestinations = [];
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.mobile, hasTouch: vp.mobile });
+    // Destination guard: every request, redirect hop and sub-resource must pass the
+    // literal + DNS public-address check. Failures abort the request (fail closed).
+    await context.route('**/*', async (route) => {
+      const reqUrl = route.request().url();
+      if (reqUrl.startsWith('data:') || reqUrl.startsWith('blob:')) return route.continue();
+      const verdict = await checkRequestUrl(reqUrl);
+      if (!verdict.ok) {
+        blockedDestinations.push(`${verdict.reason}`);
+        return route.abort('blockedbyclient');
+      }
+      return route.continue();
+    });
+    if (carriedCookies.length) await context.addCookies(carriedCookies);
     const page = await context.newPage();
     const consoleErrors = [];
     page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300)); });
     page.on('pageerror', (e) => consoleErrors.push(`PAGEERROR ${String(e).slice(0, 300)}`));
     let status = null;
     try {
-      const res = await page.goto(target.url, { waitUntil: 'load', timeout: 45_000 });
+      const res = await page.goto(navigateUrl, { waitUntil: 'load', timeout: 45_000 });
       status = res ? res.status() : null;
       await page.waitForTimeout(1500);
     } catch (error) {
@@ -74,6 +211,8 @@ async function run() {
     await context.close();
   }
   await browser.close();
+  report.blockedDestinations = [...new Set(blockedDestinations)];
+  report.redirectHops = walk.hops;
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   const captured = Object.values(report.viewports).filter((v) => !v.error).length;
   if (captured === 0) {

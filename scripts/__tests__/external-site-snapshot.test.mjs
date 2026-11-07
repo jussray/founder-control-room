@@ -18,3 +18,87 @@ test('snapshot dir name is timestamped and host-safe', () => {
   const name = snapshotDirName('a.b/c', new Date('2026-09-30T06:30:00.000Z'));
   assert.match(name, /^2026-09-30T06-30-00-a\.b_c$/);
 });
+
+import { isPublicAddress, resolvePublicHost, checkRequestUrl } from '../external-site-snapshot.mjs';
+
+test('classifies IPv4 and IPv6 addresses as public or non-public', () => {
+  for (const ip of ['127.0.0.1', '10.1.2.3', '172.31.9.9', '192.168.0.1', '169.254.1.1', '100.64.0.1', '198.18.0.1', '0.0.0.0', '224.0.0.1', '::1', '::', 'fc00::1', 'fd12::1', 'fe80::1', 'ff02::1', '::ffff:10.0.0.1']) {
+    assert.equal(isPublicAddress(ip), false, ip);
+  }
+  for (const ip of ['8.8.8.8', '93.184.216.34', '2606:4700:4700::1111']) {
+    assert.equal(isPublicAddress(ip), true, ip);
+  }
+});
+
+test('DNS guard rejects a hostname that resolves to any private address', async () => {
+  const mixed = async () => [{ address: '93.184.216.34', family: 4 }, { address: '10.0.0.7', family: 4 }];
+  assert.equal((await resolvePublicHost('rebind.example.com', mixed)).ok, false);
+  const failing = async () => { throw new Error('ENOTFOUND'); };
+  assert.equal((await resolvePublicHost('missing.example.com', failing)).ok, false);
+  const publicOnly = async () => [{ address: '93.184.216.34', family: 4 }];
+  assert.equal((await resolvePublicHost('example.com', publicOnly)).ok, true);
+});
+
+test('request guard blocks literal and DNS-private destinations for redirects and sub-resources', async () => {
+  const privateDns = async () => [{ address: '127.0.0.1', family: 4 }];
+  assert.equal((await checkRequestUrl('https://metadata.example.com/latest', privateDns)).ok, false);
+  assert.equal((await checkRequestUrl('http://example.com/redirect', privateDns)).ok, false);
+  const publicDns = async () => [{ address: '93.184.216.34', family: 4 }];
+  assert.equal((await checkRequestUrl('https://example.com/ok', publicDns)).ok, true);
+});
+
+import { walkRedirects, cookiesFromWalk } from '../external-site-snapshot.mjs';
+
+function fakeFetch(routes) {
+  return async (url) => {
+    const r = routes[url];
+    if (!r) throw new Error(`no route for ${url}`);
+    return { status: r.status, headers: { get: (k) => (r.location && k === 'location' ? r.location : null), getSetCookie: () => r.setCookie || [] }, body: null };
+  };
+}
+const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
+
+test('redirect walker follows a public chain and stops at the validated final URL', async () => {
+  const fetchFn = fakeFetch({
+    'https://start.example.com/': { status: 301, location: 'https://www.example.com/' },
+    'https://www.example.com/': { status: 200 },
+  });
+  const r = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(r.ok, true);
+  assert.equal(r.finalUrl, 'https://www.example.com/');
+  assert.deepEqual(r.hops, ['https://start.example.com/', 'https://www.example.com/']);
+});
+
+test('redirect walker blocks a chain that hops into a private destination before fetching it', async () => {
+  let fetched = [];
+  const fetchFn = async (url) => {
+    fetched.push(url);
+    if (url === 'https://start.example.com/') return { status: 302, headers: { get: (k) => (k === 'location' ? 'http://127.0.0.1:8080/admin' : null) }, body: null };
+    throw new Error(`must not fetch ${url}`);
+  };
+  const r = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(r.ok, false);
+  assert.deepEqual(fetched, ['https://start.example.com/']);
+});
+
+test('redirect walker fails closed on a redirect loop', async () => {
+  const fetchFn = async () => ({ status: 302, headers: { get: () => 'https://loop.example.com/' }, body: null });
+  const r = await walkRedirects('https://loop.example.com/', { fetchFn, lookupFn: publicLookup, maxHops: 3 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'too many redirects');
+});
+
+test('redirect cookies from validated hops are carried into the browser context without widening scope', async () => {
+  const fetchFn = fakeFetch({
+    'https://start.example.com/': { status: 302, location: 'https://www.example.com/', setCookie: ['session=abc123; Path=/; Secure; HttpOnly; Domain=example.com'] },
+    'https://www.example.com/': { status: 200, setCookie: ['routing=eu; Max-Age=0', 'lang=en; Path=/app'] },
+  });
+  const walk = await walkRedirects('https://start.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  const cookies = cookiesFromWalk(walk);
+  const session = cookies.find((c) => c.name === 'session');
+  assert.deepEqual(session, { name: 'session', value: 'abc123', domain: 'start.example.com', path: '/', secure: true, httpOnly: true });
+  assert.equal(cookies.find((c) => c.name === 'routing'), undefined);
+  assert.equal(cookies.find((c) => c.name === 'lang').domain, 'www.example.com');
+  assert.equal(cookies.every((c) => c.domain !== 'example.com'), true);
+});

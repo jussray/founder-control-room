@@ -30,7 +30,7 @@ describe('Chief AI Founder OS project adapter', () => {
       id: 'chief-ai-machine',
       adapterId: 'chief-ai-machine-project-preview',
       repository: 'jussray/chief-ai-machine',
-      auditedSourceHead: '0d1106424802fa21d37c6a05fc3e6f6422cc989a',
+      auditedSourceHead: 'f2c2fa83c04ce67c3f37cc7682793a053ea9696e',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -39,7 +39,7 @@ describe('Chief AI Founder OS project adapter', () => {
       sourceTraceRequired: true,
     });
     expect(ADAPTER.auditedContractBlobs).toMatchObject({
-      'src/domain/capability-registry.js': 'abb2daf0ee7ce85442cd4b04588b4881cc4b9b53',
+      'src/domain/capability-registry.js': '5b1c6e39a9ec675e03032a480ff00c2967479f22',
       'config/founder-chief-pair.contract.json': 'dd008420e1a91e78516b45d9e27de89344abf432',
     });
     expect(ADAPTER.requiredContractPaths).toEqual([
