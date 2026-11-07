@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createXFirstPartyAdapter, XFirstPartyAdapterError } from '../xFirstPartyAdapter.js';
+import { FIRST_PARTY_PLATFORM_CAPABILITIES } from '../firstPartySocialPublisher.js';
 import type { PreparedFirstPartyPublication } from '../firstPartySocialPublisher.js';
 
 const userId = '1234567';
@@ -9,15 +10,24 @@ const copy =
 const prepared = {
   platform: 'x',
   accountId: userId,
+  contentField: 'x_draft',
   text: copy,
-  media: [],
-  mode: 'publish',
-  contentHash: 'a'.repeat(64),
-  sourceCommitSha: 'b'.repeat(40),
-  idempotencyKey: 'c'.repeat(64),
-  founderApprovalId: 'founder-approved-once',
+  traction: 'Exact-head tests and readbacks must be observed.',
+  governanceAdvantage: 'Publication is gated by explicit founder approval.',
+  audienceValue: 'Accountability for every published provider action.',
+  investorSignal: 'Verified execution evidence is distinguished from proposals.',
+  proofLinks: [{ label: 'FCR source proof', url: 'https://github.com/jussray/founder-control-room/pull/1069' }],
   proofUrls: ['https://github.com/jussray/founder-control-room/pull/1069'],
-} as PreparedFirstPartyPublication;
+  sourceRepository: 'jussray/founder-control-room',
+  sourceCommitSha: 'b'.repeat(40),
+  mode: 'publish',
+  founderApprovalId: 'founder-approved-once',
+  media: [],
+  characterLimit: 270,
+  contentHash: 'a'.repeat(64),
+  idempotencyKey: 'c'.repeat(64),
+  capability: FIRST_PARTY_PLATFORM_CAPABILITIES.x,
+} satisfies PreparedFirstPartyPublication;
 
 const jsonResponse = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
