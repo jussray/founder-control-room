@@ -1,0 +1,33 @@
+name: AI Inbox Focused Proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/aiInboxRouting.ts'
+      - 'src/lib/__tests__/aiInboxRouting.test.ts'
+      - '.github/workflows/ai-inbox-focused.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Run AI Inbox focused tests
+        run: npx vitest run src/lib/__tests__/aiInboxRouting.test.ts
+      - name: Lint AI Inbox changes
+        run: npx eslint src/lib/aiInboxRouting.ts src/lib/__tests__/aiInboxRouting.test.ts --max-warnings 0
