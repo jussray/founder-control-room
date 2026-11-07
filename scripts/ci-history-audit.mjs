@@ -45,7 +45,8 @@ async function allPages(path, token) {
   const results = [];
   for (let page = 1; page <= 30; page++) {
     const separator = path.includes('?') ? '&' : '?';
-    const batch = await githubGet(`${path}${separator}per_page=100&page=${page}`, token);
+    const response = await githubGet(`${path}${separator}per_page=100&page=${page}`, token);
+    const batch = Array.isArray(response) ? response : response.workflow_runs;
     if (!Array.isArray(batch)) throw new Error('Expected GitHub array response');
     results.push(...batch);
     if (batch.length < 100) return results;
