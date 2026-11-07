@@ -65,9 +65,18 @@ function verdictToSeverity(verdict: string): keyof typeof SEVERITY_MAP {
   return 'OBSERVE';
 }
 
+/** Chief's attack-unit verdict may be more severe than its perimeter classification. */
+function effectiveVerdict(verdict: SecurityVerdict): keyof typeof SEVERITY_MAP {
+  const perimeter = verdictToSeverity(verdict.verdict);
+  const unit = verdict.unit?.unitVerdict;
+  if (perimeter === 'REPAIR_REQUIRED' || unit === 'REPAIR_REQUIRED') return 'REPAIR_REQUIRED';
+  if (perimeter === 'CONTAIN_ESCALATE' || unit === 'CONTAIN_ESCALATE') return 'CONTAIN_ESCALATE';
+  return perimeter;
+}
+
 function shouldEscalate(verdict: SecurityVerdict): boolean {
   if (!verdict.meaningful) return false;
-  const s = verdictToSeverity(verdict.verdict);
+  const s = effectiveVerdict(verdict);
   return SEVERITY_MAP[s] === 'critical' || SEVERITY_MAP[s] === 'high';
 }
 
@@ -75,7 +84,7 @@ function formatSlackMessage(verdict: SecurityVerdict): {
   text: string;
   blocks: Array<Record<string, unknown>>;
 } {
-  const severity = SEVERITY_MAP[verdictToSeverity(verdict.verdict)];
+  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
   const emoji =
     severity === 'critical'
       ? ':rotating_light:'
@@ -90,14 +99,14 @@ function formatSlackMessage(verdict: SecurityVerdict): {
     (verdict.technicalIdentity?.verifiedBot ? 'verified-bot' : 'unknown-actor');
   const country = verdict.technicalIdentity?.country || 'unknown';
 
-  const text = `${emoji} ${verdict.verdict} | ${verdict.service} | Actor: ${actor} | Country: ${country}`;
+  const text = `${emoji} ${effectiveVerdict(verdict)} | ${verdict.service} | Actor: ${actor} | Country: ${country}`;
 
   const blocks: Array<Record<string, unknown>> = [
     {
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `${emoji} Security Incident: ${verdict.verdict}`,
+        text: `${emoji} Security Incident: ${effectiveVerdict(verdict)}`,
         emoji: true,
       },
     },
@@ -110,7 +119,7 @@ function formatSlackMessage(verdict: SecurityVerdict): {
         },
         {
           type: 'mrkdwn',
-          text: `*Verdict:*\n${verdict.verdict}`,
+          text: `*Verdict:*\n${effectiveVerdict(verdict)}`,
         },
         {
           type: 'mrkdwn',
@@ -232,7 +241,7 @@ export async function escalateToPagerDuty(
   const integrationKey = env.PAGERDUTY_INTEGRATION_KEY;
   if (!integrationKey) return false;
 
-  const severity = SEVERITY_MAP[verdictToSeverity(verdict.verdict)];
+  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
   if (severity !== 'critical' && severity !== 'high') return false;
 
   try {
@@ -244,12 +253,12 @@ export async function escalateToPagerDuty(
         event_action: 'trigger',
         dedup_key: `${verdict.service}:${verdict.receipt?.slice(0, 16) || 'unknown'}`,
         payload: {
-          summary: `${verdict.verdict} on ${verdict.service}`,
+          summary: `${effectiveVerdict(verdict)} on ${verdict.service}`,
           severity,
           source: 'chief-ai-security',
           component: verdict.service,
           custom_details: {
-            verdict: verdict.verdict,
+            verdict: effectiveVerdict(verdict),
             actor: verdict.technicalIdentity?.claimedCrawler || 'unknown',
             country: verdict.technicalIdentity?.country || 'unknown',
             external_threat: verdict.boundaries?.externalCompromise ? 'yes' : 'no',
@@ -278,7 +287,7 @@ export async function logIncidentToLinear(
   const apiKey = env.LINEAR_API_KEY;
   if (!apiKey) return false;
 
-  const severity = SEVERITY_MAP[verdictToSeverity(verdict.verdict)];
+  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
   if (severity !== 'critical') return false;
 
   try {
@@ -302,10 +311,10 @@ export async function logIncidentToLinear(
         variables: {
           input: {
             teamId: 'security', // Assumes 'security' team exists
-            title: `Security Incident: ${verdict.verdict} on ${verdict.service}`,
-            description: `Verdict: ${verdict.verdict}\nService: ${verdict.service}\nActor: ${verdict.technicalIdentity?.claimedCrawler || 'unknown'}\nCountry: ${verdict.technicalIdentity?.country || 'unknown'}\nReceipt: ${verdict.receipt}`,
+            title: `Security Incident: ${effectiveVerdict(verdict)} on ${verdict.service}`,
+            description: `Verdict: ${effectiveVerdict(verdict)}\nService: ${verdict.service}\nActor: ${verdict.technicalIdentity?.claimedCrawler || 'unknown'}\nCountry: ${verdict.technicalIdentity?.country || 'unknown'}\nReceipt: ${verdict.receipt}`,
             priority: 1, // Urgent
-            labels: [verdict.verdict, 'security', 'auto-created'],
+            labels: [effectiveVerdict(verdict), 'security', 'auto-created'],
           },
         },
       }),
@@ -360,7 +369,7 @@ export async function escalateIncident(
 
   const hasExternalThreat =
     verdict.boundaries?.externalCompromise === true || verdict.boundaries?.externalExploit === true;
-  if (failed === results.length && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+  if (failed === results.length && (effectiveVerdict(verdict) === 'REPAIR_REQUIRED' || hasExternalThreat)) {
     console.error('[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:', {
       channels_failed: failed,
       has_external_threat: Boolean(hasExternalThreat),
