@@ -346,12 +346,8 @@ export async function escalateIncident(
 ): Promise<void> {
   if (!shouldEscalate(verdict)) return;
 
-  console.log(
-    '[incident-escalation] Escalating',
-    verdict.verdict,
-    'from',
-    verdict.service,
-  );
+  // Verdict fields are untrusted; log fixed event codes only.
+  console.log('[incident-escalation] ESCALATION_STARTED');
 
   const results = await Promise.allSettled([
     escalateToSlack(verdict, env),
@@ -366,11 +362,8 @@ export async function escalateIncident(
     verdict.boundaries?.externalCompromise === true || verdict.boundaries?.externalExploit === true;
   if (failed === results.length && (verdict.verdict === 'REPAIR_REQUIRED' || hasExternalThreat)) {
     console.error('[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:', {
-      verdict: verdict.verdict,
-      service: verdict.service,
-      receipt: verdict.receipt,
       channels_failed: failed,
-      has_external_threat: hasExternalThreat,
+      has_external_threat: Boolean(hasExternalThreat),
     });
   }
 
@@ -385,7 +378,7 @@ export function emitReciprocalTelemetryWithEscalation(
   if (!verdict.meaningful) return;
 
   const logTask = Promise.resolve().then(() => {
-    console.log('[reciprocal-defense]', JSON.stringify(verdict));
+    console.log('[reciprocal-defense] SECURITY_VERDICT_OBSERVED');
   });
 
   const escalationTask = escalateIncident(verdict, env);
