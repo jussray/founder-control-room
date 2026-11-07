@@ -649,3 +649,13 @@ The entries below are failures or cancellations observed in the exact GitHub Act
 | `1d69c7344f90359960620e3b3966f133c27137eb` | Founder Repo Cycle (run 42400371954) | cancelled | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42400371954); outcome only | OPEN |
 | `1d69c7344f90359960620e3b3966f133c27137eb` | Attack-20 V3 (run 42400372040) | cancelled | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42400372040); outcome only | OPEN |
 | `1d69c7344f90359960620e3b3966f133c27137eb` | Historical CI Accountability (run 42400371923) | failure | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42400371923); outcome only | OPEN |
+
+
+## 2026-11-07 auditor follow-up — newly completed failures
+
+The following Historical CI Accountability runs failed because earlier historical outcomes had not yet been recorded. This adds observed failure evidence without converting any prior red result to green. Live status remains dependent on subsequent exact-head CI.
+
+| Failed/cancelled SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `add8f562585d6beaaedcbfbd950575c17ab9ffd6` | Historical CI Accountability (run 42400448844) | failure | Earlier historical failure evidence absent from ledger | Append the observed missing evidence; do not suppress audit | [Failed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42400448844) | OPEN |
+| `9401e61c12d35d6dfeb15a3c4e2b73e5919f6147` | Historical CI Accountability (run 42404310293) | failure | Earlier historical failure evidence absent from ledger | Append the observed missing evidence; do not suppress audit | [Failed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42404310293) | OPEN |

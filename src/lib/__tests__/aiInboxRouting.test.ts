@@ -15,6 +15,14 @@ describe('AI Inbox observation-only routing', () => {
     expect(decision.evidence).toBe('message_only');
     expect(decision.requiresHumanReview).toBe(true);
   });
+  it('prioritizes frozen store and HSTS security notices without claiming provider verification', () => {
+    for (const subject of ['Urgent: JBH is frozen', '[Alert] Domains without HSTS']) {
+      const decision = classifyAiInboxMessage({ ...base, subject, replySignal: true });
+      expect(decision.lane).toBe('money_security');
+      expect(decision.evidence).toBe('message_only');
+      expect(decision.requiresHumanReview).toBe(true);
+    }
+  });
   it('does not claim a current CI failure from a notification', () => {
     const decision = classifyAiInboxMessage({ ...base, subject: 'Run failed: required gate' });
     expect(decision.lane).toBe('ci_unverified');

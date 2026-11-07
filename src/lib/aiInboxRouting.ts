@@ -45,7 +45,7 @@ export function classifyAiInboxMessage(message: AiInboxMessage): AiInboxDecision
   if (/unsubscribe|remove me from (this|your) list|stop emailing/.test(subject)) {
     lane = 'suppression_review';
     reason = 'Possible opt-out; do not dispatch until suppression is reviewed';
-  } else if (/payment (failed|declined)|billing (failed|problem)|invoice overdue|subscription (expir|deactiv)|security alert|unauthorized sign.in|account compromised/.test(subject)) {
+  } else if (/payment (failed|declined)|billing (failed|problem)|invoice overdue|subscription (expir|deactiv)|security alert|security insight|domains without hsts|unauthorized sign.in|account compromised|\b(?:is|has been)\s+(?:frozen|suspended)\b/.test(subject)) {
     lane = 'money_security';
     reason = 'Financial or security risk signaled by message, not independently verified';
   } else if (/delivery (failed|status notification)|undeliverable|action required|approval requested/.test(subject)) {
