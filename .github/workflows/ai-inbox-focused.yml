@@ -5,6 +5,10 @@ on:
     paths:
       - 'src/lib/aiInboxRouting.ts'
       - 'src/lib/__tests__/aiInboxRouting.test.ts'
+      - 'src/lib/growthInboxReply.ts'
+      - 'src/lib/__tests__/growthInboxReply.test.ts'
+      - 'src/http/routes/pluginCenterMessaging.ts'
+      - 'src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts'
       - '.github/workflows/ai-inbox-focused.yml'
   workflow_dispatch:
 
@@ -28,6 +32,6 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run AI Inbox focused tests
-        run: npx vitest run src/lib/__tests__/aiInboxRouting.test.ts
+        run: npx vitest run src/lib/__tests__/aiInboxRouting.test.ts src/lib/__tests__/growthInboxReply.test.ts src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts
       - name: Lint AI Inbox changes
-        run: npx eslint src/lib/aiInboxRouting.ts src/lib/__tests__/aiInboxRouting.test.ts --max-warnings 0
+        run: npx eslint src/lib/aiInboxRouting.ts src/lib/__tests__/aiInboxRouting.test.ts src/lib/growthInboxReply.ts src/lib/__tests__/growthInboxReply.test.ts src/http/routes/pluginCenterMessaging.ts src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts --max-warnings 0
