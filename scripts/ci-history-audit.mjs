@@ -72,7 +72,7 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const token = process.env.GITHUB_TOKEN;
   const pr = process.env.PR_NUMBER;
-  if (!/^[\\w.-]+\\/[\\w.-]+$/.test(repo || '') || !token || !/^[1-9]\\d*$/.test(pr || ''))
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '') || !token || !/^[1-9]\d*$/.test(pr || ''))
     throw new Error('GITHUB_REPOSITORY, GITHUB_TOKEN and PR_NUMBER required');
   const rows = parseLedger(readFileSync('docs/ci-historical-accountability.md', 'utf8'));
   const commits = await allPages(`/repos/${repo}/pulls/${pr}/commits`, token);
