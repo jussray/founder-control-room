@@ -277,6 +277,31 @@ describe('incident-escalation', () => {
     errorSpy.mockRestore();
   });
 
+  it('does not expose untrusted security verdict details in logs', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const verdict = createMockVerdict('REPAIR_REQUIRED');
+      verdict.service = 'private-service-LEAK-MARKER';
+      verdict.receipt = 'private-receipt-LEAK-MARKER';
+      verdict.unit!.findings![0]!.title = 'private-title-LEAK-MARKER';
+      verdict.technicalIdentity!.claimedCrawler = 'private-actor-LEAK-MARKER';
+
+      let completion: Promise<unknown> | undefined;
+      emitReciprocalTelemetryWithEscalation(verdict, {}, {
+        waitUntil: (promise) => { completion = promise; },
+      });
+      expect(completion).toBeDefined();
+      await completion;
+
+      const emitted = JSON.stringify([logSpy.mock.calls, errorSpy.mock.calls]);
+      expect(emitted).not.toContain('LEAK-MARKER');
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
   it('ignores non-meaningful verdicts', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const verdict = createMockVerdict('OBSERVE');
