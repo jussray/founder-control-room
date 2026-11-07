@@ -415,6 +415,10 @@ A committed regression test is source evidence only until the exact-head workflo
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
 
+## Sauce Guard agent inheritance and log-egress stop condition
+
+Always load the founder-owned `.agents/skills/sauce-guard/SKILL.md` before public posts, outreach, status summaries, release announcements, or any external communication derived from product work. Chief proposes; Current You approves exact copy; FCR revalidates temporal claims and executes only within approved authority; provider readback proves the result. CI must block new dynamic logger sinks through `scripts/verify-sauce-guard-egress.mjs`. Never print raw errors, private user records, prompts, keys, or provider payloads to defeat a failing check. The narrow changed-line audit cannot prove older logs are safe and never grants merge, publish, deploy, or production authority.
+
 
 ## CI lockfile determinism — current exact-head source contract
 

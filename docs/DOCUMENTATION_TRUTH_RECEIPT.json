@@ -506,6 +506,13 @@
       ]
     },
     {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
+        "`.github/workflows/ci.yml` must run the canonical Sauce Guard agent-contract tests and block newly added dynamic logger sinks through `scripts/verify-sauce-guard-egress.mjs` in the existing PR/push Lint job; a passing changed-line guard is not a full historical log audit, published artifact proof, or authorization to bypass founder review."
+      ]
+    },
+    {
       "path": ".github/workflows/quality-gate.yml",
       "claims": [
         "`.github/workflows/quality-gate.yml` must use lockfile-strict npm ci for its Node verification jobs and cache npm download content keyed to the committed dependency lockfile, while retaining typecheck, lint, coverage tests, guarded terminal contracts, RLS, and production build checks as distinct executed requirements until same-head replacement proof is verified.",

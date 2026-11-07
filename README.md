@@ -595,6 +595,10 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
 
+## Sauce Guard agent and logging egress (candidate governance)
+
+Founder Control Room owns the canonical `.agents/skills/sauce-guard/SKILL.md` for all founder-product outward communication. The skill requires verified, temporally current public-safe claims, exact Current You approval, FCR execution-time revalidation and destination-provider readback. CI's `scripts/verify-sauce-guard-egress.mjs` is a separate, changed-line source check that rejects newly introduced dynamic logger sinks and unsafe logging of raw provider/user content in covered code areas. It cannot certify older logs, external agents, security scanning, or publication. The PR must pass exact-head checks, independent review and founder-final merge authorization before this policy is integrated.
+
 ## October 24 StoryEngine relay-proof peer refresh
 
 StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.

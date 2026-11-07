@@ -1,5 +1,14 @@
 # Founder Control Room Global AI Contract
 
+## Mandatory founder Sauce Guard (all contributors and agents)
+
+**Always read and apply the canonical founder-owned skill** `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md` before any externally visible update, publication, outreach, progress claim, shared screenshot, link, evidence summary, or outgoing content derived from internal product work. This repository owns the skill; keep its source canonical. All humans, coding agents, reviewers, and automated contributors inherit this rule, including delegated subagents.
+
+**Public egress:** verify proof for CURRENT claims; mark historical evidence accurately; hold STALE / UNKNOWN assertions; omit proprietary prompts, internal mechanics, unapproved metrics, private user/teen/customer data, secrets, raw diffs, and provider payloads. **Current You** must approve the exact executable copy; FCR revalidates and **provider readback** is required before claiming it was published. Missing skill, approval, or evidence means HOLD.
+
+**Log egress:** use fixed uppercase event codes rather than untrusted exception messages, user IDs, credentials, raw response bodies or payloads at logger sinks. `scripts/verify-sauce-guard-egress.mjs` rejects newly added dynamic logs in CI. This changed-line scanner does not certify all inherited logs or replace Sauce Guard publication approval; do not bypass either gate to turn CI green.
+
+
 For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
 
 ## Parent operating contract
