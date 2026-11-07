@@ -7,6 +7,9 @@ on:
       - 'src/lib/__tests__/mediaFfmpegRender.test.ts'
       - 'scripts/render-video.mts'
       - 'scripts/verify-video-playback.mjs'
+      - 'scripts/free_buffer_video.mjs'
+      - 'scripts/test_free_buffer_video.mjs'
+      - '.ai/skills/founder-signal-buffer-followup/SKILL.md'
       - '.claude/skills/makevideo/SKILL.md'
       - '.github/workflows/video-renderer-proof.yml'
   pull_request:
@@ -15,6 +18,9 @@ on:
       - 'src/lib/__tests__/mediaFfmpegRender.test.ts'
       - 'scripts/render-video.mts'
       - 'scripts/verify-video-playback.mjs'
+      - 'scripts/free_buffer_video.mjs'
+      - 'scripts/test_free_buffer_video.mjs'
+      - '.ai/skills/founder-signal-buffer-followup/SKILL.md'
       - '.claude/skills/makevideo/SKILL.md'
       - '.github/workflows/video-renderer-proof.yml'
   workflow_dispatch:
@@ -37,6 +43,8 @@ jobs:
           ffprobe -version | head -1
       - name: Focused renderer tests
         run: npx vitest run src/lib/__tests__/mediaFfmpegRender.test.ts
+      - name: Free-first authentic footage regression suite
+        run: node --test scripts/test_free_buffer_video.mjs
       - name: Render through the public CLI
         run: |
           cat > /tmp/fcr-video-proof.json <<'JSON'
