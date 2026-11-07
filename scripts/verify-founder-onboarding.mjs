@@ -69,7 +69,10 @@ requireText('ui', 'HubSpot onboarding slot', 'value="hubspot"');
 requireText('ui', 'Playwright onboarding slot', 'value="playwright"');
 requireText('ui', 'workspace bootstrap endpoint', "api('/onboarding/bootstrap'");
 requireText('ui', 'workspace state endpoint', "api('/onboarding/state')");
-requireText('ui', 'composer payload', 'controlRoom:{projectType:');
+// The Composer's field structure is authoritative, not the code formatter.
+if (!/controlRoom\s*:\s*\{\s*projectType\s*:/.test(files.ui)) {
+  errors.push('composer payload: missing controlRoom projectType field');
+}
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "api('/auth/password'");
