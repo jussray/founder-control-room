@@ -3,8 +3,6 @@ name: Main Release Provenance
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       target_sha:
@@ -22,7 +20,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+  TARGET_SHA: ${{ inputs.target_sha || github.sha }}
 
 jobs:
   contract:
@@ -49,7 +47,6 @@ jobs:
 
   provenance:
     name: Main release provenance
-    if: ${{ github.event_name != 'pull_request' }}
     needs: contract
     runs-on: ubuntu-latest
     steps:

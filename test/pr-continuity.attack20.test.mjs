@@ -224,12 +224,27 @@ test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
   assert.match(cleanup, /^    if: \|$/m);
   assert.doesNotMatch(cleanup, /if: always\(\)/);
 });
-test('CI-SKIP FCR05 release contract is PR-tested, provenance is gated', () => {
-  const workflow = skipPolicyWorkflow('main-release-provenance.yml');
-  assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
-  const provenance = assertExactJobSkipGuard(workflow, 'provenance', "${{ github.event_name != 'pull_request' }}");
+test('CI-SKIP FCR05 separates PR contract from privileged main provenance without fake passes', () => {
+  const main = skipPolicyWorkflow('main-release-provenance.yml');
+  const pr = skipPolicyWorkflow('main-release-provenance-pr.yml');
+
+  assert.match(main, /^  push:\n    branches: \[main\]$/m);
+  assert.match(main, /^  workflow_dispatch:/m);
+  assert.doesNotMatch(main, /^  pull_request:/m);
+  assert.match(skipPolicyJob(main, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  const provenance = skipPolicyJob(main, 'provenance');
+  assert.doesNotMatch(provenance, /^    if:/m, 'main-only provenance must not create skipped PR checks');
   assert.match(provenance, /^    needs: contract$/m);
+
+  assert.match(pr, /^  pull_request:\n    branches: \[main\]$/m);
+  assert.doesNotMatch(pr, /^  push:|^  workflow_dispatch:|^  pull_request_target:/m);
+  assert.match(pr, /TARGET_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const prContract = skipPolicyJob(pr, 'contract');
+  assert.match(prContract, /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  assert.match(prContract, /ref: \$\{\{ env\.TARGET_SHA \}\}/);
+  assert.doesNotMatch(pr, /^  provenance:/m, 'PR validation must never run main release provenance');
 });
+
 test('CI-SKIP FCR06 reject unconditional and widened metadata expressions', () => {
   const source = skipPolicyWorkflow('pr-continuity.yml');
   const original = "if: github.event_name == 'pull_request_target'";
