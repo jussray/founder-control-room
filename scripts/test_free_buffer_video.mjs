@@ -43,3 +43,24 @@ test('10s reel is decoded, hash-receipted, and source files untouched',async()=>
    assert.ok((await readFile(intro)).length>0);
  }finally{await rm(d,{recursive:true,force:true})}
 });
+
+test('optional approved world and recorded voiceover render without invented UI',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+   const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4'),voice=join(d,'voice.m4a'),world=join(d,'world.png'),out=join(d,'out.mp4');
+   makeClip(intro,3.5,true); makeClip(screen,7.5,false);
+   assert.equal(cmd('ffmpeg',['-v','error','-y','-f','lavfi','-i','sine=frequency=250:sample_rate=48000','-t','7.5','-c:a','aac',voice]).status,0);
+   assert.equal(cmd('ffmpeg',['-v','error','-y','-f','lavfi','-i','color=c=black:s=320x568','-frames:v','1',world]).status,0);
+   const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--world',world,'--voiceover',voice,'--output',out,'--width','270','--height','480']);
+   assert.equal(p.status,0,p.stderr);
+   const receipt=JSON.parse(await readFile(out+'.receipt.json','utf8'));
+   assert.ok(receipt.source_sha256.world);assert.ok(receipt.source_sha256.voiceover);
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+test('never overwrites existing output or source footage',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+   const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4');
+   makeClip(intro,3.5,true);makeClip(screen,7.5,true);
+   const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--output',intro]);
+   assert.notEqual(p.status,0);assert.match(p.stderr,/overwrite|exists/i);
+ }finally{await rm(d,{recursive:true,force:true})}
+});
