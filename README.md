@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## Gmail AI Inbox — candidate scoped runtime
+
+PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
