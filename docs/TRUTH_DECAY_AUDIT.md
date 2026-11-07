@@ -1,5 +1,12 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 1, 2026: Actions Mail Audit governance and proof expiry
+
+The existing FCR PR #965 carries a repository-owned, **default-disabled** GitHub Actions monitoring workflow and a GitHub Copilot audit skill. Changes to `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md` and the monitoring evidence contract must not upgrade a verified source/test result to Gmail OAuth consent, operating scheduler, exact current production configuration, incident resolution, or merge authority. The adapter is scoped to GitHub run metadata and separately provisioned read-only Gmail credentials; account profile equality is checked at run time. The FCR GitHub webhook continues to own provider event authority and is not replaced by notification mail.
+
+Documentation names five protected workflow secrets in `docs/SECRETS.md`; naming does not establish secret presence, provider scope, token validity, or mailbox authorization. A security alert remains triage until reviewed by its actual provider. Older checks, including the successful PR-head auditor contract and historical GitGuardian incident, expire for any successor head. Exact-head CI, Playwright, CodeQL, Documentation Truth, independent review, GitGuardian adjudication, and provider/runtime readback remain separate. The monitor cannot auto-merge, auto-repair, mutate email, or certify all cross-repository workflows with a repository-scoped GitHub token.
+
+
 ## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
 
 The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.

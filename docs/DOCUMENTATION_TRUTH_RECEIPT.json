@@ -493,6 +493,13 @@
       ]
     },
     {
+      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
+      "claims": [
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must preserve the founder's bounded Observe/Orient/Decide/Act/Verify loop and existing branch authority; the exported Actions Mail Audit cannot promote an email notification into current GitHub exact-head proof or grant automatic repairs, approvals, merge, or production activation.",
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must keep the separate owner-authorized read-only Gmail discovery lane subordinate to the verified FCR GitHub event source, with no assertion that adding a repository skill, GitHub schedule, OAuth secret name, or passing contract test proves live mailbox consent or a deployed monitoring runtime."
+      ]
+    },
+    {
       "path": "src/http/routes/mcp.ts",
       "claims": [
         "The canonical /mcp and legacy /mcp/read POST auth/tool routes must share one explicit 60-per-minute per-IP, per-process route-local express-rate-limit middleware before any OAuth/static-token dispatch, alongside the existing 120-per-minute global baseline; this source guard does not prove globally distributed or deployed enforcement and must not weaken the authentication/grant checks.",
