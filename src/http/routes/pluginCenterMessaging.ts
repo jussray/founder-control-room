@@ -358,7 +358,7 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
   }
 
   const gmailRead = gmailInboxReadStatus();
-  if (requestedChannel === 'email' && gmailRead.configured && gmailRead.projectSlug !== projectSlug) {
+  if (requestedChannel === 'email' && gmailRead.labelId && (!gmailRead.configured || gmailRead.projectSlug !== projectSlug)) {
     return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
   }
 
