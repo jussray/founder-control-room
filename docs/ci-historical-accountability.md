@@ -10,6 +10,7 @@ This record is append-only in meaning: a successor's green checks do not rewrite
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Attack-20 V3 (run 42340569113) | failure | Typecheck step failed; exact diagnostics not separately established here | `aed65464c42e39cf621d1c645fb6313173ac03a4` | Attack-20 V3 run 42340693866 succeeded on corrective SHA | REMEDIATED |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Cloudflare + Local Parallel Preflight (run 42340569137) | failure | UNKNOWN — failed-job logs not yet examined | UNKNOWN | No verified failure-to-fix mapping | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Founder Control Room Test Catalog (run 42340569122) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
+| `0684cd93a1628cb29171d5331b5e2a4bf8842400` | PR Continuity (run 42340568976) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | PR Continuity (run 42340569245) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Quality Gate (run 42340569202) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
 | `0684cd93a1628cb29171d5331b5e2a4bf8842400` | Control Room Test Ledger (run 42340569179) | cancelled | UNKNOWN — cancellation reason unverified | UNKNOWN | Not proven | OPEN |
