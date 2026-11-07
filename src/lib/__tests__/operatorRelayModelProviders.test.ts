@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   OPERATOR_RELAY_REQUEST_CONTRACT,
   operatorRelayRequestHash,
@@ -326,5 +326,47 @@ describe('createServerOperatorRelayAdapters', () => {
     }, fetchMock);
     await expect(adapters.perplexity?.(relay('restricted'))).rejects.toThrow('restricted relay context');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+// Earlier carrier cases are reconciled with main's stronger response/error and spend contracts.
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+describe('reconciled Anthropic transport safeguards', () => {
+  it('preserves the explicit workspace header alongside current MCP and spending controls', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({ 'anthropic-workspace-id': 'wrkspc_test' });
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return new Response(JSON.stringify({ id: 'msg_workspace', type: 'message', role: 'assistant', content: [{ type: 'text', text: 'bounded result' }] }), { status: 200 });
+    }) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({ ANTHROPIC_API_KEY: FIXTURE, FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model', FCR_RELAY_ANTHROPIC_WORKSPACE_ID: 'wrkspc_test' }, fetchMock);
+    await expect(adapters['claude-code']?.(relay('internal', 'claude-code'))).resolves.toMatchObject({ evidenceRefs: ['provider:anthropic:msg_workspace'] });
+  });
+
+  it('refuses an oversized error body without echoing the configured key', async () => {
+    const key = 'synthetic-key-never-echo';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { message: key + 'x'.repeat(600000) } }), { status: 400 })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({ ANTHROPIC_API_KEY: key, FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model' }, fetchMock);
+    const pending = adapters['claude-code']?.(relay('internal', 'claude-code'));
+    await expect(pending).rejects.toThrow('Anthropic relay failed with HTTP 400');
+    await expect(pending).rejects.not.toThrow(key);
+  });
+
+  it('observes timeout rejection with a handler attached before advancing the clock', async () => {
+    vi.useFakeTimers();
+    const controllers: AbortController[] = [];
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((delay) => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      setTimeout(() => controller.abort(), delay);
+      return controller.signal;
+    });
+    const fetchMock = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+    })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({ ANTHROPIC_API_KEY: FIXTURE, FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model' }, fetchMock);
+    const assertion = expect(adapters['claude-code']?.(relay('internal', 'claude-code'))).rejects.toThrow('Anthropic relay request failed');
+    await vi.advanceTimersByTimeAsync(60000);
+    await assertion;
+    expect(controllers[0].signal.aborted).toBe(true);
   });
 });

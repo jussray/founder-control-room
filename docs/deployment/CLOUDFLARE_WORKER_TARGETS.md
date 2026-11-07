@@ -277,6 +277,10 @@ Current executable source and authoritative provider readback outrank an older v
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
 
+## Governed execution carrier candidate
+
+`wrangler.worker.toml` declares `GOVERNED_EXECUTION_WORKFLOW` / `fcr-governed-execution-v1`, exported from `src/workflows/governedExecutionWorkflow.ts`. The candidate carrier waits for a broker-owned world, a separately authorized execution receipt, and an independent witness; event delivery and Workflow persistence never authenticate founder authority or authorize provider effects. Source declarations and generated types do not establish a configured Workflow, instance, deployed identity, D1/R2 binding, or production outcome. The separate staged `governedExecutionWorkflowV1.ts` module is not exported by this candidate binding and must not be mistaken for its runtime implementation. Activation remains a separate authority and provider-proof gate.
+
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.

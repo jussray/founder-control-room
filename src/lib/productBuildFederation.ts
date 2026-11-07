@@ -4,6 +4,10 @@ import {
   type ProductBuildDirective,
   type ProductBuildReceipt,
 } from './productBuildDirective.js';
+import {
+  evaluateGovernedActionAuthorization,
+  type GovernedActionGrant,
+} from '../ultrathink-core/governedActionAuthorization.js';
 
 export const STORYENGINE_PRODUCT_BUILD_PROJECT = 'l99' as const;
 export const STORYENGINE_PRODUCT_BUILD_REPOSITORY = 'jussray/StoryEngine' as const;
@@ -11,7 +15,9 @@ export const STORYENGINE_PRODUCT_CONTROL_ROOM = 'storyengine-control-room' as co
 export const STORYENGINE_PRODUCT_BUILD_CAPABILITY = 'founder-control-room-federation' as const;
 export const STORYENGINE_PRODUCT_BUILD_ACTION = 'build-product-control-room-loop' as const;
 export const STORYENGINE_PRODUCT_BUILD_MUTATION_SCOPE = 'control-room:event-log' as const;
+export const STORYENGINE_PRODUCT_BUILD_ACTION_ID = 'storyengine-control-room:event-log:write' as const;
 
+const STORYENGINE_PRODUCT_BUILD_ACTION_TARGET = `${STORYENGINE_PRODUCT_BUILD_REPOSITORY}#${STORYENGINE_PRODUCT_BUILD_MUTATION_SCOPE}`;
 const MAX_JSON_BYTES = 64 * 1024;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -73,6 +79,10 @@ export interface ProductBuildFederationOptions {
   apiKey?: string;
   fetchImpl?: FetchLike;
   timeoutMs?: number;
+  actionAuthorization?: {
+    approvalReceiptId: string;
+    approvalValid: boolean;
+  };
 }
 
 function record(value: unknown): JsonRecord | null {
@@ -108,6 +118,44 @@ function storyEngineDirectiveBoundaryErrors(directive: ProductBuildDirective): s
     errors.push('StoryEngine product build requires node-test and playwright proof');
   }
   return errors;
+}
+
+function storyEngineActionGrant(directive: ProductBuildDirective): GovernedActionGrant {
+  return {
+    actionId: STORYENGINE_PRODUCT_BUILD_ACTION_ID,
+    actionClass: 'write_external',
+    target: `${directive.repository}#${directive.allowedMutationScope[0] ?? ''}`,
+    capability: directive.allowedCapabilities[0] ?? '',
+    reversible: true,
+    requiresApproval: true,
+    approvalReceiptId: directive.founderDecisionHash,
+    evidenceRequired: true,
+  };
+}
+
+function requireStoryEngineActionAuthorization(
+  directive: ProductBuildDirective,
+  authorization: ProductBuildFederationOptions['actionAuthorization'],
+): void {
+  const decision = evaluateGovernedActionAuthorization(
+    [storyEngineActionGrant(directive)],
+    {
+      actionId: STORYENGINE_PRODUCT_BUILD_ACTION_ID,
+      actionClass: 'write_external',
+      target: STORYENGINE_PRODUCT_BUILD_ACTION_TARGET,
+      capability: STORYENGINE_PRODUCT_BUILD_CAPABILITY,
+      approvalReceiptId: authorization?.approvalReceiptId,
+      approvalValid: authorization?.approvalValid === true,
+    },
+  );
+
+  if (decision.disposition !== 'EXECUTE') {
+    throw new ProductBuildFederationError(
+      'PRODUCT_BUILD_ACTION_UNAUTHORIZED',
+      `StoryEngine product-build action failed the immediate authority gate: ${decision.reasons.join(', ')}`,
+      false,
+    );
+  }
 }
 
 function runtimeIdentity(value: unknown): StoryEngineRuntimeIdentity | null {
@@ -315,6 +363,11 @@ export async function dispatchStoryEngineProductBuildDirective(
       `StoryEngine runtime head ${runtimeIdentityBefore.release_sha} does not match directive head ${expectedHead}.`,
     );
   }
+
+  // Per-action authority is evaluated at the effect boundary, after exact runtime
+  // identity is known and immediately before the external POST. Planning, routing,
+  // capability choice, model quality, and earlier validation cannot bypass this gate.
+  requireStoryEngineActionAuthorization(directive, options.actionAuthorization);
 
   let response;
   try {
