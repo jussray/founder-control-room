@@ -1,0 +1,45 @@
+{
+  "schema": "fcr/public-front-door-boundary@v1",
+  "asOf": "2026-10-22",
+  "provider": "Cloudflare Zero Trust Access",
+  "publicHostname": "foundercontrolroom.org",
+  "publicPaths": [
+    "/",
+    "/juss-rayy/",
+    "/fcr-public-tabs.js"
+  ],
+  "protectedPaths": [
+    "/control-room",
+    "/control-room/*",
+    "/admin",
+    "/admin/*",
+    "/api/founder",
+    "/api/founder/*"
+  ],
+  "applicationName": "FCR protected owner paths — public front door remains open",
+  "policyReuse": "existing FCR email allow policy",
+  "exclusions": [
+    "Never blanket-disable Worker Access",
+    "Do not infer this contract alone proves current provider state",
+    "Treat all future private routes as protected until independently verified"
+  ],
+  "crossProductRule": "FCR, PromptOS, SOL, Chief and Think Tank are independent app products even if shared skills, API contracts or infrastructure exist.",
+  "protectedHostnames": [
+    "foundercontrolroom.org",
+    "app.foundercontrolroom.org",
+    "checkout.foundercontrolroom.org",
+    "founder-control-room.pages.dev",
+    "*.founder-control-room.pages.dev"
+  ],
+  "accessApplicationNames": [
+    "FCR protected owner paths — public front door remains open",
+    "FCR protected alternate app and checkout paths",
+    "FCR Pages default and preview owner paths"
+  ],
+  "publicHostnames": [
+    "foundercontrolroom.org",
+    "app.foundercontrolroom.org",
+    "checkout.foundercontrolroom.org",
+    "founder-control-room.pages.dev"
+  ]
+}
