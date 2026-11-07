@@ -16,7 +16,7 @@ import {
   type PublicProjectSummary,
 } from '../../mcp/publicTenantAccess.js';
 
-const OWNER_CONSOLE_URL = 'https://www.foundercontrolroom.org/control-room/';
+const OWNER_CONSOLE_URL = 'https://foundercontrolroom.org/control-room/';
 const limiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false });
 export const commandCenterSiteRouter = Router();
 
@@ -71,10 +71,10 @@ commandCenterSiteRouter.get('/site/command-center/bootstrap', limiter, async (re
     return error || !data?.user ? null : {
       id: data.user.id, email: data.user.email, is_anonymous: data.user.is_anonymous,
     };
-  }, async email => {
+  }, async immutableUserId => {
     const { data, error } = await supabase.from('founder_users')
-      .select('email').eq('email', email).maybeSingle();
-    return !error && Boolean(data);
+      .select('user_id').eq('user_id', immutableUserId).maybeSingle();
+    return !error && data?.user_id === immutableUserId;
   });
   if (!actor) return res.status(401).json({ error: 'Authentication required' });
   if (actor.role === 'owner') {
