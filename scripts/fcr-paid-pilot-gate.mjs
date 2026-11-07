@@ -1,6 +1,10 @@
 /**
  * Non-chargeable FCR pilot gate. Pure decision logic; does not call payment
  * providers, write receipts, or grant production authority.
+ *
+ * Fails closed: caller-supplied delivery fields are never sufficient to return
+ * allowed: true. Allowing requires a server-owned, independent delivery verifier,
+ * which is not wired in this module.
  */
 export function assessPilotExecution(input) {
   if (!input || typeof input !== 'object') throw new TypeError('pilot input required');
@@ -18,10 +22,10 @@ export function assessPilotExecution(input) {
     return { allowed: false, reason: 'DELIVERY_NOT_PROVEN' };
   }
   return {
-    allowed: true,
-    reason: 'PILOT_EVIDENCE_ACCEPTED',
-    receipt: Object.freeze({
-      kind: 'fcr_non_chargeable_pilot',
+    allowed: false,
+    reason: 'DELIVERY_UNVERIFIED',
+    candidate: Object.freeze({
+      kind: 'fcr_non_chargeable_pilot_candidate',
       executionId,
       artifactDigest: delivery.artifactDigest,
       paymentStatus: 'not_charged',
