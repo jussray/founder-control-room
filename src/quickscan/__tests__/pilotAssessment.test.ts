@@ -13,9 +13,10 @@ describe('QuickScan non-chargeable pilot assessment', () => {
     const result = assessQuickScanSandboxPilot(true, input());
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe('DELIVERY_UNVERIFIED');
-    if (!('candidate' in result)) throw new Error('expected unverified candidate');
-    expect(result.candidate.deliveryVerified).toBe(false);
-    expect(result.candidate.independentlyVerified).toBe(false);
+    const candidate = result.candidate;
+    if (!candidate) throw new Error('expected unverified candidate');
+    expect(candidate.deliveryVerified).toBe(false);
+    expect(candidate.independentlyVerified).toBe(false);
   });
   it('cannot be used to request payment or production authority', () => {
     expect(assessQuickScanSandboxPilot(true, { ...input(), chargeRequested: true }).allowed).toBe(false);
