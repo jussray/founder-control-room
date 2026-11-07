@@ -506,6 +506,18 @@
       ]
     },
     {
+      "path": "src/mcp/policy.ts",
+      "claims": [
+        "Read-only advertised annotations make destructiveHint inapplicable without reducing tool-name or policy risk; metadata cannot authorize mutation."
+      ]
+    },
+    {
+      "path": "src/mcp/hub.ts",
+      "claims": [
+        "The MCP invocation boundary must bypass the discovery cache and fail closed on fresh discovery failure, tool removal or mutating metadata before tools/call; fresh hints are not provider-behavior proof or an atomic remote execution binding."
+      ]
+    },
+    {
       "path": ".github/workflows/quality-gate.yml",
       "claims": [
         "`.github/workflows/quality-gate.yml` must use lockfile-strict npm ci for its Node verification jobs and cache npm download content keyed to the committed dependency lockfile, while retaining typecheck, lint, coverage tests, guarded terminal contracts, RLS, and production build checks as distinct executed requirements until same-head replacement proof is verified.",

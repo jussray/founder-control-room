@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## MCP invocation evidence boundary
+
+The advertised-risk candidate refreshes tools/list immediately before each invocation instead of reusing the five-minute discovery cache. A removed tool or fresh discovery failure prevents tools/call; current mutating annotations require separate approval. readOnlyHint=true makes destructiveHint inapplicable while preserving any risk already inferred from the tool name. Metadata remains an untrusted hint, not proof that a remote provider performs no mutation; fresh discovery narrows the cache race but cannot atomically bind a separate remote tools/call. Exact-head behavior tests and independent review remain required before integration, with production activation and outcomes separately unverified.
+
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
