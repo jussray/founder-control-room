@@ -44,6 +44,7 @@ type TestRule = { type: string; parameters?: Record<string, unknown> };
 function preservedProviderRules(): TestRule[] {
   return [
     { type: "required_linear_history" },
+    { type: "required_signatures" },
     { type: "code_quality", parameters: { severity: "errors" } },
     {
       type: "copilot_code_review",
@@ -416,7 +417,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
   });
 
-  it("preserves unrelated provider security rules when splitting the live review membrane", async () => {
+  it("preserves signed-commit enforcement and unrelated provider rules when splitting the live review membrane", async () => {
     const preserved = preservedProviderRules();
     mockGetRepoRulesets.mockResolvedValue({
       data: [

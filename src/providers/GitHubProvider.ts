@@ -35,6 +35,8 @@ const FCR_REVIEW_PRESERVABLE_RULE_TYPES = new Set([
   "required_linear_history",
   "code_quality",
   "copilot_code_review",
+  // Preserve the live signed-commit requirement across governance migration.
+  "required_signatures",
 ]);
 
 export interface GitHubProviderConfig {

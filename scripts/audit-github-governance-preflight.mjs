@@ -9,6 +9,7 @@ export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
   'required_linear_history',
   'code_quality',
   'copilot_code_review',
+  'required_signatures',
 ]);
 export const CODEQL_SECURITY_FLOOR = Object.freeze({
   tool: 'CodeQL',
