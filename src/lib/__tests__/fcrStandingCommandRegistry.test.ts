@@ -27,7 +27,7 @@ describe('FCR standing command and OS registry', () => {
     const ids = new Set(FCR_STANDING_COMMAND_REGISTRY.map((entry) => entry.id));
     for (const id of [
       'ultrathink', 'truthmode', 'confess', 'redteam', 'lindymode', 'ooda', 'l99',
-      'goalfix', 'attack', 'makevideo', 'leevize', 'garyvee', 'billgates', 'elonmusk',
+      'goalfix', 'urlfix', 'attack', 'makevideo', 'leevize', 'garyvee', 'billgates', 'elonmusk',
       'devil', 'steelman', 'human', 'ghost', 'futureyou', 'steal', 'hormozi',
       'firstprinciples', 'socrates', 'antiadvice', 'unlearn', 'visualize', 'artifact',
       'compact', 'btw', 'effort', 'caveman', 'v10', 'insights', 'sales', 'expert',
@@ -66,6 +66,17 @@ describe('FCR standing command and OS registry', () => {
       'council-os',
       'preflight-os',
     ]));
+  });
+
+  it('auto-routes live-site repair intent through URLFIX without granting execution', () => {
+    const decision = routeFcrStandingCommands(
+      'Test this website URL in the browser, find issues, and repair verified defects.',
+      'write',
+    );
+
+    expect(decision.standingCommandIds).toContain('urlfix');
+    const descriptor = FCR_STANDING_COMMAND_REGISTRY.find((entry) => entry.id === 'urlfix');
+    expect(descriptor).toMatchObject({ owningOs: 'founder-control-room', kind: 'workflow', mayExecute: false });
   });
 
   it('auto-routes video intent through Video Production OS plus Media Router OS', () => {

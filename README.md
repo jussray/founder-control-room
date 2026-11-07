@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 4, 2026: Chief AI project-adapter source reconciliation
+
+The Chief AI project adapter is an **inspect/plan-only, read-only source snapshot**, not a shared runtime or a deployment signal. Its independently observed main-head and five contract-blob fingerprints are pinned in `src/founder-os-lab/projectAdapters.ts` and checked by `chiefAiProjectAdapter.test.ts` plus the live adapter freshness job. The new Chief capability registry carries non-authorizing continuity fingerprints, and merge-intent evaluation treats draft status as a blocker. Chief's pair contract preserves standalone product and technical independence, although its default commercial-packaging label changed; that change does **not** authorize bundling, change pricing, or collapse product identity.
+
+The Chief source refresh expires prior adapter evidence and cannot donate CI, Playwright, Cloudflare, live ProofMode MCP, production, merge, or founder approval. Separate Chief production ProofMode checks remain separately gated. Future head/blob changes require another semantic comparison and new exact-head checks.
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
