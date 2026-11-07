@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Founder Control Room",
+    "slug": "founder-control-room",
+    "scheme": "foundercontrolroom",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "updates": { "enabled": false },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jussray.foundercontrolroom",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.jussray.foundercontrolroom",
+      "versionCode": 1
+    },
+    "plugins": ["expo-router"]
+  }
+}
