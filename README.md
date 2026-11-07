@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## November 2, 2026: Search Console and evidence challenge source candidate
+
+The existing PR #1055 branch includes a source-only Founder Control Room owner-insights screen at `/control-room/owner-insights.html` and founder-authenticated API endpoints `GET /owner-insights/search-console` and `POST /owner-insights/challenge`. The former makes read-only Google Search Console sitemap and *sampled* URL Inspection requests for `sc-domain:jussco.company`; absent or rejected service-account authority must remain a blocked/unknown state rather than a zero-indexing statistic. It requires an independent, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret and read access to that exact Search Console property. The latter sends only consented, bounded claim/evidence text to the configured Cloudflare Workers AI binding routed through AI Gateway; model gaps, adversarial questions, and manual gate suggestions are unverified recommendations, not founder authorization.
+
+The two features are **not production-verified**, and neither grants deployment, merge, customer-account access, or indexing. The first slice remains founder-only; general project owners require separate project-scoped authentication, RLS, billing and privacy verification. Keep Google credentials off public Pages and source control, and do not turn a green source check into a production claim. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
+
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.

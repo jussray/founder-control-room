@@ -71,8 +71,23 @@ function statusFrom(value: unknown): FounderPermissionStatus | null {
   return FOUNDER_PERMISSION_STATUSES.includes(candidate) ? candidate : null;
 }
 function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
-  if (value == null) return null;
-  if (!isRecord(value) || text(value.type) !== 'merge') return null;
+  if (value == null || !isRecord(value)) return null;
+  const type = text(value.type);
+  if (type === 'learning_application') {
+    return {
+      type,
+      learningId: text(value.learningId),
+      targetMissionId: text(value.targetMissionId),
+      targetOutcomeId: text(value.targetOutcomeId),
+      targetHeadSha: text(value.targetHeadSha),
+      targetDomain: text(value.targetDomain),
+      crossDomainReason: text(value.crossDomainReason),
+    };
+  }
+  if (type === 'learning_retirement') {
+    return { type, learningId: text(value.learningId), originHeadSha: text(value.originHeadSha) };
+  }
+  if (type !== 'merge') return null;
   return {
     type: 'merge',
     repo: text(value.repo),

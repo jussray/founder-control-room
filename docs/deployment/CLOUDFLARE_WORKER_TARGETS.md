@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+## November 2, 2026: Owner Insights optional bindings — source only
+
+The existing `founder-control-room` Worker remains the single FCR API target. This branch declares an optional Workers AI `AI` binding and an optional, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret. The AI binding permits only the authenticated, proposal-only evidence challenge route `/owner-insights/challenge`; the Google secret permits only the read-only `/owner-insights/search-console` lookup after the exact Search Console property grants access. Missing Google authorization must return a blocked state. Neither binding allows payments, production mutation, deploys, or an unauthenticated public dashboard, and no credential value belongs in Wrangler source, GitHub Actions output, or Pages assets.
+
+The presence of `[ai]` and an optional-secret name is **configuration intent, not proof** of Worker runtime bindings, live AI Gateway inference, Google index measurements, or tenant/project-owner entitlements. Protect the founder session, same-origin CSRF barrier, existing service boundaries, and existing exact-head deploy guard. Verify the full test suite, CodeQL, provider readback, founder-only browser behavior and an approved Cloudflare deployment before claiming activation. Source details: `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.

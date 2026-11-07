@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## November 2, 2026: AI Gateway owner-evidence challenge boundary
+
+The owner-insights candidate introduces an optional Cloudflare `AI` binding on the canonical Founder Control Room Worker, configured through `[ai]` in `wrangler.worker.toml` and passed as `aiBinding` to the existing authenticated Express server. `POST /owner-insights/challenge` requires founder authentication, bounded submitted evidence and explicit disclosure consent before calling Workers AI with the AI Gateway `default` ID, no response caching, and no gateway request logging. The model output is treated as unverified text and limited to questions, evidence gaps, and a proposed **manual** next gate; it is not evidence of independent provider validation and never executes a release decision. Binding absence or malformed model output fails closed without a substitute success.
+
+The parallel `GET /owner-insights/search-console` requires an independently authorized, Worker-held read-only `GSC_SERVICE_ACCOUNT_JSON` credential; it cannot reveal indexing metrics without a real Google Search Console property response. Sitemaps, six sampled URL inspections and unknown/error states must be labeled as provider observations, not a property-wide index count. This source change does not demonstrate a live gateway invocation, provider grant, runtime activation, successful release, or safe tenant-level access. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md` for the missing gates.
+
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
