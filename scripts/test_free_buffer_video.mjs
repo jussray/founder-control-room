@@ -91,3 +91,29 @@ test('refuses to replace dangling symlink output or receipt',async()=>{
   assert.ok((await lstat(out)).isSymbolicLink());
  }finally{await rm(d,{recursive:true,force:true})}
 });
+
+
+test('overlay text requires an explicit approved font; no generic fallback',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4');
+  makeClip(intro,3.5);makeClip(screen,7.5);
+  const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--intro-title','Why Buffer?', '--output',join(d,'out.mp4'),'--width','270','--height','480']);
+  assert.notEqual(p.status,0);assert.match(p.stderr,/font/i);
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+
+test('approved lower thirds are rendered using text files and fingerprinted',async()=>{
+ const {existsSync}=await import('node:fs');
+ const font=['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf','/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf'].find(existsSync);
+ assert.ok(font,'CI must provide an installed test font');
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4'),out=join(d,'out.mp4');
+  makeClip(intro,3.5);makeClip(screen,7.5);
+  const p=cmd('node',[script,'--intro',intro,'--screen',screen,'--intro-title',"The Buffer test: here's why",'--screen-title','FCR + PromptOS • evidence first','--font-file',font,'--output',out,'--width','270','--height','480']);
+  assert.equal(p.status,0,p.stderr);
+  const receipt=JSON.parse(await readFile(out+'.receipt.json','utf8'));
+  assert.match(receipt.overlay_text_sha256?.intro||'',/^[0-9a-f]{64}$/);
+  assert.match(receipt.font_sha256||'',/^[0-9a-f]{64}$/);
+  assert.equal(receipt.publish_authority,false);
+ }finally{await rm(d,{recursive:true,force:true})}
+});
