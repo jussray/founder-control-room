@@ -81,7 +81,9 @@ function mediaPackage(platform: string, requested: string, humanObservation: str
   };
 }
 function platformCopy(platform: string, x: { observation: string; fact: string; value: string; boundary: string; cta: string; proof: string; hashtags: readonly string[]; intent: string }) {
-  // The existing first-party draft validator requires the same visible source proof\n  // for every editorial intent; excluding it silently blocks non-proof updates.\n  const proof = '\n' + x.proof;
+  // The existing first-party draft validator requires the same visible source proof
+  // for every editorial intent; excluding it silently blocks non-proof updates.
+  const proof = '\n' + x.proof;
   const tags = x.hashtags.join(' ');
   let copy: string;
   if (platform === 'linkedin') {
