@@ -5,7 +5,7 @@ export const CONTENT_METRICS_CSV_CONTRACT = 'content-metrics-csv@v1' as const;
 const MAX_CSV_BYTES = 1024 * 1024;
 const MAX_DATA_ROWS = 10_000;
 const MAX_FIELD_LENGTH = 2_000;
-const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 export const CONTENT_METRIC_NAMES = [
   'impressions',
@@ -85,6 +85,7 @@ function parseCsvRows(csv: string): string[][] {
   let row: string[] = [];
   let field = '';
   let quoted = false;
+  let justClosedQuote = false;
 
   for (let index = 0; index < csv.length; index += 1) {
     const char = csv[index];
@@ -95,9 +96,34 @@ function parseCsvRows(csv: string): string[][] {
           index += 1;
         } else {
           quoted = false;
+          justClosedQuote = true;
         }
       } else {
         field += char;
+      }
+      continue;
+    }
+
+    if (justClosedQuote) {
+      if (char === ',') {
+        row.push(field);
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\n') {
+        row.push(field.replace(/\r$/, ''));
+        rows.push(row);
+        row = [];
+        field = '';
+        justClosedQuote = false;
+      } else if (char === '\r' && csv[index + 1] === '\n') {
+        index += 1;
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        justClosedQuote = false;
+      } else {
+        throw new Error('content metrics CSV quoted field must be followed by a comma, newline, or end-of-input');
       }
       continue;
     }
@@ -136,10 +162,38 @@ function requiredString(value: string | undefined, field: string, rowNumber: num
 
 function timestamp(value: string | undefined, field: string, rowNumber: number): string {
   const normalized = requiredString(value, field, rowNumber);
-  if (!ISO_TIMESTAMP.test(normalized) || !Number.isFinite(Date.parse(normalized))) {
+  const match = ISO_TIMESTAMP.exec(normalized);
+  const parsed = Date.parse(normalized);
+  if (!match || !Number.isFinite(parsed)) {
     throw new Error(`content metrics CSV row ${rowNumber}: ${field} must be an offset-aware ISO timestamp`);
   }
-  return normalized;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const offsetHour = match[8] === 'Z' ? 0 : Number(match[10]);
+  const offsetMinute = match[8] === 'Z' ? 0 : Number(match[11]);
+  const calendarProbe = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    month < 1 || month > 12
+    || calendarProbe.getUTCFullYear() !== year
+    || calendarProbe.getUTCMonth() !== month - 1
+    || calendarProbe.getUTCDate() !== day
+    || hour > 23
+    || minute > 59
+    || second > 59
+    || offsetHour > 14
+    || offsetMinute > 59
+    || (offsetHour === 14 && offsetMinute !== 0)
+  ) {
+    throw new Error(`content metrics CSV row ${rowNumber}: ${field} must be a valid offset-aware ISO timestamp`);
+  }
+
+  return new Date(parsed).toISOString();
 }
 
 function metricValue(value: string | undefined, rowNumber: number): number | null {

@@ -1,0 +1,97 @@
+name: Cloudflare Logpush Portfolio
+
+on:
+  pull_request:
+    paths:
+      - config/cloudflare-logpush.portfolio.json
+      - scripts/cloudflare-logpush-plan.mjs
+      - scripts/cloudflare-logpush-plan.node-test.mjs
+      - .github/workflows/cloudflare-logpush.yml
+  workflow_dispatch:
+    inputs:
+      mode:
+        required: true
+        type: choice
+        default: inspect
+        options: [inspect, apply]
+      expected_head_sha:
+        description: Exact current main SHA
+        required: true
+        type: string
+      approval_reference:
+        description: Required for apply; must identify the founder approval
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.expected_head_sha || github.sha }}
+
+concurrency:
+  group: cloudflare-logpush-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: node --test scripts/cloudflare-logpush-plan.node-test.mjs
+      - run: node scripts/cloudflare-logpush-plan.mjs verify
+
+  provider:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Bind exact main and approval
+        env:
+          MODE: ${{ inputs.mode }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          live_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$live_main"
+          test "$live_main" = "$EXPECTED_HEAD_SHA"
+          if [[ "$MODE" == apply ]]; then
+            [[ "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]
+          else
+            test -z "$APPROVAL_REFERENCE"
+          fi
+      - name: Inspect or reconcile
+        env:
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_LOGPUSH_READ_TOKEN: ${{ secrets.CLOUDFLARE_LOGPUSH_READ_TOKEN }}
+          CLOUDFLARE_LOGPUSH_WRITE_TOKEN: ${{ secrets.CLOUDFLARE_LOGPUSH_WRITE_TOKEN }}
+          CLOUDFLARE_LOGPUSH_DESTINATION_CONF: ${{ secrets.CLOUDFLARE_LOGPUSH_DESTINATION_CONF }}
+        run: node scripts/cloudflare-logpush-plan.mjs "${{ inputs.mode }}"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-logpush-${{ inputs.mode }}-${{ inputs.expected_head_sha }}
+          path: test-results/cloudflare-logpush.json
+          if-no-files-found: ignore
+          retention-days: 14

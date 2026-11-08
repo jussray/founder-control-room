@@ -4,17 +4,25 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { getTerminalCommand, listTerminalCommands } from '../../terminal/registry.js';
 import { GuardedTerminalRunner } from '../../terminal/runner.js';
+import { SpriteReadOnlyRunner } from '../../terminal/spriteReadOnlyRunner.js';
 import { TerminalRunnerError } from '../../terminal/types.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 type TerminalExecutor = Pick<GuardedTerminalRunner, 'run' | 'cancel'>;
 
-let sharedRunner: GuardedTerminalRunner | null = null;
+let sharedRunner: TerminalExecutor | null = null;
 
 function resolveRunner(override?: TerminalExecutor): TerminalExecutor {
   if (override) return override;
   if (!sharedRunner) {
-    sharedRunner = new GuardedTerminalRunner(process.env['CONTROL_ROOM_WORKSPACE_ROOT'] ?? '');
+    const mode = process.env['CONTROL_ROOM_READ_ONLY_RUNNER'] ?? 'local';
+    if (mode === 'sprites') {
+      sharedRunner = new SpriteReadOnlyRunner(process.env['SPRITES_FCR_EXEC_TOKEN'] ?? '');
+    } else if (mode === 'local') {
+      sharedRunner = new GuardedTerminalRunner(process.env['CONTROL_ROOM_WORKSPACE_ROOT'] ?? '');
+    } else {
+      throw new Error('Unsupported CONTROL_ROOM_READ_ONLY_RUNNER; refusing implicit fallback.');
+    }
   }
   return sharedRunner;
 }
