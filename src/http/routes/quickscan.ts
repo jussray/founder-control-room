@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { assessQuickScanSandboxPilot } from '../../quickscan/pilotAssessment.js';
 import {
   QUICKSCAN_CONTRACT,
   QUICKSCAN_PRICE_CENTS,
@@ -83,6 +84,18 @@ export function createQuickScanRouter(dependencies: QuickScanRouteDependencies =
   const runChief = dependencies.runChief ?? createOpenAiQuickScanChiefRunner();
 
   quickScanRouter.use(requireFounder);
+
+// Authenticated, non-mutating sandbox assessment. Caller evidence is never verified here.
+quickScanRouter.post('/pilot/assess', (req: FounderRequest, res) => {
+  const assessment = assessQuickScanSandboxPilot(Boolean(req.founder), req.body);
+  return res.status(assessment.allowed ? 200 : 422).json({
+    ok: assessment.allowed,
+    assessment,
+    persisted: false,
+    deliveryVerified: false,
+    productionAuthorized: false,
+  });
+});
 
 quickScanRouter.get('/', (_req, res) => {
   const prospects = listQuickScanProspects();
