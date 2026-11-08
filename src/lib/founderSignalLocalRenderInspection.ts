@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { lstat, open, realpath, stat } from 'node:fs/promises';
+import { lstat, open, realpath } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import {
