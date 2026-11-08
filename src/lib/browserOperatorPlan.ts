@@ -6,7 +6,7 @@
  */
 export const FCR_BROWSER_PREVIEW_CONTRACT = 'fcr/browser-operator-preview@v1';
 
-const PROJECT_DOMAIN = 'games.jussco.company';
+const PROJECT_DOMAIN = 'sync.jussco.company';
 const MANIFEST_PATH = 'config/browser-journeys/sync-party.json';
 const MAX_LENGTH = 500;
 const UNSAFE_PATTERN = [
@@ -44,7 +44,7 @@ interface ApprovedPlanPreview {
   contract: typeof FCR_BROWSER_PREVIEW_CONTRACT;
   status: 'REQUIRES_FOUNDER_RUN_APPROVAL';
   project: 'sync-party-game';
-  targetOrigin: 'https://games.jussco.company';
+  targetOrigin: 'https://sync.jussco.company';
   journey: 'sync-party';
   manifest: typeof MANIFEST_PATH;
   actorCount: 2;
@@ -106,7 +106,7 @@ export function previewFounderBrowserIntent(raw: unknown): BrowserPreviewResult 
     contract: FCR_BROWSER_PREVIEW_CONTRACT,
     status: 'REQUIRES_FOUNDER_RUN_APPROVAL',
     project: 'sync-party-game',
-    targetOrigin: 'https://games.jussco.company',
+    targetOrigin: 'https://sync.jussco.company',
     journey: 'sync-party',
     manifest: MANIFEST_PATH,
     actorCount: 2,
