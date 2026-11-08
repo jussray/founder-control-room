@@ -572,7 +572,7 @@
       "path": ".github/workflows/deterministic-review-core-advisory.yml",
       "claims": [
         ".github/workflows/deterministic-review-core-advisory.yml must bind its trusted witness publisher's GitHub App private key to the existing production environment secret APP_PRIVATE_KEY while preserving APP_ID issuer identity, protected environment approval, exact current-main verification, fail-closed RSA parsing, independent provider readback, and separately authorized merge and deployment gates.",
-        ".github/workflows/deterministic-review-core-advisory.yml must retain fail-closed RSA parsing while labeling secrets.APP_PRIVATE_KEY as the effective runtime input with unverified origin/scope, never claiming the original key is defective or demanding replacement based solely on a failed local parse; a failed preflight must prohibit GitHub App authentication, governance mutation, merge, and deployment."
+        ".github/workflows/deterministic-review-core-advisory.yml must retain fail-closed RSA parsing while labeling secrets.APP_PRIVATE_KEY as the effective runtime input with unverified origin/scope, never claiming the original key is defective or demanding replacement based solely on a failed local parse; the failed preflight itself must not attempt GitHub App authentication, governance mutation, merge, or deployment, and grants no authority to those separate paths."
       ]
     },
     {
