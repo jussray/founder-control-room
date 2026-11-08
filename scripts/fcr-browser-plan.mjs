@@ -15,7 +15,7 @@ const SUPPORTED_INTENTS = Object.freeze([
   {
     id: 'sync-party',
     project: 'sync-party-game',
-    hostname: 'games.jussco.company',
+    hostname: 'sync.jussco.company',
     manifest: 'config/browser-journeys/sync-party.json',
     triggers: [/\bgames\.jussco\.company\b/i, /\bsync[\s-]+party\b/i, /\bsync-party-game\b/i]
   }
