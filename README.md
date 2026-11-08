@@ -674,6 +674,10 @@ The FCR source reconciler in `src/providers/GitHubProvider.ts` must preserve exi
 
 This changes candidate source policy, tests, and documentation only. It does **not** prove GitHub's live ruleset is reconciled or a deployment occurred. Authoritative evidence requires independently read-back provider state after explicitly authorized mutation; green PR checks and auto-merge intent do not substitute for merge or release authority.
 
+## Gmail AI Inbox — candidate scoped runtime
+
+PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
+
 ## FCR SQL function qualification: source-to-provider verification (November 2026)
 
 The existing PR #982 carries a **forward-only** migration `20261108075000_qualify_fcr_sql_lint_functions.sql` that repairs schema-qualified `extensions.digest` and table-column aliases in three existing truth-console/customer-send lease functions. Previous applied migrations remain immutable. The CI `Migration lint` job runs `test/fcr-sql-function-qualifications.node-test.mjs` before a fresh isolated local Supabase migration replay and `supabase db lint --local --fail-on error`. The separate Neon preview, repository documentation-truth, Playwright, and Required Gate checks remain mandatory where applicable. A source check is not a live Supabase apply or merge/deploy approval.
