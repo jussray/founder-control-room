@@ -53,6 +53,7 @@ import {
   handleProofOfShipReceiptLookup,
 } from './routes/proofOfShipReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
+import { exactHeadCockpitRouter } from './routes/exactHeadCockpit.js';
 import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
@@ -388,6 +389,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/integration-cockpit', exactHeadCockpitRouter);
   app.use('/switchboard', switchboardRouter);
   app.use('/security-posture', securityPostureRouter);
   app.use('/projects', repositoryVerificationRouter);
