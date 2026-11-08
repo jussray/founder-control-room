@@ -20,7 +20,7 @@ const UNSAFE_PATTERN = [
   /\b(?:ignore instructions|override|bypass|disable safety|no approval|without approval)\b/i,
 ];
 const SUPPORTED_PROJECT = [
-  /\bgames\.jussco\.company\b/i,
+  /\bsync\.jussco\.company\b/i,
   /\bsync[\s-]+party\b/i,
   /\bsync-party-game\b/i,
 ];
