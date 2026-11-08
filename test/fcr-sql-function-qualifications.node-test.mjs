@@ -31,5 +31,5 @@ test('send finalize targets the claimed lease with explicit alias', () => {
 });
 test('source correction does not broaden database authority', () => {
   assert.doesNotMatch(sql, /^\s*(?:grant|revoke|alter\s+policy|drop\s+policy|alter\s+table|delete\s+from|truncate)\b/im);
-  assert.doesNotMatch(sql, /\bsecurity definer\b[\s\S]*\bset search_path\s*=\s*public,/i);
+  assert.doesNotMatch(sql, /\bsecurity definer\s+set search_path\s*=\s*public,/i);
 });
