@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -79,6 +80,13 @@ function buildApp(
   app.use(express.json());
   app.post(
     ENDPOINT,
+    rateLimit({
+      windowMs: 60 * 1_000,
+      limit: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Rate limit exceeded.' },
+    }),
     (_req, res, next) => {
       if (standingPolicyAuthorization) {
         res.locals.founderSignalAutomationAuthorization = standingPolicyAuthorization;
@@ -121,6 +129,16 @@ beforeEach(() => {
 });
 
 describe('Founder Signal Engine remote MCP', () => {
+  it('caps repeated unauthenticated MCP requests before any handler or provider work', async () => {
+    const app = buildApp();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const denied = await request(app).post(ENDPOINT).send(rpc('ping'));
+      expect(denied.status).toBe(401);
+    }
+    const limited = await request(app).post(ENDPOINT).send(rpc('ping'));
+    expect(limited.status).toBe(429);
+  });
+
   it('rejects requests without the dedicated MCP bearer token', async () => {
     const response = await request(buildApp()).post(ENDPOINT).send(rpc('tools/list'));
 

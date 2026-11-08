@@ -255,6 +255,13 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   app.post(
     '/mcp/founder-signal-engine',
+    rateLimit({
+      windowMs: 60 * 1_000,
+      limit: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Rate limit exceeded.' },
+    }),
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
     requireFounderSignalEngineMcpToken,
