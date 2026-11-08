@@ -408,6 +408,10 @@ jobs:
               ;;
           esac
 
+      - name: Verify repaired SQL function authority contracts
+        if: steps.scope.outputs.execute == 'true'
+        run: node --test test/fcr-sql-function-qualifications.node-test.mjs
+
       - name: Set up Supabase CLI for changed schema
         if: steps.scope.outputs.execute == 'true'
         uses: supabase/setup-cli@v1
