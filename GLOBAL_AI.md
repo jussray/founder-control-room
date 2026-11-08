@@ -290,3 +290,7 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
+## FCR Neon preview contract — scoped verification only
+
+When an FCR pull request changes `supabase/`, the existing `.github/workflows/neon-pr-branches.yml` performs live-base ancestry and exact-head checks, creates an isolated `preview/pr-<number>` using Neon's account-default suspend settings when absent, and keeps the pinned action, private connection readback, migration execution and SQL contract tests load-bearing. Do not reuse a different PR's preview or delete an active PR preview to manufacture capacity. Failed provider provisioning, invalid preview parent, missing private connection or migration failures are BLOCKED, not green; verify the provider run and exact commit. A successful preview is isolated schema evidence only and never production migration, authorization, release or merger proof.
