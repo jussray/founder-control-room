@@ -130,6 +130,20 @@ test('rejects an unreviewed direct commit hidden before a later reviewed main me
   assert.equal(result.successorSha, DIRECT);
 });
 
+test('rejects a successor whose merged PR names a different merge commit', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: OTHER,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: SHA })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, OTHER);
+});
+
 test('rejects a successor observation that does not terminate at the release target', () => {
   const result = classifyReviewedFirstParentSuccessors({
     terminalRatifiedTip: TERMINAL,
@@ -232,6 +246,36 @@ test('deploy observer rejects a direct first-parent successor before a reviewed 
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'unreviewed_first_parent_successor');
   assert.equal(result.successorSha, DIRECT);
+});
+
+test('deploy observer walks a first-parent successor chain longer than 256 commits', async () => {
+  const chain = Array.from({ length: 301 }, (_, index) => index.toString(16).padStart(40, '0'));
+  const terminal = chain[0];
+  const target = chain[300];
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) return response({ commit: { sha: target } });
+    const match = value.match(/\/commits\/([0-9a-f]{40})(\/pulls)?$/);
+    if (!match) return response({}, 404);
+    const sha = match[1];
+    const index = chain.indexOf(sha);
+    if (index < 0) return response({}, 404);
+    if (match[2]) return response([pr({ number: index, merge_commit_sha: sha })]);
+    return response({ sha, parents: index > 0 ? [{ sha: chain[index - 1] }] : [] });
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: target,
+    terminalRatifiedTip: terminal,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'reviewed_pr_merge_provenance');
+  assert.equal(result.successorChain.reason, 'reviewed_first_parent_successor_chain');
+  assert.equal(result.successorChain.successorCount, 300);
 });
 
 test('deploy observer re-reads mutable main after the successor walk', async () => {

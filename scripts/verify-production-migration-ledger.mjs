@@ -11,7 +11,6 @@ const VERSION_PATTERN = /^\d{14}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_API_BASE = 'https://api.github.com';
-const MAX_FIRST_PARENT_SUCCESSORS = 256;
 
 // This is the immutable terminal tip of the currently ratified direct-main
 // history. Keep it bound to verify-main-release-ratification-extension.mjs.
@@ -117,9 +116,15 @@ async function observeReviewedFirstParentSuccessors({
   if (target === terminal) return [];
 
   const newestFirst = [];
+  const visited = new Set();
   let cursor = target;
 
-  for (let index = 0; index < MAX_FIRST_PARENT_SUCCESSORS && cursor !== terminal; index += 1) {
+  while (cursor !== terminal) {
+    if (visited.has(cursor)) {
+      throw new Error(`First-parent history cycle detected at ${cursor}`);
+    }
+    visited.add(cursor);
+
     const [commit, associatedPulls] = await Promise.all([
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}`, token),
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}/pulls`, token),
@@ -137,10 +142,6 @@ async function observeReviewedFirstParentSuccessors({
       throw new Error(`First-parent history ended before terminal ratified tip ${terminal}`);
     }
     cursor = parentSha;
-  }
-
-  if (cursor !== terminal) {
-    throw new Error(`Terminal ratified tip ${terminal} was not reached within ${MAX_FIRST_PARENT_SUCCESSORS} first-parent successors`);
   }
 
   return newestFirst.reverse();

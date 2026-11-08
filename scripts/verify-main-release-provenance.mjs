@@ -2,11 +2,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
-function mergedMainPullsForCommit(associatedPulls) {
+function mergedMainPullsForCommit(associatedPulls, commitSha) {
   if (!Array.isArray(associatedPulls)) return null;
   return associatedPulls.filter((pull) => {
     if (!pull || typeof pull !== 'object') return false;
-    return Boolean(pull.merged_at) && String(pull.base?.ref || '').trim() === 'main';
+    const mergeSha = String(pull.merge_commit_sha || '').trim().toLowerCase();
+    return Boolean(pull.merged_at)
+      && String(pull.base?.ref || '').trim() === 'main'
+      && mergeSha === commitSha;
   });
 }
 
@@ -43,7 +46,7 @@ export function classifyReviewedFirstParentSuccessors({
     }
     seen.add(sha);
 
-    const matches = mergedMainPullsForCommit(successor?.associatedPulls);
+    const matches = mergedMainPullsForCommit(successor?.associatedPulls, sha);
     if (matches === null) {
       return { ok: false, reason: 'successor_pr_provenance_unavailable', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
     }
