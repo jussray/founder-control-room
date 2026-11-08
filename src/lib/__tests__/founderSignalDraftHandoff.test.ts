@@ -58,6 +58,20 @@ describe('Founder Signal read-only draft handoff preview', () => {
     expect(x.handoffFingerprint).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('keeps the exact GitHub proof URL in every supported non-proof intent so drafts pass shape validation', () => {
+    for (const intent of ['conversation-research', 'personal-founder', 'offer']) {
+      const campaign = {
+        ...CAMPAIGN,
+        strategy: { ...CAMPAIGN.strategy, intent },
+      };
+      const reviewed = reviewFounderSignalDraftHandoff(proposal({ campaign }));
+      expect(reviewed.status, intent).toBe('LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED');
+      expect(reviewed.preview?.text, intent).toContain(CAMPAIGN.source.proofUrl);
+      expect(reviewed.authority.canPublish).toBe(false);
+      expect(reviewed.providerDeliveryObserved).toBe(false);
+    }
+  });
+
   it('reviews video platform drafts with a media asset and declared native limit', () => {
     const x=reviewFounderSignalDraftHandoff(proposal({
       platform:'youtube', accountId:'channel-01', platformCharacterLimit:3000, media:[media('video')],
