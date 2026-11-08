@@ -35,7 +35,7 @@ This record is append-only in meaning: a successor's green checks do not rewrite
 5. Never call an earlier red SHA green. Never treat passing checks as delivery, payment, production deployment, or independent runtime proof.
 6. Do not merge, deploy, rerun, create PRs, or mutate production solely to update this ledger.
 
-This file is an authored evidence snapshot, **not** an automated enforcement gate. A future checker must independently query GitHub run history and verify ledger completeness before it can claim enforcement.
+This file is an append-only authored evidence snapshot. The live `scripts/ci-history-audit.mjs` audits its recorded rows against observed GitHub run history. Malformed, contradicted, duplicate, or unverified recorded rows **fail CI**. Newly observed predecessor failures/cancellations not yet included in the committed snapshot are classified as `INCOMPLETE_HISTORICAL_COVERAGE` in an immutable per-run Actions artifact and visible job summary, **never as remediated or silently complete**. Such late-arriving runs do not fail the same auditing workflow, because a corrective commit can itself cancel prior jobs and create an infinite CI failure loop. The current exact-head merge, review, security, and Playwright gates remain independent and must not infer release readiness from this ledger job's success.
 
 ## Additional observed run evidence (untriaged, not remediated)
 
