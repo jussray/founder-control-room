@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const policyPath = 'security/attack-20-v3.policy.json';
@@ -50,6 +51,14 @@ function fail(message) {
 
 function requireValue(condition, message) {
   if (!condition) fail(message);
+}
+
+function gitCommitExists(sha) {
+  return spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { stdio: 'ignore' }).status === 0;
+}
+
+function gitIsAncestor(ancestor, descendant) {
+  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { stdio: 'ignore' }).status === 0;
 }
 
 function parseTomlBoolean(source, key) {
@@ -105,10 +114,20 @@ requireValue(FULL_SHA.test(registry.declaredFromMainSha ?? ''), 'registry must n
 const expectedBaseSha = process.env.EXPECTED_BASE_SHA?.trim() || null;
 if (expectedBaseSha !== null) {
   requireValue(FULL_SHA.test(expectedBaseSha), 'EXPECTED_BASE_SHA must be an exact 40-character commit SHA when provided');
-  requireValue(
-    registry.declaredFromMainSha === expectedBaseSha,
-    `registry declaredFromMainSha must match exact verified base ${expectedBaseSha}`,
-  );
+  if (FULL_SHA.test(registry.declaredFromMainSha ?? '') && FULL_SHA.test(expectedBaseSha)) {
+    requireValue(
+      gitCommitExists(registry.declaredFromMainSha),
+      `registry declaredFromMainSha ${registry.declaredFromMainSha} must resolve to a commit in the checked-out history`,
+    );
+    requireValue(
+      gitCommitExists(expectedBaseSha),
+      `exact verified base ${expectedBaseSha} must resolve to a commit in the checked-out history`,
+    );
+    requireValue(
+      gitIsAncestor(registry.declaredFromMainSha, expectedBaseSha),
+      `registry declaredFromMainSha ${registry.declaredFromMainSha} must be an ancestor of exact verified base ${expectedBaseSha}`,
+    );
+  }
 }
 requireValue(registry.aggregation?.noAveraging === true, 'registry must prohibit averaging');
 requireValue(Array.isArray(registry.workers) && registry.workers.length >= 3, 'registry must contain every known production FCR Worker');

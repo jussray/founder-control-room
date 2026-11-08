@@ -11,6 +11,7 @@ const VERSION_PATTERN = /^\d{14}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_API_BASE = 'https://api.github.com';
+const MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH = '.github/workflows/main-release-provenance.yml';
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
 ]);
@@ -94,6 +95,58 @@ async function fetchGithubJson(fetchImpl, url, token) {
   return response.json();
 }
 
+export function classifyTrustedMainReleaseProvenanceRun({
+  repository,
+  targetSha,
+  workflowRuns,
+} = {}) {
+  const repo = String(repository || '').trim();
+  const target = String(targetSha || '').trim().toLowerCase();
+  const owner = repo.split('/')[0]?.toLowerCase() || '';
+
+  if (!REPOSITORY_PATTERN.test(repo)) {
+    return { ok: false, reason: 'invalid_repository', targetSha: target || null };
+  }
+  if (!FULL_SHA.test(target)) {
+    return { ok: false, reason: 'invalid_sha', targetSha: target || null };
+  }
+  if (!Array.isArray(workflowRuns)) {
+    return { ok: false, reason: 'provenance_runs_unavailable', targetSha: target };
+  }
+
+  const trusted = workflowRuns
+    .filter((run) => {
+      if (!run || typeof run !== 'object') return false;
+      const actor = String(run.actor?.login || '').trim().toLowerCase();
+      return String(run.path || '').trim() === MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH
+        && String(run.head_sha || '').trim().toLowerCase() === target
+        && String(run.head_branch || '').trim() === 'main'
+        && String(run.event || '').trim() === 'push'
+        && String(run.status || '').trim() === 'completed'
+        && String(run.conclusion || '').trim() === 'success'
+        && actor === owner;
+    })
+    .sort((left, right) => Number(right.id || 0) - Number(left.id || 0));
+
+  if (trusted.length === 0) {
+    return {
+      ok: false,
+      reason: 'missing_trusted_direct_main_provenance_receipt',
+      targetSha: target,
+    };
+  }
+
+  const [run] = trusted;
+  return {
+    ok: true,
+    reason: 'verified_main_release_provenance_workflow',
+    targetSha: target,
+    workflowRunId: run.id,
+    workflowActor: run.actor?.login,
+    workflowPath: MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH,
+  };
+}
+
 export async function observeMainReleaseProvenance({
   repository,
   targetSha,
@@ -116,16 +169,45 @@ export async function observeMainReleaseProvenance({
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
     ]);
 
-    const result = classifyMainReleaseProvenance({
+    const reviewedResult = classifyMainReleaseProvenance({
       targetSha: target,
       currentMainSha: mainBranch?.commit?.sha,
       associatedPulls,
     });
 
+    if (reviewedResult.ok || reviewedResult.reason !== 'direct_or_unproven_main_commit') {
+      return {
+        ...reviewedResult,
+        repository: repo,
+        provider: 'github',
+      };
+    }
+
+    const query = new URLSearchParams({
+      head_sha: target,
+      event: 'push',
+      status: 'success',
+      per_page: '100',
+    });
+    // This repository is public. The provenance run itself is public provider
+    // evidence, so observe it without widening the Deploy token to actions:read.
+    // If the repository or provider visibility changes, this request fails closed.
+    const runs = await fetchGithubJson(
+      fetchImpl,
+      `${GITHUB_API_BASE}/repos/${repo}/actions/runs?${query.toString()}`,
+      '',
+    );
+    const directResult = classifyTrustedMainReleaseProvenanceRun({
+      repository: repo,
+      targetSha: target,
+      workflowRuns: runs?.workflow_runs,
+    });
+
     return {
-      ...result,
+      ...directResult,
       repository: repo,
       provider: 'github',
+      reviewedProvenanceReason: reviewedResult.reason,
     };
   } catch (error) {
     return {

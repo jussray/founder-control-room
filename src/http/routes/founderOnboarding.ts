@@ -12,8 +12,37 @@ export const founderOnboardingRouter = Router();
 founderOnboardingRouter.use(requireFounder);
 
 type DbRecord = Record<string, unknown>;
+type ControlRoomProfile = {
+  projectType: string;
+  mission: string;
+  currentState: string;
+};
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PROJECT_TYPES = [
+  'product-app',
+  'website',
+  'ai-agent',
+  'business-company',
+  'client-project',
+  'content-brand',
+  'store-commerce',
+  'research-decision',
+  'other',
+] as const;
+const MISSIONS = ['build', 'fix', 'launch', 'grow', 'operate', 'decide', 'prove'] as const;
+const PROJECT_STATES = [
+  'idea',
+  'planning',
+  'building',
+  'live',
+  'broken',
+  'needs-improvement',
+  'unsure',
+] as const;
+const PROJECT_TYPE_SET = new Set<string>(PROJECT_TYPES);
+const MISSION_SET = new Set<string>(MISSIONS);
+const PROJECT_STATE_SET = new Set<string>(PROJECT_STATES);
 const RECOMMENDED_PROVIDER_TYPES = [
   'github',
   'cloudflare',
@@ -36,6 +65,26 @@ function optionalString(value: unknown): string | null {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === 'string');
+}
+
+function recordValue(value: unknown): DbRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as DbRecord
+    : null;
+}
+
+function normalizeControlRoomProfile(value: unknown): ControlRoomProfile | null {
+  const record = recordValue(value);
+  if (!record) return null;
+
+  const projectType = stringValue(record.projectType);
+  const mission = stringValue(record.mission);
+  const currentState = stringValue(record.currentState);
+  if (!PROJECT_TYPE_SET.has(projectType)) return null;
+  if (!MISSION_SET.has(mission)) return null;
+  if (!PROJECT_STATE_SET.has(currentState)) return null;
+
+  return { projectType, mission, currentState };
 }
 
 function recommendedCatalog() {
@@ -73,6 +122,8 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
     .filter((id): id is string => Boolean(id));
 
   let connectionRows: DbRecord[] = [];
+  let onboardingEventRows: DbRecord[] = [];
+  let composerProfileEvidenceStatus: 'available' | 'unavailable' = 'available';
   if (projectIds.length > 0) {
     const { data, error } = await supabase
       .from('project_connections')
@@ -82,6 +133,18 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
     connectionRows = (data ?? []) as DbRecord[];
+
+    const { data: eventData, error: eventError } = await supabase
+      .from('project_events')
+      .select('project_id, event_type, metadata, created_at')
+      .in('project_id', projectIds)
+      .order('created_at', { ascending: false });
+
+    if (eventError) {
+      composerProfileEvidenceStatus = 'unavailable';
+    } else {
+      onboardingEventRows = (eventData ?? []) as DbRecord[];
+    }
   }
 
   const connectionsByProject = new Map<string, DbRecord[]>();
@@ -91,6 +154,16 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
     const current = connectionsByProject.get(projectId) ?? [];
     current.push(connection);
     connectionsByProject.set(projectId, current);
+  }
+
+  const profileByProject = new Map<string, ControlRoomProfile>();
+  for (const event of onboardingEventRows) {
+    if (optionalString(event.event_type) !== 'founder_onboarding_bootstrapped') continue;
+    const projectId = optionalString(event.project_id);
+    if (!projectId || profileByProject.has(projectId)) continue;
+    const metadata = recordValue(event.metadata);
+    const profile = normalizeControlRoomProfile(metadata?.controlRoomProfile);
+    if (profile) profileByProject.set(projectId, profile);
   }
 
   const normalizedProjects = projects.map((project) => {
@@ -104,6 +177,7 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
       stack: optionalString(project.stack),
       status: optionalString(project.status),
       riskLevel: optionalString(project.risk_level),
+      controlRoomProfile: profileByProject.get(projectId) ?? null,
       connections: (connectionsByProject.get(projectId) ?? []).map((connection) => ({
         id: optionalString(connection.id),
         type: optionalString(connection.connection_type),
@@ -121,6 +195,16 @@ founderOnboardingRouter.get('/state', async (_req: FounderRequest, res) => {
   return res.json({
     complete: normalizedProjects.length > 0,
     projects: normalizedProjects,
+    composerProfileEvidence: {
+      status: composerProfileEvidenceStatus,
+      founderDeclared: true,
+      authorityGranted: false,
+    },
+    composerOptions: {
+      projectTypes: [...PROJECT_TYPES],
+      missions: [...MISSIONS],
+      currentStates: [...PROJECT_STATES],
+    },
     recommendedProviders: recommendedCatalog(),
     authorityBoundary: {
       loginGrantsExecution: false,
@@ -136,9 +220,16 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
 
   const body = req.body as DbRecord;
-  const projectInput = body.project && typeof body.project === 'object'
-    ? body.project as DbRecord
-    : {};
+  const projectInput = recordValue(body.project) ?? {};
+  const suppliedProfile = body.controlRoom === undefined
+    ? null
+    : normalizeControlRoomProfile(body.controlRoom);
+
+  if (body.controlRoom !== undefined && !suppliedProfile) {
+    return res.status(400).json({
+      error: 'controlRoom must include a supported projectType, mission, and currentState',
+    });
+  }
 
   const slug = stringValue(projectInput.slug);
   const name = stringValue(projectInput.name);
@@ -272,6 +363,8 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
       projectCreated,
       requestedProviders,
       createdProviders: createdConnections.map((connection) => connection.connection_type),
+      controlRoomProfile: suppliedProfile,
+      controlRoomProfileAuthority: 'founder-declared',
       authorityGranted: false,
       credentialsStored: false,
     },
@@ -287,6 +380,8 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
   return res.status(projectCreated ? 201 : 200).json({
     ok: true,
     project,
+    controlRoomProfile: suppliedProfile,
+    controlRoomProfileAuthority: suppliedProfile ? 'founder-declared' : null,
     projectCreated,
     connectionsCreated: createdConnections,
     connectionsAlreadyPresent: requestedProviders.filter((provider) => existingTypes.has(provider)),

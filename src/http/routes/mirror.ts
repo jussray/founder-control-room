@@ -60,6 +60,10 @@ function providerErrorCode(error: unknown): string {
   return error instanceof MirrorProviderError ? error.code : 'MIRROR_ENGINE_FAILED';
 }
 
+function providerConfigurationMissing(code: string): boolean {
+  return code === 'MODEL_PROVIDER_NOT_CONFIGURED' || code.endsWith('_NOT_CONFIGURED');
+}
+
 async function defaultResolveProjectId(): Promise<string> {
   const { data, error } = await supabase
     .from('projects')
@@ -181,8 +185,9 @@ export function createMirrorRouter(dependencies: MirrorRouteDependencies = {}) {
       }
 
       const code = providerErrorCode(error);
-      return res.status(code === 'OPENAI_NOT_CONFIGURED' ? 503 : 502).json({
-        error: code === 'OPENAI_NOT_CONFIGURED'
+      const configurationMissing = providerConfigurationMissing(code);
+      return res.status(configurationMissing ? 503 : 502).json({
+        error: configurationMissing
           ? 'Mirror Engine model provider is not configured'
           : 'Mirror Engine model provider failed',
         code,
