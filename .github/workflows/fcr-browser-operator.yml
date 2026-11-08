@@ -62,7 +62,7 @@ jobs:
           node --check scripts/fcr-grafana-read.mjs
           node --test test/fcr-browser-journey.test.mjs test/fcr-browser-plan.test.mjs test/fcr-grafana-read.test.mjs
           node scripts/fcr-browser-journey.mjs config/browser-journeys/sync-party.json --dry-run
-          node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
+          node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://sync.jussco.company'
       - name: Install dependencies and sandboxed Chromium
         run: |
           npm ci --ignore-scripts
