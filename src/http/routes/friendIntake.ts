@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import {
   type FriendIntakeReceipt,
   type FriendRuntimeProvider,
@@ -397,6 +398,16 @@ export function createFriendIntakeRouter(dependencies: FriendIntakeRouteDependen
   const preflightLiveInference = dependencies.preflightLiveInference
     ?? ((provider: LiveFriendRuntimeProvider) => assertFriendRuntimeProviderReady(provider));
 
+  // Route-local limiter makes Friend's authorization boundary explicit to
+  // security scanning and independently caps repeated attempts before auth.
+  // The global app limiter remains in force for production traffic.
+  router.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Friend Intake rate limit exceeded.', code: 'FRIEND_RATE_LIMITED' },
+  }));
   router.use(requireFounder);
 
   router.post('/', async (req: FounderRequest, res) => {

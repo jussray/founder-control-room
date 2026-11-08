@@ -115,6 +115,34 @@ function authenticate() {
 }
 
 describe('POST /mirror/friend-intake', () => {
+
+  it('caps unauthenticated Friend requests before founder authentication', async () => {
+    const runFriendRuntime = vi.fn(async () => runtimeResult());
+    const app = buildApp({ runFriendRuntime });
+    const payload = validPayload();
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await request(app).post('/mirror/friend-intake').send(payload);
+      expect(response.status).toBe(401);
+    }
+
+    const limited = await request(app).post('/mirror/friend-intake').send(payload);
+    expect(limited.status).toBe(429);
+    expect(limited.body.code).toBe('FRIEND_RATE_LIMITED');
+    expect(runFriendRuntime).not.toHaveBeenCalled();
+  });
+
+  it('shares one rate limit across Friend submissions and usefulness feedback', async () => {
+    const app = buildApp();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      expect((await request(app).post('/mirror/friend-intake').send(validPayload())).status).toBe(401);
+      expect((await request(app).post('/mirror/friend-intake/not-a-run/usefulness').send({ response: 'yes' })).status).toBe(401);
+    }
+
+    const limited = await request(app).post('/mirror/friend-intake/not-a-run/usefulness').send({ response: 'yes' });
+    expect(limited.status).toBe(429);
+    expect(limited.body.code).toBe('FRIEND_RATE_LIMITED');
+  });
   it('rejects unauthenticated access before runtime execution', async () => {
     const runFriendRuntime = vi.fn(async () => runtimeResult());
     const response = await request(buildApp({ runFriendRuntime }))
