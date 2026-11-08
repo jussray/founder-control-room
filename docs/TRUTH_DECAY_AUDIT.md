@@ -68,6 +68,34 @@ An independent [StoryEngine main read](https://api.github.com/repos/jussray/Stor
 Refreshing the FCR pin selects that independently observed dependency subject only. The successor FCR head remains UNKNOWN for federation until live-ref equality, immutable checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser witness execute successfully for the new pair. Predecessor green remains historical, and no production, merge, deploy, or provider authority transfers.
 
 
+## October 26, 2026: local FFmpeg output byte readback is not live media distribution
+
+`inspectFounderSignalLocalFfmpegRender` binds a locally accessible FFmpeg output path (confined to a trusted server-owned directory) and renderer receipt digest/byte count to actual MP4 file bytes, with path and race safeguards. The result is only `LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF`; synthetic MP4 tests prove byte matching, and the conditional FFmpeg integration test exercises a real rendered file where the binaries are available. Neither result authenticates renderer receipt provenance, image rights, playable decoder output, visual truth, publication approval, or a social provider. Cloudflare R2 listed zero buckets and Supabase project discovery failed in the audit, so no live media storage provider can be claimed or invented. No storage or Buffer publication mutation took place.
+
+## October 26, 2026: authenticated reader interface does not mean real media verified
+
+The additive FSE media reader boundary validates caller-independent server principal/project/registry metadata only when supplied by a **future trusted and audited implementation**. In the current PR it is dependency-injected with synthetic tests and is **not connected to a production storage provider**. Byte hashes and registry claims are distinct from full decode, copyright permission, identity consent, reputational safety, verified brand provenance, publication or business impact. No CHECK status can be treated as send, draft, upload or publish authority. Provider account readbacks and exact Current You approval remain unknown.
+
+## October 26, 2026: new media byte check is isolated, not a trusted asset pipeline
+
+An additive FSE helper computes SHA-256 directly over bounded streamed asset bytes and checks basic PNG/JPEG/WebP/MP4 byte markers, but does not authenticate the stream's origin, successfully decode the media, prove human identity or copyright permission, or inspect safety/accuracy. It cannot convert earlier user-declared license hashes or visual-verdict JSON into trusted provider evidence. It is not connected to production Media Router/Buffer and has no permission to create drafts or publish. A verified hash or familiar file signature alone must not be relabeled `MEDIA_VERIFIED` or `READY_TO_PUBLISH`.
+
+## October 26, 2026: live public GitHub commit existence, not claim verification
+
+The new authenticated MCP `verify_founder_signal_public_source` makes fixed-host read-only public GitHub API requests and confirms one public repository identity and the exact SHA/permalink of one Git commit. Response state `VERIFIED_PUBLIC_GITHUB_COMMIT` does not prove whether the commit is currently `main`, merged, deployed, safe, used or accompanied by rendered media or business outcomes. HTTP errors, unavailable API, rate limits, private repos and stale/mismatched commits fail closed as `HOLD_UNVERIFIED`. Observed source existence is time-scoped and is **not an approval or permission** for Buffer/HubSpot/social provider writes. A later producer must reverify the relevant evidence and authority at execution time.
+
+## October 26, 2026: local media handoff is not authenticated asset proof
+
+The additive `review_founder_signal_draft_handoff` MCP preview uses the existing first-party social publisher's **draft-mode structural validation**. Source URL, render SHA, image/video rights receipt, alternate text, media verdict and account labels remain self-attested until independent authenticated provider/asset checks occur. No draft is actually stored, no media is uploaded, no Buffer action executes, and a user-created verdict JSON cannot grant release approval. Even `LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED` means only a locally consistent copy/media proposal. If any source, account, rights, finished caption or asset changes after review, prior fingerprints and approval checks require renewal.
+
+## October 26, 2026: Founder Signal Engine campaign planner is not a published social campaign
+
+The new `plan_founder_signal_campaign` MCP tool produces founder-review **editorial proposals** from caller-supplied public GitHub identifiers and brief content. Its output is `USER_SUPPLIED_UNVERIFIED`; neither a source link nor a 40-character SHA independently confirms repository visibility, product behavior, audience response, or publication. Documented founder voice and editorial rules are not live social-history readback. A content continuity fingerprint is not a tracking cookie or permission to contact anyone.
+
+Prepared media is `NOT_RENDERED`: an image/video direction, storyboard, alt-text note, tag list or generated preview cannot stand in for a rights-cleared, source-matched rendered asset that has passed the existing `visual-wonder-contract.cjs` proof and quality checks. Brand/reputation heuristics reduce risk but cannot certify that a public post is harmless or commercially effective. The source planner grants no Buffer, scheduling, sending, publication, HubSpot, credential or AI invocation authority.
+
+Any later planned → rendered → approved → Buffer draft → provider-observed → HubSpot/FCR-recorded → measured promotion must retain the existing distinct provider, runtime, exact payload/approval, privacy and temporal evidence gates. Outcomes and partner/customer impact remain UNKNOWN until independently observed and reconciled. Source edits alone do not activate a workflow.
+
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
 The signed-out Control Room previously left founder-stack navigation present in the DOM as a visible dock. The repair makes first paint fail closed and derives dock visibility from the authenticated `#root .shell`; losing that shell closes and hides the dock again. Structural fixtures may synthesize the authenticated shell only after proving the signed-out state, while the opaque HttpOnly-cookie browser path remains the authority for real session behavior. UI hiding does not replace server authorization and does not prove production privacy until the exact successor browser witness passes.
