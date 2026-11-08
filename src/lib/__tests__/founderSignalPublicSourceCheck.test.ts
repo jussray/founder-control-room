@@ -131,6 +131,20 @@ describe('Founder Signal Engine immutable public source readback', () => {
       expect(r.reason).toBe('PUBLIC_REPOSITORY_READBACK_NOT_VERIFIED');
     }
   });
+  it('rejects an unbounded streamed response without trusting a missing content-length', async () => {
+    let streamCancelled = false;
+    const oversized = new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode(' '.repeat(65_537))); },
+      cancel() { streamCancelled = true; },
+    }), { headers: { 'content-type': 'application/json' } });
+    const m = mock([oversized]);
+    const result = await verifyFounderSignalPublicSource(input, { fetchFn: m.fetchFn, now });
+    expect(result.status).toBe('HOLD_UNVERIFIED');
+    expect(result.reason).toBe('PUBLIC_REPOSITORY_READBACK_NOT_VERIFIED');
+    expect(result.authorizesPublish).toBe(false);
+    expect(streamCancelled).toBe(true);
+    expect(m.count()).toBe(1);
+  });
   it('holds oversized payloads and no-content-type responses', async () => {
     const m=mock([json({full_name:REPO,private:false},200,{'content-length':'65537'})]);
     const r=await verifyFounderSignalPublicSource(input,{fetchFn:m.fetchFn,now});
