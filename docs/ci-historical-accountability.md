@@ -2,6 +2,10 @@
 
 This record is append-only in meaning: a successor's green checks do not rewrite a predecessor's failed or cancelled checks. Entries distinguish observed CI from claimed remediation. Never mark a historical failure resolved solely because a later head is green.
 
+Base-bound: `88c859efb59cadd1997f35ef5a42f412f89e23e5`
+
+Rows below were reconciled against this main SHA. When main moves, the binding becomes stale and the audit fails closed until rows are re-verified.
+
 ## Evidence ledger
 
 | Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
