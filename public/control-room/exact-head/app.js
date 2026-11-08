@@ -5,7 +5,7 @@
   const clear=n=>n.replaceChildren();
   const STAGES=['Find failure','Diagnose','Fix','Verify','Harden','Reverify','Deploy','Production proof'];
   const FIELDS=['REALITY','FIX','PROOF','RISK','ROLLBACK','NEXT GATE'];
-  let projects=[],selected=null,inspected=null,stage=0;
+  let projects=[],selected=null,inspected=null,stage=0,inspectionGeneration=0;
   const note={};
   for(const k of FIELDS)note[k]='';
   async function get(path){
@@ -17,7 +17,35 @@
   function message(s){const n=el('message');n.hidden=!s;n.textContent=s||''}
   function cell(key,v){const d=mk('div');d.append(mk('small','',key),mk('code','',v||'NOT VERIFIED'));return d}
   function count(key,v){const d=mk('div');d.append(mk('strong','',v===null?'?':v),mk('small','',key));return d}
-  function reset(){inspected=null;stage=0;el('detail').hidden=true;for(const k of FIELDS){note[k]='';const input=document.getElementById('n-'+k.replaceAll(' ','_'));if(input)input.value=''}pipeline()}
+  // A project/PR change invalidates every previous evidence surface and
+  // every in-flight response, not just the collapsed check list.
+  function reset(){
+    inspectionGeneration+=1;
+    inspected=null;stage=0;el('detail').hidden=true;
+    el('go').disabled=false;
+    el('source').textContent='UNKNOWN';
+    el('next').textContent='Inspect a live PR to identify the next bounded action.';
+    const blockers=el('blockers');clear(blockers);
+    blockers.append(mk('li','','Exact PR head not yet verified'));
+    const gates=el('gates');clear(gates);
+    for(const [name,status] of [
+      ['GitHub checks','UNKNOWN'],['Required rulesets','UNKNOWN'],
+      ['FCR founder approval','NOT GRANTED'],['Cloudflare production','UNKNOWN'],
+      ['Supabase / runtime','UNKNOWN']
+    ]){
+      const row=mk('div','gate');
+      row.append(mk('span','',name),mk('b','',status));
+      gates.append(row);
+    }
+    for(const k of FIELDS){
+      note[k]='';
+      const input=document.getElementById('n-'+k.replaceAll(' ','_'));
+      if(input)input.value='';
+    }
+    pipeline();
+    message('');
+    return inspectionGeneration;
+  }
   function pipeline(){const root=el('pipeline');clear(root);STAGES.forEach((name,i)=>{
     const b=mk('button',stage===i?'active':'',name);b.type='button';b.prepend(mk('span','',String(i+1).padStart(2,'0')));
     b.disabled=i>Math.min(stage+1,5);b.title=i>=6?'Requires FCR production proof':'Operator work stage only';
@@ -54,9 +82,28 @@
       projects=data.projects;selected=projects.find(p=>p.repository)?.id||null;
       el('access').hidden=true;el('private').hidden=false;renderRegistry();
       el('project').onchange=()=>{selected=el('project').value;reset();renderRegistry();message('Target changed. Refresh exact-head evidence.')};
-      el('inspect').onsubmit=async e=>{e.preventDefault();const id=el('project').value,n=Number(el('pr').value);if(!Number.isSafeInteger(n)||n<=0)return message('Valid PR number required.');
-        el('go').disabled=true;reset();message('Reading current GitHub evidence...');
-        try{render(await get('/integration-cockpit/inspect/'+encodeURIComponent(id)+'/'+n))}catch(error){el('source').textContent='UNKNOWN';message(error.message+'. Merge and deployment remain blocked.')}finally{el('go').disabled=false}}
+      el('inspect').onsubmit=async e=>{
+        e.preventDefault();
+        const id=el('project').value,n=Number(el('pr').value);
+        if(!Number.isSafeInteger(n)||n<=0||n>10000000)return message('Valid PR number required.');
+        const requestedRepository=projects.find(p=>p.id===id)?.repository;
+        const token=reset();
+        el('go').disabled=true;
+        message('Reading current GitHub evidence...');
+        try{
+          const data=await get('/integration-cockpit/inspect/'+encodeURIComponent(id)+'/'+n);
+          if(token!==inspectionGeneration||selected!==id)return;
+          if(data?.project?.id!==id||data?.project?.repository!==requestedRepository||data?.pullRequest!==n)
+            throw new Error('Inspection response does not match the selected PR');
+          render(data);
+        }catch(error){
+          if(token!==inspectionGeneration||selected!==id)return;
+          reset();
+          message(error.message+'. Merge and deployment remain blocked.');
+        }finally{
+          if(token===inspectionGeneration)el('go').disabled=false;
+        }
+      }
     }catch(error){const root=el('access');clear(root);root.append(mk('h2','',error.status===401?'Sign in to Founder Control Room':'Private evidence unavailable'),mk('p','','Private project and engineering data remain hidden until the existing founder session is verified.'));const a=mk('a','','Open FCR sign-in →');a.href='/control-room/';root.append(a)}}
   boot();
 })();
