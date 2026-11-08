@@ -7,6 +7,7 @@ export interface RelaySessionAuthority {
 
 export function authorizeOperatorRelay(session: RelaySessionAuthority, request: OperatorRelayRequestV1): string[] {
   const errors: string[] = [];
+  if (request.fromOperator === 'fcr') errors.push('fcr relay source is reserved for internal orchestration');
   if (!session.authenticated) errors.push('relay requires authenticated founder session');
   if (session.operator !== request.fromOperator) errors.push('relay source operator is not bound to current session');
   return errors;

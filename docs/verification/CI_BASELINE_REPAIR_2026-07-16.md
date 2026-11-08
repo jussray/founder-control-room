@@ -1,3 +1,9 @@
+# Founder Control Room baseline repair state — 2026-07-16 [SUPERSEDED]
+
+**STATUS: HISTORICAL. This repair was completed and superseded by `docs/CI_SETUP_PYTHON_PIN_REPAIR_2026-10-04.md`.**
+
+---
+
 # Founder Control Room baseline repair state — 2026-07-16
 
 ## OODA decision

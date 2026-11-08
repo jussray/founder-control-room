@@ -18,18 +18,21 @@ import express from 'express';
 import { randomBytes } from 'node:crypto';
 
 const sha = () => randomBytes(20).toString('hex');
+const E2E_CHECK_APP_ID = 15368;
+const E2E_CHECK_TIME = '2026-01-01T00:00:00.000Z';
 
 export function createFakeGitHubServer() {
   const app = express();
   app.use(express.json());
 
-  const repos = new Map(); // "owner/repo" -> { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha }
+  const repos = new Map(); // "owner/repo" -> { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha, checkRuns }
 
   function addRepo({ owner, repo, defaultBranch = 'main', seedFiles = {}, rootCommitSha }) {
     const trees = new Map();
     const commits = new Map();
     const branches = new Map();
     const blobs = new Map();
+    const checkRuns = new Map();
 
     const rootTreeSha = sha();
     trees.set(rootTreeSha, new Map(Object.entries(seedFiles)));
@@ -38,8 +41,19 @@ export function createFakeGitHubServer() {
       ?? (/^[0-9a-f]{40}$/.test(configuredRootSha) ? configuredRootSha : sha());
     commits.set(rootCommit, { treeSha: rootTreeSha, parents: [] });
     branches.set(defaultBranch, { sha: rootCommit, treeSha: rootTreeSha });
+    checkRuns.set(rootCommit, [{
+      id: 1,
+      name: 'e2e-base-health',
+      status: 'completed',
+      conclusion: 'success',
+      head_sha: rootCommit,
+      app: { id: E2E_CHECK_APP_ID, slug: 'github-actions' },
+      started_at: E2E_CHECK_TIME,
+      completed_at: E2E_CHECK_TIME,
+      details_url: `https://example.invalid/${owner}/${repo}/checks/e2e-base-health`,
+    }]);
 
-    const state = { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha };
+    const state = { owner, repo, defaultBranch, trees, commits, branches, blobs, rootTreeSha, checkRuns };
     repos.set(`${owner}/${repo}`, state);
     return state;
   }
@@ -60,6 +74,29 @@ export function createFakeGitHubServer() {
     const branch = req.repoState.branches.get(req.params.branch);
     if (!branch) return res.status(404).json({ message: 'Branch not found' });
     res.json({ commit: { sha: branch.sha, commit: { tree: { sha: branch.treeSha } } } });
+  });
+
+  app.get('/repos/:owner/:repo/commits/:ref/check-runs', requireRepo, (req, res) => {
+    const { commits, branches, checkRuns } = req.repoState;
+    const requested = req.params.ref;
+    const commitSha = commits.has(requested) ? requested : branches.get(requested)?.sha;
+    if (!commitSha || !commits.has(commitSha)) return res.status(404).json({ message: 'Commit not found' });
+    const runs = checkRuns.get(commitSha) ?? [];
+    res.json({ total_count: runs.length, check_runs: runs });
+  });
+
+  app.get('/repos/:owner/:repo/commits/:ref', requireRepo, (req, res) => {
+    const { commits, branches } = req.repoState;
+    const requested = req.params.ref;
+    const commitSha = commits.has(requested) ? requested : branches.get(requested)?.sha;
+    if (!commitSha || !commits.has(commitSha)) return res.status(404).json({ message: 'Commit not found' });
+    res.json({
+      sha: commitSha,
+      commit: {
+        author: { date: E2E_CHECK_TIME },
+        committer: { date: E2E_CHECK_TIME },
+      },
+    });
   });
 
   function getContents(req, res) {

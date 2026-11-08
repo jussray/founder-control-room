@@ -6,12 +6,12 @@ import {
   SharedCapabilityRuntimeError,
 } from '../../capabilities/sharedCapabilityRuntime.js';
 import {
-  TINYFISH_WEB_OBSERVATION_CAPABILITY,
-  TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
-  TinyFishReadOnlyClient,
-  TinyFishReadOnlyError,
-  type TinyFishContinuityInput,
-} from '../../capabilities/tinyFishWebObservation.js';
+  observePublicWeb,
+  PUBLIC_WEB_OBSERVATION_CAPABILITY,
+  PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
+  PublicWebObservationError,
+  type PublicWebContinuityInput,
+} from '../../capabilities/publicWebObservation.js';
 import {
   resolveUltrathinkSharedReasoning,
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
@@ -33,7 +33,7 @@ const DYNAMIC_CAPABILITIES = new Map([
 ]);
 const WORKBENCH_CAPABILITIES = Object.freeze([
   ...capabilities,
-  TINYFISH_WEB_OBSERVATION_CAPABILITY,
+  PUBLIC_WEB_OBSERVATION_CAPABILITY,
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
 ]);
 
@@ -43,9 +43,9 @@ function continuityValue(value: unknown): string | null {
   return normalized ? normalized.slice(0, 256) : null;
 }
 
-function tinyFishErrorStatus(error: TinyFishReadOnlyError): number {
-  if (error.code === 'tinyfish_invalid_request') return 400;
-  if (error.code === 'tinyfish_not_configured') return 503;
+function publicWebErrorStatus(error: PublicWebObservationError): number {
+  if (error.code === 'public_web_invalid_request') return 400;
+  if (error.code === 'public_web_unavailable') return 503;
   return 502;
 }
 
@@ -103,7 +103,7 @@ function runUltrathinkReasoning(
   }
 }
 
-async function runTinyFishObservation(
+async function runPublicWebObservation(
   req: FounderRequest,
   res: Response,
   body: Record<string, unknown>,
@@ -111,37 +111,39 @@ async function runTinyFishObservation(
   try {
     const operation = typeof body.operation === 'string' ? body.operation.trim() : '';
     if (operation !== 'search' && operation !== 'fetch') {
-      throw new TinyFishReadOnlyError('tinyfish_invalid_request', 'TinyFish operation must be search or fetch.');
+      throw new PublicWebObservationError(
+        'public_web_invalid_request',
+        'Public-web observation operation must be search or fetch.',
+      );
     }
 
-    const executionId = `tinyfish-observation:${randomUUID()}`;
+    const executionId = `public-web-observation:${randomUUID()}`;
     const sharedInvocation = prepareSharedReadOnlyCapabilityRun({
       executionId,
-      capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+      capabilityId: PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
       surface: body.surface,
       intent: boundedIntent(body, operation),
       founder: req.founder,
     });
 
-    const continuity: TinyFishContinuityInput = {
+    const continuity: PublicWebContinuityInput = {
       priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
       priorProofCookie: continuityValue(body.priorProofCookie),
     };
-    const client = TinyFishReadOnlyClient.fromEnvironment();
-    const observation = operation === 'search'
-      ? await client.search(typeof body.query === 'string' ? body.query : '', continuity)
-      : await client.fetchUrls(
-        Array.isArray(body.urls)
-          ? body.urls.map((value) => typeof value === 'string' ? value : '')
-          : [],
-        continuity,
-      );
+    const observation = await observePublicWeb({
+      operation,
+      query: typeof body.query === 'string' ? body.query : undefined,
+      urls: Array.isArray(body.urls)
+        ? body.urls.map((value) => typeof value === 'string' ? value : '')
+        : undefined,
+      continuity,
+    });
     const sharedResult = finalizeSharedReadOnlyCapabilityRun(sharedInvocation, observation);
 
     return res.status(200).set('Cache-Control', 'no-store').json({
       run: {
         id: executionId,
-        capabilityId: TINYFISH_WEB_OBSERVATION_CAPABILITY_ID,
+        capabilityId: PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
         state: 'completed',
         authority: 'read_only',
         consequence: 'READ',
@@ -158,15 +160,15 @@ async function runTinyFishObservation(
         code: error.code,
       });
     }
-    if (error instanceof TinyFishReadOnlyError) {
-      return res.status(tinyFishErrorStatus(error)).set('Cache-Control', 'no-store').json({
+    if (error instanceof PublicWebObservationError) {
+      return res.status(publicWebErrorStatus(error)).set('Cache-Control', 'no-store').json({
         error: error.message,
         code: error.code,
       });
     }
     return res.status(502).set('Cache-Control', 'no-store').json({
-      error: 'TinyFish observation failed.',
-      code: 'tinyfish_upstream_failure',
+      error: 'Public-web observation failed.',
+      code: 'public_web_upstream_failure',
     });
   }
 }
@@ -185,8 +187,8 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
     return runUltrathinkReasoning(req, res, body);
   }
 
-  if (capabilityId === TINYFISH_WEB_OBSERVATION_CAPABILITY_ID) {
-    return runTinyFishObservation(req, res, body);
+  if (capabilityId === PUBLIC_WEB_OBSERVATION_CAPABILITY_ID) {
+    return runPublicWebObservation(req, res, body);
   }
 
   const runtime = DYNAMIC_CAPABILITIES.get(capabilityId);
