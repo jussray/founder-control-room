@@ -49,6 +49,14 @@ The following additional outcomes were directly checked against GitHub Actions j
 | `3e657ec9329b9ad601aafe7af059cd559d39e6c9` | CI (run 42346721585) | cancelled | UNKNOWN: cancellation cause not established; GitHub jobs show cancelled checks and a failed Required Gate | UNKNOWN: no verified corrective SHA | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42346721585); job outcomes observed | OPEN |
 | `43d507441a668e1632e0ec2ef3e7dc4268785aed` | Historical CI Accountability (run 42392476100) | failure | Audit reported missing historical CI run 42346721585 | UNKNOWN: ledger repair authored, not yet verified by exact-head CI | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42392476100); failing job log observed | OPEN |
 
+## Historical CI accountability reconciliation (2026-11-07)
+
+Verified additional exact GitHub Actions records from PR #1069. Historical failures and cancellations remain open until independently explained; current-head success cannot rewrite past outcomes.
+
+| `43d507441a668e1632e0ec2ef3e7dc4268785aed` | Control Room Test Ledger (run 42392475952) | cancelled | UNKNOWN: cancellation reason not yet independently established | UNKNOWN: no proven remediation for the underlying historical outcome | [Provider-verified GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42392475952); exact SHA/name/conclusion match | OPEN |
+| `43d507441a668e1632e0ec2ef3e7dc4268785aed` | CI (run 42392476155) | cancelled | UNKNOWN: cancellation reason not yet independently established | UNKNOWN: no proven remediation for the underlying historical outcome | [Provider-verified GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42392476155); exact SHA/name/conclusion match | OPEN |
+| `7ca5ece61756c5b2780f87b765abf674677ff8b3` | Historical CI Accountability (run 42392993954) | failure | Historical CI Accountability detected two missing cancelled-run ledger entries; underlying cancellation causes still unverified | UNKNOWN: no proven remediation for the underlying historical outcome | [Provider-verified GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42392993954); exact SHA/name/conclusion match | OPEN |
+
 ## Agent accountability
 
 - Commit `346829f4e955381be4cbaf1ee67ed1cd81949541` attributes its QuickScan optional-candidate TypeScript fix to Claude Haiku 5.5 as co-author. This is commit metadata, not independent proof of agent execution or complete verification.
