@@ -9,6 +9,7 @@ import {
   LinkedInFirstPartyAdapterError,
   createLinkedInFirstPartyAdapter,
 } from './linkedinFirstPartyAdapter.js';
+import { XFirstPartyAdapterError, createXFirstPartyAdapter } from './xFirstPartyAdapter.js';
 // @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
 import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
@@ -97,6 +98,7 @@ export interface FirstPartyFounderPublishResult {
     | 'INVALID_AUTHORIZATION'
     | 'EXECUTION_CONTEXT_REQUIRED'
     | 'LINKEDIN_NOT_CONFIGURED'
+    | 'X_NOT_CONFIGURED'
     | 'SOURCE_PROJECT_UNRESOLVED'
     | 'ACTION_ALREADY_RESERVED'
     | 'ACTION_RESERVATION_FAILED'
@@ -124,7 +126,8 @@ interface ValidatedAuthority {
   approvalId: string;
   text: string;
   proofUrl: string | null;
-  authorUrn: string;
+  platform: 'linkedin' | 'x';
+  providerAccountId: string;
   accessToken: string;
   apiVersion: string | undefined;
   idempotencyKey: string;
@@ -165,10 +168,12 @@ function invalid(reasons: string[]): Error {
 }
 
 function linkedinConfig(env: NodeJS.ProcessEnv) {
-  const accessToken = text(env.LINKEDIN_ACCESS_TOKEN);
-  const authorUrn = text(env.LINKEDIN_AUTHOR_URN);
-  const apiVersion = text(env.LINKEDIN_API_VERSION) || undefined;
-  return { accessToken, authorUrn, apiVersion };
+  return { accessToken: text(env.LINKEDIN_ACCESS_TOKEN), providerAccountId: text(env.LINKEDIN_AUTHOR_URN), apiVersion: text(env.LINKEDIN_API_VERSION) || undefined };
+}
+
+function xConfig(env: NodeJS.ProcessEnv) {
+  // The X app API key is not a user-context posting credential.
+  return { accessToken: text(env.X_USER_ACCESS_TOKEN), providerAccountId: text(env.X_USER_ID), apiVersion: undefined };
 }
 
 function validateAuthority(
@@ -205,7 +210,10 @@ function validateAuthority(
   const currentObserved = validTime(currentYou.observed_at);
   const approvedObserved = validTime(approvedCurrentYou.observed_at);
   const approvedExpires = validTime(canonicalAuthorization.expires_at);
-  const config = linkedinConfig(env);
+  const isX = platform === 'x';
+  const activePlatform: 'linkedin' | 'x' = isX ? 'x' : 'linkedin';
+  const capability = FIRST_PARTY_PLATFORM_CAPABILITIES[activePlatform];
+  const config = isX ? xConfig(env) : linkedinConfig(env);
 
   if (canonicalAuthorization.kind !== 'fcr/founder-content-publication-authorization') {
     reasons.push('canonical publication authorization kind is invalid');
@@ -217,7 +225,9 @@ function validateAuthority(
   if (!HASH.test(publicPayloadHash)) reasons.push('canonical public_payload_hash is invalid');
   if (!OWNED_REPO.test(sourceRepo)) reasons.push('source repo must be owned by jussray');
   if (!FULL_SHA.test(sourceCommitSha)) reasons.push('source commit must be exact');
-  if (platform !== 'linkedin') reasons.push('first-party direct slice currently supports LinkedIn only');
+  if (platform !== 'linkedin' && platform !== 'x') {
+    reasons.push('first-party direct slice supports LinkedIn or X only');
+  }
   if (!approvedText || canonicalText !== approvedText) {
     reasons.push('canonical approved copy must match the exact Chief public payload');
   }
@@ -228,8 +238,8 @@ function validateAuthority(
     reasons.push('founder-content proof-link policy must remain editorial_optional');
   }
   if (proofUrl && !validHttpsUrl(proofUrl)) reasons.push('optional proof link must be HTTPS');
-  if (approvedText.length > FIRST_PARTY_PLATFORM_CAPABILITIES.linkedin.safeCharacterLimit!) {
-    reasons.push('approved LinkedIn copy exceeds the first-party safe character limit');
+  if (approvedText.length > capability.safeCharacterLimit!) {
+    reasons.push(`approved ${activePlatform} copy exceeds the first-party safe character limit`);
   }
 
   if (input.confirmation?.confirm_publication !== true) {
@@ -269,8 +279,10 @@ function validateAuthority(
     reasons.push('canonical publication authorization is expired');
   }
 
-  if (!config.accessToken) reasons.push('LINKEDIN_ACCESS_TOKEN is not configured server-side');
-  if (!LINKEDIN_AUTHOR_URN.test(config.authorUrn)) {
+  if (!config.accessToken) reasons.push(isX ? 'X_USER_ACCESS_TOKEN is not configured server-side' : 'LINKEDIN_ACCESS_TOKEN is not configured server-side');
+  if (isX) {
+    if (!/^[0-9]{1,25}$/.test(config.providerAccountId)) reasons.push('X_USER_ID is not configured as a numeric account id');
+  } else if (!LINKEDIN_AUTHOR_URN.test(config.providerAccountId)) {
     reasons.push('LINKEDIN_AUTHOR_URN is not configured as a valid member or organization URN');
   }
 
@@ -280,8 +292,8 @@ function validateAuthority(
     contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
     authorizationHash,
     publicPayloadHash,
-    platform: 'linkedin',
-    accountId: config.authorUrn,
+    platform: activePlatform,
+    accountId: config.providerAccountId,
     text: approvedText,
     sourceRepo,
     sourceCommitSha,
@@ -290,16 +302,16 @@ function validateAuthority(
     kind: 'fcr/founder-content-publish-now-idempotency@v1',
     authorizationHash,
     publicPayloadHash,
-    provider: 'linkedin',
-    providerAccountId: config.authorUrn,
+    provider: activePlatform,
+    providerAccountId: config.providerAccountId,
     sourceRepo,
     sourceCommitSha,
   });
   const proofUrls = proofUrl ? [proofUrl] : [];
   const prepared: PreparedFirstPartyPublication = {
-    platform: 'linkedin',
-    accountId: config.authorUrn,
-    contentField: 'linkedin_draft',
+    platform: activePlatform,
+    accountId: config.providerAccountId,
+    contentField: capability.contentField,
     text: approvedText,
     traction: 'canonical-founder-content-proposal',
     governanceAdvantage: 'exact-current-you-plus-provider-readback',
@@ -312,10 +324,10 @@ function validateAuthority(
     mode: 'publish',
     founderApprovalId: approvalId,
     media: [],
-    characterLimit: FIRST_PARTY_PLATFORM_CAPABILITIES.linkedin.safeCharacterLimit!,
+    characterLimit: capability.safeCharacterLimit!,
     contentHash,
     idempotencyKey,
-    capability: FIRST_PARTY_PLATFORM_CAPABILITIES.linkedin,
+    capability,
   };
 
   return {
@@ -327,7 +339,8 @@ function validateAuthority(
     approvalId,
     text: approvedText,
     proofUrl,
-    authorUrn: config.authorUrn,
+    platform: activePlatform,
+    providerAccountId: config.providerAccountId,
     accessToken: config.accessToken,
     apiVersion: config.apiVersion,
     idempotencyKey,
@@ -474,10 +487,12 @@ export async function dispatchFirstPartyFounderContentPublishNow(
     authority = validateAuthority(input, options.env ?? process.env, now);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid founder-content authorization';
-    const code = message.includes('LINKEDIN_ACCESS_TOKEN') || message.includes('LINKEDIN_AUTHOR_URN')
-      ? 'LINKEDIN_NOT_CONFIGURED'
-      : 'INVALID_AUTHORIZATION';
-    return blocked(code, code === 'LINKEDIN_NOT_CONFIGURED' ? 503 : 400, [message]);
+    const code = message.includes('X_USER_ACCESS_TOKEN') || message.includes('X_USER_ID')
+      ? 'X_NOT_CONFIGURED'
+      : message.includes('LINKEDIN_ACCESS_TOKEN') || message.includes('LINKEDIN_AUTHOR_URN')
+        ? 'LINKEDIN_NOT_CONFIGURED'
+        : 'INVALID_AUTHORIZATION';
+    return blocked(code, code === 'LINKEDIN_NOT_CONFIGURED' || code === 'X_NOT_CONFIGURED' ? 503 : 400, [message]);
   }
 
   const store = options.store ?? (await defaultStore());
@@ -493,8 +508,8 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       authorizationHash: authority.authorizationHash,
       publicPayloadHash: authority.publicPayloadHash,
       approvalId: authority.approvalId,
-      platform: 'linkedin',
-      providerAccountId: authority.authorUrn,
+      platform: authority.platform,
+      providerAccountId: authority.providerAccountId,
       contentHash: authority.prepared.contentHash,
       idempotencyKey: authority.idempotencyKey,
     },
@@ -508,22 +523,18 @@ export async function dispatchFirstPartyFounderContentPublishNow(
     );
   }
 
-  const adapter = createLinkedInFirstPartyAdapter({
-    accessToken: authority.accessToken,
-    authorUrn: authority.authorUrn,
-    apiVersion: authority.apiVersion,
-    fetchImpl: options.fetchImpl,
-  });
+  const adapter = authority.platform === 'x'
+    ? createXFirstPartyAdapter({ accessToken: authority.accessToken, userId: authority.providerAccountId, fetchImpl: options.fetchImpl })
+    : createLinkedInFirstPartyAdapter({ accessToken: authority.accessToken, authorUrn: authority.providerAccountId, apiVersion: authority.apiVersion, fetchImpl: options.fetchImpl });
 
   try {
-    const receipt = await executeFirstPartyPublication(authority.prepared, {
-      linkedin: adapter,
-    });
+    const registry = authority.platform === 'x' ? { x: adapter } : { linkedin: adapter };
+    const receipt = await executeFirstPartyPublication(authority.prepared, registry);
     const result: JsonRecord = {
       contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
       truthState: 'PUBLISHED',
       published: true,
-      platform: 'linkedin',
+      platform: authority.platform,
       externalPostId: receipt.externalPostId,
       permalink: receipt.permalink,
       providerRequestId: receipt.providerRequestId,
@@ -582,14 +593,15 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       reasons: [],
     };
   } catch (error) {
-    const linkedInError = error instanceof LinkedInFirstPartyAdapterError ? error : null;
-    const truthState = linkedInError?.truthState === 'UNKNOWN' ? 'UNKNOWN' : 'FAILED';
-    const providerEvidence: JsonRecord = linkedInError
+    const providerError = error instanceof LinkedInFirstPartyAdapterError || error instanceof XFirstPartyAdapterError ? error : null;
+    const truthState = providerError?.truthState === 'UNKNOWN' ? 'UNKNOWN' : 'FAILED';
+    const providerEvidence: JsonRecord = providerError
       ? {
-          phase: linkedInError.evidence.phase,
-          postUrn: linkedInError.evidence.postUrn,
-          permalink: linkedInError.evidence.permalink,
-          httpStatus: linkedInError.evidence.httpStatus,
+          phase: providerError.evidence.phase,
+          postUrn: error instanceof LinkedInFirstPartyAdapterError ? error.evidence.postUrn : undefined,
+          postId: error instanceof XFirstPartyAdapterError ? error.evidence.postId : undefined,
+          permalink: providerError.evidence.permalink,
+          httpStatus: providerError.evidence.httpStatus,
           retrySafe: false,
         }
       : { retrySafe: false };
@@ -597,9 +609,9 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
       truthState,
       published: false,
-      provider: 'linkedin',
+      provider: authority.platform,
       providerEvidence,
-      errorCode: linkedInError?.code ?? 'FIRST_PARTY_PUBLICATION_REJECTED',
+      errorCode: providerError?.code ?? 'FIRST_PARTY_PUBLICATION_REJECTED',
       retrySafe: false,
       freshApprovalRequired: truthState === 'FAILED',
     };
@@ -623,7 +635,7 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       receipt: null,
       providerEvidence: { ...providerEvidence, auditPersisted },
       reasons: [
-        linkedInError?.code ?? (error instanceof Error ? error.message : 'first-party publication failed'),
+        providerError?.code ?? (error instanceof Error ? error.message : 'first-party publication failed'),
         truthState === 'UNKNOWN'
           ? 'provider outcome is ambiguous; exact authorization is consumed and no blind retry is allowed'
           : 'provider rejected the write; a fresh Current-You approval is required before another attempt',
