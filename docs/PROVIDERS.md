@@ -30,6 +30,13 @@ Perplexity does not know private repository, Supabase, provider, or production s
 
 ## GitHub
 
+### Draft PR diagnosis is separate from review and merge authority
+
+`src/providers/RepositoryProvider.ts` declares optional `observePullRequest(...)` for read-only PR identity and status, including drafts and closed PRs. `src/providers/GitHubProvider.ts` must return provider-observed base/head SHAs and draft/closed state through that method without populating its internal review context. The strict `getPullRequestReviewContext(...)` method continues to reject draft or closed PRs before any independent-review or merge authority can be evaluated.
+
+`src/providers/providerFactory.ts` must delegate read-only observation to the repository-scoped provider and fail closed if that capability is not available; it cannot grant a broader installation scope or bypass the existing founder authentication. `src/http/routes/exactHeadCockpit.ts` must require the existing founder session, restrict project choices to its server-owned allowlist, re-read PR identity, report stale or missing evidence explicitly, and always return merge/deploy authority as false. A diagnostic observation, passing or skipped checks, or a local browser fixture cannot authorize a merge, production release, secret change, or provider mutation.
+
+
 Current repository provider and evidence layer. Branches, commits, PRs, checks, merges, deployments, and runtime health are separate states. Preserve the `RepositoryProvider` boundary so GitHub can be replaced.
 
 Repository supersession is governed by **obligations, not branch age or container similarity**. Provider compare plus PR readback supplies the inventory evidence for candidate work, but a matching file, cherry-picked commit, or stale branch is not closure proof. Before a superseded lane can be called safe to close, every provider-discovered unique commit/file and every required residue class must receive one explicit disposition, the replacement relation must be provider-read and acyclic, unresolved required residue/review findings must be zero, historical evidence must remain recoverable, and runtime-sensitive outcomes require proof bound to the current authoritative head. If a replacement chain later loses the obligation, the obligation becomes orphaned and must surface back into the active control plane.
