@@ -14,7 +14,7 @@ export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
 export const CODEQL_SECURITY_FLOOR = Object.freeze({
   tool: 'CodeQL',
   securityAlertsThreshold: 'high_or_higher',
-  alertsThreshold: 'errors',
+  alertsThreshold: 'all',
 });
 
 const API_VERSION = '2026-03-10';

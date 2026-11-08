@@ -46,7 +46,7 @@ function canonicalRuleset(overrides = {}) {
           code_scanning_tools: [{
             tool: 'CodeQL',
             security_alerts_threshold: 'high_or_higher',
-            alerts_threshold: 'errors',
+            alerts_threshold: 'all',
           }],
         },
       },

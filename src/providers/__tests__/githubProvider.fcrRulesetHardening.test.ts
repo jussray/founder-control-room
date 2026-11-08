@@ -76,7 +76,7 @@ function reviewReadback(request: TestConfig = config, preserved: TestRule[] = []
         code_scanning_tools: [{
           tool: "CodeQL",
           security_alerts_threshold: "high_or_higher",
-          alerts_threshold: "errors",
+          alerts_threshold: "all",
         }],
       },
     },
@@ -214,7 +214,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
         code_scanning_tools: [{
           tool: "CodeQL",
           security_alerts_threshold: "high_or_higher",
-          alerts_threshold: "errors",
+          alerts_threshold: "all",
         }],
       });
 
@@ -417,7 +417,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
   });
 
-  it("preserves signed-commit enforcement and unrelated provider rules when splitting the live review membrane", async () => {
+  it("preserves signed commits and unrelated provider security rules when splitting the live review membrane", async () => {
     const preserved = preservedProviderRules();
     mockGetRepoRulesets.mockResolvedValue({
       data: [

@@ -346,6 +346,18 @@ These entries record actual failed or cancelled workflow conclusions observed by
 | `fee815a12349a6fd8fc2005420d9f33176a87d20` | Control Room Test Ledger (run 42340553110) | cancelled | UNKNOWN: cancellation reason not yet verified | UNKNOWN: corrective action not yet established | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42340553110); outcome observed, remediation not verified | OPEN |
 | `fee815a12349a6fd8fc2005420d9f33176a87d20` | Attack-20 V3 (run 42340553160) | cancelled | UNKNOWN: cancellation reason not yet verified | UNKNOWN: corrective action not yet established | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42340553160); outcome observed, remediation not verified | OPEN |
 
+
+## PR #1072 — newly observed exact-head failed runs (append-only)
+
+The following GitHub Actions runs were independently read by run ID, commit SHA, workflow name, and job logs. A PR description edit is not a commit and does not retroactively alter the originally failed event payload. All rows remain OPEN until successor exact-head workflows re-run successfully. These failures are preserved even after remediation.
+
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ee8d8de3614b9cc2651a59d8c8e7664a23217f75` | Repo Reality Evidence (run 42389462544) | failure | Observed CI gate rejected missing ### Scope, Verification, Evidence, Limits and Rollback PR sections | PR #1072 description now includes ### evidence sections; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42389462544); failed job/step and log inspected, successor pass unverified | OPEN |
+| `ee8d8de3614b9cc2651a59d8c8e7664a23217f75` | Historical CI Accountability (run 42389462627) | failure | Observed ledger verifier reported missing failed Repo Reality Evidence run 42389462544 | Append the exact failed run to this historical ledger; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42389462627); failed job/step and log inspected, successor pass unverified | OPEN |
+| `4dc8110f66a1323733fed456d4575a391ef9f5b5` | Repo Reality Evidence (run 42391915297) | failure | Observed CI gate rejected missing ### Scope, Verification, Evidence, Limits and Rollback PR sections (at run event time) | PR #1072 description now includes ### evidence sections; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42391915297); failed job/step and log inspected, successor pass unverified | OPEN |
+| `4dc8110f66a1323733fed456d4575a391ef9f5b5` | Historical CI Accountability (run 42391915243) | failure | Observed ledger verifier reported missing historical failed runs 42389462544 and 42389462627 on predecessor SHA | Append the missing historical failed runs to this ledger; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42391915243); failed job/step and log inspected, successor pass unverified | OPEN |
+
 ## PR #463 historical run observations (November 7, 2026)
 
 These records preserve observed GitHub outcomes from the exact predecessor commits of PR #463. A successor's green check does not rewrite a cancellation or establish unrelated remediation.
@@ -360,3 +372,9 @@ These records preserve observed GitHub outcomes from the exact predecessor commi
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Documentation Truth (run 42346031989) | failure | Documentation Truth required README refresh and a current structured truth receipt | README and existing Documentation Truth receipt updated on successor | [Failed run](https://github.com/jussray/founder-control-room/actions/runs/42346031989); [successor Documentation Truth success](https://github.com/jussray/founder-control-room/actions/runs/42346215104) at e86a6f1a9a2fb252f8d4de67c3d3341615f5606c | REMEDIATED |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Quality Gate (run 42346032096) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346032096); result observed, no remediation proof | OPEN |
 | `e86a6f1a9a2fb252f8d4de67c3d3341615f5606c` | Historical CI Accountability (run 42346215140) | failure | Seven failed or cancelled predecessor workflow runs were unrecorded for PR #463 | Ledger backfill proposed in successor commit, not independently verified yet | [Failed historical auditor](https://github.com/jussray/founder-control-room/actions/runs/42346215140); no successor success yet | OPEN |
+
+## PR #463 predecessor head verified outcomes
+
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `743bb87e0e429636b11fa29c384e210c2c782e0f` | PR Continuity (run 42395990252) | cancelled | UNKNOWN: result observed, root cause not verified | UNKNOWN: no verified correction yet | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42395990252); no remediation proven | OPEN |

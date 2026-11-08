@@ -13,6 +13,12 @@
   ],
   "changes": [
     {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+      ]
+    },
+    {
       "path": ".github/workflows/deploy.yml",
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
@@ -406,7 +412,8 @@
     {
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
-        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
+        "`src/providers/GitHubProvider.ts` must retain the live CodeQL `alerts_threshold: all` severity setting rather than downgrade it to `errors` while reconciling required-signatures and strict freshness; both source and independent governance preflight must enforce this, and successful source checks do not prove a live provider mutation."
       ]
     },
     {
