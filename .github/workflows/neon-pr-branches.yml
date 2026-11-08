@@ -154,6 +154,49 @@ jobs:
           test -n "$NEON_DB_URL" || { echo 'Neon create action returned no database URL' >&2; exit 1; }
           echo 'Neon branch identity and private database URL output are present. URL value was not printed.'
 
+      - name: Resolve private Neon preview connection on creation or reuse
+        id: neon_connection
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}
+          CREATED_DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          connection="$CREATED_DATABASE_URL"
+          if [ -n "$EXISTING_BRANCH_ID" ]; then
+            # Reused branch has no create-action database URL. Never default to main.
+            [[ "$NEON_PROJECT_ID" =~ ^[a-z0-9-]+$ ]]
+            [[ "$EXISTING_BRANCH_ID" =~ ^br-[a-z0-9-]+$ ]]
+            base="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$EXISTING_BRANCH_ID"
+            databases="$(curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer $NEON_API_KEY" "$base/databases")"
+            roles="$(curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer $NEON_API_KEY" "$base/roles")"
+            database_name="$(jq -er '[.databases[]? | select(.name == "neondb") | .name] | if length == 1 then .[0] else empty end' <<< "$databases")"
+            role_name="$(jq -er '[.roles[]? | select(.name == "neondb_owner") | .name] | if length == 1 then .[0] else empty end' <<< "$roles")"
+            connection="$(curl --fail-with-body --silent --show-error --get \
+              --header "Authorization: Bearer $NEON_API_KEY" \
+              --data-urlencode "branch_id=$EXISTING_BRANCH_ID" \
+              --data-urlencode "database_name=$database_name" \
+              --data-urlencode "role_name=$role_name" \
+              --data-urlencode 'pooled=false' \
+              "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/connection_uri" \
+              | jq -er '.uri | select(type == "string" and length > 20)')"
+          fi
+          case "$connection" in
+            postgresql://*|postgres://*) ;;
+            *) echo 'Private Neon branch connection URI unavailable' >&2; exit 1 ;;
+          esac
+          # Store credentials in a runner-local mode-0600 file; pass only path.
+          uri_file="$(mktemp "$RUNNER_TEMP/neon-preview-uri.XXXXXXXX")"
+          chmod 600 "$uri_file"
+          printf '%s' "$connection" > "$uri_file"
+          printf 'uri_file=%s\n' "$uri_file" >> "$GITHUB_OUTPUT"
+          echo 'Private Neon preview connection available (URL withheld).'
+
       - name: Verify exact PR head
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
@@ -167,9 +210,12 @@ jobs:
         env:
           LIVE_BASE_SHA: ${{ steps.neon_scope.outputs.live_base_sha }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+          NEON_URI_FILE: ${{ steps.neon_connection.outputs.uri_file }}
         run: |
           set -euo pipefail
+          test -f "$NEON_URI_FILE"
+          NEON_DB_URL="$(cat "$NEON_URI_FILE")"
+          test -n "$NEON_DB_URL"
 
           MIGRATIONS=()
           while IFS=$'\t' read -r status migration; do
@@ -249,9 +295,12 @@ jobs:
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         env:
-          NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+          NEON_URI_FILE: ${{ steps.neon_connection.outputs.uri_file }}
         run: |
           set -euo pipefail
+          test -f "$NEON_URI_FILE"
+          NEON_DB_URL="$(cat "$NEON_URI_FILE")"
+          test -n "$NEON_DB_URL"
           HAS_FCR_COMMERCE="$(psql "$NEON_DB_URL" -X -Atqc "select to_regclass('public.fcr_commerce_receipts') is not null")"
           if [ "$HAS_FCR_COMMERCE" != "t" ]; then
             echo 'FCR commerce table is not part of this preview; generic migration execution completed.'
