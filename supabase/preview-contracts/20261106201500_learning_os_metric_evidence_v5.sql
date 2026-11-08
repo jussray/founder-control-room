@@ -399,6 +399,9 @@ CREATE TABLE public.proof_gate_results (
 \ir ../migrations/20261106195000_learning_os_retirement_binding_v3.sql
 \ir ../migrations/20261106200000_learning_os_single_application_v4.sql
 \ir ../migrations/20261106201500_learning_os_metric_evidence_v5.sql
+\if :{?VERIFY_LEARNING_V6}
+\ir ../migrations/20261108005500_learning_os_metric_direction_required_v6.sql
+\endif
 
 -- Runtime contract, not a "migration parsed" shortcut: source provenance,
 -- state advancement, founder retirement authority, hashes and lease semantics.
@@ -755,4 +758,29 @@ BEGIN
   END IF;
 END
 $learning_proof$;
+
+\if :{?VERIFY_LEARNING_V6}
+-- A positive, source-backed metric comparison must already exist. Attempt
+-- to revoke its direction via UPDATE and insist the database rejects it.
+DO $learning_v6_proof$
+DECLARE v_rejected boolean := false;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.learning_application_reviews
+    WHERE demonstrated_improvement IS TRUE AND better_when = 'higher'
+  ) THEN RAISE EXCEPTION 'LEARNING_V6_NO_POSITIVE_METRIC_FIXTURE'; END IF;
+  BEGIN
+    UPDATE public.learning_application_reviews
+       SET better_when = NULL
+     WHERE demonstrated_improvement IS TRUE;
+  EXCEPTION WHEN check_violation THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'LEARNING_V6_NULL_METRIC_DIRECTION_ACCEPTED';
+  END IF;
+END
+$learning_v6_proof$;
+\endif
+
 ROLLBACK;
