@@ -42,6 +42,9 @@ test('owner-like email never promotes another verified account', async () => {
 test('resource, audience, scope, client, issuer and expiry must match exactly', async () => {
   const bad = [
     { resource: 'https://evil.example' }, { aud: 'other-api' },
+    { aud: 'https://evil.example/' + COMMAND_CENTER_SITE_RESOURCE },
+    { aud: COMMAND_CENTER_SITE_RESOURCE + '.evil.example' },
+    { resource: 'https://evil.example/?redirect=' + COMMAND_CENTER_SITE_RESOURCE },
     { resource: COMMAND_CENTER_SITE_RESOURCE + '/extra' },
     { aud: 'authenticated', resource: 'https://evil.example' },
     { client_id: 'unknown-client' }, { exp: 999 },

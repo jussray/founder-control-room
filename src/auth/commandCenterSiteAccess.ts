@@ -47,7 +47,7 @@ export async function resolveCommandCenterActor(
   // Supabase OAuth JWTs normally have aud=authenticated plus a signed client_id.
   // scope/resource are NOT standard access-token claims; they are optional custom
   // hook claims. The exact registered OAuth client ID is mandatory either way.
-  const validAudience = audience.includes(COMMAND_CENTER_SITE_RESOURCE) || audience.includes('authenticated');
+  const validAudience = audience.some(value => value === COMMAND_CENTER_SITE_RESOURCE || value === 'authenticated');
   if (!validAudience) return null;
   if (typeof claims.client_id !== 'string' || !config.allowedClientIds.includes(claims.client_id)) return null;
   const now = config.now ?? Math.floor(Date.now() / 1000);

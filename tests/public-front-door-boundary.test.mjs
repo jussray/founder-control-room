@@ -30,6 +30,6 @@ test('public-facing Pages hosts all have protected owner path policy scopes', ()
     assert.ok(cfg.protectedHostnames.includes(host), host);
   }
   assert.equal(cfg.accessApplicationNames.length, 3);
-  assert.ok(cfg.publicHostnames.includes('app.foundercontrolroom.org'));
+  assert.ok(cfg.publicHostnames.some(host => host === 'app.foundercontrolroom.org'));
   assert.ok(cfg.publicHostnames.includes('founder-control-room.pages.dev'));
 });
