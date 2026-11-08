@@ -391,6 +391,12 @@ async function verifyLogoutAndProtectedBoundary(page) {
   console.log('\n[logout] Server-revoked logout returns to welcome and denies the private shell');
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#sign-out');
+  // Preserve the original cookie in test memory to prove server revocation,
+  // not merely that logout cleared the current browser's cookie jar.
+  // Never print or persist the session value in test logs or artifacts.
+  const priorSessionCookie = (await page.context().cookies(BASE_URL))
+    .find((cookie) => cookie.name === '__Host-fcr_session');
+  assert(Boolean(priorSessionCookie?.value), 'an authenticated founder session cookie exists before logout');
   await page.click('#sign-out');
   await page.waitForURL(`${BASE_URL}/welcome`);
   await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
@@ -400,6 +406,19 @@ async function verifyLogoutAndProtectedBoundary(page) {
     return response.status;
   });
   assert(identityAfterLogout === 401, 'revoked browser cookie no longer authorizes founder identity');
+  // A copied pre-logout cookie must be invalid on the server too. A fresh
+  // isolated BrowserContext makes this fail if logout only clears client state.
+  const replayContext = await page.context().browser().newContext({
+    storageState: { cookies: [priorSessionCookie], origins: [] },
+  });
+  try {
+    const replayIdentity = await replayContext.request.get(`${BASE_URL}/auth/me`, {
+      failOnStatusCode: false,
+    });
+    assert(replayIdentity.status() === 401, 'the pre-logout cookie is rejected in an isolated browser context');
+  } finally {
+    await replayContext.close();
+  }
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
