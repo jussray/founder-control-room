@@ -50,6 +50,28 @@ describe('Founder Signal Engine immutable public source readback', () => {
       expect(JSON.stringify(options)).not.toContain('Authorization');
     }
   });
+  it('reads patch-free Git commit identity instead of a possibly oversized REST diff', async () => {
+    const calls: string[] = [];
+    const fetchFn = vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url === 'https://api.github.com/repos/' + REPO) {
+        return json({ full_name: REPO, private: false });
+      }
+      if (url === 'https://api.github.com/repos/' + REPO + '/git/commits/' + SHA) {
+        return json({ sha: SHA, html_url: URL });
+      }
+      return json({ files: [{ patch: 'x'.repeat(70_000) }] }, 200, { 'content-length': '70000' });
+    }) as unknown as typeof fetch;
+    const result = await verifyFounderSignalPublicSource(input, {fetchFn, now});
+    expect(result.status).toBe('VERIFIED_PUBLIC_GITHUB_COMMIT');
+    expect(calls).toEqual([
+      'https://api.github.com/repos/' + REPO,
+      'https://api.github.com/repos/' + REPO + '/git/commits/' + SHA,
+    ]);
+    expect(result.authorizesDraft).toBe(false);
+    expect(result.authorizesPublish).toBe(false);
+  });
+
   it('rejects caller-controlled URLs without network calls', async () => {
     const m=allowed();
     const r=await verifyFounderSignalPublicSource({...input,proofUrl:'https://github.com/other/repo/commit/'+SHA},
