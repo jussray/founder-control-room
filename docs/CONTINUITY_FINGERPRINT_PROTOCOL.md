@@ -18,6 +18,45 @@ For Founder Control Room, high-signal fingerprints include: merge intent, eviden
 
 If a fingerprint could belong to another project, verify the exact repo, branch, files, issue/PR, provider state, and current `main` before acting.
 
+## TRUE-FIRST discovery invariant
+
+Build the strongest evidence-bound TRUE baseline before trying to identify what is false.
+
+```text
+authoritative subject
+→ exact repo/runtime/provider binding
+→ VERIFIED + TRUE claims with evidence refs only
+→ deterministic baseline fingerprint
+→ bounded continuity/proof cookie
+→ contradiction search
+→ exact-subject challenge
+→ reconfirm TRUE, VERIFIED_CONTRADICTION, or re-baseline
+```
+
+Rules:
+
+1. A TRUE baseline may contain only claims that are `VERIFIED`, explicitly TRUE for the inspected subject, and bound to at least one evidence reference.
+2. `INFERRED`, `REMEMBERED`, `UNKNOWN`, `BLOCKED`, `STALE`, evidence-free, or already-FALSE claims never enter the TRUE baseline. Preserve them separately rather than upgrading them.
+3. Falsehood is discovered only by fresh verified contradictory evidence against the same exact subject binding. A moved repo head, runtime, provider state, scope, or authority state makes the predecessor baseline `STALE`; movement is not itself proof that the old claim was false.
+4. Rebuild TRUE first after any load-bearing movement, then challenge the new baseline. This prevents comparing two different realities and calling the difference a lie.
+5. The baseline fingerprint must be deterministic over the load-bearing project, repository, branch/head or equivalent runtime identity, scope, and verified TRUE claims/evidence refs.
+6. The continuity/proof cookie must be non-secret, freshness-bounded, optionally parent-linked to its predecessor, and marked `EVIDENCE_ONLY`. It cannot grant approval, merge, deploy, publish, provider, payment, or mutation authority.
+7. Preserve predecessor fingerprints/cookies and link successors. Do not overwrite history to make the present look cleaner.
+8. For UI/runtime truth, exact-head Playwright or equivalent real-path evidence remains required where the governing project contract requires it.
+
+### Browser proof authority
+
+Playwright is the default first browser and runtime proof surface for portfolio web work unless a stricter project-local contract names another primary authority.
+
+- For customer-facing UI, routes, auth flows, onboarding, checkout, release, or browser-observable runtime changes, use exact-head Playwright evidence before calling the changed path complete.
+- When the governing project requires desktop and mobile coverage, both must be proven before cutover.
+- Browser connectors such as Opera may provide exploratory readback or a secondary independent view, but they are not substitutes for required Playwright evidence.
+- A secondary browser connector being disconnected, unavailable, stale, or unable to invoke must never block work that Playwright and the authoritative repository/provider/runtime can still perform.
+- Do not rewrite a user's connector configuration as broken merely because the current agent surface cannot invoke it. Record the current observation precisely and continue through the primary proof path.
+- If Playwright itself is blocked by environment policy, network controls, missing browser dependencies, or runner infrastructure, record that exact Playwright blocker and continue all non-substitutive verification that remains available. Do not convert secondary-browser failure into the blocker.
+
+The executable FCR implementation is `src/continuity/trueFirstPortfolio.ts`. It intentionally returns `BASELINE_STALE` when a head/cookie binding moves instead of manufacturing a FALSE verdict.
+
 ## Genesis fingerprint
 
 When asked when this project started, do not infer genesis from the oldest visible chat. Resolve in this order:
@@ -50,6 +89,52 @@ prior decision
 → revalidation
 → current authority
 ```
+
+## Capability continuity without historical erasure
+
+Connector and external-capability continuity has two independent time planes:
+
+1. **historical evidence**: what a receipt proved at the time it was observed; and
+2. **current observation**: what the authoritative runtime/provider exposes now.
+
+A fresh current observation may supersede a present-tense capability claim. It may not rewrite history. Verified predecessor evidence remains append-only provenance unless the receipt itself is proven forged, misbound, or otherwise invalid.
+
+When evidence exists, keep these capability dimensions separate rather than collapsing them into one `available` boolean:
+
+- catalog visibility;
+- installation or enablement;
+- authentication/session identity;
+- callability from the current execution surface;
+- read capability;
+- write capability/authority;
+- provider acceptance; and
+- verified successful outcome.
+
+Each observation must be time-bound and source-bound. `Not exposed in this session at T2` is a valid current observation. It is not evidence that the connector never existed at T1.
+
+Resolution examples:
+
+| Historical receipt | Current observation | Correct classification |
+| --- | --- | --- |
+| successful connector use | connector absent now | `HISTORICALLY_VERIFIED` + `CURRENTLY_UNAVAILABLE` |
+| successful connector use | no current probe | `HISTORICALLY_VERIFIED` + `UNKNOWN` |
+| none found | connector absent now | current absence only; historical existence remains `UNKNOWN` |
+| one current surface says installed, another cannot invoke | contradictory current evidence | `CONNECTOR_STATE_CONFLICT` |
+
+Never infer an uninstall actor or root cause from disappearance alone. `Founder removed it`, `agent removed it`, `provider delisted it`, `OAuth expired`, and `eligibility changed` each require their own evidence receipt.
+
+Hard invariants:
+
+```text
+CURRENTLY_UNAVAILABLE != NEVER_EXISTED
+UNKNOWN != NO
+STALE != FALSE
+INSTALLED != AUTHORIZED
+AUTHORIZED != SUCCESSFUL
+SUCCESSFUL_ONCE != VERIFIED_NOW
+```
+
+Continuity fingerprints and proof cookies may link predecessor and successor observations, including the capability dimensions and evidence references above. They remain non-secret state markers only. They cannot install a connector, authenticate a session, create provider authority, replay approval, or convert historical success into current capability.
 
 ## Reuse rule
 

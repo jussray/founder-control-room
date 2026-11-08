@@ -6,16 +6,16 @@ describe('strategic security posture', () => {
     const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
 
     expect(snapshot.summary).toEqual({
-      totalProjects: 8,
-      v8Targets: 1,
+      totalProjects: 9,
+      v8Targets: 2,
       v9Targets: 4,
       v10Targets: 3,
-      playwrightRequiredProjects: 3,
-      totalStageObligations: 74,
+      playwrightRequiredProjects: 4,
+      totalStageObligations: 82,
       uniqueControlCount: 62,
       frameworkSignalCount: expect.any(Number),
       cryptographicInventoryEntries: 7,
-      cryptographicReviewRequiredProjects: 3,
+      cryptographicReviewRequiredProjects: 4,
       publicKeyMigrationEntries: 4,
       providerPqcEvidenceEntries: 10,
       providerPqcCurrentEntries: 2,
@@ -24,7 +24,7 @@ describe('strategic security posture', () => {
       providerPqcUnknownEntries: 2,
       provenProjects: 0,
     });
-    expect(snapshot.projects).toHaveLength(8);
+    expect(snapshot.projects).toHaveLength(9);
     expect(snapshot.projects.every((project) => project.assessmentState === 'target_only')).toBe(true);
     expect(snapshot.projects.every((project) => project.provenVersion === null)).toBe(true);
   });
@@ -38,17 +38,19 @@ describe('strategic security posture', () => {
     expect(bySlug.get('chief-ai-machine')?.targetVersion).toBe(10);
     expect(bySlug.get('juss-beautiful-hair')?.targetVersion).toBe(9);
     expect(bySlug.get('l99')?.targetVersion).toBe(8);
+    expect(bySlug.get('sync-party')?.targetVersion).toBe(8);
     expect(bySlug.get('sekret-bip')?.requiredProof).toContain('Playwright evidence for UI/runtime claims');
+    expect(bySlug.get('sync-party')?.requiredProof).toContain('Playwright evidence for UI/runtime claims');
   });
 
   it('covers every active project with observed crypto evidence or an explicit review-required state', () => {
     const snapshot = buildSecurityPostureSnapshot(new Date('2026-09-11T00:00:00.000Z'));
 
     expect(snapshot.cryptography.coverage).toEqual({
-      activeProjectCount: 8,
-      representedProjectCount: 8,
+      activeProjectCount: 9,
+      representedProjectCount: 9,
       inventoryEntryCount: 7,
-      reviewRequiredProjectCount: 3,
+      reviewRequiredProjectCount: 4,
       publicKeyMigrationEntryCount: 4,
       missingProjectSlugs: [],
       overlappingProjectSlugs: [],
@@ -71,6 +73,7 @@ describe('strategic security posture', () => {
       'chief-ai-machine',
       'juss-beautiful-hair',
       'promptos',
+      'sync-party',
     ]);
   });
 
