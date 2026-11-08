@@ -152,7 +152,7 @@ async function main() {
     summary, report, untriaged, invalid,
   };
   mkdirSync('artifacts/ci-history-audit', { recursive: true });
-  writeFileSync('artifacts/ci-history-audit/receipt.json', JSON.stringify(receipt, null, 2) + '\\n');
+  writeFileSync('artifacts/ci-history-audit/receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   console.log(`FCR_CI_HISTORY_VISIBILITY ${JSON.stringify(summary)}`);
   console.log(JSON.stringify({ pr: Number(pr), commits: report.length,
     exactHeadSha: exactHead, liveMainSha, auditIntegrity: receipt.auditIntegrity,
