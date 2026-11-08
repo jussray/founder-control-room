@@ -231,11 +231,15 @@ jobs:
               exit 1
             fi
             if [ -f "$PREVIEW_CONTRACT" ]; then
+              # Compatibility setup never replaces the actual migration.
               echo "Running migration preview contract: $PREVIEW_CONTRACT"
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
-            else
-              echo "Applying preview migration atomically: $migration"
-              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
+            echo "Applying preview migration atomically: $migration"
+            psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            if [ -f "$PREVIEW_CONTRACT" ]; then
+              echo "Verifying applied migration with preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
             fi
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"
