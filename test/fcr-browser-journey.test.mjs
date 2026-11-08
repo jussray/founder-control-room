@@ -9,7 +9,7 @@ const copy = () => structuredClone(manifest);
 test('the reviewed Sync Party journey validates as synthetic, same-origin, two-player proof', () => {
   const result = validateJourney(manifest);
   assert.equal(result.project, 'sync-party-game');
-  assert.equal(result.origin, 'https://games.jussco.company');
+  assert.equal(result.origin, 'https://sync.jussco.company');
   assert.equal(result.actors, 2);
   assert.ok(result.steps >= 40);
   assert.equal(manifest.steps.filter((step) => step.action === 'captureText').length, 1);
@@ -18,14 +18,14 @@ test('the reviewed Sync Party journey validates as synthetic, same-origin, two-p
 
 test('unapproved target domains and private or unsafe protocols fail closed', () => {
   for (const url of [
-    'http://games.jussco.company/',
+    'http://sync.jussco.company/',
     'https://127.0.0.1/',
     'https://localhost/',
     'https://evil.example/',
-    'https://games.jussco.company.evil.example/',
-    'https://alice:password@games.jussco.company/',
-    'https://games.jussco.company/?token=fake',
-    'https://games.jussco.company:444/'
+    'https://sync.jussco.company.evil.example/',
+    'https://alice:password@sync.jussco.company/',
+    'https://sync.jussco.company/?token=fake',
+    'https://sync.jussco.company:444/'
   ]) {
     assert.throws(() => validateOrigin(url), url);
   }
@@ -69,7 +69,7 @@ test('all steps have traceable titles but never require actual user credentials'
 test('the network guard blocks cross-origin HTTP redirects without following them', async () => {
   const actions = [];
   const route = {
-    request: () => ({ url: () => 'https://games.jussco.company/redirect' }),
+    request: () => ({ url: () => 'https://sync.jussco.company/redirect' }),
     fetch: async (options) => {
       actions.push(['fetch', options]);
       return { status: () => 302 };
@@ -78,7 +78,7 @@ test('the network guard blocks cross-origin HTTP redirects without following the
     fulfill: async () => { actions.push(['fulfill']); },
     continue: async () => { actions.push(['continue']); },
   };
-  await enforceSameOriginRoute(route, 'https://games.jussco.company');
+  await enforceSameOriginRoute(route, 'https://sync.jussco.company');
   assert.deepEqual(actions, [
     ['fetch', { maxRedirects: 0 }],
     ['abort', 'blockedbyclient'],
@@ -97,10 +97,10 @@ test('the network guard fulfills normal same-origin responses but never fetches 
     fulfill: async ({ response }) => { actions.push(['fulfill', response.status()]); },
     continue: async () => { actions.push(['continue']); },
   });
-  await enforceSameOriginRoute(route('https://games.jussco.company/safe', 200), 'https://games.jussco.company');
+  await enforceSameOriginRoute(route('https://sync.jussco.company/safe', 200), 'https://sync.jussco.company');
   assert.deepEqual(actions, [['fetch', { maxRedirects: 0 }], ['fulfill', 200]]);
   actions.length = 0;
-  await enforceSameOriginRoute(route('https://elsewhere.example/leak', 200), 'https://games.jussco.company');
+  await enforceSameOriginRoute(route('https://elsewhere.example/leak', 200), 'https://sync.jussco.company');
   assert.deepEqual(actions, [['abort', 'blockedbyclient']]);
 });
 
@@ -111,14 +111,14 @@ test('WebSocket guard only forwards the approved origin and rejects external soc
     connectToServer: () => { calls.push(['connect', url]); },
     close: (options) => { calls.push(['close', options.code]); },
   });
-  const origin = 'https://games.jussco.company';
-  enforceSameOriginWebSocket(socketRoute('wss://games.jussco.company/sync'), origin);
-  assert.deepEqual(calls, [['connect', 'wss://games.jussco.company/sync']]);
+  const origin = 'https://sync.jussco.company';
+  enforceSameOriginWebSocket(socketRoute('wss://sync.jussco.company/sync'), origin);
+  assert.deepEqual(calls, [['connect', 'wss://sync.jussco.company/sync']]);
   for (const foreign of [
     'wss://evil.example/sync',
-    'wss://games.jussco.company.evil.example/sync',
-    'wss://games.jussco.company:8443/sync',
-    'ws://games.jussco.company/sync',
+    'wss://sync.jussco.company.evil.example/sync',
+    'wss://sync.jussco.company:8443/sync',
+    'ws://sync.jussco.company/sync',
     'not-a-websocket',
   ]) {
     calls.length = 0;
