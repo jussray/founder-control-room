@@ -64,7 +64,7 @@ try {
     assert.equal(await page.getByRole('button', { name: /Execute — not yet enabled/ }).isDisabled(), true);
     assert.equal(previewCalls, 1);
     for (const target of ['https://example.io', 'https://127.0.0.1',
-      'https://games.jussco.company.evil.dev']) {
+      'https://sync.jussco.company.evil.dev']) {
       await page.locator('#task').fill('Test Sync Party and ' + target);
       await page.getByRole('button', { name: 'Preview test plan' }).click();
       await page.getByText('Rejected. No browser execution.', { exact: true }).waitFor();
