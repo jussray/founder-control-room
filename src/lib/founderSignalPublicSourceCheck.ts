@@ -81,7 +81,8 @@ export async function verifyFounderSignalPublicSource(raw: unknown, deps: Public
     repo.full_name.toLowerCase() !== repository.toLowerCase()) {
     return hold(repository, sha, 'PUBLIC_REPOSITORY_READBACK_NOT_VERIFIED', observedAt);
   }
-  const commit = await get('/repos/' + repository + '/commits/' + sha);
+  // Git Data returns commit identity without the potentially enormous changed-file diff.
+  const commit = await get('/repos/' + repository + '/git/commits/' + sha);
   if (!commit || trim(commit.sha).toLowerCase() !== sha ||
     trim(commit.html_url).toLowerCase() !== expectedProof.toLowerCase()) {
     return hold(repository, sha, 'EXACT_COMMIT_READBACK_NOT_VERIFIED', observedAt);
