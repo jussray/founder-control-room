@@ -108,30 +108,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          python3 - <<'PY'
-          import os
-          import re
-          import sys
-
-          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-
-          try:
-              token.encode('ascii')
-          except UnicodeEncodeError:
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
-              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
-              sys.exit(1)
-
-          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
-          PY
+          credential_receipt="$RUNNER_TEMP/fcr-deploy-credential-shape.json"
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id-env CLOUDFLARE_ACCOUNT_ID \
+            --require-account-id true \
+            --purpose fcr-production-deploy-authority \
+            --output "$credential_receipt"
 
           secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
           npx --yes wrangler@4.110.0 secret list \
@@ -158,7 +141,17 @@ jobs:
 
           provider_required = sorted(required - workflow_written)
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
-              receipt = json.load(handle)
+              receipt_text = handle.read()
+          # wrangler may write human progress lines to stdout ahead of the JSON
+          # list (seen with env-var token auth); extract the JSON array instead
+          # of assuming the receipt is pure JSON. Fail closed, with evidence.
+          array_start = receipt_text.find('[')
+          array_end = receipt_text.rfind(']')
+          if array_start == -1 or array_end < array_start:
+            print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+            print(f'Receipt begins: {receipt_text[:200]!r}')
+            sys.exit(1)
+          receipt = json.loads(receipt_text[array_start:array_end + 1])
 
           if not isinstance(receipt, list):
               print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
@@ -180,6 +173,10 @@ jobs:
               'values were not read.'
           )
           PY
+
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
 
       - name: Record authority receipt
         shell: bash
@@ -1117,7 +1114,7 @@ jobs:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
     needs: smoke-test
-    continue-on-error: true
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

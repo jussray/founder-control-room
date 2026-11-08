@@ -11,8 +11,8 @@ const HASH_B = `sha256:${'b'.repeat(64)}`;
 
 function prepared(surface: 'voice' | 'text' = 'text') {
   return prepareSharedReadOnlyCapabilityRun({
-    executionId: 'tinyfish-observation:test',
-    capabilityId: 'tinyfish-web-observation-v1',
+    executionId: 'public-web-observation:test',
+    capabilityId: 'public-web-observation-v1',
     surface,
     intent: 'Observe public evidence without mutation.',
     founder: { userId: 'founder-1', email: 'founder@example.com' },
@@ -21,14 +21,14 @@ function prepared(surface: 'voice' | 'text' = 'text') {
 
 function observation(): SharedReadOnlyObservation {
   return {
-    provider: 'tinyfish',
+    provider: 'fcr-research-hub',
     providerAccepted: true,
     truthState: 'provider_observed_unverified',
     requestFingerprint: HASH_A,
     resultCount: 2,
     continuity: {
       evidenceFingerprint: HASH_B,
-      proofCookie: 'tinyfish-readonly:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      proofCookie: 'fcr-public-web:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       transition: 'initial',
       authorityEffect: 'none',
     },
@@ -56,7 +56,7 @@ describe('shared read-only capability runtime', () => {
   it('rejects unknown surfaces and missing live founder authority before execution', () => {
     expect(() => prepareSharedReadOnlyCapabilityRun({
       executionId: 'run:1',
-      capabilityId: 'tinyfish-web-observation-v1',
+      capabilityId: 'public-web-observation-v1',
       surface: 'root-admin',
       intent: 'Observe evidence.',
       founder: { userId: 'founder-1', email: 'founder@example.com' },
@@ -64,7 +64,7 @@ describe('shared read-only capability runtime', () => {
 
     expect(() => prepareSharedReadOnlyCapabilityRun({
       executionId: 'run:2',
-      capabilityId: 'tinyfish-web-observation-v1',
+      capabilityId: 'public-web-observation-v1',
       surface: 'text',
       intent: 'Observe evidence.',
     })).toThrow(SharedCapabilityRuntimeError);
@@ -88,7 +88,7 @@ describe('shared read-only capability runtime', () => {
       contract: 'fcr/shared-capability-runtime-receipt@v1',
       state: 'PROVIDER_ACCEPTED',
       surface: 'voice',
-      provider: { name: 'tinyfish', accepted: true },
+      provider: { name: 'fcr-research-hub', accepted: true },
       evidence: {
         truthState: 'provider_observed_unverified',
         evidenceFingerprint: HASH_B,
