@@ -82,7 +82,13 @@ export function auditAllCommits(rows, history) {
   const report = [];
   for (const [index, { sha, runs }] of history.entries()) {
     const failures = runs.filter(r => ['failure', 'cancelled'].includes(r.conclusion));
-    const commitErrors = auditLedger(rows, runs, sha);
+    let commitErrors = auditLedger(rows, runs, sha);
+    // A cancelled run is superseded when a LATER PR commit has a successful run of the same check.
+    // Failures are never superseded automatically; they still need a verified REMEDIATED row.
+    const supersededIds = runs
+      .filter(r => r.conclusion === 'cancelled' && history.slice(index + 1).some(h => h.runs.some(x => x.name === r.name && x.conclusion === 'success')))
+      .map(r => r.id);
+    commitErrors = commitErrors.filter(e => !supersededIds.some(id => e.includes(`run ${id} (cancelled)`)));
     for (const row of rows.filter(r => r.sha === sha && r.status === 'REMEDIATED')) {
       const problem = verifyRemediation(row, history, index);
       if (problem) commitErrors.push(`${problem} (run ${row.runId})`);

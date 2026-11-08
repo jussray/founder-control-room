@@ -74,3 +74,23 @@ test('ledger bound to an old main is stale and fails closed', () => {
   assert.deepEqual(auditBase(undefined, 'b'.repeat(40)).length, 1);
   assert.deepEqual(auditBase('a'.repeat(40), undefined), ['LIVE_BASE_UNKNOWN']);
 });
+
+test('a cancelled run is superseded by a later green run of the same check', () => {
+  const oldCancelled = { id: 700, name: 'CI', head_sha: oldSha, conclusion: 'cancelled' };
+  const history = [
+    { sha: oldSha, runs: [oldCancelled] },
+    { sha: fixSha, runs: [{ id: 701, name: 'CI', head_sha: fixSha, conclusion: 'success' }] },
+  ];
+  const result = auditAllCommits([], history);
+  assert.equal(result.errors.length, 0);
+});
+test('a cancelled run without a later green run stays an error', () => {
+  const oldCancelled = { id: 700, name: 'CI', head_sha: oldSha, conclusion: 'cancelled' };
+  const result = auditAllCommits([], [{ sha: oldSha, runs: [oldCancelled] }, { sha: fixSha, runs: [] }]);
+  assert.ok(result.errors.some(e => e.includes('run 700 (cancelled)')));
+});
+test('a failed run is never superseded automatically', () => {
+  const oldFailed = { id: 800, name: 'CI', head_sha: oldSha, conclusion: 'failure' };
+  const result = auditAllCommits([], [{ sha: oldSha, runs: [oldFailed] }, { sha: fixSha, runs: [{ id: 801, name: 'CI', head_sha: fixSha, conclusion: 'success' }] }]);
+  assert.ok(result.errors.some(e => e.includes('run 800 (failure)')));
+});
