@@ -412,7 +412,8 @@
     {
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
-        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
+        "`src/providers/GitHubProvider.ts` must retain the live CodeQL `alerts_threshold: all` severity setting rather than downgrade it to `errors` while reconciling required-signatures and strict freshness; both source and independent governance preflight must enforce this, and successful source checks do not prove a live provider mutation.",
         "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority."
       ]
     },
