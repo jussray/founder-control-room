@@ -8,13 +8,13 @@ const load = async () => manifest;
 
 test('plain-language Sync Party test is previewed, not executed', async () => {
   const preview = await previewBrowserRequest(
-    'Test the complete new user journey on https://games.jussco.company: create, join, choose, sync, score',
+    'Test the complete new user journey on https://sync.jussco.company: create, join, choose, sync, score',
     load
   );
   assert.equal(preview.contract, 'fcr/browser-plan-preview@v1');
   assert.equal(preview.status, 'REQUIRES_FOUNDER_RUN_APPROVAL');
   assert.equal(preview.project, 'sync-party-game');
-  assert.equal(preview.target, 'https://games.jussco.company');
+  assert.equal(preview.target, 'https://sync.jussco.company');
   assert.equal(preview.actors, 2);
   assert.equal(preview.steps, 53);
   assert.match(preview.manifestSha256, /^[a-f0-9]{64}$/);
@@ -28,7 +28,7 @@ test('project aliases select only one source-reviewed manifest', () => {
   const requests = [
     'Verify the Sync Party game journey',
     'Check my sync-party-game flow',
-    'Run test of games.jussco.company live journey',
+    'Run test of sync.jussco.company live journey',
     'Please audit Sync Party flow'
   ];
   for (const request of requests) {
@@ -40,16 +40,16 @@ test('project aliases select only one source-reviewed manifest', () => {
 
 test('unsafe or compound requests fail closed even when project is identified', async () => {
   for (const request of [
-    'Test games.jussco.company and then deploy fixes',
+    'Test sync.jussco.company and then deploy fixes',
     'Check Sync Party and delete all test records',
     'Test Sync Party then merge any green PR',
-    'Test games.jussco.company and email results',
+    'Test sync.jussco.company and email results',
     'Test the Sync Party admin login',
     'Test Sync Party bypass auth requirements',
     'Test Sync Party and pay for a purchase',
-    'Test games.jussco.company and https://chief.foundercontrolroom.org',
-    'Test games.jussco.company then execute javascript',
-    'Test games.jussco.company then fetch request headers',
+    'Test sync.jussco.company and https://chief.foundercontrolroom.org',
+    'Test sync.jussco.company then execute javascript',
+    'Test sync.jussco.company then fetch request headers',
     'Use Sync Party to test unrelated pages',
     'Test unknown-website.example',
     'Hi',
@@ -72,7 +72,7 @@ test('a substituted or incorrectly scoped manifest cannot be previewed', async (
   await assert.rejects(
     previewBrowserRequest('Test Sync Party flow', async () => JSON.stringify(other))
   );
-  other.target = 'https://games.jussco.company/';
+  other.target = 'https://sync.jussco.company/';
   other.project = 'storyengine';
   await assert.rejects(
     previewBrowserRequest('Test Sync Party flow', async () => JSON.stringify(other))
@@ -92,9 +92,9 @@ test('manifest content digest binds the exact preview configuration', async () =
 
 test('complete URL and bare hostname boundaries reject mixed projects before loading', async () => {
   for (const target of ['https://example.io', 'https://127.0.0.1', 'https://[::1]',
-    'https://games.jussco.company.evil.dev', 'example.dev', '127.0.0.1',
-    'http://games.jussco.company', 'https://games.jussco.company:8443',
-    '//example.io', 'ftp://games.jussco.company']) {
+    'https://sync.jussco.company.evil.dev', 'https://games.jussco.company/', 'example.dev', '127.0.0.1',
+    'http://sync.jussco.company', 'https://sync.jussco.company:8443',
+    '//example.io', 'ftp://sync.jussco.company']) {
     const result = await previewBrowserRequest('Test Sync Party and ' + target, async () => {
       assert.fail('Rejected cross-project requests must not load a manifest');
     });
@@ -102,9 +102,13 @@ test('complete URL and bare hostname boundaries reject mixed projects before loa
     assert.equal(result.reason, 'CROSS_PROJECT_REQUEST', target);
     assert.equal(result.browserExecuted, false);
   }
-  for (const target of ['https://games.jussco.company/', 'https://GAMES.JUSSCO.COMPANY',
-    'https://games.jussco.company:443', '(https://games.jussco.company).',
-    'https://games.jussco.company/index.html']) {
+  for (const target of ['https://sync.jussco.company/', 'https://SYNC.JUSSCO.COMPANY',
+    'https://sync.jussco.company:443', '(https://sync.jussco.company).',
+    'https://sync.jussco.company/index.html']) {
     assert.equal(routeBrowserRequest('Test Sync Party at ' + target).status, 'ROUTED_FOR_PREVIEW', target);
   }
+});
+
+test('Games Hub launcher does not satisfy a SYNC Party game journey', () => {
+  assert.equal(routeBrowserRequest('Test games.jussco.company live journey').status, 'REJECTED');
 });
