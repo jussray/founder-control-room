@@ -79,7 +79,7 @@ export function auditAllCommits(rows, history) {
  * observations are INCOMPLETE, never remediated and never silently green.
  */
 export function classifyHistoricalCoverage(errors) {
-  const unrecorded = errors.filter(error => /(?:^|\\s)MISSING [^\\n]+ run [1-9]\\d* \\((?:failure|cancelled)\\)$/.test(error));
+  const unrecorded = errors.filter(error => /(?:^|\s)MISSING [^\n]+ run [1-9]\d* \((?:failure|cancelled)\)$/.test(error));
   const integrityErrors = errors.filter(error => !unrecorded.includes(error));
   return {
     state: integrityErrors.length ? 'INVALID_EVIDENCE'
@@ -124,7 +124,7 @@ async function main() {
     integrityErrors: classification.integrityErrors,
   };
   mkdirSync('artifacts', { recursive: true });
-  writeFileSync('artifacts/ci-historical-accountability.json', JSON.stringify(receipt, null, 2) + '\\n');
+  writeFileSync('artifacts/ci-historical-accountability.json', JSON.stringify(receipt, null, 2) + '\n');
   console.log(JSON.stringify({
     contract: receipt.contract, status: receipt.status, commits: report.length,
     unrecorded: classification.unrecorded.length, integrityErrors: classification.integrityErrors.length,
@@ -136,11 +136,11 @@ async function main() {
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFileSync } = await import('node:fs');
     appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-      '### Historical CI evidence: ' + classification.state + '\\n'
-      + '- Unrecorded failures/cancellations: ' + classification.unrecorded.length + '\\n'
-      + '- Invalid/contradicted ledger claims: ' + classification.integrityErrors.length + '\\n'
-      + '- Full immutable run observation: ci-historical-accountability artifact\\n'
-      + '- This audit never authorizes merge or deployment.\\n');
+      '### Historical CI evidence: ' + classification.state + '\n'
+      + '- Unrecorded failures/cancellations: ' + classification.unrecorded.length + '\n'
+      + '- Invalid/contradicted ledger claims: ' + classification.integrityErrors.length + '\n'
+      + '- Full immutable run observation: ci-historical-accountability artifact\n'
+      + '- This audit never authorizes merge or deployment.\n');
   }
   if (classification.integrityErrors.length) process.exitCode = 1;
 }
