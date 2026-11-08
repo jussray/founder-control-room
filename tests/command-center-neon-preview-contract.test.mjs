@@ -25,7 +25,6 @@ test('Neon preview executes the actual migration but rolls back all fixtures', (
   }
   assert.match(sql, /FOREACH rel_name IN ARRAY/i);
   assert.match(sql, /format\('public\.%I', rel_name\)/i);
-  }
 });
 
 test('preview checks RLS and denies client privileges instead of fake-pass mocks', () => {
