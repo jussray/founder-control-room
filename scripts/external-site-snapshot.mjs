@@ -80,59 +80,98 @@ export async function checkRequestUrl(raw, lookupFn = dnsLookup) {
 // Location is validated before anything follows it. Returns the validated final URL the
 // browser should navigate to. Limits: sub-resource redirects and DNS rebinding between this
 // check and the browser connection are not covered here (see the URLFIX contract).
+// Parses one Set-Cookie line. Domain is deliberately ignored so scope stays host-bound.
+export function parseSetCookie(raw) {
+  const [pair, ...attrs] = String(raw).split(';').map((x) => x.trim());
+  const eq = pair.indexOf('=');
+  if (eq <= 0) return null;
+  const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), path: '/', secure: false, httpOnly: false, expired: false };
+  for (const a of attrs) {
+    const [k, ...rest] = a.split('=');
+    const key = k.toLowerCase();
+    const val = rest.join('=');
+    if (key === 'path' && val.startsWith('/')) cookie.path = val;
+    else if (key === 'httponly') cookie.httpOnly = true;
+    else if (key === 'secure') cookie.secure = true;
+    else if (key === 'max-age' && Number(val) <= 0) cookie.expired = true;
+  }
+  return cookie;
+}
+
+// Cookie header for the next validated hop: host-only, path-prefix, and Secure-aware.
+function cookieHeaderFor(jar, host, urlString) {
+  const { pathname, protocol } = new URL(urlString);
+  const isSecure = protocol === 'https:';
+  const pairs = [];
+  for (const c of jar.values()) {
+    if (c.host !== host) continue;
+    if (c.secure && !isSecure) continue;
+    if (!pathname.startsWith(c.path)) continue;
+    pairs.push(`${c.name}=${c.value}`);
+  }
+  return pairs.join('; ');
+}
+
+// Walks the top-level redirect chain one hop at a time with redirect:'manual', so every
+// Location is validated before anything follows it. Cookies set by validated hops are sent
+// back to later validated hops on the same host (the way a browser navigation would), and
+// the final jar is returned for seeding the browser context. Limits: sub-resource redirects
+// and DNS rebinding between this check and the browser connection are not covered here.
 export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsLookup, maxHops = 5 } = {}) {
   let current = startUrl;
   const hops = [];
-  const cookies = [];
+  const jar = new Map(); // key host|path|name -> { host, name, value, path, secure, httpOnly }
+  const finalCookies = () => [...jar.values()];
   for (let i = 0; i <= maxHops; i++) {
     const verdict = await checkRequestUrl(current, lookupFn);
-    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops, cookies };
+    if (!verdict.ok) return { ok: false, reason: verdict.reason, hops, cookies: finalCookies() };
     hops.push(verdict.url);
+    const cookieHeader = cookieHeaderFor(jar, verdict.host, verdict.url);
     let res;
     try {
-      res = await fetchFn(verdict.url, { redirect: 'manual', method: 'GET', signal: AbortSignal.timeout(20_000) });
+      res = await fetchFn(verdict.url, {
+        redirect: 'manual',
+        method: 'GET',
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+        signal: AbortSignal.timeout(20_000),
+      });
     } catch {
-      return { ok: false, reason: 'hop request failed', hops, cookies };
+      return { ok: false, reason: 'hop request failed', hops, cookies: finalCookies() };
     }
-    // Keep Set-Cookie from every validated hop so the browser sees the same session state
-    // a normal navigation would have produced. Values are held in memory only.
+    // Keep Set-Cookie from every validated hop. Values are held in memory only.
     const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
-    for (const raw of setCookies) cookies.push({ host: verdict.host, secure: verdict.url.startsWith('https:'), raw });
+    for (const raw of setCookies) {
+      const parsed = parseSetCookie(raw);
+      if (!parsed) continue;
+      const key = `${verdict.host}|${parsed.path}|${parsed.name}`;
+      if (parsed.expired) jar.delete(key);
+      else jar.set(key, { ...parsed, host: verdict.host });
+    }
     try { await res.body?.cancel(); } catch { /* ignore */ }
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
-      if (!location) return { ok: true, finalUrl: verdict.url, hops, cookies };
+      if (!location) return { ok: true, finalUrl: verdict.url, hops, cookies: finalCookies() };
       current = new URL(location, verdict.url).toString();
       continue;
     }
-    return { ok: true, finalUrl: verdict.url, hops, cookies };
+    return { ok: true, finalUrl: verdict.url, hops, cookies: finalCookies() };
   }
-  return { ok: false, reason: 'too many redirects', hops, cookies };
+  return { ok: false, reason: 'too many redirects', hops, cookies: finalCookies() };
 }
 
 // Converts Set-Cookie lines from the validated walk into Playwright cookie objects.
 // Host-only cookies are bound to the hop host. A Domain attribute is ignored on purpose:
 // it could widen scope beyond the validated host. Expired cookies are dropped.
 export function cookiesFromWalk(walk) {
-  const out = [];
-  for (const c of walk.cookies || []) {
-    const [pair, ...attrs] = c.raw.split(';').map((x) => x.trim());
-    const eq = pair.indexOf('=');
-    if (eq <= 0) continue;
-    const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: c.host, path: '/', secure: c.secure, httpOnly: false };
-    let expired = false;
-    for (const a of attrs) {
-      const [k, ...rest] = a.split('=');
-      const key = k.toLowerCase();
-      const val = rest.join('=');
-      if (key === 'path' && val.startsWith('/')) cookie.path = val;
-      else if (key === 'httponly') cookie.httpOnly = true;
-      else if (key === 'secure') cookie.secure = true;
-      else if (key === 'max-age' && Number(val) <= 0) expired = true;
-    }
-    if (!expired) out.push(cookie);
-  }
-  return out;
+  // walk.cookies is already the final jar: expired cookies were removed during the walk.
+  return (walk.cookies || []).map((c) => ({
+    name: c.name,
+    value: c.value,
+    domain: c.host,
+    path: c.path,
+    secure: c.secure,
+    httpOnly: c.httpOnly,
+  }));
 }
 
 export function snapshotDirName(host, now = new Date()) {

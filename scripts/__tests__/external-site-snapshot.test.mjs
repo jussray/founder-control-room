@@ -88,6 +88,49 @@ test('redirect walker fails closed on a redirect loop', async () => {
   assert.equal(r.reason, 'too many redirects');
 });
 
+test('a cookie-dependent same-host hop is followed only because the walk sent the earlier hop cookie back', async () => {
+  const seen = [];
+  const gateFetch = (sameHost) => async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://start.example.com/') return { status: 302, headers: { get: () => (sameHost ? 'https://start.example.com/gate' : 'https://www.example.com/gate'), getSetCookie: () => ['token=xyz; Path=/; Secure'] }, body: null };
+    if (url === 'https://start.example.com/gate' || url === 'https://www.example.com/gate') {
+      const ok = init?.headers?.cookie?.includes('token=xyz');
+      return ok
+        ? { status: 302, headers: { get: () => `${new URL(url).origin}/app`, getSetCookie: () => [] }, body: null }
+        : { status: 403, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+    }
+    if (url.endsWith('/app')) return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+    throw new Error(`unexpected ${url}`);
+  };
+  // Same host: the cookie is sent, the gate passes, the walk reaches /app.
+  const same = await walkRedirects('https://start.example.com/', { fetchFn: gateFetch(true), lookupFn: publicLookup });
+  assert.equal(same.ok, true);
+  assert.equal(same.finalUrl, 'https://start.example.com/app');
+  assert.equal(seen.find((s) => s.url === 'https://start.example.com/gate').cookie, 'token=xyz');
+  // Other host: the host-bound cookie is not sent, the gate refuses, the walk stops there.
+  seen.length = 0;
+  const cross = await walkRedirects('https://start.example.com/', { fetchFn: gateFetch(false), lookupFn: publicLookup });
+  assert.equal(cross.ok, true);
+  assert.equal(cross.finalUrl, 'https://www.example.com/gate');
+  assert.equal(seen.find((s) => s.url === 'https://www.example.com/gate').cookie, null);
+});
+
+test('the walk sends a same-host cookie to the next hop and drops it once expired', async () => {
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://a.example.com/') return { status: 302, headers: { get: () => 'https://a.example.com/b', getSetCookie: () => ['sid=1; Path=/'] }, body: null };
+    if (url === 'https://a.example.com/b') return { status: 302, headers: { get: () => 'https://a.example.com/c', getSetCookie: () => ['sid=; Max-Age=0; Path=/'] }, body: null };
+    return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+  };
+  const walk = await walkRedirects('https://a.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  assert.equal(seen[1].cookie, 'sid=1');
+  // Hop c follows the Max-Age=0 clear from hop b, so no cookie is sent.
+  assert.equal(seen[2].cookie, null);
+  assert.equal(cookiesFromWalk(walk).find((c) => c.name === 'sid'), undefined);
+});
+
 test('redirect cookies from validated hops are carried into the browser context without widening scope', async () => {
   const fetchFn = fakeFetch({
     'https://start.example.com/': { status: 302, location: 'https://www.example.com/', setCookie: ['session=abc123; Path=/; Secure; HttpOnly; Domain=example.com'] },
