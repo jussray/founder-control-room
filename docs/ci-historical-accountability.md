@@ -463,3 +463,13 @@ The following entries are GitHub run conclusions, not validated cause/remediatio
 | `0af5d7d510afb00b588f10844f2271705a1895fc` | Historical CI Accountability (run 42346661484) | failure | Historical evidence failed; exact root cause not independently established | UNKNOWN — no fix verified | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42346661484) — conclusion observed | OPEN |
 | `c9c9b88a3375e0da43fcd5fc9458232b7bf92aab` | Control Room Test Ledger (run 42347466557) | failure | 4 skipped checks (including PR-inapplicable workflows); observer failed closed | UNKNOWN — no fix verified | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42347466557) — conclusion observed | OPEN |
 | `c9c9b88a3375e0da43fcd5fc9458232b7bf92aab` | Historical CI Accountability (run 42347466809) | failure | Six previously unrecorded failed or cancelled historical runs | UNKNOWN — no fix verified | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42347466809) — conclusion observed | OPEN |
+
+## 2026-11-07 — PR #950 post-reconciliation historical run receipt
+
+These three run conclusions were fetched from GitHub Actions and matched by exact SHA, name and conclusion. They are OPEN historical evidence, not remediated outcomes or merge authorization.
+
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `0af5d7d510afb00b588f10844f2271705a1895fc` | CI (run 42346661491) | cancelled | UNKNOWN: underlying cause not established here | UNKNOWN: successor proof not yet established | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42346661491); independently checked identity and conclusion | OPEN |
+| `3c3056cd2df5cc044a12e04cc777d6c907df1c5f` | Control Room Test Ledger (run 42392343403) | failure | UNKNOWN: underlying cause not established here | UNKNOWN: successor proof not yet established | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42392343403); independently checked identity and conclusion | OPEN |
+| `3c3056cd2df5cc044a12e04cc777d6c907df1c5f` | Historical CI Accountability (run 42392343321) | failure | UNKNOWN: underlying cause not established here | UNKNOWN: successor proof not yet established | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42392343321); independently checked identity and conclusion | OPEN |
