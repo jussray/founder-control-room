@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 export const SUBJECT = Object.freeze({
   repository:'jussray/jussray',ruleId:26428639,ruleName:'Production',branch:'main',pullRequest:69,
+  auditedPullRequests:Object.freeze([69,71]),
   checks:Object.freeze(['Independent Review Evidence','Review Gate Unit Tests','Juss & Co Site Browser Proof','Repo Reality / exact-head']),
 });
 const SHA=/^[a-f0-9]{40}$/i, API='https://api.github.com/repos/'+SUBJECT.repository;
@@ -17,7 +18,8 @@ function stable(x){
   return JSON.stringify(x);
 }
 function hash(x){return createHash('sha256').update(stable(x)).digest('hex');}
-export function assessJusscoRuleset(readback,{mainSha,prHeadSha}={}){
+export function assessJusscoRuleset(readback,{mainSha,prHeadSha,pullRequest=SUBJECT.pullRequest}={}){
+  if(!SUBJECT.auditedPullRequests.includes(pullRequest))throw Error('Juss & Co PR outside pinned FCR audit scope');
   const r=obj(readback,'ruleset');
   if(!SHA.test(mainSha||'')||!SHA.test(prHeadSha||''))throw Error('Exact main and PR head SHAs required');
   if(r.id!==SUBJECT.ruleId||r.name!==SUBJECT.ruleName||r.source!==SUBJECT.repository||r.target!=='branch'||r.enforcement!=='active')
@@ -64,7 +66,7 @@ export function assessJusscoRuleset(readback,{mainSha,prHeadSha}={}){
   }
   return {
     contract:'fcr/jussco-ruleset-readback@v1',
-    subject:{repository:SUBJECT.repository,rulesetId:SUBJECT.ruleId,pullRequest:SUBJECT.pullRequest},
+    subject:{repository:SUBJECT.repository,rulesetId:SUBJECT.ruleId,pullRequest},
     exactMainHead:mainSha.toLowerCase(),exactPrHead:prHeadSha.toLowerCase(),
     rulesetFingerprint:hash(r),rulesetUpdatedAt:r.updated_at||null,
     observed:{mandatoryChecks:names,bypassActorCount:actors.length,approvalCount:review.parameters.required_approving_review_count,deploymentRequirementCount:environments.length},
@@ -80,23 +82,44 @@ async function read(url,request,token){
   if(!res.ok)throw Error('GitHub read unavailable: HTTP '+res.status);
   return res.json();
 }
-export async function runJusscoAudit({request=fetch,token='',now=()=>new Date()}={}){
+export async function runJusscoAudit({request=fetch,token='',now=()=>new Date(),pullRequest=SUBJECT.pullRequest}={}){
+  if(!SUBJECT.auditedPullRequests.includes(pullRequest))
+    throw Error('Juss & Co PR outside pinned FCR audit scope');
   const get=p=>read(API+p,request,token);
-  const main=await get('/branches/main'),pr=await get('/pulls/69');
+  const main=await get('/branches/main'),pr=await get('/pulls/'+pullRequest);
   const mainSha=main?.commit?.sha,prHeadSha=pr?.head?.sha;
-  if(!SHA.test(mainSha||'')||!SHA.test(prHeadSha||'')||pr?.base?.ref!=='main'||
-    pr?.base?.sha!==mainSha||pr?.state!=='open'||pr?.draft)
-    throw Error('PR/main relationship incomplete or stale');
+  const current=pr?.state==='open' && !pr?.draft && pr?.merged!==true;
+  const historical=pr?.state==='closed' && pr?.merged===true &&
+    SHA.test(pr?.merge_commit_sha||'') && typeof pr?.merged_at==='string';
+  if(!SHA.test(mainSha||'')||!SHA.test(prHeadSha||'')||pr?.base?.ref!=='main'||(!current&&!historical))
+    throw Error('PR/main identity incomplete or outside verified active/merged states');
+  if(pr?.number!=null&&pr.number!==pullRequest)throw Error('PR identity mismatch');
   const ruleset=await get('/rulesets/26428639');
-  const result=assessJusscoRuleset(ruleset,{mainSha,prHeadSha});
-  const again=await get('/branches/main'),againPr=await get('/pulls/69'),againRule=await get('/rulesets/26428639');
+  const result=assessJusscoRuleset(ruleset,{mainSha,prHeadSha,pullRequest});
+  const again=await get('/branches/main'),againPr=await get('/pulls/'+pullRequest),againRule=await get('/rulesets/26428639');
   if(again?.commit?.sha!==mainSha||againPr?.head?.sha!==prHeadSha||
-     againPr?.base?.sha!==mainSha||hash(againRule)!==result.rulesetFingerprint)
+    againPr?.base?.sha!==pr?.base?.sha||againPr?.state!==pr?.state||
+    againPr?.merged!==pr?.merged||againPr?.merge_commit_sha!==pr?.merge_commit_sha||
+    againPr?.merged_at!==pr?.merged_at||hash(againRule)!==result.rulesetFingerprint)
     throw Error('Provider state changed during audit; discard stale witness');
-  return {...result,observedAt:now().toISOString(),readOnly:true};
+  // A merged PR is historical, not an exact-head merge candidate. A stale base remains blocked.
+  const findings=[...result.findings];
+  if(historical)findings.push('PR_ALREADY_MERGED_HISTORICAL');
+  else if(pr?.base?.sha!==mainSha)findings.push('PR_BASE_STALE');
+  return {
+    ...result,findings,
+    disposition:historical?'HISTORICAL_MERGED_READ_ONLY':findings.length?'BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE':'NO_CHANGE_REQUIRED',
+    pullRequestState:historical?'merged-historical':'open-candidate',
+    exactPrBaseHead:pr?.base?.sha||null,mergeCommit:historical?pr.merge_commit_sha:null,
+    mutationAuthorized:false,releaseAuthorized:false,
+    observedAt:now().toISOString(),readOnly:true,
+  };
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
-  runJusscoAudit({token:process.env.FCR_GITHUB_RULESET_READ_TOKEN||''})
+  runJusscoAudit({
+    token:process.env.FCR_GITHUB_RULESET_READ_TOKEN||'',
+    pullRequest:process.env.FCR_JUSSCO_AUDIT_PR==null?SUBJECT.pullRequest:Number(process.env.FCR_JUSSCO_AUDIT_PR),
+  })
    .then(v=>{console.log(JSON.stringify(v,null,2));if(v.findings.length)process.exitCode=2;})
    .catch(e=>{console.error('FCR governance BLOCKED: '+e.message);process.exitCode=1;});
 }

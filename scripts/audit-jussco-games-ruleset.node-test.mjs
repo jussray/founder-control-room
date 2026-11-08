@@ -47,3 +47,35 @@ test('live audit is GET-only and rejects concurrent provider changes',async()=>{
  let k=0;const changed=async (url,opts)=>{const res=await request(url,opts);if(url.includes('/rulesets/')&&++k===2)return {ok:true,status:200,json:async()=>({...state,updated_at:'changed'})};return res;};
  await assert.rejects(()=>runJusscoAudit({request:changed}),/Provider state changed/);
 });
+
+test('FCR can inspect open PR #71 with stale base without pretending it is merge-ready',async()=>{
+ const pr={number:71,state:'open',draft:false,merged:false,base:{ref:'main',sha:'c'.repeat(40)},head:{sha:HEAD}};
+ const calls=[];
+ const request=async (url,opts)=>{calls.push([url,opts.method]);return {ok:true,status:200,json:async()=>url.includes('/branches/')?{commit:{sha:MAIN}}:url.includes('/pulls/')?pr:baseline()};};
+ const result=await runJusscoAudit({request,pullRequest:71});
+ assert.equal(result.subject.pullRequest,71);
+ assert.equal(result.pullRequestState,'open-candidate');
+ assert.ok(result.findings.includes('PR_BASE_STALE'));
+ assert.equal(result.mutationAuthorized,false);assert.equal(result.releaseAuthorized,false);
+ assert.equal(calls.length,6);
+ assert.ok(calls.every(([url,method])=>url.startsWith('https://api.github.com/repos/jussray/jussray/')&&method==='GET'));
+ assert.ok(calls.filter(([url])=>url.includes('/pulls/71')).length===2);
+});
+test('FCR retains merged PR #69 as historical evidence without merge or release authority',async()=>{
+ const pr={number:69,state:'closed',draft:false,merged:true,merged_at:'2026-11-08T18:35:46Z',merge_commit_sha:MAIN,base:{ref:'main',sha:'c'.repeat(40)},head:{sha:HEAD}};
+ const request=async url=>({ok:true,status:200,json:async()=>url.includes('/branches/')?{commit:{sha:MAIN}}:url.includes('/pulls/')?pr:baseline()});
+ const result=await runJusscoAudit({request});
+ assert.equal(result.subject.pullRequest,69);
+ assert.equal(result.pullRequestState,'merged-historical');
+ assert.equal(result.disposition,'HISTORICAL_MERGED_READ_ONLY');
+ assert.ok(result.findings.includes('PR_ALREADY_MERGED_HISTORICAL'));
+ assert.equal(result.mergeCommit,MAIN);
+ assert.equal(result.mutationAuthorized,false);assert.equal(result.releaseAuthorized,false);
+});
+test('FCR cannot audit unapproved pull requests or closed-unmerged PRs',async()=>{
+ await assert.rejects(()=>runJusscoAudit({pullRequest:70}),/outside pinned FCR audit scope/);
+ assert.throws(()=>assessJusscoRuleset(baseline(),{mainSha:MAIN,prHeadSha:HEAD,pullRequest:70}),/outside pinned FCR audit scope/);
+ const pr={number:71,state:'closed',merged:false,base:{ref:'main',sha:MAIN},head:{sha:HEAD}};
+ const request=async url=>({ok:true,status:200,json:async()=>url.includes('/branches/')?{commit:{sha:MAIN}}:url.includes('/pulls/')?pr:baseline()});
+ await assert.rejects(()=>runJusscoAudit({pullRequest:71,request}),/outside verified active\/merged states/);
+});
