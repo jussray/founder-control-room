@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLedger, auditLedger, auditAllCommits } from './ci-history-audit.mjs';
+import { parseLedger, auditLedger, auditAllCommits, classifyLedgerIntegrity } from './ci-history-audit.mjs';
 
 const sha = 'a'.repeat(40);
 const run = { id: 123, name: 'CI', head_sha: sha, conclusion: 'failure' };
@@ -85,4 +85,23 @@ test('unknown or pending current head never looks successful', () => {
 test('duplicate PR commit identities are rejected as untrustworthy history', () => {
   const result = auditAllCommits([], [{ sha, runs: [] }, { sha, runs: [] }]);
   assert.ok(result.errors.some(error => error.includes('INVALID_OR_DUPLICATE_COMMIT_SHA')));
+});
+
+test('untriaged historical reds are not lost or misclassified as repaired', () => {
+  const result = auditAllCommits([], [{ sha, runs: [{ ...run, status: 'completed' }] }]);
+  const check = classifyLedgerIntegrity(result.errors);
+  assert.equal(check.untriaged.length, 1);
+  assert.equal(check.invalid.length, 0);
+  assert.equal(result.summary.manualLedgerComplete, false);
+  assert.equal(result.summary.requiredCheckReadinessProven, false);
+  assert.equal(result.summary.productionReadinessProven, false);
+});
+
+test('fabricated or contradictory manual ledger claims remain integrity failures', () => {
+  const result = auditAllCommits(parseLedger(ledger.replace('| failure |', '| cancelled |')), [
+    { sha, runs: [{ ...run, status: 'completed' }] },
+  ]);
+  const check = classifyLedgerIntegrity(result.errors);
+  assert.ok(check.invalid.some(entry => entry.includes('OUTCOME_MISMATCH')));
+  assert.ok(check.invalid.some(entry => entry.includes('EVIDENCE_MISMATCH')));
 });
