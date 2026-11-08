@@ -69,8 +69,27 @@ export async function verifyFounderSignalPublicSource(raw: unknown, deps: Public
       if (!/^application\/json\b/.test(contentType)) return null;
       const declaredLength = Number(response.headers.get('content-length') ?? 0);
       if (declaredLength > 65_536) return null;
-      const rawBody = await response.text();
-      if (Buffer.byteLength(rawBody, 'utf8') > 65_536) return null;
+      // Bound bytes while reading: checking size after response.text() is too late.
+      if (!response.body) return null;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let rawBody = '';
+      let observedBytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          observedBytes += value.byteLength;
+          if (observedBytes > 65_536) {
+            await reader.cancel();
+            return null;
+          }
+          rawBody += decoder.decode(value, { stream: true });
+        }
+        rawBody += decoder.decode();
+      } finally {
+        reader.releaseLock();
+      }
       return record(JSON.parse(rawBody));
     } catch {
       return null;
