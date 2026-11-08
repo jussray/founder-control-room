@@ -31,7 +31,7 @@ Report path: test-results/fcr-browser-operator/report.json by default, or FCR_BR
 
 FCR now includes `scripts/fcr-browser-plan.mjs`, a **bounded plain-language routing preview**. It is not an open-ended autonomous browser agent. For known, reviewed projects it can recognize a request such as:
 
-    node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://games.jussco.company'
+    node scripts/fcr-browser-plan.mjs --request 'Test the complete Sync Party new user journey on https://sync.jussco.company'
 
 The command returns a manifest identifier, the two-player/step counts, exact manifest SHA-256 fingerprint, target origin, and `REQUIRES_FOUNDER_RUN_APPROVAL`. It executes **zero** browser or provider operations. Only the source-controlled Sync Party route is currently supported; other projects must receive their own reviewed manifest and route. Unsupported, multiple-project, mixed or sensitive-action requests are rejected rather than interpreted expansively. It does not import AI model outputs or page instructions into browser authority.
 
