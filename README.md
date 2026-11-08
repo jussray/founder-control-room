@@ -4,6 +4,11 @@
 
 PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
 
+## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
+
+The founder-only `/integration-cockpit/projects` and `/integration-cockpit/inspect/:id/:number` endpoints operate alongside the existing Control Room on its authenticated origin. The read-only diagnostic `observePullRequest` capability includes draft and closed PR identities so an operator can see blocked work. The existing independent `getPullRequestReviewContext` gate still rejects draft or closed PRs and exclusively controls the review context used by merge authority. Read-only observation must never populate that review context, grant merge or deployment authority, or treat skipped checks as proof. Exact-head checks, current base/head, and browser session are separate observations; live FCR/Cloudflare/Supabase production proof is not established by a local fixture, passing CI slice, or preview build. Games Hub repository mapping remains unresolved and is not guessed.
+
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
@@ -25,6 +30,26 @@ FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `s
 
 FCR Playwright also selects a newly observed StoryEngine peer `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`, four commits ahead and zero behind the prior pin `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The changed peer files are documentation and governance content, but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
 
+The existing Portfolio Actions and Stale Evidence Audit is configured to observe
+default-branch GitHub Actions daily, in parallel batches of six repositories.
+Its receipt includes a prioritized, non-authorizing next-task handoff bound to
+the observed repository/head and the audit source/run. The workflow preserves
+that handoff even when collection is blocked and presents the next action in its
+job summary.
+The credential-bearing observation job is restricted to main push, schedule,
+or manual-dispatch events and verifies its checked-out SHA against freshly
+fetched main immediately before token minting. Production-environment branch
+restrictions still require independent provider readback.
+Consumers must re-read the current head before acting. This is an
+artifact handoff, not a hosted task-queue write or proof of deployed protection;
+Cloudflare checks, unmerged repair branches, and production behavior need
+separate evidence. Integration on the default branch and a successful scheduled
+run are required before claiming the new handoff operates automatically.
+
+Lantern policy validation requires every sandbox safeguard to be an explicit
+boolean matching the isolated, evidence-only policy. Missing values and string
+or numeric substitutes fail validation; this source contract does not establish
+a running decoy, deployed protection, or permission to execute.
 
 Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
 
