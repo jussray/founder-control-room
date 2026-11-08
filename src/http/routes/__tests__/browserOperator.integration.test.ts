@@ -73,7 +73,7 @@ describe('FCR founder-only browser planner', () => {
     const result = await request(app())
       .post('/browser-operator/preview')
       .set('Authorization', BEARER)
-      .send({ request: 'Test the complete Sync Party new user journey on games.jussco.company' });
+      .send({ request: 'Test the complete Sync Party new user journey on sync.jussco.company' });
     expect(result.status).toBe(200);
     expect(result.headers['cache-control']).toBe('no-store');
     expect(result.headers['x-robots-tag']).toBe('noindex, nofollow');
@@ -81,7 +81,7 @@ describe('FCR founder-only browser planner', () => {
       contract: 'fcr/browser-operator-preview@v1',
       status: 'REQUIRES_FOUNDER_RUN_APPROVAL',
       project: 'sync-party-game',
-      targetOrigin: 'https://games.jussco.company',
+      targetOrigin: 'https://sync.jussco.company',
       manifest: 'config/browser-journeys/sync-party.json',
       actorCount: 2,
       stepCount: 53,
@@ -99,7 +99,7 @@ describe('FCR founder-only browser planner', () => {
     const requests = [
       'Test Sync Party and deploy changes',
       'Check Sync Party admin login',
-      'Test games.jussco.company and chief.foundercontrolroom.org',
+      'Test sync.jussco.company and chief.foundercontrolroom.org',
       'Test Sync Party then delete data',
       'Test Sync Party and email results',
       'Open private parent portal on sekretbip.net',
@@ -107,10 +107,11 @@ describe('FCR founder-only browser planner', () => {
       'Test Sync Party and https://example.io',
       'Test Sync Party and https://127.0.0.1',
       'Test Sync Party and https://[::1]',
-      'Test Sync Party and https://games.jussco.company.evil.dev',
+      'Test Sync Party and https://sync.jussco.company.evil.dev',
+      'Test Sync Party and https://games.jussco.company',
       'Test Sync Party and example.dev',
-      'Test Sync Party and http://games.jussco.company',
-      'Test Sync Party and https://games.jussco.company:8443',
+      'Test Sync Party and http://sync.jussco.company',
+      'Test Sync Party and https://sync.jussco.company:8443',
     ];
     for (const input of requests) {
       const result = await request(app())
