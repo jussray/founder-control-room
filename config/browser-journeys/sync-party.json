@@ -1,7 +1,7 @@
 {
   "contract": "fcr/browser-journey@v1",
   "project": "sync-party-game",
-  "target": "https://games.jussco.company/",
+  "target": "https://sync.jussco.company/",
   "syntheticOnly": true,
   "approvedSyntheticActions": true,
   "actors": {
