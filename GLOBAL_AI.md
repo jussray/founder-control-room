@@ -290,3 +290,7 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
+## FCR SQL-lint source correction and provider boundary
+
+When repairing FCR migration lint, audit live `main` and the exact PR head first. Preserve historical applied migration bytes, add a forward-only schema migration for the failing function bodies, and qualify extension functions and PL/pgSQL output-column references without changing grants, RLS, or the single-use send lease. Run `test/fcr-sql-function-qualifications.node-test.mjs` in the required `Migration lint` job before isolated local Supabase replay and lint. Do not confuse passing CI with live provider apply, Neon preview proof, Founder Final, merging, or production release.

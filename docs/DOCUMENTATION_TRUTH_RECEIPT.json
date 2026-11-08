@@ -16,7 +16,8 @@
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
-        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution.",
+        "`CI / Migration lint` must run the exact-source `test/fcr-sql-function-qualifications.node-test.mjs` before applying migrations in an isolated local Supabase instance and must still execute `supabase db lint --local --fail-on error` after replay. The forward-only migration qualifies `extensions.digest` and all conflicting PL/pgSQL output-column references in the three affected functions without weakening RLS, role grants, or claim-lease consumption; source tests never authorize production database apply, a bypass, merge, or deployment."
       ]
     },
     {
