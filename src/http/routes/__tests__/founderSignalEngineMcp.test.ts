@@ -250,7 +250,7 @@ describe('Founder Signal Engine remote MCP', () => {
           status:200,headers:{'content-type':'application/json'},
         });
       }
-      if(value==='https://api.github.com/repos/'+repo+'/commits/'+sha) {
+      if(value==='https://api.github.com/repos/'+repo+'/git/commits/'+sha) {
         return new globalThis.Response(JSON.stringify({sha,html_url:proof}),{
           status:200,headers:{'content-type':'application/json'},
         });
