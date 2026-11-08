@@ -446,6 +446,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
 | Publication | Exact route-specific Current You authority + FCR one-shot approval claim + provider outcome proof |
+| PromptOS registry promotion | Exact founder decision + trusted live-state revalidation + atomic one-shot consume + server-side effect gate + provider-native outcome proof |
 | Investor email | Applicable policy + recipient qualification + send authority |
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
@@ -496,6 +497,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md) — repository and bounded product-build federation
 - [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md) — Jira/n8n bounded automation and activation gate
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — repository integration authority
+- [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md) — exact founder decisions and server-side execution binding
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth aging and documentation drift
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
@@ -650,6 +652,27 @@ StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f
 
 The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+### Founder permission execution membrane
+
+Founder permission is not a transferable execution token. The Ask-Founder broker records exact founder decisions, while consequential execution remains a separate server-side membrane.
+
+For the PromptOS workflow-registry promotion action, source now binds the approved subject to the canonical repository and branch, exact head SHA, workflow id/version, workflow content hash, registry content hash, canonical workflow/registry paths, provider identity, capability version, and consequence class. Before one-shot consumption, FCR must re-observe the current PromptOS head and the approved workflow/registry bytes through its trusted repository provider. After consumption, it must revalidate that same provider state again at the effect boundary.
+
+```text
+exact founder decision
+-> trusted server-side provider observation
+-> exact subject/hash comparison
+-> atomic one-shot consume
+-> immediate effect-boundary revalidation
+-> separately gated provider effect
+-> provider-native outcome verification
+```
+
+A caller-supplied “live context,” copied consume response, binding fingerprint, approval row, continuity receipt, or provider acceptance cannot become reusable provider-write authority. Public consume responses remain `executionAuthorized: false`; they may expose sanitized verification evidence, but the internal execution permit stays server-side. State drift after consumption requires a new approval rather than a blind retry.
+
+This is **source-implemented authority plumbing**, not proof that a PromptOS registry mutation has occurred. A provider effect and its resulting registry state still require separate execution and provider-native readback before an outcome claim becomes `PROVEN`.
+
+See [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md).
 ### FCR external MCP consent candidate (not deployed)
 
 The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
@@ -681,3 +704,12 @@ Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.y
 - Verified locally only: snapshot tests 6/6, registry and router tests 35/35, AI-skill verifier passed, typecheck passed. Provider CI on the new head is not yet observed. Claims about live runtime behaviour remain unproven.
 - Redirect handling: the snapshot script walks the top-level redirect chain one validated hop at a time before navigation. Known limits: sub-resource redirects and DNS rebinding between check and connection are not covered.
 - Redirect cookies: Set-Cookie from validated redirect hops is sent back to later validated hops on the same host during the walk, then carried into the ephemeral browser context (host-bound, no Domain widening, expired cookies dropped). Cookie values are never written to reports or artifacts.
+## FCR GitHub ruleset reconciliation: signed commits and deployment authority
+
+The FCR source reconciler in `src/providers/GitHubProvider.ts` must preserve existing `required_signatures` and the stronger live CodeQL `alerts_threshold: all` merge protection, without lowering it to `errors`. The two-membrane model places required status checks in a separate strict-freshness ruleset with zero bypass actors, while leaving signed commits, linear history, quality and Copilot controls in the review membrane. Only legacy *pre-merge* `required_deployments` is intentionally removed as circular because production deployment authority is exact-current-`main` **after** merge. Deployment approval and production runtime proof remain separate requirements.
+
+This changes candidate source policy, tests, and documentation only. It does **not** prove GitHub's live ruleset is reconciled or a deployment occurred. Authoritative evidence requires independently read-back provider state after explicitly authorized mutation; green PR checks and auto-merge intent do not substitute for merge or release authority.
+
+## Gmail AI Inbox — candidate scoped runtime
+
+PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
