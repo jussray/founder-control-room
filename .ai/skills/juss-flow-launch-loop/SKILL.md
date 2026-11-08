@@ -413,4 +413,13 @@ Next founder gate:
 
 A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
 
+For runtime-kernel receipts, `.github/workflows/ci.yml` must keep the `test_check_receipt.py` discovery step inside the load-bearing `python-tests` job. A kernel receipt must prove prospective authority before PERMIT, and a receipt whose executor or verifier is a status word (`UNKNOWN`, `CANDIDATE`, `PROVEN`) is a violation rather than a verified actor. A passing checker run is evidence for receipt consistency only and never substitutes for founder approval or provider readback.
+
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.
