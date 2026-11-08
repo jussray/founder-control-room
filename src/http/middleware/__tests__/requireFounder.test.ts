@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import express, { type Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderRequest } from '../requireFounder.js';
@@ -151,6 +152,14 @@ function refreshedSession(): Session {
 
 function createProbeApp() {
   const app = express();
+  // Synthetic authorization probes are not production routes, but still
+  // explicitly exercise the same pre-auth request-limiting boundary.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  }));
   app.get('/protected', requireFounder, (req: FounderRequest, res) => {
     res.json({ founder: req.founder });
   });
@@ -159,6 +168,14 @@ function createProbeApp() {
 
 function createAuthChannelProbeApp() {
   const app = express();
+  // Synthetic authorization probes are not production routes, but still
+  // explicitly exercise the same pre-auth request-limiting boundary.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  }));
   app.get('/protected', requireFounder, (req: FounderRequest, res) => {
     res.json({
       founder: req.founder,
@@ -206,6 +223,17 @@ beforeEach(() => {
 });
 
 describe('requireFounder', () => {
+  it('probe throttles unauthorized requests before authentication', async () => {
+    const app = createAuthChannelProbeApp();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await request(app).get('/protected');
+      expect(response.status).toBe(401);
+    }
+    const limited = await request(app).get('/protected');
+    expect(limited.status).toBe(429);
+    expect(limited.headers['retry-after']).toBeDefined();
+  });
+
   it('requires a bearer token or founder cookie', async () => {
     const response = await request(createProbeApp()).get('/protected');
 
