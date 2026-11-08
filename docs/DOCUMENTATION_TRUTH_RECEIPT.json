@@ -567,6 +567,12 @@
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
       ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "claims": [
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+      ]
     }
   ]
 }
