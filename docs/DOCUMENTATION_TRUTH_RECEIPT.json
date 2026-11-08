@@ -681,6 +681,13 @@
       "claims": [
         "The existing `src/lib/mediaFfmpegRender.ts` local renderer remains the independent receipt producer: its generated MP4 and FFprobe/sha256 receipt can now be tested against a separate read-only FSE byte-inspection bridge, but neither code path proves release permission or social distribution."
       ]
+    },
+    {
+      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "claims": [
+        "`src/lib/firstPartyFounderContentExecutor.ts` must preserve canonical exact-current-founder approval, bounded approval freshness, exact public copy and payload hashes, source SHA, one durable idempotency reservation and provider-native outcome receipt for both LinkedIn and X; an X developer app API key alone must never grant publishing authority.",
+        "For X, FCR requires server-held X_USER_ACCESS_TOKEN and X_USER_ID, verifies user-context account identity before any post write, consumes ambiguous write/readback reservations without a blind retry, and never emits token material in public results. Passing source tests does not establish live X authentication or publication."
+      ]
     }
   ]
 }
