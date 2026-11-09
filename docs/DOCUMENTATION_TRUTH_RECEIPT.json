@@ -613,6 +613,18 @@
       "claims": [
         "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
       ]
+    },
+    {
+      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "claims": [
+        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post."
+      ]
+    },
+    {
+      "path": "src/lib/xFirstPartyAdapter.ts",
+      "claims": [
+        "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
     }
   ]
 }
