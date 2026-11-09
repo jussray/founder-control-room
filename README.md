@@ -677,3 +677,7 @@ This changes candidate source policy, tests, and documentation only. It does **n
 ## Gmail AI Inbox — candidate scoped runtime
 
 PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
+
+## X user-context publisher — source candidate
+
+The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
