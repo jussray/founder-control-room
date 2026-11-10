@@ -46,7 +46,7 @@ function canonicalRuleset(overrides = {}) {
           code_scanning_tools: [{
             tool: 'CodeQL',
             security_alerts_threshold: 'high_or_higher',
-            alerts_threshold: 'errors',
+            alerts_threshold: 'all',
           }],
         },
       },
@@ -140,6 +140,7 @@ test('canonical review membrane permits only the known preservable provider rule
   const preserved = canonicalRuleset();
   preserved.rules.push(
     { type: 'required_linear_history' },
+    { type: 'required_signatures' },
     { type: 'code_quality', parameters: { severity: 'errors' } },
     {
       type: 'copilot_code_review',
@@ -148,7 +149,7 @@ test('canonical review membrane permits only the known preservable provider rule
   );
   assert.deepEqual(
     [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
-    ['code_quality', 'copilot_code_review', 'required_linear_history'].sort(),
+    ['code_quality', 'copilot_code_review', 'required_linear_history', 'required_signatures'].sort(),
   );
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
 
@@ -344,7 +345,7 @@ test('review membrane rejects legacy pre-merge deployment requirements', () => {
 
 test('review membrane rejects unmodeled extra provider rules', () => {
   const extraRule = canonicalRuleset();
-  extraRule.rules.push({ type: 'required_signatures' });
+  extraRule.rules.push({ type: 'creation' });
   const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
   assert.equal(report.status, 'NOT_READY');
   assert.equal(report.canonicalFloorSatisfied, false);

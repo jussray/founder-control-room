@@ -190,8 +190,5 @@ class WorkerReconcileSecretReceiptTests(unittest.TestCase):
         self.assertIn("Invalid Cloudflare secret receipt", result.stdout)
         self.assertNotIn("SECRET_DO_NOT_ECHO", result.stdout + result.stderr)
 
-
-
-
 if __name__ == "__main__":
     unittest.main()
