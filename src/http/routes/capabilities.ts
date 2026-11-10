@@ -21,6 +21,7 @@ import {
   VIDEO_GRAPHIC_RENDER_CAPABILITY,
   VIDEO_GRAPHIC_RENDER_CAPABILITY_ID,
 } from '../../capabilities/videoGraphicRender.js';
+import { localDocumentToMarkdownCapability } from '../../capabilities/localDocumentConversion.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -37,6 +38,7 @@ const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
 const WORKBENCH_CAPABILITIES = Object.freeze([
+  localDocumentToMarkdownCapability,
   ...capabilities,
   PUBLIC_WEB_OBSERVATION_CAPABILITY,
   ULTRATHINK_SHARED_REASONING_CAPABILITY,
