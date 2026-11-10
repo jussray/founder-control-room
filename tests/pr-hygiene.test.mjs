@@ -14,7 +14,7 @@ const daysAgo = (days) => new Date(now.getTime() - days * 86_400_000).toISOStrin
 const pr = (number, { draft = false, idle = 0, labels = [] } = {}) => ({
   number,
   draft,
-  updated_at: daysAgo(idle),
+  last_activity_at: daysAgo(idle),
   labels: labels.map((name) => ({ name })),
 });
 
@@ -24,8 +24,8 @@ test('fresh drafts and ready PRs are left alone', () => {
 
 test('idle draft is marked stale, then closed only after the grace period', () => {
   assert.deepEqual(planPrHygiene([pr(3, { draft: true, idle: DRAFT_STALE_DAYS })], now), [{ number: 3, action: 'mark-stale' }]);
-  assert.deepEqual(planPrHygiene([pr(4, { draft: true, idle: DRAFT_CLOSE_DAYS - 1, labels: [STALE_LABEL] })], now), []);
-  assert.deepEqual(planPrHygiene([pr(5, { draft: true, idle: DRAFT_CLOSE_DAYS, labels: [STALE_LABEL] })], now), [{ number: 5, action: 'close' }]);
+  assert.deepEqual(planPrHygiene([pr(4, { draft: true, idle: DRAFT_STALE_DAYS + DRAFT_CLOSE_DAYS - 1, labels: [STALE_LABEL] })], now), []);
+  assert.deepEqual(planPrHygiene([pr(5, { draft: true, idle: DRAFT_STALE_DAYS + DRAFT_CLOSE_DAYS, labels: [STALE_LABEL] })], now), [{ number: 5, action: 'close' }]);
 });
 
 test('ready PRs are marked stale but never closed automatically', () => {
@@ -42,5 +42,10 @@ test('keep-open exempts any PR', () => {
 });
 
 test('invalid timestamps are skipped rather than acted on', () => {
-  assert.deepEqual(planPrHygiene([{ number: 11, draft: true, updated_at: 'not-a-date', labels: [] }], now), []);
+  assert.deepEqual(planPrHygiene([{ number: 11, draft: true, last_activity_at: 'not-a-date', labels: [] }], now), []);
+});
+
+test('a new real commit removes the stale label instead of closing', () => {
+  assert.deepEqual(planPrHygiene([pr(12, { draft: true, idle: 1, labels: [STALE_LABEL] })], now), [{ number: 12, action: 'unmark-stale' }]);
+  assert.deepEqual(planPrHygiene([pr(13, { idle: 1, labels: [STALE_LABEL] })], now), [{ number: 13, action: 'unmark-stale' }]);
 });

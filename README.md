@@ -4,7 +4,7 @@
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
 
-`.github/workflows/pr-hygiene.yml` runs weekly using `scripts/pr-hygiene.mjs`: drafts idle 21 days are labelled `stale` and closed 7 days later (reversible, branches kept); ready pull requests idle 30 days are labelled `stale` but never closed automatically; `keep-open` exempts any pull request. Manual runs default to dry run. Neither workflow grants merge, approval, or deploy authority.
+`.github/workflows/pr-hygiene.yml` runs weekly using `scripts/pr-hygiene.mjs`: drafts with no new commit for 21 days are labelled `stale` and closed 7 days later (reversible, branches kept); ready pull requests with no new commit for 30 days are labelled `stale` but never closed automatically. Idle time is measured from the last non-merge commit, because automated merges of `main` into every open pull request reset GitHub's updated time; `keep-open` exempts any pull request. Manual runs default to dry run. Neither workflow grants merge, approval, or deploy authority.
 
 ## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
 
