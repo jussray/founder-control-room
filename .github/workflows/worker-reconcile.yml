@@ -173,15 +173,32 @@ jobs:
               sys.exit(1)
 
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
-              observed = json.load(handle)
+              receipt_text = handle.read()
+          # Wrangler can prefix the JSON list with authentication notices.
+          # Parse only the list, never log the provider response or secret values.
+          array_start = receipt_text.find('[')
+          array_end = receipt_text.rfind(']')
+          if array_start < 0 or array_end <= array_start:
+              print('::error title=Invalid Cloudflare secret receipt::No JSON list returned.')
+              sys.exit(1)
+          try:
+              observed = json.loads(receipt_text[array_start:array_end + 1])
+          except (ValueError, TypeError):
+              print('::error title=Invalid Cloudflare secret receipt::Malformed JSON list.')
+              sys.exit(1)
           if not isinstance(observed, list) or any(
-              not isinstance(entry, dict) or not isinstance(entry.get('name'), str)
+              not isinstance(entry, dict) or
+              not isinstance(entry.get('name'), str) or not entry['name']
               for entry in observed
           ):
-              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain name-bearing entries.')
+              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain valid name-bearing entries.')
+              sys.exit(1)
+          observed_names = [entry['name'] for entry in observed]
+          if len(observed_names) != len(set(observed_names)):
+              print('::error title=Invalid Cloudflare secret receipt::Duplicate binding names.')
               sys.exit(1)
 
-          present = {entry['name'] for entry in observed}
+          present = set(observed_names)
           required = set(names) - workflow_written
           missing = sorted(required - present)
           if missing:
