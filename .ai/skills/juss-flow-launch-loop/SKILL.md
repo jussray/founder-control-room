@@ -348,7 +348,7 @@ Merge only when:
 - rollback is understood; and
 - the PR does not mix unrelated risky work.
 
-Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness.
+Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness. Last-moment freshness covers both refs: FCR re-resolves the live base and the mutable head immediately before provider integration, and a base that moved after review fails closed with `Base moved after verification`.
 
 FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
 

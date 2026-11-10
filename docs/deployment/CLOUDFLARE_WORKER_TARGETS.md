@@ -7,6 +7,11 @@ FCR member sign-in and workspace navigation are apex-cookie-bound: safe `GET`/`H
 
 The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.
 
+## November 7, 2026 — proposed Gmail AI Inbox feature bindings
+
+The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.
+
+Before enabling: obtain founder-authorized scoped provider configuration; verify canonical Worker/account deployment SHA and provider-held binding names/types without exposing values; prove Google-profile equality to the pinned mailbox; require both `INBOX` and the pinned custom business label; exercise only the founder-authenticated metadata read against a permitted project; record minimized provider/browser receipts. Do not infer that customer, investor, government or sponsor correspondence is substantively answered from subject/headers alone. Existing single-reply send authority stays a separate, explicitly approved and audited route. See [Gmail AI Inbox runtime](../GMAIL_AI_INBOX_RUNTIME.md).
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 

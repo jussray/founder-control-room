@@ -7,6 +7,11 @@ The www public entry is not a browser session origin. `public/_worker.js` must n
 
 Member email sign-in is distinct from the founder allowlist. `public/_worker.js` must route API-generated `/auth/member/callback.js` and all `/auth/member/*` requests through the same-origin Pages `FCR_API` service binding, while serving the static `/welcome` and `/member/` interfaces from Pages assets. The FCR API validates the Supabase identity, rejects founder accounts in member sessions, revokes cross-role browser sessions, and issues a separate opaque, HttpOnly, Secure, SameSite=Strict cookie backed by `fcr_member_browser_sessions`. The new member route returns only the member's empty workspace, not founder projects or agent state. A source route, pending SQL migration, or mock Playwright result cannot establish an applied migration, a correctly provisioned service binding, a live OTP, or real network/browser isolation. Release must fail closed until independent provider and runtime evidence is observed.
 
+## November 7, 2026 — candidate Gmail AI Inbox read boundary
+
+PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
+
+Only an exact-head authorized release, Cloudflare Worker binding/source readback, Google consent/scope and account verification, and founder-only runtime request can substantiate operational Gmail metadata reads. AI reply drafts, multi-account connection, scheduled synchronization, automated outreach, dispatch and revenue results are not established by this PR; the existing one-reply approval gate remains independent. See [Gmail AI Inbox runtime](GMAIL_AI_INBOX_RUNTIME.md).
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
