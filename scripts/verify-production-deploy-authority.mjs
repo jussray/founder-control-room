@@ -351,7 +351,33 @@ for (const [name, value] of publicBindings) {
   );
 }
 
+// Pinned deploy-required Worker secret names. This list is deliberately not
+// derived from wrangler.worker.toml: deriving it would make the check
+// circular, so silently demoting a required secret to optional would pass.
+// Promote a feature secret only after it is installed on the Cloudflare
+// Worker, and update this pin and wrangler.worker.toml in the same change.
+const PINNED_REQUIRED_WORKER_SECRETS = [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'OPENAI_API_KEY',
+  'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
+];
 const requiredWorkerSecrets = workerSecretRegistry.required;
+assert.deepEqual(
+  [...requiredWorkerSecrets].sort(),
+  [...PINNED_REQUIRED_WORKER_SECRETS].sort(),
+  'wrangler.worker.toml [secrets].required must exactly equal the pinned deploy-required Worker secret set',
+);
+// Every provider-held Worker secret, required or optional, must stay out of
+// GitHub Actions copy paths.
+const providerHeldWorkerSecrets = [
+  ...workerSecretRegistry.required,
+  ...workerSecretRegistry.optional,
+];
 
 assert.match(
   wrangler,
@@ -394,7 +420,7 @@ assert.match(
   'canonical deploy must actively force the broad Founder Signal grant disabled',
 );
 
-for (const name of requiredWorkerSecrets.filter(
+for (const name of providerHeldWorkerSecrets.filter(
   (secretName) => secretName !== 'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
 )) {
   assert.doesNotMatch(
