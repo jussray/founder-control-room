@@ -1,0 +1,80 @@
+name: FCR Commerce Money Path Exact-Head Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/fcrCommerce/**'
+      - 'src/http/fcrCommerceIngress.ts'
+      - 'src/http/webhooks/shopifyFcrCommerce.ts'
+      - 'src/http/webhooks/__tests__/shopifyFcrCommerce.test.ts'
+      - 'src/config/projectShells.ts'
+      - 'src/config/__tests__/projectShells.test.ts'
+      - 'src/index.ts'
+      - 'src/worker/cf-entry.ts'
+      - 'supabase/migrations/20260920030000_fcr_commerce_receipts.sql'
+      - 'supabase/migrations/20260920031500_fcr_commerce_event_identity.sql'
+      - 'wrangler.worker.toml'
+      - '.github/workflows/fcr-commerce-money-path-exact-head.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  proof:
+    name: FCR Shopify Money Path Exact-Head Proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Focused FCR commerce and shell tests
+        run: >-
+          npx vitest run
+          src/http/webhooks/__tests__/shopifyFcrCommerce.test.ts
+          src/config/__tests__/projectShells.test.ts
+
+      - name: Prove raw webhook boundary is mounted in both runtimes
+        run: |
+          grep -F "mountFcrCommerceIngress(app);" src/index.ts
+          grep -F "mountFcrCommerceIngress(app);" src/worker/cf-entry.ts
+          grep -F "'/webhooks/shopify/fcr/orders-paid'" src/http/fcrCommerceIngress.ts
+
+      - name: Prove canonical FCR database and runtime-secret boundary
+        run: |
+          grep -F "../../lib/supabaseClient.js" src/http/webhooks/shopifyFcrCommerce.ts
+          grep -F '"FCR_SHOPIFY_WEBHOOK_SECRET",' wrangler.worker.toml
+          grep -F '"FCR_COMMERCE_HASH_SALT",' wrangler.worker.toml
+          node scripts/verify-production-deploy-authority.mjs
+
+      - name: Prove privacy-safe additive and provider-event-idempotent ledger
+        run: |
+          grep -F "CREATE TABLE IF NOT EXISTS public.fcr_commerce_receipts" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
+          grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_order_event_uidx" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
+          grep -F "ADD COLUMN IF NOT EXISTS event_id UUID" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
+          grep -F "CREATE UNIQUE INDEX IF NOT EXISTS fcr_commerce_receipts_provider_event_uidx" supabase/migrations/20260920031500_fcr_commerce_event_identity.sql
+          grep -F "ALTER TABLE public.fcr_commerce_receipts ENABLE ROW LEVEL SECURITY" supabase/migrations/20260920030000_fcr_commerce_receipts.sql
+          ! grep -Eiq 'customer_(name|email|phone)|shipping_address|payment_instrument|raw_order' supabase/migrations/20260920030000_fcr_commerce_receipts.sql supabase/migrations/20260920031500_fcr_commerce_event_identity.sql

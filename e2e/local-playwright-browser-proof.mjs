@@ -25,7 +25,7 @@ try {
         <script>
           document.querySelector('#proof-form').addEventListener('submit', (event) => {
             event.preventDefault();
-            document.querySelector('#status').textContent = 'provider accepted';
+            document.querySelector('#status').textContent = 'fixture event observed';
           });
         </script>
       </body>
@@ -33,22 +33,24 @@ try {
 
   await page.getByLabel('Message').fill('approved payload');
   await page.getByRole('button', { name: 'Submit approved payload' }).click();
-  await page.getByText('provider accepted').waitFor();
+  await page.getByText('fixture event observed').waitFor();
 
   const status = await page.locator('#status').textContent();
-  assert.equal(status, 'provider accepted');
+  assert.equal(status, 'fixture event observed');
 
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   const receipt = {
-    contract: 'fcr/local-playwright-browser-proof@v1',
+    contract: 'fcr/local-playwright-browser-fixture@v2',
     engine: 'playwright',
     executionMode: 'local',
+    evidenceScope: 'synthetic-dom-fixture',
     costClass: COST_CLASS,
     providerWalletRequired: false,
-    formMutationProved: true,
-    providerAccepted: true,
-    verifiedOutcome: true,
+    fixtureFormMutationProved: true,
+    formMutationProved: false,
+    providerAccepted: false,
+    verifiedOutcome: false,
     screenshot: path.relative(process.cwd(), screenshotPath),
   };
 

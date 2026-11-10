@@ -87,6 +87,31 @@ Run only fixed allowlisted command IDs through the authenticated terminal API:
 
 Every terminal run must bind `expectedCommitSha` to the mission SHA. `output_truncated=true` is warning evidence and cannot satisfy the proof gate.
 
+## SignalLoop control-room onboarding (read-only observation only)
+
+SignalLoop is a standalone Juss & Co. product whose canonical GitHub repository
+is `JussAndCo/signal-loop`. Keep its worktree at
+`<workspace-root>/signal-loop`, separate from the FCR repository and other
+projects. Verify its Git remote is exactly the intended organization repository
+and its HEAD is the approved 40-character commit SHA before collecting evidence.
+
+The FCR legacy terminal registry recognizes the project slug `signal-loop`
+for the fixed `git.head`, `git.status`, and `git.diff-stat` commands **only**.
+Those reads are not build, unit, integration, browser, source-export, deployment,
+or production verification. An approved FCR project/mission row, founder session,
+loopback workspace, and exact-head checks are still prerequisites; the registry
+entry does not create them.
+
+SignalLoop application tests must be executed by its own product control-room
+sandbox under a fresh L99 ApprovalReceipt and imported to FCR with a matching
+exact-head result. The legacy FCR terminal refuses executable test commands;
+do not change its risk classification or permit a raw shell as a workaround.
+
+The original 24app/Vibe Coding React export has not been verified in the
+`JussAndCo/signal-loop` main branch. Do not merge the divergent standalone
+freemium PR as a substitute for that original product, and do not describe
+a synthetic `page.setContent` browser fixture as provider acceptance.
+
 ## Completion rules
 
 A mission stays `sandboxed` until every required evidence kind has a latest `pass` row at the exact SHA:
@@ -105,3 +130,33 @@ Let `MissionController` advance the mission to `in_review`. Do not update status
 If the local workspace is wrong, dirty, stale, nested, or contains unexpected private material, stop before terminal execution. Fix the workspace outside the repository, rerun preflight, and preserve the failed preflight output as non-proof diagnostic context. Do not delete Control Room evidence rows.
 
 To reverse this target reconciliation, restore the previous mission target fields through a guarded transaction, preserve all evidence and reconciliation history, and revert the repository contract commit. Do not delete evidence rows as rollback.
+
+## Optional Sprites read-only runner (candidate; not activated)
+
+The Node/Express legacy terminal may select `CONTROL_ROOM_READ_ONLY_RUNNER=sprites` **only in a separately governed server environment**. It retains founder authentication, enabled terminal flag, project verification, exact mission SHA, valid mission state, and durable `terminal_runs` audit before attempting a provider call. The default remains `local`; an unknown runner mode fails closed. This flag does not activate the Cloudflare Worker or install an HTTP Sprite service.
+
+The opt-in adapter pins the private organization Sprite `fcr-governed-exec` and the documented authenticated Sprites management Exec API. Its single hard-coded executable runs the versioned `scripts/sprites/read-only-terminal-stdio.cjs` (installed in the Sprite at `/home/sprite/fcr/runner/`), accepting only the checked-in `fcr/sprite-read-only-terminal@v1` envelope for the exact `jussray/founder-control-room` checkout and `git.head`, `git.status`, or `git.diff-stat`. A response is diagnostic unless it matches request identity and evidence digests; fingerprints never grant authority.
+
+`SPRITES_FCR_EXEC_TOKEN` is a **server-side provider-held credential** that must not be copied into the Sprite, browser, repository, CI artifact, or chat. The full provider token may allow broad Sprite management, so do not activate this flag until its least-privilege scope, production binding, secret residency, audited FCR-to-Sprite call, cancellation and ambiguity behavior, and canonical receipt ingestion are independently verified. The adapter does not obtain or create that token; without it, execution fails closed. The current Sprite workspace is an isolated local proof only, not a live deployed FCR integration.
+
+No mutating command, build, dependency installation, browser command, merge, deployment, provider change, or project switch is supported by this runner. Its `cancel` reports false instead of claiming a remote process stopped. HTTP success alone never makes an FCR receipt green. The Sprite's outbound network policy remains deny-all except while explicitly authorized installation is underway.
+
+To undo the candidate, revert the focused branch commit (which also removes the opt-in mode); leaving the flag unset preserves existing local behavior. The Sprite's preserved checkpoint `v4` predates this adapter's stdin entrypoint and may be restored separately with explicit authority.
+
+
+### Separate FCR Sprite roles
+
+The checked-in `src/terminal/fcrSpriteCatalog.ts` inventory names two private
+FCR Sprites; it is a declarative roster, **not** a credential, permission grant,
+or deployment configuration.
+
+- `fcr-governed-exec`: optional, tightly bounded, read-only Git observations in
+  the legacy Node terminal. Its adapter must not be exposed by the public MCP.
+- `fcr-production-proof`: isolated browser/runtime evidence worker. It is
+  registered for FCR ownership and review, but has no FCR production dispatch
+  adapter or live verification service yet. It cannot authorize a merge or deploy.
+
+Neither role is activated merely by appearing in the source. A release requires
+separately verified provider identity, least-privilege access, exact-head browser
+proof, redacted evidence ingestion, cancellation handling, and founder authority.
+The public MCP customer route never inherits a Sprite connection.

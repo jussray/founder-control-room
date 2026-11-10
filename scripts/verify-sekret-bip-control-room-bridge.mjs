@@ -18,7 +18,7 @@ const [manifestSource, headers, buildScript] = await Promise.all([
 const manifest = JSON.parse(manifestSource);
 const peerOrigin = 'https://sekret-bip-audit.p9s5nbwqyt.chatgpt.site';
 
-assert.equal(manifest.schemaVersion, '1.0.0');
+assert.equal(manifest.schemaVersion, '1.1.0');
 assert.equal(manifest.bridgeId, 'sekret-bip-founder-control-room');
 assert.deepEqual(manifest.publisher, {
   projectId: 'founder-control-room',
@@ -30,12 +30,20 @@ assert.deepEqual(manifest.publisher, {
 assert.deepEqual(manifest.peer, {
   projectId: 'sekret-bip',
   runtimeOrigin: peerOrigin,
-  controlRoom: `${peerOrigin}/control-room`,
+  role: 'audit-mirror',
+  auditView: `${peerOrigin}/control-room`,
+  legacyRouteAlias: '/control-room',
   manifest: `${peerOrigin}/api/control-room-link`,
 });
+assert.deepEqual(manifest.canonicalBipControlRoom, {
+  repository: 'jussray/Sekret-Bip',
+  entry: 'app/(dev)/control-room.tsx',
+  singleton: true,
+});
+assert.equal('controlRoom' in manifest.peer, false);
 assert.deepEqual(manifest.authority.founderControlRoom.actions, ['approve', 'execute']);
-assert.deepEqual(manifest.authority.sekretBip.actions, ['observe', 'request']);
-assert.equal(manifest.authority.sekretBip.actions.includes('execute'), false);
+assert.deepEqual(manifest.authority.sekretBipAuditMirror.actions, ['observe', 'request']);
+assert.equal(manifest.authority.sekretBipAuditMirror.actions.includes('execute'), false);
 assert.deepEqual(manifest.connection, {
   registration: 'CONFIGURED',
   verification: 'REQUIRES_LIVE_READBACK',
@@ -62,4 +70,4 @@ assert.equal(
   true,
 );
 
-console.log(`Se’kret Bip runtime bridge contract verified from ${repositoryRoot}`);
+console.log(`Se’kret Bip singleton Control Room bridge contract verified from ${repositoryRoot}`);

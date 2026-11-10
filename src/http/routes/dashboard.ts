@@ -20,6 +20,7 @@ import {
   type ProofSignal,
   type ProofStatus,
 } from '../../proof-engine/readiness.js';
+import { truthConsoleRouter } from './truthConsole.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireFounder);
@@ -251,3 +252,7 @@ dashboardRouter.post('/manual-analysis', async (req: FounderRequest, res) => {
   const status = result.status === 'converged' ? 200 : result.status === 'retry' ? 202 : 422;
   return res.status(status).json({ project: { slug: project.slug, name: project.name }, result });
 });
+
+// Seven-screen truth console: founder-authenticated and backed by the existing
+// evidence/reconciliation/truth/continuity spine rather than a parallel proof system.
+dashboardRouter.use('/truth', truthConsoleRouter);

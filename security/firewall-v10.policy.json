@@ -89,7 +89,7 @@
       "productionApplied": "unknown",
       "strategy": "edge-observe-then-enforce-plus-application-baseline",
       "applicationBaseline": {
-        "generalPerIp": { "limit": 60, "periodSeconds": 60 },
+        "generalPerIp": { "limit": 120, "periodSeconds": 60 },
         "magicLinkPerIp": { "limit": 5, "periodSeconds": 900 },
         "founderPermissionPerIp": { "limit": 60, "periodSeconds": 60 }
       },

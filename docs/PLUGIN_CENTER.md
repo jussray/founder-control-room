@@ -42,6 +42,32 @@ The center is intentionally an **inventory and authority contract**, not a magic
    - Proof gates record exact-head machine evidence.
    - Temporary grants record reason, usage limit, expiry, and revocation.
 
+## HeyGen avatar-video provider (catalog only)
+
+The Plugin Center catalog declares HeyGen as an L6, separately-gated provider.
+This is an available *capability definition*, not proof that a connection was
+installed, that a provider key exists, or that a video was rendered.
+
+- **MakeVideo** exports a local, privacy-minimized Story Engine draft JSON file.
+  The export is not an upload, provider request or approval.
+- **Story Engine** owns the private HeyGen API key, production-plan validation,
+  single-shot submission, provider status and local attempt evidence.
+- **FCR** owns project-level inventory, founder approval and release truth.
+  The catalog card carries no standalone provider execution implementation.
+
+Provider status such as "completed" is **not** media-byte/playback verification,
+rights approval, billing reconciliation, creator consent or publication proof.
+The production provider route must verify exact authenticated workspace,
+current source/continuity, a real founder-approved budget and refusal to retry
+uncertain paid submissions. FCR may record only sanitized IDs, status and
+evidence references; no raw provider API responses, bearer media URLs or keys.
+
+An actual FCR HeyGen project connection requires a separate authorized
+project-scoped registry entry and a live readback. Merely listing HeyGen in
+PLUGIN_CATALOG does not insert a connection or bind a secret.
+A Cloudflare Worker secret does not automatically configure a separate
+Story Engine Railway/Node backend.
+
 ## API surface
 
 ### `GET /plugin-center`
@@ -78,11 +104,15 @@ Rules:
 - Grant must expire within 24 hours.
 - Grant text must not contain credential-like material.
 - If `connectionId` is provided, it must belong to the named project.
-- An audit event is required. If the audit write fails, the route revokes the grant and returns an audit-incomplete error.
+- An audit event is required. If the audit write fails, the route attempts to revoke the newly created grant and verifies that rollback by readback.
+- A confirmed rollback returns `PLUGIN_GRANT_AUDIT_INCOMPLETE` with `grantRevoked: true`; it does not pretend the missing audit receipt succeeded.
+- An unconfirmed rollback returns the separate `PLUGIN_GRANT_ROLLBACK_INCOMPLETE` receipt with `grantMayRemainActive: true`; audit failure and rollback failure are never collapsed into one state.
 
 ### `POST /plugin-center/grants/:grantId/revoke`
 
-Founder-only revocation route. Records `revoked_at` and emits a `plugin_permission_grant_revoked` event.
+Founder-only revocation route. The first successful revocation records `revoked_at` and emits a `plugin_permission_grant_revoked` event. Repeating the revoke is idempotent: the original `revoked_at` receipt is returned with `alreadyRevoked: true`, without rewriting history or emitting a duplicate revocation event.
+
+If the revocation succeeds but its audit event cannot be persisted, the route returns `PLUGIN_REVOKE_AUDIT_INCOMPLETE` with `revocationSucceeded: true`; provider/data mutation truth remains separate from audit-receipt truth.
 
 ## Authority levels
 

@@ -3,10 +3,12 @@
 
   const API_BASE = '/automation/conveyor/founder-content/lifecycle';
   const APPROVAL_ROUTE = '/automation/conveyor/founder-content/approvals';
+  const YOUTUBE_GROWTH_ROUTE = '/automation/conveyor/founder-content/youtube-growth/evaluate';
   const liveRuntime = location.protocol === 'https:' || location.protocol === 'http:';
 
   const root = document.querySelector('[data-lifecycle-control-plane]');
   if (!root) return;
+  const learningRoot = document.querySelector('[data-content-learning-loop]');
 
   const state = {
     posts: [],
@@ -48,6 +50,18 @@
     }
   }
 
+  function parseJsonObjectText(rawValue, label) {
+    const raw = text(rawValue);
+    if (!raw) throw new Error(`${label} is required`);
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
+      return parsed;
+    } catch {
+      throw new Error(`${label} must be valid JSON object text`);
+    }
+  }
+
   function toIsoFromLocal(value, label) {
     const raw = text(value);
     const ms = Date.parse(raw);
@@ -70,7 +84,7 @@
   function errorMessage(error) {
     if (error && typeof error === 'object') {
       if (error.payload && typeof error.payload === 'object') {
-        return error.payload.reason || error.payload.code || error.message || 'Lifecycle operation failed';
+        return error.payload.reason || error.payload.reasons?.[0] || error.payload.code || error.message || 'Lifecycle operation failed';
       }
       if (typeof error.message === 'string') return error.message;
     }
@@ -100,7 +114,7 @@
       payload = { ok: false, code: 'NON_JSON_RESPONSE' };
     }
     if (!response.ok) {
-      const error = new Error(payload?.reason || payload?.code || `HTTP ${response.status}`);
+      const error = new Error(payload?.reason || payload?.reasons?.[0] || payload?.code || `HTTP ${response.status}`);
       error.status = response.status;
       error.payload = payload;
       throw error;
@@ -125,6 +139,107 @@
       throw error;
     }
     return payload;
+  }
+
+  async function youtubeGrowthRequest(body) {
+    if (!liveRuntime) throw new Error('Static proof mode: YouTube growth evaluation requires authenticated FCR runtime.');
+    const response = await fetch(YOUTUBE_GROWTH_ROUTE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let payload = null;
+    try { payload = await response.json(); } catch { payload = { ok: false, code: 'NON_JSON_RESPONSE' }; }
+    if (!response.ok) {
+      const error = new Error(payload?.reasons?.[0] || payload?.code || `HTTP ${response.status}`);
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+    return payload;
+  }
+
+  function mountYouTubeGrowthControl() {
+    if (!learningRoot || learningRoot.querySelector('[data-youtube-growth-control]')) return;
+
+    const card = document.createElement('article');
+    card.className = 'control-card';
+    card.dataset.youtubeGrowthControl = 'advisory';
+    card.dataset.youtubeGrowthAuthority = 'advisory-only';
+
+    const heading = document.createElement('h3');
+    heading.textContent = 'YouTube growth evidence';
+    const description = document.createElement('p');
+    description.textContent = 'Evaluate a current evidence packet against TEST_AND_VALIDATE → DOUBLE_DOWN → SCALE. A HOLD or ADVANCE recommendation never publishes, schedules, spends, scales, or proves a provider outcome.';
+
+    const field = document.createElement('div');
+    field.className = 'field full';
+    const label = document.createElement('label');
+    label.htmlFor = 'youtube-growth-evidence';
+    label.textContent = 'Evidence packet JSON';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'control-textarea code';
+    textarea.id = 'youtube-growth-evidence';
+    textarea.dataset.youtubeGrowthInput = '';
+    textarea.placeholder = '{\n  "day": 31,\n  "evaluatedAt": "2026-09-19T20:00:00.000Z",\n  "currentPhase": "TEST_AND_VALIDATE",\n  "requestedPhase": "DOUBLE_DOWN",\n  "experiments": []\n}';
+    textarea.spellcheck = false;
+    const note = document.createElement('span');
+    note.className = 'field-note';
+    note.textContent = 'Paste evidence you can trace to the source. Missing or malformed proof fails closed; sample targets are not outcome evidence.';
+    field.append(label, textarea, note);
+
+    const actions = document.createElement('div');
+    actions.className = 'lifecycle-toolbar';
+    const evaluate = document.createElement('button');
+    evaluate.type = 'button';
+    evaluate.className = 'control-button primary';
+    evaluate.dataset.youtubeGrowthEvaluate = '';
+    evaluate.textContent = 'Evaluate evidence';
+    if (!liveRuntime) evaluate.disabled = true;
+    const authority = document.createElement('span');
+    authority.className = 'pill warn';
+    authority.dataset.youtubeGrowthAuthorityLabel = '';
+    authority.textContent = 'Advisory only · no publish authority';
+    actions.append(evaluate, authority);
+
+    const result = document.createElement('pre');
+    result.className = 'console-output';
+    result.dataset.youtubeGrowthOutput = '';
+    result.dataset.tone = 'neutral';
+    result.textContent = liveRuntime
+      ? 'No evaluation run. Paste a current evidence packet to produce a bounded recommendation.'
+      : 'Static proof mode. Open the authenticated FCR runtime to evaluate evidence.';
+
+    card.append(heading, description, field, actions, result);
+    learningRoot.append(card);
+
+    evaluate.addEventListener('click', async () => {
+      evaluate.disabled = true;
+      result.dataset.tone = 'neutral';
+      result.textContent = 'Evaluating evidence…';
+      try {
+        const packet = parseJsonObjectText(textarea.value, 'YouTube growth evidence packet');
+        const payload = await youtubeGrowthRequest(packet);
+        const evaluation = payload?.result || {};
+        result.dataset.tone = evaluation.transition === 'ADVANCE' ? 'good' : 'neutral';
+        result.textContent = JSON.stringify({
+          transition: evaluation.transition || 'UNKNOWN',
+          phase: evaluation.phase || 'UNKNOWN',
+          reasons: evaluation.reasons || [],
+          diagnoses: evaluation.diagnoses || [],
+          experimentFailures: evaluation.experimentFailures || [],
+          authority: evaluation.authority || {},
+          published: payload?.published === true,
+          providerMutationAttempted: payload?.providerMutationAttempted === true,
+        }, null, 2);
+      } catch (error) {
+        result.dataset.tone = 'error';
+        result.textContent = errorMessage(error);
+      } finally {
+        evaluate.disabled = !liveRuntime;
+      }
+    });
   }
 
   function selectedPost() {
@@ -504,6 +619,8 @@
       if (!error?.payload) setOutput(errorMessage(error), 'error');
     }
   });
+
+  mountYouTubeGrowthControl();
 
   if (!liveRuntime) {
     root.querySelectorAll('[data-live-only]').forEach((node) => { node.disabled = true; });

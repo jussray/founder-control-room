@@ -1,6 +1,36 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const MAIN_REF = 'refs/heads/main';
+
+function normalized(value) {
+  return String(value || '').trim();
+}
+
+function ownerDirectMainProvenance(directMainContext) {
+  if (!directMainContext || typeof directMainContext !== 'object') return null;
+
+  const eventName = normalized(directMainContext.eventName);
+  const ref = normalized(directMainContext.ref);
+  const actor = normalized(directMainContext.actor);
+  const repositoryOwner = normalized(directMainContext.repositoryOwner);
+
+  if (
+    eventName !== 'push'
+    || ref !== MAIN_REF
+    || !actor
+    || !repositoryOwner
+    || actor.toLowerCase() !== repositoryOwner.toLowerCase()
+  ) {
+    return null;
+  }
+
+  return {
+    ok: true,
+    reason: 'founder_owner_direct_main_provenance',
+    directMainActor: actor,
+  };
+}
 
 function mergedMainPullsForCommit(associatedPulls, commitSha) {
   if (!Array.isArray(associatedPulls)) return null;
@@ -17,6 +47,7 @@ export function classifyReviewedFirstParentSuccessors({
   terminalRatifiedTip,
   targetSha,
   successorCommits,
+  directTargetProvenance = null,
 }) {
   const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
   const target = String(targetSha || '').trim().toLowerCase();
@@ -51,6 +82,14 @@ export function classifyReviewedFirstParentSuccessors({
       return { ok: false, reason: 'successor_pr_provenance_unavailable', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
     }
     if (matches.length === 0) {
+      if (sha === target && directTargetProvenance?.ok === true) {
+        successors.push({ sha, provenance: 'owner_direct_main_push', directMainActor: directTargetProvenance.directMainActor });
+        continue;
+      }
+      if (successor?.trustedRun?.ok === true && successor.trustedRun.targetSha === sha) {
+        successors.push({ sha, provenance: 'trusted_direct_main_run', workflowRunId: successor.trustedRun.workflowRunId });
+        continue;
+      }
       return { ok: false, reason: 'unreviewed_first_parent_successor', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
     }
     if (matches.length !== 1) {
@@ -97,9 +136,10 @@ export function classifyMainReleaseProvenance({
   associatedPulls,
   terminalRatifiedTip = null,
   successorCommits = null,
+  directMainContext = null,
 }) {
-  const target = String(targetSha || '').trim().toLowerCase();
-  const current = String(currentMainSha || '').trim().toLowerCase();
+  const target = normalized(targetSha).toLowerCase();
+  const current = normalized(currentMainSha).toLowerCase();
 
   if (!FULL_SHA.test(target) || !FULL_SHA.test(current)) {
     return { ok: false, reason: 'invalid_sha' };
@@ -121,10 +161,7 @@ export function classifyMainReleaseProvenance({
       && mergeSha === target;
   });
 
-  if (matches.length === 0) {
-    return { ok: false, reason: 'direct_or_unproven_main_commit', targetSha: target };
-  }
-  if (matches.length !== 1) {
+  if (matches.length > 1) {
     return {
       ok: false,
       reason: 'ambiguous_pr_provenance',
@@ -133,25 +170,54 @@ export function classifyMainReleaseProvenance({
     };
   }
 
-  let successorChain = null;
+  if (matches.length === 1) {
+    const [pull] = matches;
+    let successorChain = null;
+    if (terminalRatifiedTip !== null) {
+      successorChain = classifyReviewedFirstParentSuccessors({
+        terminalRatifiedTip,
+        targetSha: target,
+        successorCommits,
+      });
+      if (!successorChain.ok) return successorChain;
+    }
+    return {
+      ok: true,
+      reason: 'reviewed_pr_merge_provenance',
+      targetSha: target,
+      pullRequestNumber: pull.number,
+      mergedAt: pull.merged_at,
+      ...(successorChain ? { successorChain } : {}),
+    };
+  }
+
+  // Terminal-ratified mode: an owner direct-push tip is admitted only when every
+  // first-parent successor after the terminal tip is PR-reviewed or carries its own
+  // exact-head trusted run. The ratified terminal commit is never re-admitted by push context.
   if (terminalRatifiedTip !== null) {
-    successorChain = classifyReviewedFirstParentSuccessors({
+    const direct = ownerDirectMainProvenance(directMainContext);
+    if (!direct || normalized(terminalRatifiedTip).toLowerCase() === target) {
+      return { ok: false, reason: 'direct_or_unproven_main_commit', targetSha: target };
+    }
+    const successorChain = classifyReviewedFirstParentSuccessors({
       terminalRatifiedTip,
       targetSha: target,
       successorCommits,
+      directTargetProvenance: direct,
     });
     if (!successorChain.ok) return successorChain;
+    return { ...direct, targetSha: target, successorChain };
   }
 
-  const [pull] = matches;
-  return {
-    ok: true,
-    reason: 'reviewed_pr_merge_provenance',
-    targetSha: target,
-    pullRequestNumber: pull.number,
-    mergedAt: pull.merged_at,
-    ...(successorChain ? { successorChain } : {}),
-  };
+  const direct = ownerDirectMainProvenance(directMainContext);
+  if (direct) {
+    return {
+      ...direct,
+      targetSha: target,
+    };
+  }
+
+  return { ok: false, reason: 'direct_or_unproven_main_commit', targetSha: target };
 }
 
 function cli() {
@@ -179,6 +245,12 @@ function cli() {
     associatedPulls,
     terminalRatifiedTip,
     successorCommits,
+    directMainContext: {
+      eventName: process.env.MAIN_RELEASE_EVENT_NAME,
+      ref: process.env.MAIN_RELEASE_REF,
+      actor: process.env.MAIN_RELEASE_ACTOR,
+      repositoryOwner: process.env.MAIN_RELEASE_REPOSITORY_OWNER,
+    },
   });
   mkdirSync('artifacts', { recursive: true });
   writeFileSync('artifacts/main-release-provenance.json', `${JSON.stringify(result, null, 2)}\n`, 'utf8');
