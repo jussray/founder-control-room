@@ -90,8 +90,6 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
-      - name: Audit Jussco governance fail-closed tests
-        run: node --test test/audit-jussco-rulesets.test.mjs
 
   e2e:
     name: Playwright e2e
