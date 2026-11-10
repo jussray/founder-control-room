@@ -1,5 +1,11 @@
 # Cloudflare Reasoning Contract
 
+## November 7, 2026 — candidate Gmail AI Inbox read boundary
+
+PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
+
+Only an exact-head authorized release, Cloudflare Worker binding/source readback, Google consent/scope and account verification, and founder-only runtime request can substantiate operational Gmail metadata reads. AI reply drafts, multi-account connection, scheduled synchronization, automated outreach, dispatch and revenue results are not established by this PR; the existing one-reply approval gate remains independent. See [Gmail AI Inbox runtime](GMAIL_AI_INBOX_RUNTIME.md).
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
