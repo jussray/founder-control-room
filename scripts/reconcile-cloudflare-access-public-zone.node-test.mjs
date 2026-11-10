@@ -210,7 +210,7 @@ test('apply touches public-root app only, preserves private owner-path Access an
   assert.equal(receipt.action, 'detached-browser-access');
   const writes = requests.filter((request) => request.method === 'PUT');
   assert.equal(writes.length, 1);
-  assert.match(writes[0].url, /\\/access\\/apps\\/mixed-1$/);
+  assert.match(writes[0].url, /\/access\/apps\/mixed-1$/);
   assert.deepEqual(JSON.parse(writes[0].body).destinations, [{ type: 'worker', uri: 'founder-control-room' }]);
 });
 
