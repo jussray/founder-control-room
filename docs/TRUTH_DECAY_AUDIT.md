@@ -1,5 +1,11 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
+
+The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
+
+Updating `.github/workflows/playwright.yml` to the newer exact SHA selects the successor for a fresh immutable checkout and complete FCR browser federation witness; it **must not** inherit predecessor green, imply Council production execution, or waive founder authentication, review-spend controls, privacy, merge, deployment, or publication gates. An unsuccessful, skipped, cancelled, or incomplete successor Playwright run leaves the FCR federation claim UNKNOWN/BLOCKED, and subsequent peer or FCR head movement expires the evidence again.
+
 ## November 3, 2026: FCR auth-lifecycle proof is narrower than release proof
 
 FCR PR #978's predecessor `82d0e7139d3876e166844de64e17b4a770c23b90` passed its dedicated Playwright welcome → magic-link login → opaque browser-session identity → authenticated welcome redirect → server-revoked logout → private-shell denial scenario. GitHub run `41728146923` nevertheless failed in the independently required guarded-terminal journey when the V10 client-side fetch membrane rejected a planless privileged action before the older test could observe the server's separate rejection. A source or test fix must preserve both negative guards and require fresh, exact-head Playwright execution; it may never create the branch that the test is supposed to deny.
@@ -298,12 +304,15 @@ The verifier classifies truth-sensitive changed files by domain and requires the
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
 
+Founder-permission authority is also explicitly part of the classification. Changes to `src/http/routes/founderPermissions.ts`, `src/lib/founderPermissionBroker.ts`, or `src/lib/founderPermissionExecution.ts` must require current portable-approval documentation and a path-bound receipt because those paths can change what a founder decision means, what live state is trusted, and whether a receipt can unlock an external effect.
+
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
 - current repository identity is resolved at use time only by separately authorized provider revalidation, while webhook facts remain historical last-observed provenance;
 - FCR merge docs describe the independent-review membrane and server-owned reviewer trust;
 - live GitHub ruleset enforcement stays a separate provider truth;
+- PromptOS workflow-registry approval binds exact workflow and registry state, uses trusted server-side observation, and keeps public receipts non-authorizing;
 - Goalfix carries the verified target branch rather than assuming `main`, authenticates Founder Final through the checked-in authority contract, rereads mutable provider/PR/base/head/diff/check/review state immediately before integration, distinguishes browser Playwright proof from backend/provider evidence, and reports `MERGED_UNVERIFIED` until required runtime proof exists;
 - Claude and Perplexity master execution overlays defer Goalfix execution order to the canonical workflow rather than maintaining weaker parallel loops;
 - the adaptive kernel remains a governance/source contract until runtime/API/UI integration is separately implemented and proven;
@@ -612,6 +621,54 @@ Current federation remains `UNKNOWN` until the exact successor FCR head complete
 
 **Branch and release gates:** FCR candidate \`68b020105c9a4d22851643e3f029571b53cc6af4\` was five commits behind FCR main \`fb4af1dccc81a0ab5e334e8038f23cb10af21b6a\`. Its CI recorded seven failures across ancestry, documentation truth, missing structured PR evidence, and a downstream Required Gate. Corrective integration must preserve main's unrelated changes and original branch history, rerun current exact-head checks, and obtain fresh, separate founder approval for that exact head/base pair before any merge or deployment. No green or merge authority is transferred by this documentation entry.
 
+## 2026-09 control correction: founder-permission authority false-green
+
+ATTACK-6000 against the PromptOS workflow-registry approval path found a documentation-governance defect in addition to the runtime threats. `src/http/routes/founderPermissions.ts`, `src/lib/founderPermissionBroker.ts`, and the new `src/lib/founderPermissionExecution.ts` can change the boundary between founder decision capture and consequential execution, but the Documentation Truth classifier did not recognize those production paths. The old Documentation Truth run could therefore report green while the durable approval documentation still described exact target binding primarily as a merge concern.
+
+That green is classified as a false-green coverage result, not proof that the authority implementation was unsafe by itself. The corrected verifier registers all three production paths as `founder-permission-authority`. Any future movement in that domain now requires a substantive refresh of `docs/PORTABLE_FOUNDER_APPROVALS.md`, README coverage, and a path-bound documentation receipt. Changes to the verifier itself remain `truth-governance`, so the repair cannot exempt itself from the documentation controls it enforces.
+
+The PromptOS action contract now documents the same boundaries enforced in source: canonical repository and `main`, exact head, exact workflow and registry content hashes, canonical paths, provider identity, capability version, and consequence class. Founder decision capture remains non-authorizing with `executionAuthorized: false`. Mutable state must be derived through a trusted server-side provider observation before one-shot consumption and revalidated immediately at the effect boundary. Caller-supplied “live” context, copied API responses, binding fingerprints, proof cookies, and continuity receipts cannot be promoted into bearer execution authority.
+
+This repair still does not prove a PromptOS provider write occurred. Documentation consistency, request consumption, provider acceptance, and verified external outcome remain separate planes. A consequential effect requires its separately gated server-side execution path, and completion requires provider-native readback of the resulting state. If the approved state moves after consumption, the prior authority stays consumed and a new approval is required rather than replaying or blindly retrying the action.
+
+### PromptOS founder-permission proof invariants
+
+- A founder-permission decision, consume receipt, or binding fingerprint cannot become provider-write authority; consequential execution must stay server-side, bind exact live state, and fail closed when that state moves.
+- A Documentation Truth green cannot certify an authority surface the classifier does not recognize; missing path registration is itself a false green that must be repaired before the result is trusted.
+
 ### October 14, 2026 StoryEngine peer evidence rollover
 
 The FCR Playwright peer pin was advanced from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the observed StoryEngine `refs/heads/main` commit `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. This selects a fresh external evidence subject. Historical passing tests cannot be used as current proof. The exact FCR head must pass the live peer-reference check, peer-runtime identity check, and the product-build federation Playwright witness before declaring the new pair verified.
+
+
+## 2026-11-03 FCR CI queue and deterministic-install evidence boundary — PR #1024
+
+This section records a bounded CI performance repair, not a verified production release or a claim that every repository check is green. The candidate is the existing `jussray/founder-control-room` PR #1024 against the current reviewed `main` base. Its CI jobs retain exact-head checkout checks, the test-discovery ratchet, Documentation Truth, required browser proof, independent review requirements, and founder approval boundaries.
+
+The performance change uses lockfile-strict `npm ci --no-audit --no-fund` and npm download caching in the core CI and Quality Gate Node jobs; no `node_modules` or test result is reused as a passing proof. The separate Playwright workflow now uses the source-controlled browser discovery in `e2e/run.mjs` without rewriting that source at runtime. Its first exact-head build is reused by `test:e2e:prepared`, whose executed browser checks are the same commands as `test:e2e` after the initial build. Normal `test:e2e` retains its own build. The PR-specific CI and Quality Gate concurrency keys cancel only superseded pull-request runs; main push verification and deployed-state witnesses cannot inherit canceled evidence. The explicit Node regression at `test/ci-performance-contract.node-test.mjs` executes in the required test-discovery job without weakening default Vitest test discovery.
+
+**Observed checks before this documentation repair:** GitHub Actions for PR #1024 at exact candidate `3f31a6730564a6b9363424a77d55754b2e9d86d5` completed 28 of 30 workflow runs successfully. Quality Gate, Playwright E2E, repository cycle, and test ledger completed successfully. The CI required gate and standalone Documentation Truth workflow failed because `docs/TRUTH_DECAY_AUDIT.md` was not substantively refreshed in the candidate's live-base diff. The failed CI job's Documentation Truth report said the required document was missing, with 74 source consistency checks and one documentation coverage failure. The test-discovery job passed, including four targeted CI-performance regression tests, with no new default-excluded test files. A green standalone test-ledger observation must not be interpreted as a blanket merge authorization.
+
+**Remaining authority and verification:** This documentation update must itself run through new exact-head CI, Documentation Truth, Quality Gate, Playwright, and any other required checks before claims become current. Cache-hit rate, runner queue reduction, p50/p95 throughput, and parity under intentionally failing tests remain unverified until measured on comparable fresh runs. Merge and deployment remain prohibited without the separate founder-bound approval and production proof. No status check, security gate, production authority, or tenant-isolation boundary is waived by this speed optimization.
+
+## 2026-11-03 CI proof completeness and safe run supersession — PR #1024 follow-up
+
+Source audit of `scripts/control-room-test-ledger.mjs` found two distinct evidence risks: timestamp-ordered deduplication could prefer an older completed check when a newer same-name attempt was only queued, and a fixed ten-page check-run enumeration could return a partial result without a truncation failure. The new Node regression tests require newest check-run identity and reject truncated, malformed, or duplicate check-run pages. The test ledger remains a check observer, not a substitute for the native `Required Gate` or any separate merge/prod approval.
+
+PR-specific concurrency is extended across exact-head CI, Quality Gate, Playwright, Documentation Truth, ledger, Verification Core, QuickScan, Attack-20, Pages API Recovery, and repo-cycle workflows. The policy may cancel only superseded `pull_request` heads. Each `push`, manual run, runtime state update, and deployment-witness event gets its own run ID in the concurrency group; these non-PR source/authority events must not be silently replaced. Independent security, browser, data, exact-head, and founder checks remain present; no path filters or failure handling were relaxed.
+
+Verification Core and QuickScan now use committed-lockfile `npm ci --no-audit --no-fund` and npm download cache only, without caching executed proof as success. This is a performance hypothesis pending exact-head new-run comparison, not proof of reduced wall-clock time or production behavior. Existing success for `c0896b2a7219c87eab57b6199957100cd3e9ca2e` (30/30 workflows) is historical after these edits. No production, merge, credential, tenant, or provider changes are authorized by this candidate.
+
+## 2026-11-03 false-green migration-lint and exact-head browser witness regression
+
+GitHub Actions run 41763158863 marked `Migration lint` successful even though `supabase db lint --local` exited 1 after the local PostgreSQL connection to 127.0.0.1:54322 was refused. The step was hidden behind `continue-on-error: true` and omitted from the native `Required Gate` dependency inventory. A green CI run therefore proved RLS source-contract assertions, **not** database-backed migration lint.
+
+The remediation must bind a reviewed live `main` base to the exact candidate, classify all touched `supabase/` and known RLS baseline paths, and explicitly mark database lint as not applicable when none changed. For schema changes it must initialize a temporary local Supabase project if the repository lacks `supabase/config.toml`, start a local stack that applies migrations, then run `supabase db lint --local --fail-on error`. A database startup, initialization, lint error, unavailable review base, or missing evidence must fail the job; the native Required Gate must depend on its result. No remote database, project credentials, production, secrets, or deployment are touched.
+
+The companion regression `src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts` must assert the newer PR-only Playwright cancellation condition rather than require unsafe cancellation of main push and deployment witness runs. The prior candidate `9369b3421236878a646c2a819efbb2510cbe978e` failed four workflows because a source-text test still demanded the obsolete global cancellation stanza; the new test assertion preserves exact-head checkout, immutable browser witness requirements, and artifact retention. A passing source test is not production runtime proof. <em>Both corrections require fresh exact-head CI.</em>
+
+The migration scope output is also a required proof: the local-DB path is conditional only after the verifier emits exactly `true` or `false`. A missing or malformed output must fail the migration job, not silently skip both database lint and the non-applicability witness. This is a source/test contract awaiting new exact-head CI proof.
+
+## SleepWealth account-model scopes (governance profile update)
+
+The claims `customer_scope_eligibility` and `pooled_scope_eligibility` in `src/governance/portfolioGovernanceProfiles.ts` were added on branch `claude/fcr-sleepwealth-account-models`. Their present-tense status is only as current as the exact head that passed CI. Evidence from before this change must not be treated as covering the new claims. Any base or head movement expires that evidence and requires fresh exact-head CI before the claims are treated as current.
