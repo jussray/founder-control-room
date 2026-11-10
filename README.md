@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
+
+The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list after any human authentication notice, validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
+
+The existing exact-current-main founder approval requirement, bounded removal of the stale undeclared `CF_API_TOKEN` plaintext binding, strict post-deployment binding-type check, and direct API + public Pages identity proofs remain mandatory. No value migration or secret rotation is authorized by this candidate; the canonical Worker Reconcile workflow is the only approved execution path for legacy-binding removal.
+
 ## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
 
 The founder-only `/integration-cockpit/projects` and `/integration-cockpit/inspect/:id/:number` endpoints operate alongside the existing Control Room on its authenticated origin. The read-only diagnostic `observePullRequest` capability includes draft and closed PR identities so an operator can see blocked work. The existing independent `getPullRequestReviewContext` gate still rejects draft or closed PRs and exclusively controls the review context used by merge authority. Read-only observation must never populate that review context, grant merge or deployment authority, or treat skipped checks as proof. Exact-head checks, current base/head, and browser session are separate observations; live FCR/Cloudflare/Supabase production proof is not established by a local fixture, passing CI slice, or preview build. Games Hub repository mapping remains unresolved and is not guessed.
