@@ -193,7 +193,7 @@ The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The 
 
 ## FCR merge review boundary
 
-The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read before provider integration.
+The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read plus a live-base re-resolution that must equal the pinned reviewed base before provider integration; a moved base fails closed and requires re-review.
 
 The deterministic review receipt remains proposal-only and cannot authorize the merge. Founder final approval is the separate human authority layer and must never be described as independent review. New founder-final approvals use a server-owned policy with zero required semantic humans and cannot be weakened by caller-supplied policy.
 
