@@ -46,6 +46,7 @@ A merge is appropriate only when:
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
 - **Quality Gate jobs on pull requests must checkout and verify the exact `github.event.pull_request.head.sha`; GitHub's synthetic PR merge ref is merge-simulation evidence and cannot satisfy exact-head proof for the candidate;**
 - FCR `Required Gate` includes the secret-free exact-head Cloudflare bridge authority contract, and that dependency must succeed whenever the required gate is used; live Cloudflare/GitHub provider state remains separate evidence;
+- FCR `Required Gate` depends on the `python-tests` job, which also runs the runtime-kernel receipt checker tests; a passing checker run is receipt-consistency evidence only and grants no merge, founder, or provider authority;
 - zero-step/no-log GitHub Actions failures are classified as `runner_startup_failure` or `workflow_no_jobs`, not as code regressions;
 - a `workflow_step_failure` is not waved away as infrastructure when logs show a real failing command, assertion, build, type, lint, or Playwright step;
 - Playwright has passed for any changed user-facing web/runtime path, or is explicitly inapplicable;
@@ -81,7 +82,8 @@ For `jussray/founder-control-room` the canonical path requires, at minimum:
 - an authenticated founder-final receipt bound to the exact PR number, base SHA, head SHA, founder identity, and approval time;
 - the founder-final receipt to remain fresh inside the merge proof window;
 - the provider PR identity and diff to be re-read after approval;
-- the mutable head to be re-read immediately before provider integration; and
+- the mutable head to be re-read immediately before provider integration;
+- the live base ref to be re-resolved immediately before provider integration and to equal the pinned reviewed base SHA, failing closed with `Base moved after verification` (HTTP 409) if `main` advanced after review; and
 - the founder-final policy presented to the evaluator to match the server-owned deterministic founder-final policy.
 
 The canonical founder-final policy is intentionally narrow:
