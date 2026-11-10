@@ -68,6 +68,12 @@ FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
 FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
+# FCR-owned, authenticated, BYOK-only AI Gateway. Identity only; not an activation grant.
+FCR_EVIDENCE_GATEWAY_ID = "fcr-evidence"
+FCR_REMOTE_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp"
+FCR_REMOTE_MCP_OAUTH_ISSUER = "https://oojzfmmywbvficgybaxd.supabase.co/auth/v1"
+FCR_REMOTE_MCP_OAUTH_AUDIENCE = "authenticated"
+FCR_REMOTE_MCP_OAUTH_REQUIRED_SCOPE = "email"
 FCR_RELAY_OPENAI_MODEL = "gpt-5.6-sol"
 FCR_RELAY_ANTHROPIC_MODEL = "claude-sonnet-5"
 FCR_RELAY_MUSE_MODEL = "muse-spark-1.3"
@@ -94,6 +100,15 @@ N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 # deployment preserves them rather than copying their values through Actions.
 # The deploy preflight reads this required-name registry and fails closed before
 # mutation when any provider-held binding is missing. Values are never read.
+#
+# Founder Path B ruling (2026-10-30): the deploy gate requires only the
+# boot/deploy-essential names below — every one is already installed on the
+# production Worker, and the Worker's startup bindings
+# (src/worker/handler.ts REQUIRED_STRING_BINDINGS) are fully satisfied by
+# these secrets plus the [vars] above. The feature names under
+# [secrets].optional are NOT required to deploy or boot; each must be
+# installed on the Worker before its named feature is activated, and the
+# feature stays dark until then.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -101,16 +116,32 @@ required = [
   "FOUNDER_SESSION_ENCRYPTION_KEY",
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
+  "OPENAI_API_KEY",
+  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
+  "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
+]
+
+# Feature secrets: required before enabling the named feature, not required
+# to deploy or boot. Install on the founder-control-room Worker first, then
+# move the name into [secrets].required in the feature's activation change.
+optional = [
   "GITHUB_PRIVATE_KEY",
   "FCR_REMOTE_MCP_READ_TOKEN",
+  "FCR_GMAIL_EXPECTED_EMAIL",
+  "FCR_GMAIL_FROM_EMAIL",
+  "FCR_GMAIL_INBOX_LABEL_ID",
+  "FCR_GMAIL_INBOX_PROJECT_SLUG",
+  "FCR_GMAIL_ACCESS_TOKEN",
+  "FCR_GMAIL_REFRESH_TOKEN",
+  "FCR_GMAIL_CLIENT_ID",
+  "FCR_GMAIL_CLIENT_SECRET",
+  "FCR_GSC_OAUTH_JSON",
+  "FCR_EVIDENCE_GATEWAY_TOKEN",
   "FCR_SHOPIFY_WEBHOOK_SECRET",
   "FCR_COMMERCE_HASH_SALT",
   "FCR_CLOUDFLARE_MCP_READ_TOKEN",
-  "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
   "MODEL_API_KEY",
-  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
-  "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
   "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
   "N8N_FOUNDER_CONTENT_WEBHOOK_URL",

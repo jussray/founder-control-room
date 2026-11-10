@@ -123,7 +123,8 @@ test('renders Claude Cowork as a GitHub-grounded Council lane in the founder sta
   const appHtml = readFileSync(resolve(repoRoot, 'public/control-room/index.html'), 'utf8');
   const stackRouterSource = readFileSync(resolve(repoRoot, 'public/control-room/stack-router.js'), 'utf8')
     .replace("import { installMissionBoard } from './mission-board.js';", 'const installMissionBoard = () => {};')
-    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};');
+    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};')
+    .replace("import { installTruthConsole } from './truth-console.js';", 'const installTruthConsole = () => {};');
 
   await page.setContent(appHtml);
   await expect(page.locator('.launch-dock')).toBeHidden();
