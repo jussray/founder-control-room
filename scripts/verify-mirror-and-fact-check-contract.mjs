@@ -6,6 +6,7 @@ const files = {
   mirrorDocs: await readFile(new URL('../docs/MIRROR_ENGINE_V1.md', import.meta.url), 'utf8'),
   mirrorRoute: await readFile(new URL('../src/http/routes/mirror.ts', import.meta.url), 'utf8'),
   mirrorClient: await readFile(new URL('../src/mirror/openaiClient.ts', import.meta.url), 'utf8'),
+  structuredProvider: await readFile(new URL('../src/aiRuntime/structuredProvider.ts', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   claude: await readFile(new URL('../CLAUDE.md', import.meta.url), 'utf8'),
 };
@@ -56,9 +57,9 @@ for (const phrase of [
   'POST /mirror/run',
   'draft-only response',
   '`store: false`',
-  'strict JSON Schema Structured Outputs',
+  'provider-neutral structured-output runtime',
   'Fact Check Every Claim',
-  'Playwright is not required for the API-only V1 route',
+  'A real Playwright receipt is still required before any later UI/browser-flow claim or merge gate that requires browser proof.',
 ]) requireText('Mirror docs invariant', files.mirrorDocs, phrase);
 
 for (const phrase of [
@@ -70,11 +71,19 @@ for (const phrase of [
 
 for (const phrase of [
   'OPENAI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'runStructuredJson',
+  'MAX_RESPONSE_BYTES',
+  "storedByProvider: result.provider === 'openai' ? false : null",
+]) requireText('Mirror provider-adapter invariant', files.mirrorClient, phrase);
+
+for (const phrase of [
   'store: false',
   "type: 'json_schema'",
-  'MAX_RESPONSE_BYTES',
-  'storedByProvider: false',
-]) requireText('Mirror provider invariant', files.mirrorClient, phrase);
+  'DEFAULT_MAX_RESPONSE_BYTES',
+  'compileAnthropicStructuredSchema',
+  'output_config',
+]) requireText('shared structured-provider invariant', files.structuredProvider, phrase);
 
 requireText('AGENTS fact-check entry', files.agents, 'skills/fact-check-every-claim/SKILL.md');
 requireText('AGENTS portable approval entry', files.agents, 'docs/PORTABLE_FOUNDER_APPROVALS.md');
