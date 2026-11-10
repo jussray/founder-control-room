@@ -143,3 +143,31 @@ test('browser proof independently proves no Access interception, founder contain
   assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);
   assert.match(browserProof, /chromium\.launch/);
 });
+
+const cloudflareBridgeWorkflow = readFileSync('.github/workflows/fcr-cloudflare-bridge-contract.yml', 'utf8');
+
+test('Cloudflare Access boundary contract is triggered by direct source and proof dependencies', () => {
+  const pullRequestPaths = cloudflareBridgeWorkflow.split('\n  pull_request:')[1]?.split('\n  push:')[0] ?? '';
+  const pushPaths = cloudflareBridgeWorkflow.split('\n  push:')[1]?.split('\npermissions:')[0] ?? '';
+  const directDependencies = [
+    "scripts/fcr-stranger-front-door-contract.node-test.mjs",
+    "src/http/server.ts",
+    "src/http/routes/mcp.ts",
+    "src/http/routes/auth.ts",
+    "src/worker/founderSignalReviewEmail.ts",
+    "src/worker/cf-entry.ts",
+    "src/worker/bipChiefEvidenceIngress.ts",
+    "public/_worker.js",
+    ".github/workflows/prompt-workflow-router-runtime-proof.yml",
+    "e2e/builder-prompt-workflow-runtime.spec.ts",
+    "e2e/operator-relay-live.spec.ts"
+];
+  for (const [event, paths] of [['pull_request', pullRequestPaths], ['push', pushPaths]]) {
+    for (const dependency of directDependencies) {
+      assert.ok(
+        paths.includes(`      - '${dependency}'`),
+        `Cloudflare boundary contract must run on ${event} when ${dependency} changes`,
+      );
+    }
+  }
+});
