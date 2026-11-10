@@ -147,12 +147,71 @@ test('raw whitespace token is rejected instead of silently normalized', async ()
 
 test('browser-facing Access means apex or www public destinations, not private Worker destinations', () => {
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }), true);
-  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/api/founder/*` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}` }), true);
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `api.${FCR_PUBLIC_ZONE}/version` }), false);
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'worker', uri: 'founder-control-room' }), false);
   assert.equal(appHasBrowserFacingFcrDestination(mixedApp()), true);
   assert.equal(browserFacingDestinationCount(mixedApp()), 1);
   assert.deepEqual(matchingAccessReasons(mixedApp()), ['browser-public-destination', 'worker']);
+});
+
+function protectedOwnerPathsApp() {
+  return {
+    id: 'private-paths-1',
+    name: 'FCR protected owner paths',
+    type: 'self_hosted',
+    domain: `${FCR_PUBLIC_ZONE}/control-room`,
+    destinations: [
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/control-room` },
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/control-room/*` },
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` },
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin/*` },
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/api/founder` },
+      { type: 'public', uri: `${FCR_PUBLIC_ZONE}/api/founder/*` },
+    ],
+  };
+}
+
+test('private owner-path Access application is never a public-root recovery candidate', () => {
+  const app = protectedOwnerPathsApp();
+  assert.equal(appHasBrowserFacingFcrDestination(app), false);
+  assert.equal(browserFacingDestinationCount(app), 0);
+});
+
+test('inspect distinguishes public root from private owner-path Access, even with both present', async () => {
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({ applications: [protectedOwnerPathsApp(), mixedApp()] }),
+  });
+  assert.equal(receipt.matchingApplicationCount, 1);
+  assert.equal(receipt.browserAccessDestinationCount, 1);
+  assert.equal(receipt.action, 'would-detach-browser-access');
+  assert.equal(receipt.mutationPerformed, false);
+});
+
+test('apply touches public-root app only, preserves private owner-path Access and policies', async () => {
+  const requests = [];
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: adminEnv,
+    apply: true,
+    fetchImpl: fakeFetch({
+      applications: [protectedOwnerPathsApp(), mixedApp()],
+      policiesByApp: {
+        'mixed-1': [{ id: 'policy-root', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }],
+        'private-paths-1': [{ id: 'policy-private', decision: 'allow', include: [{ email: { email: 'founder@example.com' } }] }],
+      },
+      onRequest(request) { requests.push(request); },
+    }),
+  });
+  assert.equal(receipt.action, 'detached-browser-access');
+  const writes = requests.filter((request) => request.method === 'PUT');
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].url, /\\/access\\/apps\\/mixed-1$/);
+  assert.deepEqual(JSON.parse(writes[0].body).destinations, [{ type: 'worker', uri: 'founder-control-room' }]);
 });
 
 test('inspect reports clear when Access does not own the FCR browser doorway', async () => {
