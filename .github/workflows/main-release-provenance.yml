@@ -137,6 +137,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TERMINAL_RATIFIED_TIP: ${{ steps.provider.outputs.terminal_ratified_tip }}
+          CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+          MAIN_RELEASE_EVENT_NAME: ${{ github.event_name }}
+          MAIN_RELEASE_REF: ${{ github.ref }}
+          MAIN_RELEASE_ACTOR: ${{ github.actor }}
+          MAIN_RELEASE_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           export CURRENT_MAIN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"

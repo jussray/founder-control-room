@@ -12,8 +12,10 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-  TEST_DISCOVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+concurrency:
+  group: fcr-ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   typecheck:
@@ -21,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -30,11 +32,12 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Verify MCP boundaries
         run: npm run verify:mcp
       - name: Type check
@@ -45,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -54,11 +57,12 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Lint
         run: npm run lint
 
@@ -67,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -76,11 +80,12 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run tests
         run: npm test
         env:
@@ -92,7 +97,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -102,12 +107,13 @@ jobs:
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Install Chromium for Playwright harness
         shell: bash
@@ -122,12 +128,21 @@ jobs:
           NODE_ENV: test
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
 
+      - name: Run crawler and public-work browser proof
+        run: >-
+          npx playwright test -c playwright.config.ts
+          e2e/pages-api-recovery.spec.ts
+          e2e/public-work-directory.spec.ts
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -136,18 +151,24 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
+      - name: Install PyYAML for workflow YAML guard
+        run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+      - name: Verify every workflow file parses as YAML
+        run: python3 scripts/verify_workflow_yaml.py .
       - name: Run Python unit tests
-        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity -v
+        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt scripts.test_linkedin_analytics_continuity scripts.test_verify_workflow_yaml -v
+      - name: Run runtime-kernel receipt checker tests
+        run: python3 -m unittest discover -s systems/skills/local-runtime-kernel/scripts -p 'test_check_receipt.py' -v
 
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
       - name: Record and verify exact head
@@ -156,7 +177,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify every public migration table has reviewed RLS state
@@ -166,7 +187,7 @@ jobs:
           npm run verify:rls-contract 2>&1 | tee rls-contract-report.txt
       - name: Upload RLS contract report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: rls-contract-report
           path: rls-contract-report.txt
@@ -178,7 +199,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head with history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
@@ -187,16 +208,48 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "CI Documentation Truth base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "CI Documentation Truth base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'DOC_TRUTH_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify documentation truth
         run: node scripts/verify-documentation-truth.mjs
       - name: Upload documentation truth report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: documentation-truth-ci-${{ github.run_id }}
           path: artifacts/documentation-truth-report.json
@@ -209,7 +262,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
@@ -220,7 +273,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Verify Cloudflare bridge syntax and authority contracts
@@ -237,35 +290,151 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
       - name: Record and verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@v4
+      - name: Resolve exact live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            live_base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if ! [[ "$live_base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$live_base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "Test discovery base resolution failed: expected an exact live base SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$live_base_sha"
+          if ! git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"; then
+            echo "Test discovery base resolution failed: live base is not an ancestor of the exact candidate." >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            echo "candidate_sha=$EXPECTED_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          printf 'TEST_DISCOVERY_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          printf 'resolved_base_sha=%s\n' "$live_base_sha"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
       - name: Prove the discovery ratchet rejects baseline laundering
         run: node --test scripts/verify-test-discovery.node-test.mjs
+      - name: Enforce CI performance regression contracts
+        run: |
+          node --test test/ci-performance-contract.node-test.mjs
+          node --test test/ci-migration-scope.node-test.mjs
       - name: Verify no test is excluded from default discovery without base-bound debt
         run: npm run verify:test-discovery
 
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - name: Check out exact candidate with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact candidate and resolve live base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test -n "$BASE_REF"
+            git check-ref-format "refs/heads/${BASE_REF}"
+            base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+          fi
+          if ! [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo 'Migration lint base resolution failed closed: missing live base SHA.' >&2
+            exit 1
+          fi
+          git fetch --no-tags origin "$base_sha"
+          git merge-base --is-ancestor "$base_sha" "$EXPECTED_HEAD_SHA" || {
+            echo 'Migration lint blocked: live base is not ancestor of exact head.' >&2
+            exit 1
+          }
+          printf 'MIGRATION_BASE_SHA=%s\n' "$base_sha" >> "$GITHUB_ENV"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Classify exact-head Supabase changes
+        id: scope
+        run: node scripts/ci-migration-scope.mjs
+
+      - name: Require an explicit fail-closed schema scope decision
+        shell: bash
+        env:
+          SCHEMA_SCOPE: ${{ steps.scope.outputs.execute }}
+        run: |
+          set -euo pipefail
+          case "$SCHEMA_SCOPE" in
+            true|false) ;;
+            *)
+              echo 'Migration scope verifier did not produce true or false; refusing implicit success.' >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Set up Supabase CLI for changed schema
+        if: steps.scope.outputs.execute == 'true'
+        uses: supabase/setup-cli@v1
         with:
           version: 2.101.0
-      - name: Lint migrations
-        run: supabase db lint --local
-        continue-on-error: true
+
+      - name: Initialize isolated local project when absent
+        if: steps.scope.outputs.execute == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+
+      - name: Start local Supabase and apply checked migrations
+        if: steps.scope.outputs.execute == 'true'
+        run: supabase start
+
+      - name: Fail on local schema lint errors
+        if: steps.scope.outputs.execute == 'true'
+        run: supabase db lint --local --fail-on error
+
+      - name: Explicitly record non-applicability
+        if: steps.scope.outputs.execute == 'false'
+        run: |
+          echo 'NOT_APPLICABLE: exact-head change does not modify the Supabase schema or migrations.'
 
   required-gate:
     name: Required Gate
@@ -280,6 +449,7 @@ jobs:
       - test-discovery
       - documentation-truth
       - cloudflare-bridge-authority
+      - migration-lint
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -294,9 +464,10 @@ jobs:
           DISCOVERY_RESULT: ${{ needs.test-discovery.result }}
           DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
           CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
+          MIGRATION_RESULT: ${{ needs.migration-lint.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\nmigration=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
@@ -305,7 +476,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$MIGRATION_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -316,7 +488,8 @@ jobs:
             "$RLS_RESULT" \
             "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
-            "$CLOUDFLARE_AUTHORITY_RESULT"; do
+            "$CLOUDFLARE_AUTHORITY_RESULT" \
+            "$MIGRATION_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
