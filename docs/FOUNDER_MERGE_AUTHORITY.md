@@ -82,7 +82,8 @@ For `jussray/founder-control-room` the canonical path requires, at minimum:
 - an authenticated founder-final receipt bound to the exact PR number, base SHA, head SHA, founder identity, and approval time;
 - the founder-final receipt to remain fresh inside the merge proof window;
 - the provider PR identity and diff to be re-read after approval;
-- the mutable head to be re-read immediately before provider integration; and
+- the mutable head to be re-read immediately before provider integration;
+- the live base ref to be re-resolved immediately before provider integration and to equal the pinned reviewed base SHA, failing closed with `Base moved after verification` (HTTP 409) if `main` advanced after review; and
 - the founder-final policy presented to the evaluator to match the server-owned deterministic founder-final policy.
 
 The canonical founder-final policy is intentionally narrow:

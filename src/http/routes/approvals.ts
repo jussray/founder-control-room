@@ -885,12 +885,14 @@ approvalsRouter.post(
 
         let independentReviewEvidence: Record<string, unknown> | null = null;
         let founderFinalReviewEvidence: Record<string, unknown> | null = null;
+        let reviewedBaseSha: string | null = null;
         if (isFounderControlRoomRepository(projectRow)) {
           const pinnedResult = readPinnedIndependentReview(mission.policy_snapshot?.independentReview);
           if (!pinnedResult.ok) {
             throw new Error(`Independent review gate blocked: ${pinnedResult.error}`);
           }
           const pinned = pinnedResult.review;
+          reviewedBaseSha = pinned.baseSha;
           const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
 
           if (typeof provider.getPullRequestReviewContext !== 'function') {
@@ -978,8 +980,21 @@ approvalsRouter.post(
         }
 
         // This is deliberately after review/founder-final validation. Provider
-        // reads may take time; the mutable head must still equal the approved
-        // SHA at the last possible moment before integration.
+        // reads may take time; the mutable head and, for FCR, the mutable base
+        // must still equal the reviewed candidate at the last possible moment
+        // before integration. Otherwise the merge lands on a base nobody reviewed.
+        if (isFounderControlRoomRepository(projectRow)) {
+          if (!reviewedBaseSha) {
+            throw new Error('Independent review gate blocked: reviewed base SHA is unavailable before integration');
+          }
+          const currentBaseSha = await provider.resolveRef(project.slug, base);
+          if (lower(currentBaseSha) !== reviewedBaseSha) {
+            throw new Error(
+              `Base moved after verification: current ${currentBaseSha}, reviewed ${reviewedBaseSha}.`,
+            );
+          }
+        }
+
         const currentHeadSha = await provider.resolveRef(project.slug, head);
         if (currentHeadSha !== expectedHeadSha) {
           throw new Error(
