@@ -1,0 +1,42 @@
+name: PR Hygiene
+
+# Keeps open drafts and PRs from piling up. Policy lives in scripts/pr-hygiene.mjs:
+# idle drafts are labelled `stale` and closed after a grace period (reversible,
+# branches kept); idle ready PRs are only labelled, never closed; `keep-open`
+# exempts any PR.
+
+on:
+  schedule:
+    - cron: '17 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only print the planned actions'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-hygiene
+  cancel-in-progress: false
+
+jobs:
+  hygiene:
+    name: PR hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Apply PR hygiene policy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_HYGIENE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+        run: node scripts/pr-hygiene.mjs
