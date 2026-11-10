@@ -9,7 +9,8 @@
     "publishing",
     "merge-authority",
     "workflow-authority",
-    "truth-governance"
+    "truth-governance",
+    "founder-permission-authority"
   ],
   "changes": [
     {
@@ -372,7 +373,7 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
@@ -598,6 +599,19 @@
       "path": "src/governance/portfolioGovernanceProfiles.ts",
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+      ]
+    },
+    {
+      "path": "src/lib/founderPermissionBroker.ts",
+      "claims": [
+        "`src/lib/founderPermissionBroker.ts` must accept an `apply_learning_cross_domain` proposal only with an exact `learning_application` actionTarget whose lesson, downstream mission and outcome ids are UUIDs, whose `targetHeadSha` is a full SHA equal to the proposal's expectedHeadSha, whose target domain is a bounded slug and whose cross-domain reason is 12-600 characters; it must reject any other shape fail closed.",
+        "`src/lib/founderPermissionBroker.ts` must accept a `retire_learning` proposal only with an exact `learning_retirement` actionTarget that binds a UUID lesson id to a full `originHeadSha` equal to the proposal's expectedHeadSha. A validated learning target never grants founder approval, merge, deploy or execution authority on its own."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderPermissions.ts",
+      "claims": [
+        "`src/http/routes/founderPermissions.ts` must only translate `learning_application` and `learning_retirement` request bodies into typed actionTargets for the broker; it must not validate, approve or execute them, and every other unknown target type still parses to null so the broker rejects it fail closed."
       ]
     }
   ]
