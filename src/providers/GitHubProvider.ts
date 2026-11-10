@@ -20,7 +20,7 @@ import type {
 
 const FCR_CODE_SCANNING_TOOL = "CodeQL";
 const FCR_CODE_SCANNING_SECURITY_THRESHOLD = "high_or_higher";
-const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "errors";
+const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "all";
 const FCR_REVIEW_OWNED_RULE_TYPES = new Set([
   "pull_request",
   "required_status_checks",
@@ -36,6 +36,8 @@ const FCR_REVIEW_PRESERVABLE_RULE_TYPES = new Set([
   "required_linear_history",
   "code_quality",
   "copilot_code_review",
+  // Keep signed-commit enforcement already active in the provider ruleset.
+  "required_signatures",
 ]);
 
 export interface GitHubProviderConfig {
