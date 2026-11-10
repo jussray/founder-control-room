@@ -55,7 +55,9 @@ jobs:
 
   observe:
     name: Audit accessible installation repositories (read-only)
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: regression
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -69,6 +71,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+      - name: Verify trusted main immediately before token mint
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$current_main" = "$actual"
+          echo "PORTFOLIO_AUDIT_SOURCE_SHA=$actual" >> "$GITHUB_ENV"
       - name: Mint read-only portfolio installation token
         env:
           APP_ID: ${{ secrets.APP_ID }}
@@ -92,9 +104,29 @@ jobs:
         shell: bash
         run: |
           if test ! -s artifacts/portfolio-actions-audit/receipt.json; then
-            mkdir -p artifacts/portfolio-actions-audit
-            node -e "require('node:fs').writeFileSync('artifacts/portfolio-actions-audit/receipt.json',JSON.stringify({schema:'fcr/portfolio-actions-audit@v1',state:'BLOCKED',reason:'AUDIT_DID_NOT_PRODUCE_RECEIPT',operationVerified:false,productionVerified:false,mutationAuthorized:false},null,2)+'\n')"
+            node scripts/portfolio-actions-audit.mjs --blocked-receipt || test -s artifacts/portfolio-actions-audit/receipt.json
           fi
+      - name: Present the next non-authorizing audit task
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const receipt = JSON.parse(readFileSync('artifacts/portfolio-actions-audit/receipt.json', 'utf8'));
+          const action = receipt.nextAction;
+          const safe = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]+$/.test(value) ? value : 'UNKNOWN';
+          const lines = [
+            '## Portfolio audit handoff',
+            '',
+            '- State: ' + safe(receipt.state),
+            '- Next action: ' + safe(action?.action),
+            '- Next owner: ' + safe(action?.owner),
+            '- Source/run bindings: recorded in the attached receipt; revalidate before use.',
+            '- This audit observes default-branch Actions only; it does not prove Cloudflare, production, or unmerged repair branches.',
+            '- Audit evidence and next-task proposals grant no execution authority.',
+          ];
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
       - name: Upload safe summary artifact, including failure or incomplete coverage
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
