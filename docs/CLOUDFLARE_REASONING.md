@@ -6,6 +6,11 @@ The FCR Shopify offer `founder-proof-audit` has a Shopify-declared product path 
 
 The page provides honest offer scope and an inquiry CTA, never an unverified payment or delivery claim. A separate FCR Shopify draft theme corrects the wrong-store redirect to `www.foundercontrolroom.org`, but remains unpublished. A GitHub commit or passing source check does not show that Cloudflare Pages deployed this file, public DNS resolves to the intended runtime, a customer reached the page, or checkout belongs to FCR. Preserve the old Pages deployment and static path map for authorized rollback.
 
+## November 7, 2026 — candidate Gmail AI Inbox read boundary
+
+PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
+
+Only an exact-head authorized release, Cloudflare Worker binding/source readback, Google consent/scope and account verification, and founder-only runtime request can substantiate operational Gmail metadata reads. AI reply drafts, multi-account connection, scheduled synchronization, automated outreach, dispatch and revenue results are not established by this PR; the existing one-reply approval gate remains independent. See [Gmail AI Inbox runtime](GMAIL_AI_INBOX_RUNTIME.md).
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 

@@ -344,7 +344,7 @@ Merge only when:
 - rollback is understood; and
 - the PR does not mix unrelated risky work.
 
-Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness.
+Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness. Last-moment freshness covers both refs: FCR re-resolves the live base and the mutable head immediately before provider integration, and a base that moved after review fails closed with `Base moved after verification`.
 
 FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
 
@@ -412,6 +412,8 @@ Next founder gate:
 ## Load-bearing regression execution
 
 A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For runtime-kernel receipts, `.github/workflows/ci.yml` must keep the `test_check_receipt.py` discovery step inside the load-bearing `python-tests` job. A kernel receipt must prove prospective authority before PERMIT, and a receipt whose executor or verifier is a status word (`UNKNOWN`, `CANDIDATE`, `PROVEN`) is a violation rather than a verified actor. A passing checker run is evidence for receipt consistency only and never substitutes for founder approval or provider readback.
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
 
