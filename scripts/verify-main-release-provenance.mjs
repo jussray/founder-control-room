@@ -47,6 +47,7 @@ export function classifyReviewedFirstParentSuccessors({
   terminalRatifiedTip,
   targetSha,
   successorCommits,
+  directTargetProvenance = null,
 }) {
   const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
   const target = String(targetSha || '').trim().toLowerCase();
@@ -81,6 +82,14 @@ export function classifyReviewedFirstParentSuccessors({
       return { ok: false, reason: 'successor_pr_provenance_unavailable', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
     }
     if (matches.length === 0) {
+      if (sha === target && directTargetProvenance?.ok === true) {
+        successors.push({ sha, provenance: 'owner_direct_main_push', directMainActor: directTargetProvenance.directMainActor });
+        continue;
+      }
+      if (successor?.trustedRun?.ok === true && successor.trustedRun.targetSha === sha) {
+        successors.push({ sha, provenance: 'trusted_direct_main_run', workflowRunId: successor.trustedRun.workflowRunId });
+        continue;
+      }
       return { ok: false, reason: 'unreviewed_first_parent_successor', terminalRatifiedTip: terminal, targetSha: target, successorSha: sha };
     }
     if (matches.length !== 1) {
@@ -182,10 +191,22 @@ export function classifyMainReleaseProvenance({
     };
   }
 
-  // Terminal-ratified mode admits only PR-reviewed first-parent successors.
-  // Founder direct-push admission applies only when no terminal tip is configured.
+  // Terminal-ratified mode: an owner direct-push tip is admitted only when every
+  // first-parent successor after the terminal tip is PR-reviewed or carries its own
+  // exact-head trusted run. The ratified terminal commit is never re-admitted by push context.
   if (terminalRatifiedTip !== null) {
-    return { ok: false, reason: 'direct_or_unproven_main_commit', targetSha: target };
+    const direct = ownerDirectMainProvenance(directMainContext);
+    if (!direct || normalized(terminalRatifiedTip).toLowerCase() === target) {
+      return { ok: false, reason: 'direct_or_unproven_main_commit', targetSha: target };
+    }
+    const successorChain = classifyReviewedFirstParentSuccessors({
+      terminalRatifiedTip,
+      targetSha: target,
+      successorCommits,
+      directTargetProvenance: direct,
+    });
+    if (!successorChain.ok) return successorChain;
+    return { ...direct, targetSha: target, successorChain };
   }
 
   const direct = ownerDirectMainProvenance(directMainContext);
