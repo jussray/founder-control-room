@@ -147,7 +147,12 @@ test('raw whitespace token is rejected instead of silently normalized', async ()
 
 test('browser-facing Access means apex or www public destinations, not private Worker destinations', () => {
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }), true);
-  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: FCR_PUBLIC_ZONE }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/*` }), true);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `www.${FCR_PUBLIC_ZONE}/control-room/*` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/admin` }), false);
+  assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/api/founder/*` }), false);
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'public', uri: `api.${FCR_PUBLIC_ZONE}/version` }), false);
   assert.equal(isBrowserFacingFcrPublicDestination({ type: 'worker', uri: 'founder-control-room' }), false);
   assert.equal(appHasBrowserFacingFcrDestination(mixedApp()), true);
@@ -155,6 +160,51 @@ test('browser-facing Access means apex or www public destinations, not private W
   assert.deepEqual(matchingAccessReasons(mixedApp()), ['browser-public-destination', 'worker']);
 });
 
+test('owner path Access does not block root-scope inspection or get detached in a bounded apply', async () => {
+  const ownerPaths = {
+    id: 'owner-paths',
+    name: 'FCR protected owner paths',
+    type: 'self_hosted',
+    domain: `${FCR_PUBLIC_ZONE}/control-room`,
+    destinations: [
+      'control-room', 'control-room/*', 'admin', 'admin/*',
+      'api/founder', 'api/founder/*',
+    ].map((path) => ({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/${path}` })),
+  };
+  assert.equal(appHasBrowserFacingFcrDestination(ownerPaths), false);
+  assert.equal(browserFacingDestinationCount(ownerPaths), 0);
+
+  const inspected = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({ applications: [ownerPaths, mixedApp()] }),
+  });
+  assert.equal(inspected.state, 'attention');
+  assert.equal(inspected.matchingApplicationCount, 1);
+  assert.equal(inspected.browserAccessDestinationCount, 1);
+  assert.equal(inspected.mutationPerformed, false);
+
+  const puts = [];
+  const applied = await reconcileFcrPublicAccessZone({
+    env: adminEnv,
+    apply: true,
+    fetchImpl: fakeFetch({
+      applications: [ownerPaths, mixedApp()],
+      policiesByApp: { 'mixed-1': [] },
+      onRequest(request) {
+        if (request.method === 'PUT') puts.push(request);
+      },
+    }),
+  });
+  assert.equal(applied.state, 'mutated-needs-browser-proof');
+  assert.equal(applied.matchingApplicationCount, 0);
+  assert.equal(puts.length, 1);
+  assert.match(puts[0].url, /\/access\/apps\/mixed-1$/);
+  assert.deepEqual(JSON.parse(puts[0].body).destinations, [{ type: 'worker', uri: 'founder-control-room' }]);
+  assert.deepEqual(ownerPaths.destinations, [
+    'control-room', 'control-room/*', 'admin', 'admin/*',
+    'api/founder', 'api/founder/*',
+  ].map((path) => ({ type: 'public', uri: `${FCR_PUBLIC_ZONE}/${path}` })));
+});
 test('inspect reports clear when Access does not own the FCR browser doorway', async () => {
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,

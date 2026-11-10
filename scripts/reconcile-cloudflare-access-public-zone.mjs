@@ -44,7 +44,10 @@ function browserHosts(zone = FCR_PUBLIC_ZONE) {
 
 export function isBrowserFacingFcrPublicDestination(destination, zone = FCR_PUBLIC_ZONE) {
   if (destinationType(destination) !== 'public') return false;
-  return browserHosts(zone).has(publicHost(destination?.uri || destination?.hostname));
+  const normalized = normalizePublicUri(destination?.uri || destination?.hostname);
+  const host = publicHost(normalized);
+  // Protected owner subpaths are not the public apex. Never detach them as root-doorway destinations.
+  return browserHosts(zone).has(host) && (normalized === host || normalized === `${host}/*`);
 }
 
 export function appHasBrowserFacingFcrDestination(application, zone = FCR_PUBLIC_ZONE) {
