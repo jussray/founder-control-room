@@ -44,7 +44,11 @@ function browserHosts(zone = FCR_PUBLIC_ZONE) {
 
 export function isBrowserFacingFcrPublicDestination(destination, zone = FCR_PUBLIC_ZONE) {
   if (destinationType(destination) !== 'public') return false;
-  return browserHosts(zone).has(publicHost(destination?.uri || destination?.hostname));
+  const uri = normalizePublicUri(destination?.uri || destination?.hostname);
+  const host = publicHost(uri);
+  if (!browserHosts(zone).has(host)) return false;
+  // Only the homepage/wildcard can be detached. Private owner paths stay Access-protected.
+  return uri === host || uri === `${host}/*`;
 }
 
 export function appHasBrowserFacingFcrDestination(application, zone = FCR_PUBLIC_ZONE) {
