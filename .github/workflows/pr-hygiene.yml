@@ -6,6 +6,12 @@ name: PR Hygiene
 # exempts any PR.
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/pr-hygiene.yml'
+      - 'scripts/pr-hygiene.mjs'
+      - 'tests/pr-hygiene.test.mjs'
   schedule:
     - cron: '17 14 * * 1'
   workflow_dispatch:
@@ -17,16 +23,33 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 concurrency:
   group: pr-hygiene
   cancel-in-progress: false
 
 jobs:
+  policy-test:
+    name: PR hygiene policy test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Test PR hygiene policy
+        run: node --test tests/pr-hygiene.test.mjs
+
   hygiene:
     name: PR hygiene
+    if: github.event_name != 'pull_request'
+    needs: policy-test
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
