@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLedger, auditLedger, auditAllCommits } from './ci-history-audit.mjs';
+import { parseLedger, auditLedger, auditAllCommits, classifyHistoricalCoverage } from './ci-history-audit.mjs';
 
 const sha = 'a'.repeat(40);
 const run = { id: 123, name: 'CI', head_sha: sha, conclusion: 'failure' };
@@ -39,4 +39,39 @@ test('audits each PR commit independently and reports missing history', () => {
   assert.equal(result.report.length, 2);
   assert.ok(result.errors.some(e => e.includes('MISSING Other run 999')));
   assert.equal(result.report[0].failures, 1);
+});
+
+test('late predecessor cancellations remain explicit incomplete evidence, without recursive CI failure', () => {
+  const missing = '75f4454880a0 MISSING Playwright E2E run 42441738210 (cancelled)';
+  const failure = '298b01781289 MISSING Historical CI Accountability run 42441917581 (failure)';
+  const result = classifyHistoricalCoverage([missing, failure]);
+  assert.equal(result.state, 'INCOMPLETE_HISTORICAL_COVERAGE');
+  assert.equal(result.complete, false);
+  assert.deepEqual(result.unrecorded, [missing, failure]);
+  assert.deepEqual(result.integrityErrors, []);
+  assert.equal(result.authorizesMerge, false);
+  assert.equal(result.authorizesDeployment, false);
+});
+test('fabricated or contradicted recorded evidence remains a hard failure', () => {
+  const missing = '75f4454880a0 MISSING CI run 42441738160 (cancelled)';
+  const mismatch = '75f4454880a0 OUTCOME_MISMATCH 42441738160';
+  const forged = '75f4454880a0 UNVERIFIED_RUN 999999';
+  const result = classifyHistoricalCoverage([missing, mismatch, forged]);
+  assert.equal(result.state, 'INVALID_EVIDENCE');
+  assert.deepEqual(result.integrityErrors, [mismatch, forged]);
+  assert.deepEqual(result.unrecorded, [missing]);
+  assert.equal(result.complete, false);
+});
+test('only exact missing-conclusion format qualifies for deferred observation', () => {
+  const bad = ['SHA MISSING broken', 'SHA MISSING CI run 0 (failure)', 'SHA MISSING CI run 42 (success)'];
+  const result = classifyHistoricalCoverage(bad);
+  assert.equal(result.state, 'INVALID_EVIDENCE');
+  assert.deepEqual(result.integrityErrors, bad);
+});
+test('a fully verified historical snapshot is reconciled but never a release grant', () => {
+  const r = classifyHistoricalCoverage([]);
+  assert.equal(r.state, 'RECONCILED_SNAPSHOT');
+  assert.equal(r.complete, true);
+  assert.equal(r.authorizesMerge, false);
+  assert.equal(r.authorizesDeployment, false);
 });
