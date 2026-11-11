@@ -10,6 +10,7 @@ Before material repository or control-room work, read and inherit:
 4. `.control-room/COUNCIL.md`
 5. `docs/AI_CHANGE_GENEALOGY_CONTRACT.md`
 6. `docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md`
+7. `skills/outcome-first/SKILL.md` — scoped outcomes, proportional verification and stop rules; not additional authority
 
 For repository audits, start with the governed recent-change window: authoritative repository/default branch and current exact head, ten recent PRs by default, comments and bounded diff evidence, every commit identity in those PRs, recent default-branch commits and provider-proven PR associations, then expand only where the causal chain demands it.
 

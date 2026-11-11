@@ -1,5 +1,22 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
+## Cloudflare Logpush workflow secrets
+
+These names are used only by the founder-gated Logpush workflow. Values must remain in GitHub/Cloudflare secret planes and must never be committed, printed, or copied into documentation.
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_LOGPUSH_READ_TOKEN` | Dedicated Cloudflare credential for non-mutating Logpush job inspection. |
+| `CLOUDFLARE_LOGPUSH_WRITE_TOKEN` | Separate Cloudflare credential allowed to create/update the bounded Logpush job during an approved manual apply. |
+| `CLOUDFLARE_LOGPUSH_DESTINATION_CONF` | Provider-held destination configuration for the Logpush job; treat the entire value as secret because it may contain endpoint credentials. |
+
+`CLOUDFLARE_ACCOUNT_ID` remains the account selector. Secret-name documentation proves only the expected binding names; it does not prove a value is configured, valid, authorized, or currently present in GitHub or Cloudflare.
+
 This repository has three separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
@@ -281,12 +298,17 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
+| `SPRITES_TOKEN` | `bip-sprite-founder-dispatch.yml` | Required only for an explicitly founder-approved `execute=true` read-only proof mission on the fixed existing Se’kret Bip Sprite. Not needed for dry-run contract validation. Keep the bearer server-side; never log or expose it. This credential grants no FCR merge, deployment, or user-data access authority. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Provider credential used only by the bounded Claude second-pass repair job in the protected `production` environment. Its presence authorizes no merge, deployment, provider mutation, or publication, and its value must never appear in logs, artifacts, source, or chat. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
 | `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` | Dedicated short-lived Supabase OAuth access token for the canonical `POST /mcp` operator-relay witness. It must carry the configured MCP audience, an allowed `client_id`, `mcp:read`, at least one allowed `mcp_projects` grant, and a current founder identity. Do not reuse the founder browser bearer, static `/mcp/read` token, provider API key, deploy token, or service-role credential. Never log or expose the token value in artifacts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
+| `FCR_JIRA_AUTOMATION_INGRESS_TOKEN` | `jira-work-automation-live-probe.yml` | Required bearer credential for the bounded FCR Jira automation ingress. Never log or expose the value. |
+| `FCR_JIRA_AUTOMATION_INGRESS_URL` | `jira-work-automation-live-probe.yml` | Required HTTPS URL for the exact `/ingest/jira-work-automation` production route; name presence does not prove reachability. |
+| `JIRA_AUTOMATION_PROBE_ISSUE_KEY` | `jira-work-automation-live-probe.yml` | Protected identifier for the dedicated Jira control issue. It constrains the probe target and is not authority to select arbitrary issues. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
