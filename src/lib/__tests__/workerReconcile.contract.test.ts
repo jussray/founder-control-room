@@ -20,6 +20,10 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('The repository Actions secret is a valid source');
+    expect(workflow).toContain('this error does not establish secret scope');
+    expect(workflow).toContain('only if one is configured');
+    expect(workflow).toContain('do not silently trim, rotate, expose, or bypass validation');
     expect(workflow).toContain('without a Bearer prefix');
     expect(workflow).toContain('without a NAME=value wrapper');
     expect(workflow).toContain('without wrapping quotes');
@@ -44,9 +48,11 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(preflightStep).toContain('npx --yes wrangler@4.110.0 secret list');
     expect(preflightStep).toContain('--config wrangler.worker.toml');
     expect(preflightStep).toContain('--format json');
-    expect(preflightStep).toContain("config.get('secrets', {}).get('required', [])");
+    expect(preflightStep).toContain("config.get('secrets', {}).get('required')");
     expect(preflightStep).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
-    expect(preflightStep).toContain('missing = sorted(required - workflow_written - present)');
+    // Main computes `required = set(names) - workflow_written` before the diff.
+    expect(preflightStep).toContain('required = set(names) - workflow_written');
+    expect(preflightStep).toContain('missing = sorted(required - present)');
     expect(preflightStep).toContain('sys.exit(1)');
     expect(preflightStep).not.toContain('wrangler secret get');
     expect(preflightStep).not.toContain('wrangler secret put');
