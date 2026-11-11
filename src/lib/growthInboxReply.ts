@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import type { AiInboxMessage } from './aiInboxRouting.js';
 
 export type GrowthInboxReplyChannel = 'email' | 'whatsapp';
 
@@ -39,6 +40,37 @@ export interface GmailReplyResult {
   sender: string;
 }
 
+export interface GmailInboxReadStatus {
+  contract: 'fcr/gmail-inbox-read@v1';
+  mode: 'observe_only';
+  configured: boolean;
+  expectedAccount: string | null;
+  projectSlug: string | null;
+  labelId: string | null;
+  missing: string[];
+}
+
+export interface GmailInboxProbeResult {
+  contract: 'fcr/gmail-inbox-probe@v1';
+  mode: 'observe_only';
+  providerObserved: true;
+  accountId: string;
+  projectSlug: string;
+  labelId: string;
+}
+
+export interface GmailInboxReadResult {
+  accountId: string;
+  projectSlug: string;
+  messages: AiInboxMessage[];
+  nextPageToken: string | null;
+}
+
+export interface GmailInboxReadOptions {
+  maxResults?: number;
+  pageToken?: string;
+}
+
 export interface WhatsAppReplyInput {
   recipientWaId: string;
   replyToMessageId: string;
@@ -59,6 +91,8 @@ type GmailMessage = {
   id?: unknown;
   threadId?: unknown;
   payload?: { headers?: GmailHeader[] };
+  internalDate?: unknown;
+  labelIds?: unknown;
 };
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -119,6 +153,39 @@ function configuredGmailMissing(): string[] {
     missing.push('FCR_GMAIL_ACCESS_TOKEN or refresh-token OAuth secret set');
   }
   return missing;
+}
+
+const SAFE_GMAIL_LABEL = /^Label_[A-Za-z0-9_-]{1,128}$/;
+const SAFE_PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{1,126}$/;
+const SAFE_PAGE_TOKEN = /^[A-Za-z0-9_+=/-]{1,512}$/;
+
+function configuredGmailReadMissing(): string[] {
+  const missing: string[] = [];
+  const expected = env('FCR_GMAIL_EXPECTED_EMAIL');
+  if (!expected || emailFromHeader(expected) !== expected.toLowerCase()) missing.push('FCR_GMAIL_EXPECTED_EMAIL');
+  const label = env('FCR_GMAIL_INBOX_LABEL_ID');
+  if (!label || !SAFE_GMAIL_LABEL.test(label)) missing.push('FCR_GMAIL_INBOX_LABEL_ID');
+  const project = env('FCR_GMAIL_INBOX_PROJECT_SLUG');
+  if (!project || !SAFE_PROJECT_SLUG.test(project)) missing.push('FCR_GMAIL_INBOX_PROJECT_SLUG');
+  const refreshReady = Boolean(env('FCR_GMAIL_REFRESH_TOKEN') && env('FCR_GMAIL_CLIENT_ID') && env('FCR_GMAIL_CLIENT_SECRET'));
+  if (!env('FCR_GMAIL_ACCESS_TOKEN') && !refreshReady) {
+    missing.push('FCR_GMAIL_ACCESS_TOKEN or refresh-token OAuth secret set');
+  }
+  return missing;
+}
+
+/** Reports configuration presence, not a successful OAuth scope or provider read. */
+export function gmailInboxReadStatus(): GmailInboxReadStatus {
+  const missing = configuredGmailReadMissing();
+  return {
+    contract: 'fcr/gmail-inbox-read@v1',
+    mode: 'observe_only',
+    configured: missing.length === 0,
+    expectedAccount: env('FCR_GMAIL_EXPECTED_EMAIL')?.toLowerCase() ?? null,
+    projectSlug: env('FCR_GMAIL_INBOX_PROJECT_SLUG'),
+    labelId: env('FCR_GMAIL_INBOX_LABEL_ID'),
+    missing,
+  };
 }
 
 function configuredWhatsAppMissing(): string[] {
@@ -227,6 +294,125 @@ async function gmailJson(
   return payload;
 }
 
+/**
+ * A founder-triggered read of header metadata only, restricted to one explicitly
+ * pinned account, project and custom business label. Never reads message bodies.
+ */
+/** Checks pinned mailbox and custom label; does not read any messages. */
+export async function probeGmailInbox(
+  fetchImpl: FetchLike = fetch,
+): Promise<GmailInboxProbeResult> {
+  const status = gmailInboxReadStatus();
+  if (!status.configured || !status.expectedAccount || !status.projectSlug || !status.labelId) {
+    throw new Error('GMAIL_INBOX_NOT_CONFIGURED');
+  }
+  const token = await gmailAccessToken(fetchImpl);
+  const profile = await gmailJson(fetchImpl, token, GMAIL_API + '/profile');
+  const account = typeof profile.emailAddress === 'string'
+    ? profile.emailAddress.trim().toLowerCase()
+    : '';
+  if (account !== status.expectedAccount) throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+  const label = await gmailJson(
+    fetchImpl, token, GMAIL_API + '/labels/' + encodeURIComponent(status.labelId),
+  );
+  if (label.id !== status.labelId || label.type !== 'user') {
+    throw new Error('GMAIL_INBOX_LABEL_SCOPE_MISMATCH');
+  }
+  return {
+    contract: 'fcr/gmail-inbox-probe@v1',
+    mode: 'observe_only',
+    providerObserved: true,
+    accountId: account,
+    projectSlug: status.projectSlug,
+    labelId: status.labelId,
+  };
+}
+
+export async function readGmailInbox(
+  options: GmailInboxReadOptions = {},
+  fetchImpl: FetchLike = fetch,
+): Promise<GmailInboxReadResult> {
+  const status = gmailInboxReadStatus();
+  if (!status.configured || !status.expectedAccount || !status.projectSlug || !status.labelId) {
+    throw new Error('GMAIL_INBOX_NOT_CONFIGURED');
+  }
+  const maxResults = options.maxResults ?? 15;
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 25) {
+    throw new Error('GMAIL_INBOX_LIMIT_INVALID');
+  }
+  if (options.pageToken && !SAFE_PAGE_TOKEN.test(options.pageToken)) {
+    throw new Error('GMAIL_INBOX_PAGE_TOKEN_INVALID');
+  }
+  const token = await gmailAccessToken(fetchImpl);
+  const profile = await gmailJson(fetchImpl, token, GMAIL_API + '/profile');
+  const account = typeof profile.emailAddress === 'string' ? profile.emailAddress.trim().toLowerCase() : '';
+  if (account !== status.expectedAccount) throw new Error('GMAIL_ACCOUNT_FINGERPRINT_MISMATCH');
+
+  const listParams = new URLSearchParams({ maxResults: String(maxResults) });
+  listParams.append('labelIds', 'INBOX');
+  listParams.append('labelIds', status.labelId);
+  if (options.pageToken) listParams.set('pageToken', options.pageToken);
+  const listing = await gmailJson(fetchImpl, token, GMAIL_API + '/messages?' + listParams.toString());
+  if (listing.messages !== undefined && !Array.isArray(listing.messages)) throw new Error('GMAIL_INBOX_LIST_INVALID');
+  const rows: unknown[] = Array.isArray(listing.messages) ? listing.messages : [];
+  if (rows.length > maxResults) throw new Error('GMAIL_INBOX_LIST_INVALID');
+
+  const messages: AiInboxMessage[] = [];
+  const seen = new Set<string>();
+  for (const rawRow of rows) {
+    const row = rawRow && typeof rawRow === 'object' ? rawRow as Record<string, unknown> : {};
+    const id = typeof row.id === 'string' ? row.id : '';
+    const listedThread = typeof row.threadId === 'string' ? row.threadId : '';
+    if (!SAFE_GMAIL_ID.test(id) || !SAFE_GMAIL_ID.test(listedThread)) {
+      throw new Error('GMAIL_INBOX_MESSAGE_ID_INVALID');
+    }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const metadataParams = new URLSearchParams({ format: 'metadata' });
+    for (const name of ['From', 'Subject', 'In-Reply-To', 'References', 'Auto-Submitted', 'Precedence']) {
+      metadataParams.append('metadataHeaders', name);
+    }
+    const metadata = await gmailJson(
+      fetchImpl, token, GMAIL_API + '/messages/' + encodeURIComponent(id) + '?' + metadataParams.toString(),
+    ) as GmailMessage;
+    if (metadata.id !== id || metadata.threadId !== listedThread) {
+      throw new Error('GMAIL_INBOX_MESSAGE_MISMATCH');
+    }
+    if (!Array.isArray(metadata.labelIds) || !metadata.labelIds.includes(status.labelId) || !metadata.labelIds.includes('INBOX')) {
+      throw new Error('GMAIL_INBOX_LABEL_SCOPE_MISMATCH');
+    }
+    const millis = typeof metadata.internalDate === 'string' && /^\d{13}$/.test(metadata.internalDate)
+      ? Number(metadata.internalDate)
+      : Number.NaN;
+    if (!Number.isFinite(millis) || !Number.isFinite(new Date(millis).getTime())) {
+      throw new Error('GMAIL_INBOX_RECEIVED_AT_INVALID');
+    }
+    const headers = metadata.payload?.headers;
+    const autoSubmitted = (header(headers, 'Auto-Submitted') ?? '').toLowerCase();
+    const precedence = (header(headers, 'Precedence') ?? '').toLowerCase();
+    messages.push({
+      accountId: account,
+      providerMessageId: id,
+      projectSlug: status.projectSlug,
+      subject: oneLine(header(headers, 'Subject') ?? '').slice(0, 2048),
+      from: oneLine(header(headers, 'From') ?? '').slice(0, 512),
+      receivedAt: new Date(millis).toISOString(),
+      replySignal: Boolean(header(headers, 'In-Reply-To') || header(headers, 'References')),
+      automated: (autoSubmitted !== '' && autoSubmitted !== 'no') || /^(bulk|list|junk)$/.test(precedence),
+    });
+  }
+  const page = listing.nextPageToken;
+  if (page !== undefined && (typeof page !== 'string' || !SAFE_PAGE_TOKEN.test(page))) {
+    throw new Error('GMAIL_INBOX_PAGE_TOKEN_INVALID');
+  }
+  return {
+    accountId: account,
+    projectSlug: status.projectSlug,
+    messages,
+    nextPageToken: typeof page === 'string' ? page : null,
+  };
+}
+
 export async function sendGmailReply(
   input: GmailReplyInput,
   fetchImpl: FetchLike = fetch,
@@ -260,6 +446,10 @@ export async function sendGmailReply(
   const originalId = typeof original.id === 'string' ? original.id : '';
   const threadId = typeof original.threadId === 'string' ? original.threadId : '';
   if (originalId !== messageId || !threadId) throw new Error('GMAIL_REPLY_TARGET_UNVERIFIED');
+  const restrictedLabel = env('FCR_GMAIL_INBOX_LABEL_ID');
+  if (restrictedLabel && (!Array.isArray(original.labelIds) || !original.labelIds.includes(restrictedLabel))) {
+    throw new Error('GMAIL_REPLY_LABEL_SCOPE_MISMATCH');
+  }
 
   const headers = original.payload?.headers;
   const recipient = emailFromHeader(header(headers, 'Reply-To') ?? header(headers, 'From') ?? '');
@@ -278,21 +468,33 @@ export async function sendGmailReply(
   ];
   const raw = `${rawHeaders.join('\r\n')}\r\n\r\n${body}\r\n`;
 
-  const sent = await gmailJson(fetchImpl, token, `${GMAIL_API}/messages/send`, {
-    method: 'POST',
-    body: JSON.stringify({ raw: base64Url(raw), threadId }),
-  });
+  // A failure across the send boundary may still mean Gmail accepted the
+  // message. Preserve the pending reservation until independent reconciliation.
+  let sent: Record<string, unknown>;
+  try {
+    sent = await gmailJson(fetchImpl, token, `${GMAIL_API}/messages/send`, {
+      method: 'POST',
+      body: JSON.stringify({ raw: base64Url(raw), threadId }),
+    });
+  } catch {
+    throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
+  }
   const sentId = typeof sent.id === 'string' ? sent.id : '';
   const sentThreadId = typeof sent.threadId === 'string' ? sent.threadId : '';
-  if (!sentId || sentThreadId !== threadId) throw new Error('GMAIL_SEND_RECEIPT_INVALID');
+  if (!sentId || sentThreadId !== threadId) throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
 
   const receiptParams = new URLSearchParams({ format: 'metadata' });
   receiptParams.append('metadataHeaders', 'From');
-  const receipt = await gmailJson(
-    fetchImpl,
-    token,
-    `${GMAIL_API}/messages/${encodeURIComponent(sentId)}?${receiptParams.toString()}`,
-  ) as GmailMessage;
+  let receipt: GmailMessage;
+  try {
+    receipt = await gmailJson(
+      fetchImpl,
+      token,
+      `${GMAIL_API}/messages/${encodeURIComponent(sentId)}?${receiptParams.toString()}`,
+    ) as GmailMessage;
+  } catch {
+    throw new Error('GMAIL_SEND_OUTCOME_UNKNOWN');
+  }
   const receiptId = typeof receipt.id === 'string' ? receipt.id : '';
   const receiptThreadId = typeof receipt.threadId === 'string' ? receipt.threadId : '';
   const receiptSender = emailFromHeader(header(receipt.payload?.headers, 'From') ?? '');

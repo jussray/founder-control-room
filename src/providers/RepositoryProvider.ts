@@ -123,6 +123,23 @@ export interface PullRequestReviewContext {
   authorIdentity: string;
 }
 
+/**
+ * Diagnostic PR identity, deliberately distinct from review/merge eligibility.
+ * Includes drafts and closed PRs to explain failures without granting authority.
+ * Never sets the provider's review context used by integration gates.
+ */
+export interface PullRequestObservation extends PullRequestReviewContext {
+  state: 'open' | 'closed';
+  draft: boolean;
+  merged: boolean;
+}
+
+export interface ChangeGenealogyReadInput {
+  limit?: number;
+  includeComments?: boolean;
+  includeDiff?: boolean;
+}
+
 export interface DiffFile {
   path: string;
   status: "added" | "modified" | "removed" | "renamed";
@@ -225,6 +242,17 @@ export interface RepositoryProvider {
 
   getProject(projectId: string): Promise<ProjectRepo>;
 
+  /**
+   * Optional bounded recent-change evidence read. The provider owns project
+   * isolation and credentials; callers must feature-detect and fail closed.
+   * The payload stays opaque here so this provider-neutral membrane does not
+   * import a host-specific evidence schema.
+   */
+  readChangeGenealogyEvidence?(
+    projectId: string,
+    input?: ChangeGenealogyReadInput,
+  ): Promise<unknown>;
+
   listFiles(projectId: string, ref: string, path?: string): Promise<FileEntry[]>;
 
   readFile(projectId: string, ref: string, path: string): Promise<string>;
@@ -264,6 +292,12 @@ export interface RepositoryProvider {
     projectId: string,
     pullRequestNumber: number,
   ): Promise<PullRequestReviewContext>;
+
+  /** Read-only observation. Draft/closed PRs are diagnostic data, not review approval. */
+  observePullRequest?(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestObservation>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;

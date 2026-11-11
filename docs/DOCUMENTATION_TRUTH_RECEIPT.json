@@ -52,7 +52,8 @@
       "path": "src/providers/githubGovernanceReconciliation.ts",
       "claims": [
         "`src/providers/githubGovernanceReconciliation.ts` must treat trusted Chief ruleset readback as evidence, preserve producer integration identity, strictness, bypass actors including provider-native null-id DeployKey entries, deployment requirements, and provider fingerprints, and plan the founder-approved producer-correct topology without authorizing provider mutation, merge, deploy, production proof, or execution.",
-        "The Chief reconciliation plan must require zero desired bypass actors and strict status freshness, place `Verify candidate ProofMode runtime with Playwright` on exact-head ruleset `20818149` with GitHub Actions integration `15368`, narrow governance-boundary unconditional checks to `Typecheck` plus `Verify operational authority`, remove production deployment environments from the pre-merge desired state while preserving `Cloudflare Production` plus `proofmode-access-admin` as post-merge/current-main proof obligations, preserve unmanaged security rules, and fail closed until a separately authorized drift-safe provider mutation is followed by fresh readback."
+        "The Chief reconciliation plan must require zero desired bypass actors and strict status freshness, place `Verify candidate ProofMode runtime with Playwright` on exact-head ruleset `20818149` with GitHub Actions integration `15368`, and narrow governance-boundary unconditional checks to `Typecheck` plus `Verify operational authority`.",
+        "The Chief reconciliation plan must remove production deployment environments from the pre-merge desired state while preserving `Cloudflare Production` plus `proofmode-access-admin` as post-merge/current-main proof obligations, preserve unmanaged security rules, and fail closed until a separately authorized drift-safe provider mutation is followed by fresh readback."
       ]
     },
     {
