@@ -44,7 +44,7 @@ const PROGRAMS = [
     facts:[['VERIFIED','DCED publishes December 1 annual deadline and 2026 forms.'],['VERIFIED','KIZ requires physical zone location, industry match and business age under eight years.'],['UNKNOWN','Applicant location, coordinator qualification and credit calculation are unverified.']],
     proof:'DCED KIZ Tax Credit Program page, Eligibility, Funding, How to Apply and 2026 Forms.',
     next:'Check the business operating location against the official KIZ map and coordinator before estimating any tax credit.',
-    risk:'A Pennsylvania mailing address or tech product alone does not satisfy the KIZ geographic gate.',
+    risk:'A mailing address or tech product does not satisfy the KIZ geographic gate; check any earlier coordinator-specific deadlines.',
     materialNote:'Credit value depends on revenue growth. Never treat the $100,000 cap as an expected award.'
   },
   {
@@ -206,7 +206,7 @@ function renderDetail(){
       '<div class="eyebrow" style="margin-top:14px">SOURCE PROVENANCE</div>'+
       '<p class="summary">'+esc(p.proof)+'</p>'+
       '<a class="source-link" href="'+esc(p.source)+'" target="_blank" rel="noopener noreferrer">Open official evidence ↗</a>'+
-      '<p class="step-hint">Recheck before any decision. Source changes and deadlines can invalidate this review.</p>';
+      '<p class="step-hint">Estimated award or eligibility: none. Recheck before any decision. Source changes and deadlines can invalidate this review.</p>';
   }else{
     const receipt={
       REALITY:p.open?'Program application window confirmed at review time; applicant eligibility UNKNOWN.':'Official program or discovery route confirmed; current intake and applicant eligibility UNKNOWN.',
