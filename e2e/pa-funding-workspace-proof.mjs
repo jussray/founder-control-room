@@ -13,7 +13,7 @@ function asset(pathname) {
   return readFileSync(new URL(file, fsRoot), 'utf8');
 }
 
-async function wire(page, signedIn) {
+async function wire(page, signedIn, founderEmail = 'founder@example.com') {
   await page.route(ORIGIN + '/**', async route => {
     const url = new URL(route.request().url());
     if (url.pathname === '/auth/me') {
@@ -21,7 +21,7 @@ async function wire(page, signedIn) {
         status: signedIn ? 200 : 401,
         contentType: 'application/json',
         body: JSON.stringify(signedIn
-          ? { success: true, data: { founder: { email: 'founder@example.com' } } }
+          ? { success: true, data: { founder: { email: founderEmail } } }
           : { error: 'unauthorized' }),
       });
     }
@@ -60,6 +60,7 @@ try {
   await page.locator('#workspace:not([hidden])').waitFor();
 
   assert.equal(await page.locator('.op-card').count(), 9, 'nine sourced programs/channels');
+  await page.screenshot({ path: proofDir + '/desktop.png', fullPage: true });
   assert.equal(await page.locator('#open-count').innerText(), '2',
     'only CEA Growth and Impact have confirmed opening windows');
   assert.equal(await page.locator('button.stage.locked').isDisabled(), true, 'APPLY is locked');
@@ -97,6 +98,16 @@ try {
   assert.match(await page.locator('#details').innerText(), /geographic gate|precise site/i,
     'KIZ location gate is shown');
   assert.equal(await page.locator('button.stage.locked').isDisabled(), true);
+  await page.locator('button[data-id="alphalab"]').click();
+  assert.match(await page.locator('#details').innerText(), /Jul 17, 2026/, 'closed AlphaLab deadline shown');
+  assert.match(await page.locator('.op-card.selected').innerText(), /CLOSED/, 'AlphaLab not mislabeled as intake-open');
+  await page.locator('button[data-id="cea-growth"]').click();
+  assert.equal(await page.locator('input[data-check="0"]').isChecked(), true, 'original founder checklist exists');
+  await wire(page, true, 'other-founder@example.com');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('#workspace:not([hidden])').waitFor();
+  assert.equal(await page.locator('input[data-check="0"]').isChecked(), false,
+    'another authenticated founder cannot inherit prior account checklist state');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: proofDir + '/mobile.png', fullPage: true });
