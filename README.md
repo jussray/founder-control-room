@@ -693,3 +693,14 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 ## X user-context publisher — source candidate
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
+
+## Four-system Founder Operator contract (source candidate, October 15, 2026)
+
+`src/founder-os-lab/founderOperatorContract.ts` is **source-level staged code**, not wired to the live FCR Worker, GitHub provider or a production UI. The existing privileged V10 approval middleware, FCR authority envelope, PR merge gate, federated relay, and production launch authority remain canonical; this module cannot replace or bypass them.
+
+- **Chief AI Machine** diagnoses and proposes; its recommendations do not grant authority.
+- **PromptOS** provides versioned, scoped, approved method metadata, with digest retained for provenance; it cannot execute writes.
+- **SolContinuity** provides source-head-bound advisory decision history; stale context is ignored without reducing existing capabilities.
+- **FCR** controls trusted approval readback, durable pending reservation, guarded patch execution, exact ref and immutable commit readback, proof verification, and final receipt persistence.
+
+The candidate rejects protected branch writes, noncanonical repository paths, unbound proposal hashes, failed pending-reservation storage, stale commits, absent browser/documentation/pro-vider proof, and unverified target identity. A trusted adapter must atomically validate/consume live approval and compare-and-swap the branch head immediately before mutation. Merely implementing this interface **does not prove** the actual adapter exists or is secure. Any connection to real execution requires a separate scoped review and real-path evidence. Exact-head tests and PR evidence do not grant a merge or deployment. The full proof must be reacquired when PR/base/head changes.
