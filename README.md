@@ -4,7 +4,7 @@
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
 
-Rollover deferral does not cancel or skip any check on a pull request that is rolled forward. Runner throughput after merge is not proven by this source change; read actual queue times on GitHub.
+Rollover deferral does not cancel or skip any check on a pull request that is rolled forward. Separately, `e2e/control-room-read-truth-proof.mjs` now opens `/control-room/?screen=control&view=overview`: since the five-screen shell the Control Room boots to Home, where the Projects list is hidden, so this proof had failed on every run regardless of the change under test. Its assertions (UNKNOWN on a failed read, verified empty state on a successful empty read, no browser-readable tokens) are unchanged. Runner throughput after merge is not proven by this source change; read actual queue times on GitHub.
 
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
