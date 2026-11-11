@@ -676,6 +676,12 @@ Workflow YAML syntax is checked on the same exact head: the `python-tests` job r
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
 
+## Juss-authored skills export — evidence gate (review-only)
+
+The proposed `skills/juss-authored/` tree in FCR PR #1063 is an additive export, not an installed or activated FCR runtime. Its repaired receipt checker rejects unsafe local evidence paths, ambiguous authority digests, invalid or future-dated receipts, and unaccounted receipt records; structural validation does not authenticate founder approval or prove production operation.
+
+The existing `.github/workflows/ci.yml` must execute the export's receipt regressions and complete SHA-256 inventory in its load-bearing `Python tests` job, which feeds `Required Gate`. A green test job is source/test evidence only. Do not merge or promote the export without complete current-head CI, current Documentation Truth, independent review, and exact-candidate founder-final approval; keep the current skill routing and Chief AI runtime independent.
+
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 
 Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
