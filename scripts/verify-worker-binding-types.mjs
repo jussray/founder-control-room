@@ -13,7 +13,7 @@ export const WORKER = 'founder-control-room';
 export function safePreflightError(error) {
   if (!(error instanceof Error)) return 'provider-preflight-failed';
   const code = error.message;
-  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|provider-request-failed|provider-response-invalid)$/.test(code)) {
+  if (/^(?:missing-cloudflare-preflight-credential|invalid-worker-account-config|worker-account-mismatch|provider-settings-not-verified|malformed-provider-bindings|duplicate-provider-binding-names|credential-binding-not-secret|repairable-stale-cf-api-token-plaintext|verified-name-type-only|provider-response-invalid)$/.test(code)) {
     return code;
   }
   if (/^provider-settings-http-[1-5][0-9]{2}$/.test(code)) return code;
