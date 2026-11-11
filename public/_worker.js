@@ -19,6 +19,17 @@ const API_OWNED_ASSET_PATHS = new Set([
 const DIRECT_ACCESS_ONLY_PATHS = new Set([
   '/mcp/founder-signal-engine',
 ]);
+// Only the declared MCP protocol routes may cross public Pages to FCR_API.
+// All administrative and unrecognized MCP descendants must use protected API.
+const PUBLIC_MCP_PROTOCOL_PATHS = new Set([
+  '/mcp',
+  '/mcp/read',
+  '/mcp/founder-signal-x-engagement',
+  '/mcp/registry/v0.1/servers',
+  '/mcp/portfolio/founder-control-room',
+  '/mcp/portfolio/solcontinuity',
+  '/mcp/portfolio/promptos',
+]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
   '/products/business-leak-quickscan/',
@@ -63,10 +74,21 @@ function shouldServeFromPages(request) {
 }
 
 function isDirectAccessOnlyPath(pathname) {
-  // Match the same case-insensitive, optional-trailing-slash route variants
-  // accepted by the downstream Express app before any service-binding proxy.
-  const canonicalPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
-  return DIRECT_ACCESS_ONLY_PATHS.has(canonicalPath);
+  // Normalize case, encoded segments, and trailing slashes before the proxy.
+  // Invalid escapes are never a reason to make an unknown route public.
+  let canonicalPath;
+  try {
+    canonicalPath = decodeURIComponent(pathname).toLowerCase().replace(/\/+$/, '') || '/';
+  } catch {
+    return true;
+  }
+  if (DIRECT_ACCESS_ONLY_PATHS.has(canonicalPath)) return true;
+  // Reject unknown MCP descendants even if application auth would later reject
+  // them: a public Service Binding is not the protected API Access perimeter.
+  if (canonicalPath === '/mcp' || canonicalPath.startsWith('/mcp/')) {
+    return !PUBLIC_MCP_PROTOCOL_PATHS.has(canonicalPath);
+  }
+  return false;
 }
 
 function directAccessOnlyResponse() {
