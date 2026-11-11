@@ -289,20 +289,21 @@ export async function logIncidentToLinear(
     });
 
     const rawBody: unknown = await response.json();
-    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
-      console.error('[incident-escalation] Linear response is not a JSON object');
-      return false;
-    }
-    const body = rawBody as {
-      errors?: Array<{ message?: string }>;
-      data?: { issueCreate?: { issue?: { id?: string } } };
-    };
+    // Provider responses are untrusted. Decode the minimal fields we need and
+    // fail closed on malformed payloads rather than trusting response.json().
+    const body = rawBody !== null && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      ? rawBody as {
+          errors?: Array<{ message?: string }>;
+          data?: { issueCreate?: { issue?: { id?: string } } };
+        }
+      : null;
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
 
-    // IMPLANT 4: GraphQL error detection — Linear returns 200 OK even for permission errors
-    if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
+    // GraphQL can report a permission/validation failure with HTTP 200.
+    if (errors.length > 0) {
       console.error(
         '[incident-escalation] Linear GraphQL error (permission/validation):',
-        body.errors[0].message,
+        typeof errors[0]?.message === 'string' ? errors[0].message : 'unknown error',
       );
       return false;
     }
@@ -311,12 +312,12 @@ export async function logIncidentToLinear(
       console.error(
         '[incident-escalation] Linear HTTP error:',
         response.status,
-        JSON.stringify(body),
+        JSON.stringify(rawBody),
       );
       return false;
     }
 
-    if (!body.data?.issueCreate?.issue?.id) {
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || !body.data.issueCreate.issue.id) {
       console.error('[incident-escalation] Linear response missing issue ID:', body);
       return false;
     }

@@ -69,11 +69,11 @@ if (workerName !== EXPECTED_WORKER) {
   } else if (!workersBranch || !workersBuildUuid) {
     authorityDecision = 'block';
     error = 'WORKER_BUILD_AUTHORITY_BLOCKED: Workers Builds branch and build UUID evidence are required.';
-  // Wrangler invokes this hook for `types` during verification. Type generation
-  // cannot promote a Worker version and still requires all exact-source checks.
   } else if (command !== 'versions upload' && command !== 'types') {
+    // `wrangler types` generates local bindings with zero provider mutation.
+    // Keep native Git promotion fail-closed for deploy and every other command.
     authorityDecision = 'block';
-    error = `NATIVE_WORKER_GIT_PROMOTION_BLOCKED: Workers Builds may only run non-promoting "wrangler versions upload" or "wrangler types" for ${EXPECTED_WORKER}; observed ${command}.`;
+    error = `NATIVE_WORKER_GIT_PROMOTION_BLOCKED: Workers Builds may only run non-promoting "wrangler versions upload" or local-only "wrangler types" for ${EXPECTED_WORKER}; observed ${command}.`;
   }
 } else if (githubActions) {
   const canonicalManualWorkflow =

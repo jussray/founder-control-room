@@ -26,10 +26,34 @@ test('tracked configuration movement changes the receipt fingerprint', () => {
   assert.deepEqual(before.files, ['.github/workflows/ci.yml', 'package.json']);
 });
 
+test('written runtime state receipt is one valid JSON document with a newline', () => {
+  const root = fixture();
+  try {
+    const receiptPath = path.join(root, 'artifacts', 'runtime-receipt.json');
+    const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: receiptPath }), root);
+    const contents = fs.readFileSync(receiptPath, 'utf8');
+    assert.deepEqual(JSON.parse(contents), receipt);
+    assert.equal(contents.endsWith(String.fromCharCode(10)), true);
+    assert.equal(contents.endsWith(String.fromCharCode(92, 110)), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('ordinary source events stay source-bound and do not pretend to prove provider state', () => {
   const receipt = buildRuntimeStateReceipt(env(), fixture(), new Date('2026-10-12T22:00:00Z'));
   assert.equal(receipt.externalState.mode, 'source-bound'); assert.equal(receipt.externalState.epoch, null);
   assert.equal(receipt.proofRule.sourceShaAloneProvesExternalState, false);
+});
+
+test('runtime-state writer emits parseable JSON without a trailing literal escape', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
+  const raw = fs.readFileSync(outputPath, 'utf8');
+  assert.ok(raw.endsWith('\n'), 'receipt must end in an actual newline');
+  assert.deepEqual(JSON.parse(raw), receipt);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('external state invalidation requires a fresh queue, non-secret epoch, and source', () => {
@@ -68,16 +92,4 @@ test('the exact-head ledger binds the runtime-state receipt into its proof surfa
     runtimeState,
   });
   assert.deepEqual(ledger.runtimeState, runtimeState);
-});
-
-test('persisted runtime-state receipt is one parseable JSON document with a real trailing newline', () => {
-  const root = fixture();
-  const outputPath = path.join(root, 'artifacts', 'control-room-runtime-state.json');
-  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
-  const written = fs.readFileSync(outputPath, 'utf8');
-  assert.equal(written.endsWith('\n'), true, 'receipt should end with a newline');
-  assert.equal(written.endsWith('\\n'), false, 'receipt must not contain a literal backslash-n suffix');
-  const parsed = JSON.parse(written);
-  assert.deepEqual(parsed, receipt);
-  assert.equal(parsed.proofRule.sourceShaAloneProvesExternalState, false);
 });

@@ -52,7 +52,7 @@ afterEach(async () => {
 });
 
 describe('Worker build authority membrane', () => {
-  it('allows Cloudflare Workers Builds only as a non-promoting version upload of the exact checked-out source', async () => {
+  it('allows only non-promoting version upload on an exact checked-out source', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
       WORKERS_CI_COMMIT_SHA: HEAD,
@@ -75,12 +75,12 @@ describe('Worker build authority membrane', () => {
     });
   });
 
-  it('allows Wrangler types during native builds without allowing production promotion', async () => {
+  it('allows read-only Wrangler type generation in Workers Builds without production authority', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
       WORKERS_CI_COMMIT_SHA: HEAD,
       WORKERS_CI_BRANCH: 'feature/test',
-      WORKERS_CI_BUILD_UUID: 'types-build-123',
+      WORKERS_CI_BUILD_UUID: 'build-types-read-only',
       WRANGLER_COMMAND: 'types',
     });
 
@@ -90,8 +90,8 @@ describe('Worker build authority membrane', () => {
       ok: true,
       wranglerCommand: 'types',
       executionContext: 'cloudflare-workers-builds',
-      sourceSha: HEAD,
       checkedOutSha: HEAD,
+      sourceSha: HEAD,
       authorityDecision: 'allow',
       productionPromotionAuthorized: false,
       nativeWorkerGitPromotionAllowed: false,
@@ -99,15 +99,14 @@ describe('Worker build authority membrane', () => {
     });
   });
 
-  it('rejects Wrangler types when native build source identity does not match', async () => {
+  it('blocks Wrangler type generation if checked-out SHA differs from provider SHA', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
       WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
       WORKERS_CI_BRANCH: 'feature/test',
-      WORKERS_CI_BUILD_UUID: 'types-build-stale',
+      WORKERS_CI_BUILD_UUID: 'build-types-wrong-head',
       WRANGLER_COMMAND: 'types',
     });
-
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('does not match checked-out source');
     expect(receipt).toMatchObject({
