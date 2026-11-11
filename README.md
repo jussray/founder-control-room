@@ -1,5 +1,8 @@
 # Founder Control Room
 
+## MCP invocation evidence boundary
+
+The advertised-risk candidate refreshes tools/list immediately before each invocation instead of reusing the five-minute discovery cache. A removed tool or fresh discovery failure prevents tools/call; current mutating annotations require separate approval. readOnlyHint=true makes destructiveHint inapplicable while preserving any risk already inferred from the tool name. Metadata remains an untrusted hint, not proof that a remote provider performs no mutation; fresh discovery narrows the cache race but cannot atomically bind a separate remote tools/call. Exact-head behavior tests and independent review remain required before integration, with production activation and outcomes separately unverified.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.

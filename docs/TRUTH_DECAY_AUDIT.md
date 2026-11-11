@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## MCP invocation evidence boundary
+
+The advertised-risk candidate refreshes tools/list immediately before each invocation instead of reusing the five-minute discovery cache. A removed tool or fresh discovery failure prevents tools/call; current mutating annotations require separate approval. readOnlyHint=true makes destructiveHint inapplicable while preserving any risk already inferred from the tool name. Metadata remains an untrusted hint, not proof that a remote provider performs no mutation; fresh discovery narrows the cache race but cannot atomically bind a separate remote tools/call. Exact-head behavior tests and independent review remain required before integration, with production activation and outcomes separately unverified.
+
 ## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
 
 The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
