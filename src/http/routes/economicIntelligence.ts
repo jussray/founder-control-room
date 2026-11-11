@@ -4,6 +4,10 @@ import {
   ECONOMIC_INTELLIGENCE_CONTRACT,
   listJurisdictionSlugs,
 } from '../../economic-intelligence/contract.js';
+import {
+  buildInitiativeExecutionSnapshot,
+  listInitiativeIds,
+} from '../../economic-intelligence/initiativeExecution.js';
 import { scoreOpportunity } from '../../economic-intelligence/score.js';
 import type { OpportunityInput } from '../../economic-intelligence/types.js';
 
@@ -23,6 +27,18 @@ economicIntelligenceRouter.get('/demo/:jurisdictionSlug', (req, res) => {
   }
 
   return res.json(demo);
+});
+
+economicIntelligenceRouter.get('/initiative/:initiativeId', (req, res) => {
+  const snapshot = buildInitiativeExecutionSnapshot(req.params.initiativeId);
+  if (!snapshot) {
+    return res.status(404).json({
+      error: 'Unknown initiative',
+      availableInitiatives: listInitiativeIds(),
+    });
+  }
+
+  return res.json(snapshot);
 });
 
 economicIntelligenceRouter.post('/score', (req, res) => {

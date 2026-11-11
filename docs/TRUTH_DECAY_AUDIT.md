@@ -304,6 +304,8 @@ The verifier classifies truth-sensitive changed files by domain and requires the
 
 Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
 
+Economic Intelligence is now explicitly part of the same truth-sensitive registry. Changes under `src/economic-intelligence/` or to `src/http/routes/economicIntelligence.ts` can change public-safe evidence receipts, provenance, freshness leases, initiative gate state, scoring contracts, or the decision framing used for civic and financing work. Those changes must therefore force a current README refresh and a path-bound Documentation Truth receipt instead of allowing `truthSensitiveFileCount: 0`. Registration proves documentation accountability only; it cannot prove City review, lender approval, site control, property eligibility, funding, hiring, merge, deployment, or any provider-side outcome.
+
 Founder-permission authority is also explicitly part of the classification. Changes to `src/http/routes/founderPermissions.ts`, `src/lib/founderPermissionBroker.ts`, or `src/lib/founderPermissionExecution.ts` must require current portable-approval documentation and a path-bound receipt because those paths can change what a founder decision means, what live state is trusted, and whether a receipt can unlock an external effect.
 
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
@@ -501,6 +503,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 42. Provider-held secret-name policy, secret presence, deployed runtime identity, and successful model invocation are four separate evidence layers and may not be collapsed into one green state.
 43. A GitHub Actions copy of a logical provider credential may serve a CI-only consumer without proving that the separately held runtime binding exists; CI and runtime secret planes must be evaluated independently.
 44. An all-secret presence verifier must derive required names from the canonical registry rather than maintain a second drifting allowlist, and failure of its Cloudflare credential before enumeration leaves the target presence set unobserved.
+45. Economic Intelligence receipt or gate changes are truth-sensitive decision-state changes; they must never bypass README/receipt reconciliation or turn source truth into City, lender, property, funding, hiring, merge, deploy, or provider authority.
 
 ## 2026-09 control correction: peer ref refresh resets proof
 

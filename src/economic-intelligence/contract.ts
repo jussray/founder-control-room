@@ -2,9 +2,9 @@ import { scoreOpportunity, SCORE_VERSION, SCORE_WEIGHTS } from './score.js';
 import type { EconomicIntelligenceDemo, Jurisdiction, OpportunityInput } from './types.js';
 
 export const ECONOMIC_INTELLIGENCE_CONTRACT = Object.freeze({
-  version: '1.0.0',
+  version: '1.1.0',
   cityAgnostic: true,
-  scope: 'jurisdiction-configurable economic intelligence and execution',
+  scope: 'jurisdiction-configurable economic intelligence and evidence-bound initiative execution',
   primitives: [
     'jurisdiction',
     'organization',
@@ -13,6 +13,10 @@ export const ECONOMIC_INTELLIGENCE_CONTRACT = Object.freeze({
     'opportunity',
     'signal',
     'outcome',
+    'initiative',
+    'gate',
+    'evidence_receipt',
+    'blocker',
   ],
   jurisdictionTypes: ['city', 'county', 'region', 'state', 'tribal', 'other'],
   scoreVersion: SCORE_VERSION,
@@ -23,8 +27,11 @@ export const ECONOMIC_INTELLIGENCE_CONTRACT = Object.freeze({
     'Every factual claim requires source provenance and an observed-at timestamp.',
     'Synthetic verification fixtures must be visibly classified and may not be represented as public fact.',
     'Identical signals produce identical scores regardless of jurisdiction.',
-    'Unknown jurisdictions fail closed and never fall back to the first configured city.',
+    'Unknown jurisdictions and initiatives fail closed and never fall back to the first configured fixture.',
     'Operational data remains founder-protected; public contract surfaces expose no credentials or private product data.',
+    'Evidence receipts, fingerprints, and proof cookies describe state continuity only and never create authority.',
+    'A commitment, review promise, eligibility path, or financing fit must not be promoted into endorsement, approval, sponsorship, or outcome proof.',
+    'Stale or superseded evidence cannot clear a current initiative gate without fresh authoritative observation.',
   ],
   prohibitedFields: [
     'johnstown_id',

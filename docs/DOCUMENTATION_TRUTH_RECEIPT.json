@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Document the candidate FCR Gmail AI Inbox source-only optional Cloudflare binding contract and metadata-read scope while preserving independent OAuth, founder approval, privacy, provider, runtime, and deployment evidence boundaries.",
+  "purpose": "Bind this candidate's Documentation Truth registry expansion and Economic Intelligence execution-state changes to current path-level invariants without converting source, receipts, tests, or documentation into City, lender, property, funding, hiring, merge, deploy, spend, or provider authority.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -10,7 +10,8 @@
     "merge-authority",
     "workflow-authority",
     "truth-governance",
-    "founder-permission-authority"
+    "founder-permission-authority",
+    "economic-intelligence"
   ],
   "changes": [
     {
@@ -386,7 +387,8 @@
         "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
+        "`scripts/verify-documentation-truth.mjs` must classify production `src/economic-intelligence/` source and `src/http/routes/economicIntelligence.ts` as truth-sensitive so their decision-state changes cannot pass Documentation Truth with zero sensitive files or without current README and path-bound receipt coverage."
       ]
     },
     {
@@ -626,6 +628,30 @@
       "path": "src/lib/xFirstPartyAdapter.ts",
       "claims": [
         "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/contract.ts",
+      "claims": [
+        "`src/economic-intelligence/contract.ts` must keep Economic Intelligence contract changes inside the truth-sensitive decision surface and cannot let a source-contract change silently bypass current documentation reconciliation."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/initiativeExecution.ts",
+      "claims": [
+        "`src/economic-intelligence/initiativeExecution.ts` must preserve provenance, bounded freshness, explicit supersession, fail-closed dependent gate state, full load-bearing continuity fingerprinting, and non-authorizing civic or financing semantics."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/types.ts",
+      "claims": [
+        "`src/economic-intelligence/types.ts` must require traceable receipt provenance and bounded validity fields so verified civic or financing evidence cannot remain untraceable or implicitly current forever."
+      ]
+    },
+    {
+      "path": "src/http/routes/economicIntelligence.ts",
+      "claims": [
+        "`src/http/routes/economicIntelligence.ts` must expose only the bounded Economic Intelligence contract and public-safe initiative state; the route cannot manufacture City, lender, property, funding, hiring, merge, deploy, spend, or provider authority."
       ]
     }
   ]
