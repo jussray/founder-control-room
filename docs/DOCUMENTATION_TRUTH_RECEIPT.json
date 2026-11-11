@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Document the candidate FCR Gmail AI Inbox source-only optional Cloudflare binding contract and metadata-read scope while preserving independent OAuth, founder approval, privacy, provider, runtime, and deployment evidence boundaries.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -10,7 +10,9 @@
     "merge-authority",
     "workflow-authority",
     "truth-governance",
-    "founder-permission-authority"
+    "truth-governance",
+    "evidence-authority",
+    "cloudflare-authority"
   ],
   "changes": [
     {
@@ -45,8 +47,7 @@
       "claims": [
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
         "A passing Worker-only secret-name preflight proves binding-name presence, not credential validity, source-to-runtime identity, live service-health, or production V4 conformance; those require independent exact-source provider/runtime receipts.",
-        "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority.",
-        "`worker-reconcile.yml` must accept a valid Cloudflare secret-name JSON list even when Wrangler precedes it with human authentication notices, reject missing or duplicate required names and malformed receipts without echoing provider text, and retain the exact-main approval, bounded legacy plaintext-removal exception, strict post-deploy binding-type verification, and live API/Pages proof requirements."
+        "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority."
       ]
     },
     {
@@ -129,8 +130,7 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
-        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release."
+        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live."
       ]
     },
     {
@@ -142,8 +142,7 @@
     {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration.",
-        "`src/http/routes/approvals.ts` must re-resolve the live base ref immediately before FCR provider integration and must fail closed with `Base moved after verification` (HTTP 409) when it does not equal the pinned reviewed base SHA, so a merge never lands on a base nobody reviewed; source and mock-test proof never proves live GitHub ruleset enforcement."
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
       ]
     },
     {
@@ -385,8 +384,7 @@
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
         "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
-        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates."
       ]
     },
     {
@@ -417,9 +415,7 @@
     {
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
-        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
-        "`src/providers/GitHubProvider.ts` must retain the live CodeQL `alerts_threshold: all` severity setting rather than downgrade it to `errors` while reconciling required-signatures and strict freshness; both source and independent governance preflight must enforce this, and successful source checks do not prove a live provider mutation.",
-        "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority."
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
       ]
     },
     {
@@ -519,27 +515,39 @@
       ]
     },
     {
-      "path": "src/http/routes/founderPermissions.ts",
+      "path": "src/http/routes/approvals.ts",
       "claims": [
-        "`src/http/routes/founderPermissions.ts` must keep the PromptOS workflow-registry action behind an authenticated interactive founder decision, exact durable one-shot consumption, and server-side provider-state revalidation; source implementation does not prove a provider effect."
+        "src/http/routes/approvals.ts must allow create_branch to reach RepositoryProvider.createBranch only after fresh create_branch proof and authenticated founder intent issue a server-owned AuthorityEnvelopeV1, the execution is reserved under the same idempotency key, mission state is re-read immediately before mutation, and the envelope passes exact capability, scope, argument, state, tool-call, expiry, idempotency, and integrity validation through executeAuthorizedCreateBranch; any drift must fail closed before provider mutation and an ambiguous pending outcome must be reconciled before retry."
       ]
     },
     {
-      "path": "src/lib/founderPermissionBroker.ts",
+      "path": ".ai/skills/goalfix/SKILL.md",
       "claims": [
-        "`src/lib/founderPermissionBroker.ts` must bind the PromptOS approval to the canonical repository, main branch, exact head and workflow identity, both content hashes, canonical paths, provider identity, capability version, and consequential-write classification."
+        ".ai/skills/goalfix/SKILL.md must require every Goalfix loop to classify exactly one current bottleneck as VERIFIED_BOTTLENECK, INFERRED_BOTTLENECK, UNKNOWN_BOTTLENECK, EXTERNAL_BLOCKER, or NO_TECHNICAL_BOTTLENECK, and HOLD or STOP must stay scoped to the dependent action rather than freezing unrelated capabilities."
       ]
     },
     {
-      "path": "src/lib/founderPermissionExecution.ts",
+      "path": ".claude/skills/goalfix/SKILL.md",
       "claims": [
-        "`src/lib/founderPermissionExecution.ts` must reject changed approved workflow or registry content before and after one-shot consumption, preserve non-authorizing public receipts, and require provider-native outcome readback for a successful consequential effect."
+        ".claude/skills/goalfix/SKILL.md must mirror the bottleneck law from the canonical goalfix contract and must never claim that the current inspect route or browser UI already emits every adaptive-kernel field."
       ]
     },
     {
-      "path": "src/providers/PromptOSRegistryWriter.ts",
+      "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`src/providers/PromptOSRegistryWriter.ts` must use the founder-approved exact parent head, a non-forced update, and independent head and registry-content readback instead of equating provider acceptance with verified outcome."
+        ".github/workflows/playwright.yml must run e2e/founder-experience-shell-proof.mjs as a named step with set -euo pipefail, and its output must be teed to logs/founder-experience-shell-proof.log so any non-zero exit fails the job closed."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
+      "claims": [
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must classify the current bottleneck from current evidence and must bind HOLD and STOP only to the dependent claim or action, never to unrelated verified capabilities that retain current evidence and authority."
+      ]
+    },
+    {
+      "path": "public/_worker.js",
+      "claims": [
+        "public/_worker.js must return the API-owned onboarding callback assets /assets/auth-callback.js and /assets/control-room.css to the API router instead of the Pages ASSETS binding, and only static GET or HEAD requests outside that set may be served from Pages."
       ]
     },
     {
@@ -602,30 +610,6 @@
       "path": "src/governance/portfolioGovernanceProfiles.ts",
       "claims": [
         "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
-      ]
-    },
-    {
-      "path": "src/providers/RepositoryProvider.ts",
-      "claims": [
-        "`src/providers/RepositoryProvider.ts` must keep optional `observePullRequest` read-only and distinct from `getPullRequestReviewContext`: draft and closed PR identities may inform diagnosis but cannot grant independent-review, merge, or deployment authority."
-      ]
-    },
-    {
-      "path": "src/providers/providerFactory.ts",
-      "claims": [
-        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
-      ]
-    },
-    {
-      "path": "src/lib/firstPartyFounderContentExecutor.ts",
-      "claims": [
-        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post."
-      ]
-    },
-    {
-      "path": "src/lib/xFirstPartyAdapter.ts",
-      "claims": [
-        "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
       ]
     }
   ]
