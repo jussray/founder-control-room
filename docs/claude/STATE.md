@@ -16,6 +16,7 @@ Juss: "Implant the needed fixes always … even if the work branch isn't yours, 
 - PROOF (local): CI history audit tests 19/19 passed, Documentation Truth `CURRENT`, redirect cookie tests 12/12 passed. Exact-head CI is pending.
 - RISK: the ledger base goes stale on every `main` move and needs a one-line re-bind each time. `verify-pair-contract` stays red until Chief `main` restores the pair contract. The Chief pair contract and capability-registry were reverted in its bulk merge on 2026-11-08, and `strategic-lens.js` was deleted.
 - DEAD END: Chief branches. `git push` and the GitHub API branch create both fail. Every branch from Chief `main` inherits merge commit `531c12b7`, and the ruleset rejects any branch containing a merge commit. Restore commit `e8f5f6ca` (4 files) exists only locally.
+- FIX (implant rule): StoryEngine `main` moved `1730f316` → `1a4a5816` (StoryEngine #154, adds one receipt JSON, no runtime code). The E2E peer-ref gate went red on `766f33ec` even though every browser scenario passed. Re-pinned `.github/workflows/playwright.yml` and recorded it in README, the truth receipt and `TRUTH_DECAY_AUDIT.md`. Rollback: revert the commit. This drift affects every PR and `main` until a repin lands there too.
 - NEXT GATE: Juss pushes the Chief restore with a bypass-capable account, or relaxes Chief's merge-commit rule. After that, refresh the FCR adapter snapshot to the new Chief head.
 
 ## 2026-11-04 — SleepWealth account-model governance on branch (not merged)
