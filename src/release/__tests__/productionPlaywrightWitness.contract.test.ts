@@ -45,7 +45,8 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(witness).toContain('    request,');
     expect(witness).toContain('const anonymousApiResponse = await request.get(');
     expect(witness).toContain('maxRedirects: 0');
-    expect(witness).toContain('cloudflareaccess\\\\.com');
+    expect(witness).toContain('cloudflareaccess');
+    expect(witness).toContain('cdn-cgi');
     expect(witness).toContain('Anonymous direct API must show an Access-specific gate');
     expect(witness.indexOf('const anonymousApiResponse')).toBeLessThan(
       witness.indexOf("readDirectIdentity('before-browser')"),
