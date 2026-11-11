@@ -1,0 +1,9 @@
+snapshot_id,captured_at,window_start,window_end,import_kind,row_type,date,complete,impressions,engagements,gross_new_followers,audience_segment,audience_share
+historical-2026-09-02,2026-09-02T23:00:00.000Z,2026-09-01,2026-09-02,historical_import,daily,2026-09-01,true,100,10,2,,
+historical-2026-09-02,2026-09-02T23:00:00.000Z,2026-09-01,2026-09-02,historical_import,daily,2026-09-02,true,120,12,1,,
+historical-2026-09-02,2026-09-02T23:00:00.000Z,2026-09-01,2026-09-02,historical_import,audience,,,,,,Founder,0.20
+historical-2026-09-02,2026-09-02T23:00:00.000Z,2026-09-01,2026-09-02,historical_import,audience,,,,,,Software Engineer,0.40
+current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-02,true,125,15,1,,
+current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,daily,2026-09-03,true,130,,2,,
+current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,audience,,,,,,Founder,0.30
+current-2026-09-03,2026-09-03T23:00:00.000Z,2026-09-02,2026-09-03,current_export,audience,,,,,,Software Engineer,0.35

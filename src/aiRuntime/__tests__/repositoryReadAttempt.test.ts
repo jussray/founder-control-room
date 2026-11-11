@@ -70,6 +70,24 @@ function lease(overrides: Partial<GovernedExecutionLease> = {}): GovernedExecuti
       modelId: 'none',
       pluginSetHash: HASH_C,
     },
+    boundary: {
+      missionId: 'mission-read-only-1',
+      shellId: 'shell-fcr-runtime',
+      credentialLane: 'project',
+      credentialProjectId: PROJECT_ID,
+      allowedProviderIds: ['github'],
+      providerFallback: 'deny',
+      network: {
+        mode: 'allowlist',
+        allowedHosts: ['api.github.com'],
+        blockPrivateNetworks: true,
+      },
+      founderAuthorization: {
+        decisionReceiptId: 'founder-decision-1',
+        approvedByActorId: 'jussray',
+      },
+      humanFinalAuthorizationRequired: true,
+    },
     authoritySnapshot: {
       capabilityManifestHash: HASH_A,
       resourceManifestHash: HASH_B,
@@ -104,6 +122,19 @@ function world(overrides: Partial<RepositoryReadBrokerWorld> = {}): RepositoryRe
       providerId: 'github',
       modelId: 'none',
       pluginSetHash: HASH_C,
+    },
+    boundary: {
+      missionId: 'mission-read-only-1',
+      shellId: 'shell-fcr-runtime',
+      credentialLane: 'project',
+      credentialProjectId: PROJECT_ID,
+      requestedEgressHosts: [],
+      founderAuthorization: {
+        decisionReceiptId: 'founder-decision-1',
+        approvedByActorId: 'jussray',
+        valid: true,
+      },
+      killSwitches: { global: false, provider: false, project: false, capability: false },
     },
     authoritySnapshot: {
       capabilityManifestHash: HASH_A,

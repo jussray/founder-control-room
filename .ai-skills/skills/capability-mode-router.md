@@ -114,3 +114,20 @@ Route by observed capability and current access, never permanent vendor rankings
 ## Stop states
 
 Material work terminates as `VERIFIED`, `BLOCKED`, `CLARIFICATION_REQUIRED`, or `INCOMPLETE`. Never translate `INCOMPLETE`, `UNKNOWN`, or `BLOCKED` into success.
+## Strategic founder/business lenses
+
+Named lenses such as `/hormozi`, `/billgates`, `/elonmusk`, `/garyvee`, `/futureyou`, and similar strategy labels are **hypothesis generators only**. They may affect questions, options, trade-offs, experiments, and risk analysis. They may never:
+
+- grant or widen authority;
+- authorize execution, mutation, disclosure, merge, deploy, publish, spending, or provider changes;
+- satisfy an evidence requirement;
+- impersonate the named person or convert their public framework into governance policy.
+
+A lens is reasoning input, not an authority object.
+
+
+## Per-action execution membrane
+
+A high-level approved goal or plan is not blanket permission for every child action produced during decomposition. Immediately before each consequential tool/effect attempt, FCR must revalidate the exact action identity, action class, target, capability, bound approval receipt, and evidence requirement against the still-valid authority envelope.
+
+A planning task that proposes a GitHub write, provider mutation, deploy, publish, or delete remains a planning task until that specific child action is independently authorized. Capability suitability and planning confidence cannot substitute for that check.
