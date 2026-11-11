@@ -100,6 +100,53 @@ jobs:
 
           echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
 
+      - name: Verify canonical Access service identity before mutation
+        env:
+          FCR_ACCESS_CLIENT_ID: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          FCR_ACCESS_CLIENT_SECRET: ${{ secrets.FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const clientId = process.env.FCR_ACCESS_CLIENT_ID;
+          const clientSecret = process.env.FCR_ACCESS_CLIENT_SECRET;
+          const isSafeHeader = (value) => typeof value === 'string'
+            && value.length > 0 && value.length <= 512
+            && /^[\x21-\x7e]+$/.test(value);
+          if (!isSafeHeader(clientId) || !isSafeHeader(clientSecret)) {
+            console.error('::error title=Access preflight blocked::Required Access credentials are missing or invalid.');
+            process.exit(1);
+          }
+          const canonicalUrl = 'https://api.foundercontrolroom.org/version';
+          let response;
+          try {
+            response = await fetch(canonicalUrl, {
+              method: 'GET',
+              headers: {
+                'CF-Access-Client-Id': clientId,
+                'CF-Access-Client-Secret': clientSecret,
+              },
+              redirect: 'manual',
+              signal: AbortSignal.timeout(15_000),
+            });
+          } catch {
+            console.error('::error title=Access preflight blocked::Canonical API credentialed read failed.');
+            process.exit(1);
+          }
+          if (response.status !== 200 || response.url !== canonicalUrl
+              || response.headers.get('x-founder-control-room-service') !== 'founder-control-room') {
+            console.error('::error title=Access preflight blocked::Canonical API did not accept the expected service identity.');
+            process.exit(1);
+          }
+          try {
+            const body = await response.json();
+            if (body?.service !== 'founder-control-room') throw Error('identity-mismatch');
+          } catch {
+            console.error('::error title=Access preflight blocked::Canonical API service identity payload invalid.');
+            process.exit(1);
+          }
+          console.log('Canonical API Access identity accepted before deployment mutation.');
+          NODE
       - name: Verify provider-held Worker secret names before mutation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
