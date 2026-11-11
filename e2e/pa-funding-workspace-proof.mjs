@@ -79,7 +79,7 @@ try {
   await page.locator('button[data-tab="checklist"]').click();
   await page.locator('input[data-check="0"]').check();
   await page.locator('button[data-stage="PREPARE"]').click();
-  assert.match(await page.locator('#details').innerText(), /Application readiness\s+UNKNOWN/,
+  assert.match(await page.locator('.detail-meta .meta-value').nth(3).innerText(), /^UNKNOWN/,
     'prep does not convert UNKNOWN to eligible');
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('#workspace:not([hidden])').waitFor();
