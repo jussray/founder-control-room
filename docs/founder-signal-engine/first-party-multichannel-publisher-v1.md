@@ -161,3 +161,11 @@ in `src/lib/firstPartyFounderContentExecutor.ts`, and the
 ## Next gate
 
 Implement official OAuth/account connection adapters, starting with the already connected LinkedIn identity, then run one founder-approved controlled LinkedIn post through the new engine. Expand to Facebook, Instagram, Threads, X, Bluesky, Mastodon, Pinterest, TikTok, and YouTube only after each platform's exact permissions and rollback path are verified.
+
+## X direct text adapter — source implemented, not activated
+
+`src/lib/xFirstPartyAdapter.ts` is invoked through the existing `dispatchFirstPartyFounderContentPublishNow` authority and reservation path for canonical `platform: x` content. It uses the official X API v2 endpoints: GET `/2/users/me` to prove the OAuth user token owns the server-configured `X_USER_ID`, POST `/2/tweets` for text-only creation, and GET `/2/tweets/:id` with `author_id,created_at` to verify the exact public post. The endpoint accepts the server-side `X_USER_ACCESS_TOKEN` only; no caller-provided token or user ID can override it.
+
+Activation requires the operator to connect an authorized X account using official user-context OAuth and appropriate `tweet.read`, `tweet.write`, and `users.read` permissions, then install or rotate the token in the intended server secret store and bind `X_USER_ID` to the verified account. No OAuth consent flow, login shortcut, secret mutation, or live publication is performed by this source implementation. The source cap remains 270 characters and rejects media. If X normalizes URL text and exact text readback does not match the approved copy, the result remains UNKNOWN rather than falsely VERIFIED; the already consumed approval must never be retried blindly.
+
+Real activation proof requires exact-current-source CI, an active authenticated founder approval, provider target-account readback, exactly one controlled authorized post, and an observed post ID/permalink/timestamp bound to the approved content and reservation. Missing credentials or a missing destination-native receipt remains BLOCKED/UNKNOWN, not green.

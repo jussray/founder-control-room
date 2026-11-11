@@ -4,235 +4,172 @@ import type {
   PreparedFirstPartyPublication,
 } from './firstPartySocialPublisher.js';
 
-export const X_ME_ENDPOINT = 'https://api.x.com/2/users/me' as const;
-export const X_POSTS_ENDPOINT = 'https://api.x.com/2/tweets' as const;
-
-const X_USER_ID = /^[0-9]{1,25}$/;
-const X_POST_ID = /^[0-9]{1,25}$/;
-const MAX_TIMEOUT_MS = 30_000;
-const DEFAULT_TIMEOUT_MS = 10_000;
-const X_SAFE_TEXT_LIMIT = 270;
-
-export type XPublicationTruthState = 'FAILED' | 'UNKNOWN';
+export const X_CURRENT_USER_ENDPOINT = 'https://api.x.com/2/users/me' as const;
+export const X_CREATE_POST_ENDPOINT = 'https://api.x.com/2/tweets' as const;
+const NUMERIC_ID = /^[0-9]{1,24}$/;
+const SHA = /^[0-9a-f]{40}$/i;
+const DIGEST = /^[0-9a-f]{64}$/i;
 
 export interface XFirstPartyAdapterConfig {
-  /** OAuth 2.0 PKCE user-context bearer token. A developer API key is not sufficient. */
   accessToken: string;
-  /** Explicit destination account. Must match /2/users/me BEFORE the provider write. */
   userId: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }
 
-export interface XPublicationEvidence {
-  phase: 'identity' | 'write' | 'write-receipt' | 'readback' | 'readback-verify';
-  postId: string | null;
-  permalink: string | null;
-  httpStatus: number | null;
-}
-
 export class XFirstPartyAdapterError extends Error {
   readonly code: string;
-  readonly truthState: XPublicationTruthState;
-  readonly retrySafe: boolean;
-  readonly evidence: XPublicationEvidence;
-
-  constructor(options: {
-    code: string;
-    truthState: XPublicationTruthState;
-    evidence?: Partial<XPublicationEvidence>;
-  }) {
-    super(options.code);
+  readonly truthState: 'FAILED' | 'UNKNOWN';
+  readonly retrySafe = false;
+  readonly evidence: {
+    phase: 'validate' | 'identity' | 'write' | 'write-receipt' | 'readback' | 'readback-verify';
+    postId: string | null;
+    permalink: string | null;
+    httpStatus: number | null;
+  };
+  constructor(
+    code: string,
+    truthState: 'FAILED' | 'UNKNOWN',
+    phase: XFirstPartyAdapterError['evidence']['phase'],
+    postId: string | null = null,
+    httpStatus: number | null = null,
+  ) {
+    super(code); // Never include tokens, HTTP body, or provider-supplied error text.
     this.name = 'XFirstPartyAdapterError';
-    this.code = options.code;
-    this.truthState = options.truthState;
-    // The publishing reservation is consumed on every attempted write. No blind retry.
-    this.retrySafe = false;
+    this.code = code;
+    this.truthState = truthState;
     this.evidence = {
-      phase: options.evidence?.phase ?? 'write',
-      postId: options.evidence?.postId ?? null,
-      permalink: options.evidence?.permalink ?? null,
-      httpStatus: options.evidence?.httpStatus ?? null,
+      phase,
+      postId,
+      permalink: postId ? `https://x.com/i/web/status/${postId}` : null,
+      httpStatus,
     };
   }
 }
 
-function text(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
-function timeout(value: number | undefined): number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 1_000 && value <= MAX_TIMEOUT_MS
-    ? Math.trunc(value)
-    : DEFAULT_TIMEOUT_MS;
+function timeout(ms: number | undefined): number {
+  return Number.isInteger(ms) && ms! >= 1000 && ms! <= 30000 ? ms! : 10000;
 }
 
-function permalink(postId: string): string {
-  return `https://x.com/i/web/status/${postId}`;
-}
-
-function validatePrepared(prepared: PreparedFirstPartyPublication, config: XFirstPartyAdapterConfig) {
-  let reason = '';
-  const accessToken = text(config.accessToken);
-  const userId = text(config.userId);
-  if (prepared.platform !== 'x') reason = 'X_ADAPTER_PLATFORM_MISMATCH';
-  else if (prepared.mode !== 'publish' || !text(prepared.founderApprovalId)) reason = 'X_FOUNDER_APPROVAL_REQUIRED';
-  else if (prepared.contentField !== 'x_draft') reason = 'X_CONTENT_FIELD_MISMATCH';
-  else if (!accessToken) reason = 'X_USER_ACCESS_TOKEN_NOT_CONFIGURED';
-  else if (!X_USER_ID.test(userId)) reason = 'X_USER_ID_INVALID';
-  else if (prepared.accountId !== userId) reason = 'X_ACCOUNT_AUTHORITY_MISMATCH';
-  else if (!prepared.text || prepared.text.length > X_SAFE_TEXT_LIMIT) reason = 'X_TEXT_LIMIT_INVALID';
-  else if (prepared.media.length > 0) reason = 'X_TEXT_ONLY_ADAPTER_REJECTS_MEDIA';
-
-  if (reason) throw new XFirstPartyAdapterError({ code: reason, truthState: 'FAILED' });
-  return { accessToken, userId };
-}
-
-async function fetchJson(response: Response): Promise<Record<string, unknown> | null> {
-  try {
-    const value: unknown = await response.json();
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
+function validatePrepared(
+  prepared: PreparedFirstPartyPublication,
+  config: XFirstPartyAdapterConfig,
+): void {
+  if (
+    prepared.platform !== 'x' || prepared.mode !== 'publish' ||
+    !NUMERIC_ID.test(config.userId) || prepared.accountId !== config.userId ||
+    !config.accessToken?.trim() || !prepared.founderApprovalId?.trim() ||
+    !DIGEST.test(prepared.contentHash) || !DIGEST.test(prepared.idempotencyKey) ||
+    !SHA.test(prepared.sourceCommitSha) ||
+    !prepared.text?.trim() || prepared.text.length > 270 ||
+    prepared.media?.length !== 0
+  ) {
+    throw new XFirstPartyAdapterError('X_PUBLICATION_INPUT_REJECTED', 'FAILED', 'validate');
   }
 }
 
-function dataFrom(payload: Record<string, unknown> | null): Record<string, unknown> {
-  const data = payload?.data;
-  return data && typeof data === 'object' && !Array.isArray(data)
-    ? data as Record<string, unknown>
-    : {};
+async function jsonData(response: Response): Promise<Record<string, unknown>> {
+  return asRecord(asRecord(await response.json()).data);
 }
 
 export function createXFirstPartyAdapter(config: XFirstPartyAdapterConfig): FirstPartyPlatformAdapter {
   return {
     platform: 'x',
-    async publish(prepared: PreparedFirstPartyPublication): Promise<FirstPartyPublicationReceipt> {
-      const { accessToken, userId } = validatePrepared(prepared, config);
+    async publish(prepared): Promise<FirstPartyPublicationReceipt> {
+      validatePrepared(prepared, config);
       const fetchImpl = config.fetchImpl ?? fetch;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-      const signalTimeout = timeout(config.timeoutMs);
+      const headers = { Authorization: `Bearer ${config.accessToken}` };
+      const ms = timeout(config.timeoutMs);
 
-      // Check user-context binding before any potentially billable/write operation.
-      let identityResponse: Response;
+      // The server-held target ID is authoritative. A token for another account must never publish.
+      let identity: Response;
       try {
-        identityResponse = await fetchImpl(X_ME_ENDPOINT, {
-          method: 'GET',
-          headers,
-          signal: AbortSignal.timeout(signalTimeout),
+        identity = await fetchImpl(X_CURRENT_USER_ENDPOINT, {
+          method: 'GET', headers, signal: AbortSignal.timeout(ms),
         });
       } catch {
-        throw new XFirstPartyAdapterError({
-          code: 'X_IDENTITY_UNAVAILABLE',
-          truthState: 'FAILED',
-          evidence: { phase: 'identity' },
-        });
+        throw new XFirstPartyAdapterError('X_IDENTITY_UNAVAILABLE', 'FAILED', 'identity');
       }
-      if (!identityResponse.ok) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_IDENTITY_NOT_VERIFIED',
-          truthState: 'FAILED',
-          evidence: { phase: 'identity', httpStatus: identityResponse.status },
-        });
+      if (!identity.ok) {
+        throw new XFirstPartyAdapterError('X_IDENTITY_REJECTED', 'FAILED', 'identity', null, identity.status);
       }
-      const identity = dataFrom(await fetchJson(identityResponse));
-      if (text(identity.id) !== userId) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_AUTHENTICATED_ACCOUNT_MISMATCH',
-          truthState: 'FAILED',
-          evidence: { phase: 'identity', httpStatus: identityResponse.status },
-        });
+      let current: Record<string, unknown>;
+      try {
+        current = await jsonData(identity);
+      } catch {
+        throw new XFirstPartyAdapterError('X_IDENTITY_INVALID', 'FAILED', 'identity');
+      }
+      if (current.id !== config.userId) {
+        throw new XFirstPartyAdapterError('X_ACCOUNT_ID_MISMATCH', 'FAILED', 'identity');
       }
 
-      let writeResponse: Response;
+      let created: Response;
       try {
-        writeResponse = await fetchImpl(X_POSTS_ENDPOINT, {
+        created = await fetchImpl(X_CREATE_POST_ENDPOINT, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: prepared.text }),
-          signal: AbortSignal.timeout(signalTimeout),
+          signal: AbortSignal.timeout(ms),
         });
       } catch {
-        throw new XFirstPartyAdapterError({
-          code: 'X_WRITE_OUTCOME_UNKNOWN',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'write' },
-        });
+        throw new XFirstPartyAdapterError('X_WRITE_OUTCOME_UNKNOWN', 'UNKNOWN', 'write');
       }
-      if (writeResponse.status >= 500) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_WRITE_SERVER_OUTCOME_UNKNOWN',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'write', httpStatus: writeResponse.status },
-        });
+      if (created.status >= 500) {
+        throw new XFirstPartyAdapterError('X_WRITE_SERVER_OUTCOME_UNKNOWN', 'UNKNOWN', 'write', null, created.status);
       }
-      if (writeResponse.status !== 201) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_WRITE_REJECTED',
-          truthState: 'FAILED',
-          evidence: { phase: 'write', httpStatus: writeResponse.status },
-        });
+      if (created.status !== 201) {
+        throw new XFirstPartyAdapterError('X_WRITE_REJECTED', 'FAILED', 'write', null, created.status);
       }
-
-      const written = dataFrom(await fetchJson(writeResponse));
-      const postId = text(written.id);
-      if (!X_POST_ID.test(postId) || text(written.text) !== prepared.text) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_WRITE_RECEIPT_UNVERIFIED',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'write-receipt', httpStatus: 201 },
-        });
-      }
-
-      // Provider readback is required before declaring success. An accepted write
-      // cannot be retried when its readback is unavailable or mismatched.
-      const postPermalink = permalink(postId);
-      const readbackUrl = `${X_POSTS_ENDPOINT}/${postId}?tweet.fields=author_id,created_at`;
-      let readbackResponse: Response;
+      let written: Record<string, unknown>;
       try {
-        readbackResponse = await fetchImpl(readbackUrl, {
-          method: 'GET',
-          headers,
-          signal: AbortSignal.timeout(signalTimeout),
-        });
+        written = await jsonData(created);
       } catch {
-        throw new XFirstPartyAdapterError({
-          code: 'X_READBACK_UNAVAILABLE',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'readback', postId, permalink: postPermalink },
-        });
+        throw new XFirstPartyAdapterError('X_WRITE_RECEIPT_INVALID', 'UNKNOWN', 'write-receipt', null, created.status);
       }
-      if (!readbackResponse.ok) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_READBACK_NOT_VERIFIED',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'readback', postId, permalink: postPermalink, httpStatus: readbackResponse.status },
-        });
+      const postId = typeof written.id === 'string' ? written.id : '';
+      if (!NUMERIC_ID.test(postId) || written.text !== prepared.text) {
+        throw new XFirstPartyAdapterError('X_WRITE_RECEIPT_MISMATCH', 'UNKNOWN', 'write-receipt', NUMERIC_ID.test(postId) ? postId : null, created.status);
       }
-      const readback = dataFrom(await fetchJson(readbackResponse));
-      const publishedAt = text(readback.created_at);
-      const parsedDate = Date.parse(publishedAt);
+
+      // A successful write is NOT published proof until independent provider readback matches.
+      let readback: Response;
+      try {
+        readback = await fetchImpl(
+          `${X_CREATE_POST_ENDPOINT}/${postId}?tweet.fields=author_id%2Ccreated_at`,
+          { method: 'GET', headers, signal: AbortSignal.timeout(ms) },
+        );
+      } catch {
+        throw new XFirstPartyAdapterError('X_READBACK_UNAVAILABLE', 'UNKNOWN', 'readback', postId);
+      }
+      if (!readback.ok) {
+        throw new XFirstPartyAdapterError('X_READBACK_REJECTED', 'UNKNOWN', 'readback', postId, readback.status);
+      }
+      let observed: Record<string, unknown>;
+      try {
+        observed = await jsonData(readback);
+      } catch {
+        throw new XFirstPartyAdapterError('X_READBACK_INVALID', 'UNKNOWN', 'readback', postId, readback.status);
+      }
+      const createdAt = typeof observed.created_at === 'string' ? observed.created_at : '';
       if (
-        text(readback.id) !== postId ||
-        text(readback.text) !== prepared.text ||
-        text(readback.author_id) !== userId ||
-        !publishedAt ||
-        !Number.isFinite(parsedDate)
+        observed.id !== postId || observed.author_id !== config.userId ||
+        observed.text !== prepared.text || !createdAt ||
+        !Number.isFinite(Date.parse(createdAt))
       ) {
-        throw new XFirstPartyAdapterError({
-          code: 'X_READBACK_MISMATCH',
-          truthState: 'UNKNOWN',
-          evidence: { phase: 'readback-verify', postId, permalink: postPermalink, httpStatus: readbackResponse.status },
-        });
+        throw new XFirstPartyAdapterError('X_READBACK_MISMATCH', 'UNKNOWN', 'readback-verify', postId, readback.status);
       }
       return {
         platform: 'x',
         externalPostId: postId,
-        permalink: postPermalink,
-        providerRequestId: text(writeResponse.headers.get('x-request-id')) || null,
-        publishedAt: new Date(parsedDate).toISOString(),
+        permalink: `https://x.com/i/web/status/${postId}`,
+        providerRequestId: readback.headers.get('x-request-id') || created.headers.get('x-request-id'),
+        publishedAt: new Date(createdAt).toISOString(),
         contentHash: prepared.contentHash,
         sourceCommitSha: prepared.sourceCommitSha,
         proofUrls: prepared.proofUrls,

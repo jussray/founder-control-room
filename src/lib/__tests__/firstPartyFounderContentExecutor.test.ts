@@ -210,26 +210,7 @@ function successFetch(expectedCopy: string) {
     );
 }
 
-function xInput(): FirstPartyFounderPublishInput {
-  const request = input();
-  const payload = request.proposal.public_payload as Record<string, unknown>;
-  payload.platform = 'x';
-  payload.draft_text = 'FCR now verifies the exact approved X post through account-bound user OAuth and direct readback. This is a controlled first-party publishing test.';
-  request.proposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(request.proposal));
-  request.approval.proposal_hash = request.proposal.proposal_hash;
-  request.approval.public_payload_hash = hashPublicPayload(canonicalChiefIdentity(request.proposal).public_payload);
-  request.approval.channels = ['x'];
-  const authorization = authorizeFounderContentPublication({
-    proposal: request.proposal,
-    approval: request.approval,
-    now: '2026-08-17T15:05:00.000Z',
-  });
-  request.confirmation.authorization_hash = authorization.authorization_hash;
-  request.confirmation.public_payload_hash = authorization.public_payload_hash;
-  return request;
-}
-
-describe('direct first-party founder X execution', () => {
+describe('direct first-party founder X execution: app-key, duplicate and readback-unavailable coverage', () => {
   const userId = '123456789';
   const postId = '1999999999999999999';
   const token = 'test-x-user-access-token';
@@ -513,5 +494,108 @@ describe('direct first-party founder LinkedIn execution', () => {
 
   it('uses a distinct durable action type for direct publication', () => {
     expect(FIRST_PARTY_FOUNDER_PUBLISH_ACTION).toBe('publish_founder_content');
+  });
+});
+
+
+function xInput(): FirstPartyFounderPublishInput {
+  const proposalValue = proposal();
+  proposalValue.public_payload.platform = 'x';
+  proposalValue.public_payload.draft_text =
+    'FCR release evidence is source-bound: historical red CI remains visible and exact-head verification is required before promotion.';
+  proposalValue.proposal_hash = hashPublicPayload(canonicalChiefIdentity(proposalValue));
+  const approvalValue = approval(proposalValue);
+  approvalValue.channels = ['x'];
+  const canonical = authorizeFounderContentPublication({
+    proposal: proposalValue,
+    approval: approvalValue,
+    now: '2026-08-17T15:05:00.000Z',
+  });
+  return input({
+    proposal: proposalValue,
+    approval: approvalValue,
+    confirmation: {
+      confirm_publication: true,
+      authorization_hash: canonical.authorization_hash,
+      public_payload_hash: canonical.public_payload_hash,
+    },
+  });
+}
+
+describe('direct first-party founder X execution', () => {
+  const xEnv = { X_USER_ACCESS_TOKEN: 'test-x-token', X_USER_ID: '1234567' };
+  const postId = '1999999999999999999';
+
+  it('reserves once, validates token ownership, and records the exact X post only after readback', async () => {
+    const request = xInput();
+    const copy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const store = new MemoryStore();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: '1234567' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: postId, text: copy } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: postId, text: copy, author_id: '1234567', created_at: '2026-08-17T15:05:01.000Z',
+      } }), { status: 200 }));
+    const result = await dispatchFirstPartyFounderContentPublishNow(request, {
+      env: xEnv,
+      now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      store,
+    });
+    expect(result.code).toBe('PUBLISHED');
+    expect(result.receipt).toMatchObject({ platform: 'x', externalPostId: postId });
+    expect(store.reservations.size).toBe(1);
+    expect(store.finalized[0]).toMatchObject({ status: 'succeeded', success: true });
+    expect(store.finalized[0].result).toMatchObject({ platform: 'x', published: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ text: copy });
+    expect(JSON.stringify(result)).not.toContain(xEnv.X_USER_ACCESS_TOKEN);
+  });
+
+  it('blocks missing X credentials and invalid founder confirmation before any provider call', async () => {
+    for (const request of [
+      xInput(),
+      { ...xInput(), confirmation: { confirm_publication: false } },
+    ]) {
+      const store = new MemoryStore();
+      const fetchMock = vi.fn();
+      const res = await dispatchFirstPartyFounderContentPublishNow(request, {
+        env: request.confirmation.confirm_publication ? { X_USER_ID: '1234567' } : xEnv,
+        now: '2026-08-17T15:05:00.000Z',
+        executedBy: 'founder@example.com',
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        store,
+      });
+      expect(res.code).toBe(request.confirmation.confirm_publication ? 'X_NOT_CONFIGURED' : 'INVALID_AUTHORIZATION');
+      expect(store.reservations.size).toBe(0);
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it('treats provider readback mismatch as UNKNOWN and denies blind replay of the approval', async () => {
+    const request = xInput();
+    const copy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const store = new MemoryStore();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: '1234567' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: postId, text: copy } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: postId, text: copy, author_id: '7654321', created_at: '2026-08-17T15:05:01.000Z',
+      } }), { status: 200 }));
+    const opts = { env: xEnv, now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com', fetchImpl: fetchMock as unknown as typeof fetch, store };
+    const first = await dispatchFirstPartyFounderContentPublishNow(request, opts);
+    expect(first.code).toBe('PROVIDER_OUTCOME_UNKNOWN');
+    expect(first.published).toBe(false);
+    expect(first.retrySafe).toBe(false);
+    expect(first.providerEvidence).toMatchObject({ postId });
+    expect(store.finalized[0]).toMatchObject({ status: 'failed', success: false });
+    const secondFetch = vi.fn();
+    const second = await dispatchFirstPartyFounderContentPublishNow(request, {
+      ...opts, fetchImpl: secondFetch as unknown as typeof fetch,
+    });
+    expect(second.code).toBe('ACTION_ALREADY_RESERVED');
+    expect(secondFetch).not.toHaveBeenCalled();
   });
 });

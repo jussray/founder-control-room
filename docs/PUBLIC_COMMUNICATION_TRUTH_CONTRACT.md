@@ -252,3 +252,7 @@ Hold the post when:
 A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
 It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.
+
+## X direct publication evidence boundary
+
+`src/lib/firstPartyFounderContentExecutor.ts` must bind X publication to the same authenticated Current You approval, exact public payload hash, source SHA, one-use durable reservation, and temporal truth gate used by first-party LinkedIn. The X adapter must validate the server-held user identity before any write and require matching destination-native post ID, author, exact text, and timestamp after writing. A provider 201, cached account configuration, network error, missing readback, or content alteration cannot be called verified publication; uncertain writes consume their reservation and must not be blindly retried. X account authorization and live result receipts remain UNKNOWN until provider readback is observed. No checked-in source test grants posting, deployment, or merge authority.

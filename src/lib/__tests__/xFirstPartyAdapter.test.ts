@@ -1,157 +1,173 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  executeFirstPartyPublication,
-  validateFirstPartySocialPost,
-  type FirstPartySocialPostInput,
-} from '../firstPartySocialPublisher.js';
-import {
-  XFirstPartyAdapterError,
-  X_ME_ENDPOINT,
-  X_POSTS_ENDPOINT,
-  createXFirstPartyAdapter,
-} from '../xFirstPartyAdapter.js';
+import { createXFirstPartyAdapter, XFirstPartyAdapterError } from '../xFirstPartyAdapter.js';
+import { FIRST_PARTY_PLATFORM_CAPABILITIES } from '../firstPartySocialPublisher.js';
+import type { PreparedFirstPartyPublication } from '../firstPartySocialPublisher.js';
 
-const USER_ID = '123456789';
-const POST_ID = '1999999999999999999';
-const ACCESS_TOKEN = 'unit-test-user-token-not-for-logs';
-const SHA = '899321488f281af150e60a1bc7ff354736d4cf17';
-const PROOF_URL = 'https://github.com/jussray/founder-control-room/pull/1027';
+const userId = '1234567';
+const postId = '1999999999999999999';
+const copy =
+  'FCR shipping update: exact-head checks, independently observed receipts, and explicit founder approval gate production promotion.';
+const prepared = {
+  platform: 'x',
+  accountId: userId,
+  contentField: 'x_draft',
+  text: copy,
+  traction: 'Exact-head tests and readbacks must be observed.',
+  governanceAdvantage: 'Publication is gated by explicit founder approval.',
+  audienceValue: 'Accountability for every published provider action.',
+  investorSignal: 'Verified execution evidence is distinguished from proposals.',
+  proofLinks: [{ label: 'FCR source proof', url: 'https://github.com/jussray/founder-control-room/pull/1069' }],
+  proofUrls: ['https://github.com/jussray/founder-control-room/pull/1069'],
+  sourceRepository: 'jussray/founder-control-room',
+  sourceCommitSha: 'b'.repeat(40),
+  mode: 'publish',
+  founderApprovalId: 'founder-approved-once',
+  media: [],
+  characterLimit: 270,
+  contentHash: 'a'.repeat(64),
+  idempotencyKey: 'c'.repeat(64),
+  capability: FIRST_PARTY_PLATFORM_CAPABILITIES.x,
+} satisfies PreparedFirstPartyPublication;
 
-function input(): FirstPartySocialPostInput {
-  return {
-    platform: 'x',
-    accountId: USER_ID,
-    contentField: 'x_draft',
-    text: `FCR checks the account before an approved X post, and verifies the result with provider readback. Proof: ${PROOF_URL}`,
-    traction: 'First-party X publishing has a guarded provider boundary.',
-    governanceAdvantage: 'Exact founder approval and readback control publication truth.',
-    audienceValue: 'People see checked updates, not prompts.',
-    investorSignal: 'Direct, governed distribution is possible without a paid content manager.',
-    proofLinks: [{ label: 'Implementation', url: PROOF_URL }],
-    sourceRepository: 'jussray/founder-control-room',
-    sourceCommitSha: SHA,
-    mode: 'publish',
-    publishAllowed: true,
-    founderApprovalId: 'test-approval',
-    media: [],
-  };
+const jsonResponse = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
+
+function successfulFetch() {
+  return vi.fn()
+    .mockResolvedValueOnce(jsonResponse({ data: { id: userId, username: 'authorized' } }))
+    .mockResolvedValueOnce(jsonResponse({ data: { id: postId, text: copy } }, 201))
+    .mockResolvedValueOnce(jsonResponse({ data: {
+      id: postId, text: copy, author_id: userId, created_at: '2026-11-07T15:00:00.000Z',
+    } }));
 }
 
-const json = (payload: unknown, status = 200) =>
-  new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
-
-const me = (id = USER_ID) => json({ data: { id, username: 'jussco' } });
-const write = (text: string) => json({ data: { id: POST_ID, text } }, 201);
-const readback = (text: string, authorId = USER_ID) =>
-  json({ data: { id: POST_ID, text, author_id: authorId, created_at: '2026-11-08T01:02:00.000Z' } });
-
-function adapter(mock: ReturnType<typeof vi.fn>, token = ACCESS_TOKEN, userId = USER_ID) {
-  return createXFirstPartyAdapter({
-    accessToken: token,
-    userId,
-    fetchImpl: mock as unknown as typeof fetch,
-  });
-}
-
-describe('first-party X publishing', () => {
-  it('proves user identity before write and readbacks exact published post', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(me())
-      .mockResolvedValueOnce(write(prepared.text))
-      .mockResolvedValueOnce(readback(prepared.text));
-    const receipt = await executeFirstPartyPublication(prepared, { x: adapter(fetchMock) });
-
-    expect(receipt).toMatchObject({
+describe('X first-party OAuth user-context publication adapter', () => {
+  it('authenticates exact user before posting, then requires matching provider readback', async () => {
+    const fetchImpl = successfulFetch();
+    const result = await createXFirstPartyAdapter({
+      accessToken: 'test-only-token',
+      userId,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared);
+    expect(result).toMatchObject({
       platform: 'x',
-      externalPostId: POST_ID,
-      permalink: `https://x.com/i/web/status/${POST_ID}`,
+      externalPostId: postId,
+      permalink: `https://x.com/i/web/status/${postId}`,
+      publishedAt: '2026-11-07T15:00:00.000Z',
       contentHash: prepared.contentHash,
-      sourceCommitSha: SHA,
-      publishedAt: '2026-11-08T01:02:00.000Z',
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[0][0]).toBe(X_ME_ENDPOINT);
-    expect(fetchMock.mock.calls[1][0]).toBe(X_POSTS_ENDPOINT);
-    expect(fetchMock.mock.calls[1][1].method).toBe('POST');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ text: prepared.text });
-    expect(fetchMock.mock.calls[2][0]).toBe(`${X_POSTS_ENDPOINT}/${POST_ID}?tweet.fields=author_id,created_at`);
-    expect(fetchMock.mock.calls[2][1].method).toBe('GET');
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.x.com/2/users/me');
+    expect(fetchImpl.mock.calls[1][0]).toBe('https://api.x.com/2/tweets');
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ text: copy });
+    expect(fetchImpl.mock.calls[2][0]).toContain(`/2/tweets/${postId}?tweet.fields=author_id%2Ccreated_at`);
+    expect(JSON.stringify(result)).not.toContain('test-only-token');
   });
 
-  it('rejects developer app keys and absent user context without a request', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn();
-    await expect(adapter(fetchMock, '').publish(prepared)).rejects.toMatchObject({
-      code: 'X_USER_ACCESS_TOKEN_NOT_CONFIGURED',
-      truthState: 'FAILED',
+  it('rejects token/account mismatch without making any POST', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { id: '7654321' } }));
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_ACCOUNT_ID_MISMATCH', truthState: 'FAILED',
     });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks the write when the authenticated account differs from the approved account', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn().mockResolvedValueOnce(me('222222222'));
-    await expect(adapter(fetchMock).publish(prepared)).rejects.toMatchObject({
-      code: 'X_AUTHENTICATED_ACCOUNT_MISMATCH',
-      truthState: 'FAILED',
+  it('blocks missing founder authority and media before any network request', async () => {
+    const fetchImpl = vi.fn();
+    const adapter = createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(adapter.publish({ ...prepared, founderApprovalId: null })).rejects.toBeInstanceOf(XFirstPartyAdapterError);
+    await expect(adapter.publish({ ...prepared, media: [{ type: 'image', url: 'https://example.com/image.png' }] })).rejects.toBeInstanceOf(XFirstPartyAdapterError);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('rejects a user id that disagrees with the approved post before network access', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn();
-    await expect(adapter(fetchMock, ACCESS_TOKEN, '222222222').publish(prepared)).rejects.toMatchObject({
-      code: 'X_ACCOUNT_AUTHORITY_MISMATCH',
+  it('returns UNKNOWN, never successful, if the write response is lost', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: { id: userId } }))
+      .mockRejectedValueOnce(new Error('network lost after provider write'));
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_WRITE_OUTCOME_UNKNOWN', truthState: 'UNKNOWN', retrySafe: false,
     });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it('treats an explicit 403 write rejection as FAILED without logging credentials', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn().mockResolvedValueOnce(me()).mockResolvedValueOnce(new Response('denied', { status: 403 }));
-    let captured: unknown;
-    try { await adapter(fetchMock).publish(prepared); } catch (error) { captured = error; }
-    expect(captured).toBeInstanceOf(XFirstPartyAdapterError);
-    const error = captured as XFirstPartyAdapterError;
-    expect(error.truthState).toBe('FAILED');
-    expect(error.evidence.httpStatus).toBe(403);
-    expect(error.message).not.toContain(ACCESS_TOKEN);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+  it('refuses to claim PUBLISHED when readback author or content mismatches', async () => {
+    for (const altered of [{ author_id: '7654321', text: copy }, { author_id: userId, text: 'different copy' }]) {
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(jsonResponse({ data: { id: userId } }))
+        .mockResolvedValueOnce(jsonResponse({ data: { id: postId, text: copy } }, 201))
+        .mockResolvedValueOnce(jsonResponse({ data: {
+          id: postId, ...altered, created_at: '2026-11-07T15:00:00.000Z',
+        } }));
+      await expect(createXFirstPartyAdapter({
+        accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+      }).publish(prepared)).rejects.toMatchObject({
+        code: 'X_READBACK_MISMATCH', truthState: 'UNKNOWN', retrySafe: false,
+        evidence: { postId },
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    }
   });
 
-  it('consumes write uncertainty on a provider 5xx; no automatic retry', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn().mockResolvedValueOnce(me()).mockResolvedValueOnce(new Response('failed', { status: 503 }));
-    await expect(adapter(fetchMock).publish(prepared)).rejects.toMatchObject({
-      truthState: 'UNKNOWN',
-      retrySafe: false,
+  it('distinguishes 4xx rejection from ambiguous 5xx and never logs provider body', async () => {
+    for (const [status, state] of [[403, 'FAILED'], [503, 'UNKNOWN']] as const) {
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(jsonResponse({ data: { id: userId } }))
+        .mockResolvedValueOnce(jsonResponse({ errors: [{ detail: 'sensitive provider text' }] }, status));
+      try {
+        await createXFirstPartyAdapter({
+          accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+        }).publish(prepared);
+        throw new Error('expected fail-closed provider result');
+      } catch (error) {
+        expect(error).toBeInstanceOf(XFirstPartyAdapterError);
+        const result = error as XFirstPartyAdapterError;
+        expect(result.truthState).toBe(state);
+        expect(result.message).not.toContain('sensitive provider text');
+      }
+    }
+  });
+});
+
+// Coverage carried forward from PR #1027's parallel adapter tests, expressed against
+// main's canonical adapter error codes.
+describe('X first-party adapter pre-network and readback-unavailable boundaries', () => {
+  it('rejects an absent user-context token before any network request', async () => {
+    const fetchImpl = vi.fn();
+    await expect(createXFirstPartyAdapter({
+      accessToken: '', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_PUBLICATION_INPUT_REJECTED', truthState: 'FAILED',
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('keeps successful transport UNKNOWN when author, text, or id cannot be verified', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn().mockResolvedValueOnce(me()).mockResolvedValueOnce(write(prepared.text))
-      .mockResolvedValueOnce(readback('wrong post', '222222222'));
-    await expect(adapter(fetchMock).publish(prepared)).rejects.toMatchObject({
-      truthState: 'UNKNOWN',
-      retrySafe: false,
+  it('rejects a configured user id that disagrees with the approved account before network access', async () => {
+    const fetchImpl = vi.fn();
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId: '222222222', fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_PUBLICATION_INPUT_REJECTED', truthState: 'FAILED',
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('preserves UNKNOWN and the post id when provider readback is inaccessible', async () => {
-    const prepared = validateFirstPartySocialPost(input());
-    const fetchMock = vi.fn().mockResolvedValueOnce(me()).mockResolvedValueOnce(write(prepared.text))
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: { id: userId } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { id: postId, text: copy } }, 201))
       .mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
-    let captured: unknown;
-    try { await adapter(fetchMock).publish(prepared); } catch (error) { captured = error; }
-    expect(captured).toBeInstanceOf(XFirstPartyAdapterError);
-    const error = captured as XFirstPartyAdapterError;
-    expect(error.truthState).toBe('UNKNOWN');
-    expect(error.evidence.postId).toBe(POST_ID);
-    expect(error.retrySafe).toBe(false);
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_READBACK_REJECTED', truthState: 'UNKNOWN', retrySafe: false,
+      evidence: { postId, httpStatus: 403 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 });
