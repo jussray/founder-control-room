@@ -1,5 +1,6 @@
 import { installMissionBoard } from './mission-board.js';
 import { installProjectShellUi } from './project-shell-ui.js';
+import { installTruthConsole } from './truth-console.js';
 
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
@@ -11,6 +12,15 @@ const ALLOWED_TABS = new Set([
   'promptos',
   'analytics',
   'terminal',
+  'truth-dashboard',
+  'truth-claims',
+  'truth-evidence',
+  'truth-reconcile',
+  'truth-attacks',
+  'truth-world',
+  'truth-continuity',
+  'truth-seo',
+  'truth-ai-review',
 ]);
 
 const READINESS_COPY = {
@@ -44,19 +54,25 @@ function readinessCopy(readiness) {
   }
   return READINESS_COPY[readiness?.state] ?? null;
 }
+let readinessRequestId = 0;
 async function refreshConveyorReadiness() {
+  const requestId = ++readinessRequestId;
   setConveyorReadiness('checking', 'Checking n8n readiness…');
   try {
     const response = await fetch('/automation/conveyor/', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (requestId !== readinessRequestId) return;
     if (response.status === 401) { setConveyorReadiness('signed-out', 'Sign in to check n8n readiness'); return; }
     if (!response.ok) throw new Error(`readiness request failed with HTTP ${response.status}`);
     const body = await response.json();
+    if (requestId !== readinessRequestId) return;
     if (body?.contract !== CONVEYOR_CONTRACT) { setConveyorReadiness('error', 'n8n contract mismatch'); return; }
     const state = body?.readiness?.state;
     const label = readinessCopy(body?.readiness);
     if (!label) { setConveyorReadiness('error', 'n8n readiness unavailable'); return; }
     setConveyorReadiness(state, label);
-  } catch { setConveyorReadiness('error', 'n8n readiness unavailable'); }
+  } catch {
+    if (requestId === readinessRequestId) setConveyorReadiness('error', 'n8n readiness unavailable');
+  }
 }
 
 function installCoworkLane() {
@@ -99,20 +115,19 @@ function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
 }
-function removeTabQueryParameter() {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has('tab')) return;
-  url.searchParams.delete('tab');
-  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
 function activateTab(tab) {
   const button = document.querySelector(`.tabs button[data-tab="${tab}"]`);
   if (!(button instanceof HTMLButtonElement)) return false;
   button.click();
   safeSessionRemove(PENDING_TAB_KEY);
-  removeTabQueryParameter();
+  // Leave ?tab= in place. The five-screen shell is now the authoritative
+  // navigation layer and consumes the legacy URL into screen/view state. If
+  // this router erased the query first, a fast render could destroy the user's
+  // deep-link intent before the five-screen adapter observes it.
   return true;
 }
+installTruthConsole();
+
 const requestedTab = requestedTabFromUrl();
 if (requestedTab) safeSessionSet(PENDING_TAB_KEY, requestedTab);
 const pendingTab = requestedTab ?? safeSessionGet(PENDING_TAB_KEY);
@@ -127,10 +142,25 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
   }
 }
 const launchDock = document.querySelector('.launch-dock');
+function syncLaunchDockVisibility() {
+  if (!(launchDock instanceof HTMLDetailsElement)) return;
+  const authenticated = document.querySelector('#root .shell') instanceof HTMLElement;
+  if (!authenticated && launchDock.open) launchDock.open = false;
+  launchDock.hidden = !authenticated;
+  launchDock.setAttribute('aria-hidden', authenticated ? 'false' : 'true');
+}
+
 if (launchDock instanceof HTMLDetailsElement) {
-  launchDock.addEventListener('toggle', () => { if (launchDock.open) void refreshConveyorReadiness(); });
+  syncLaunchDockVisibility();
+  const root = document.getElementById('root');
+  if (root) {
+    const authVisibilityObserver = new MutationObserver(syncLaunchDockVisibility);
+    authVisibilityObserver.observe(root, { childList: true, subtree: true });
+  }
+  launchDock.addEventListener('toggle', () => {
+    if (launchDock.open && !launchDock.hidden) void refreshConveyorReadiness();
+  });
 }
 installCoworkLane();
 installMissionBoard();
 installProjectShellUi();
-void refreshConveyorReadiness();

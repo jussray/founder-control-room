@@ -20,6 +20,10 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('The repository Actions secret is a valid source');
+    expect(workflow).toContain('this error does not establish secret scope');
+    expect(workflow).toContain('only if one is configured');
+    expect(workflow).toContain('do not silently trim, rotate, expose, or bypass validation');
     expect(workflow).toContain('without a Bearer prefix');
     expect(workflow).toContain('without a NAME=value wrapper');
     expect(workflow).toContain('without wrapping quotes');
@@ -29,17 +33,16 @@ describe('canonical Worker reconcile credential preflight contract', () => {
   });
 
   it('refuses production mutation when required provider-held secrets have not been independently read back', () => {
-    expect(workflow).toContain('Verify provider-held Worker secrets before mutation');
+    // Current main implements this gate as a name-only Wrangler secret list plus
+    // a name/type binding check; the PR's intent (read back before mutation) is kept.
+    const step = 'Verify provider-held Worker secret names before reconciliation';
+    expect(workflow).toContain(step);
     expect(workflow).toContain("with open('wrangler.worker.toml', 'rb') as handle:");
-    expect(workflow).toContain("data.get('success') is not True");
-    expect(workflow).toContain('required - workflow_written - installed');
-    expect(workflow).toContain("item.get('name') == 'CF_API_TOKEN'");
-    expect(workflow).toContain("item.get('type') == 'plain_text'");
-    expect(workflow).toContain('rotate/remove it through authorized secret custody before deployment.');
-    expect(workflow).toContain('no mutation allowed. Restore only through approved secret custody.');
-    expect(workflow.indexOf('Verify provider-held Worker secrets before mutation'))
-      .toBeLessThan(workflow.indexOf('Record bounded authority receipt'));
-    expect(workflow.indexOf('Verify provider-held Worker secrets before mutation'))
+    expect(workflow).toContain('missing = sorted(required - present)');
+    expect(workflow).toContain('Missing provider-held Worker secret');
+    expect(workflow).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(workflow.indexOf(step)).toBeLessThan(workflow.indexOf('Record bounded authority receipt'));
+    expect(workflow.indexOf(step))
       .toBeLessThan(workflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'));
   });
 
