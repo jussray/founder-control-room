@@ -12,7 +12,7 @@ import express from 'express';
 import request from 'supertest';
 import { createQuickScanRouter, quickScanRouter, type QuickScanRouteDependencies } from '../quickscan.js';
 import { resetQuickScanStoreForTests } from '../../../quickscan/store.js';
-import { QuickScanChiefProviderError } from '../../../quickscan/chiefOpenaiClient.js';
+import { QuickScanChiefProviderError, quickScanChiefDataRecipients } from '../../../quickscan/chiefOpenaiClient.js';
 import { QUICKSCAN_CHIEF_WORKFLOW, type QuickScanChiefPromptInput } from '../../../quickscan/chiefPrompts.js';
 import type { ChiefQuickScanRecommendation } from '../../../quickscan/contracts.js';
 
@@ -43,6 +43,34 @@ describe('QuickScan founder-gated API', () => {
   it('rejects unauthenticated reads', async () => {
     const response = await request(buildApp()).get('/quickscan');
     expect(response.status).toBe(401);
+  });
+
+  it('denies stale or unbound provider consent before invoking Chief', async () => {
+    founderSession();
+    const runChief = vi.fn();
+    const app = buildAppWithChief({ runChief });
+    const created = await request(app).post('/quickscan/prospects').set('Authorization', BEARER)
+      .send({ businessName: 'Consent Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+    const unbound = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`)
+      .set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    expect(unbound.status).toBe(409);
+    expect(unbound.body.code).toBe('CHIEF_PROVIDER_CONSENT_CHANGED');
+
+    const oldProvider = process.env.QUICKSCAN_CHIEF_PROVIDER;
+    try {
+      process.env.QUICKSCAN_CHIEF_PROVIDER = 'anthropic';
+      const stale = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`)
+        .set('Authorization', BEARER)
+        .send({ acknowledgeDataSharing: true, acknowledgedProviders: ['openai'] });
+      expect(stale.status).toBe(409);
+      const data = await request(app).get('/quickscan').set('Authorization', BEARER);
+      expect(data.body.authority.chiefDataRecipients).toContain('anthropic');
+    } finally {
+      if (oldProvider === undefined) delete process.env.QUICKSCAN_CHIEF_PROVIDER;
+      else process.env.QUICKSCAN_CHIEF_PROVIDER = oldProvider;
+    }
+    expect(runChief).not.toHaveBeenCalled();
   });
 
   it('exposes bounded architecture with external execution disabled', async () => {
@@ -205,9 +233,9 @@ describe('QuickScan founder-gated API', () => {
 
     const runChief = vi.fn(async (_input: QuickScanChiefPromptInput) => ({
       recommendation: chiefRecommendation(),
-      provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_1', promptVersion: 'quickscan-chief-v1-test' },
+      provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_1', promptVersion: 'quickscan-chief-v1-test' },
     }));
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(200);
     expect(runChief).toHaveBeenCalledTimes(1);
@@ -216,7 +244,7 @@ describe('QuickScan founder-gated API', () => {
     expect(response.body.approval).toMatchObject({ action: 'outreach', recommendedBy: 'chief', decision: 'PENDING', proposedAction: chiefRecommendation().messageDraft });
     expect(response.body.prospect.approvals).toHaveLength(1);
     expect(response.body.prospect.audit.some((entry: { type: string }) => entry.type === 'chief.recommendation')).toBe(true);
-    expect(response.body.prospect.audit.some((entry: { type: string; message: string }) => entry.type === 'chief.recommendation.provenance' && entry.message.includes('resp_1') && entry.message.includes('gpt-5-mini'))).toBe(true);
+    expect(response.body.prospect.audit.some((entry: { type: string; message: string }) => entry.type === 'chief.recommendation.provenance' && entry.message.includes('resp_1') && entry.message.includes('gpt-4o-mini'))).toBe(true);
   });
 
   it('audits why a local provider was skipped and that the run fell back to a paid one', async () => {
@@ -229,7 +257,7 @@ describe('QuickScan founder-gated API', () => {
       recommendation: chiefRecommendation(),
       provenance: {
         provider: 'openai' as const,
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         responseId: 'resp_fallback',
         promptVersion: 'quickscan-chief-v1-test',
         selection: { providerId: 'openai', costClass: 'PAID' as const, eligibilityRevision: 'quickscan-openai-v1', licenseEvidence: 'provider-api-terms', quotaEvidence: 'api-key-configured' },
@@ -240,7 +268,7 @@ describe('QuickScan founder-gated API', () => {
         fallbackReason: 'LOCAL_CHIEF_REQUEST_FAILED',
       },
     }));
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(200);
     const provenanceEntry = response.body.prospect.audit.find((entry: { type: string }) => entry.type === 'chief.recommendation.provenance');
@@ -274,11 +302,11 @@ describe('QuickScan founder-gated API', () => {
         // below was reasoned out before that evidence existed, so applying
         // it now would misattribute its basis.
         await request(app).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category: 'urgency', note: 'Mutated mid-flight.' });
-        return { recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_race', promptVersion: 'quickscan-chief-v1-test' } };
+        return { recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_race', promptVersion: 'quickscan-chief-v1-test' } };
       }),
     });
 
-    const response = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(409);
     expect(response.body.code).toBe('QUICKSCAN_CHIEF_INPUT_CHANGED');
@@ -299,13 +327,13 @@ describe('QuickScan founder-gated API', () => {
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Repeat Ask Studio', segment: 'salon_studio_team_owner' });
     const id = created.body.prospect.id;
 
-    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
     expect(first.body.prospect.approvals).toHaveLength(1);
     const firstApprovalId = first.body.approval.id;
 
-    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(second.body.prospect.approvals).toHaveLength(2);
     const priorApproval = second.body.prospect.approvals.find((item: { id: string }) => item.id === firstApprovalId);
@@ -319,12 +347,12 @@ describe('QuickScan founder-gated API', () => {
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Cooling Off Studio', segment: 'salon_studio_team_owner' });
     const id = created.body.prospect.id;
 
-    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
     const firstApprovalId = first.body.approval.id;
 
-    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ nextAction: 'disqualify', messageDraft: undefined, summary: 'No longer a fit.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ nextAction: 'disqualify', messageDraft: undefined, summary: 'No longer a fit.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(second.status).toBe(200);
     expect(second.body.approval).toBeNull();
@@ -338,12 +366,12 @@ describe('QuickScan founder-gated API', () => {
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'No Resurrection Studio', segment: 'salon_studio_team_owner' });
     const id = created.body.prospect.id;
 
-    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
     const firstApprovalId = first.body.approval.id;
 
-    await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
-      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     const resurrect = await request(buildApp()).post(`/quickscan/prospects/${id}/approvals/${firstApprovalId}/decision`).set('Authorization', BEARER).send({ decision: 'APPROVE' });
     expect(resurrect.status).toBe(409);
@@ -362,9 +390,9 @@ describe('QuickScan founder-gated API', () => {
 
     const runChief = vi.fn(async () => ({
       recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined, summary: 'Not enough evidence yet.' }),
-      provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_2', promptVersion: 'quickscan-chief-v1-test' },
+      provenance: { provider: 'openai' as const, model: 'gpt-4o-mini', responseId: 'resp_2', promptVersion: 'quickscan-chief-v1-test' },
     }));
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(200);
     expect(response.body.prospect.chiefRecommendation.nextAction).toBe('capture_more_evidence');
@@ -385,7 +413,7 @@ describe('QuickScan founder-gated API', () => {
     const id = created.body.prospect.id;
 
     const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('not configured', 'OPENAI_NOT_CONFIGURED'); });
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(503);
     expect(response.body.code).toBe('OPENAI_NOT_CONFIGURED');
@@ -397,7 +425,7 @@ describe('QuickScan founder-gated API', () => {
     const id = created.body.prospect.id;
 
     const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('boom', 'OPENAI_HTTP_ERROR', 500); });
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true, acknowledgedProviders: quickScanChiefDataRecipients() });
 
     expect(response.status).toBe(502);
     expect(response.body.code).toBe('OPENAI_HTTP_ERROR');

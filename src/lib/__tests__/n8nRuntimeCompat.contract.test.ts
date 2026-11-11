@@ -64,6 +64,6 @@ describe('n8n pinned runtime compatibility contract', () => {
     expect(workflow).toContain('branches: [main]');
     expect(workflow).toContain('bash scripts/verify-n8n-runtime-compat.sh');
     expect(workflow).toContain('n8n-runtime-compat-receipt.json');
-    expect(workflow).toContain('actions/upload-artifact@v4');
+    expect(workflow).toContain('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
   });
 });

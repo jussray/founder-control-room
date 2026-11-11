@@ -39,7 +39,7 @@ env:
 
 concurrency:
   group: project-adapter-freshness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   freshness:
@@ -80,6 +80,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: npx tsx scripts/verify-project-adapter-freshness.ts
+
+      - name: Ensure failure receipt exists
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f "$PROJECT_ADAPTER_FRESHNESS_RECEIPT" ]; then
+            mkdir -p "$(dirname "$PROJECT_ADAPTER_FRESHNESS_RECEIPT")"
+            node -e '
+              const fs = require("node:fs");
+              const receipt = {
+                schemaVersion: 1,
+                kind: "portfolio-project-adapter-freshness",
+                checkedAt: new Date().toISOString(),
+                source: "github-actions-fallback",
+                checkoutSha: process.env.EXPECTED_HEAD_SHA,
+                allFresh: false,
+                assessment: {
+                  state: "unknown",
+                  blocker: "The verifier did not produce a receipt; inspect preceding workflow steps.",
+                },
+                mutationAuthorized: false,
+                providerMutationPerformed: false,
+              };
+              fs.writeFileSync(process.env.PROJECT_ADAPTER_FRESHNESS_RECEIPT, JSON.stringify(receipt, null, 2) + "\n");
+            '
+          fi
 
       - name: Retain sanitized portfolio freshness receipt
         if: always()
