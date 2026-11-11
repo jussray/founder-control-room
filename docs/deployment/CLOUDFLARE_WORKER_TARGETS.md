@@ -99,8 +99,10 @@ The literal build command `0` is invalid. This repository intentionally uses `np
 name: founder-control-room
 route: api.foundercontrolroom.org
 FOUNDER_API_URL: https://foundercontrolroom.org
-FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
+FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org,https://checkout.foundercontrolroom.org
 ```
+
+The recognized browser origins are the apex and the checkout subdomain. `scripts/verify-production-deploy-authority.mjs` pins the same `FOUNDER_ALLOWED_ORIGINS` value, so production deploy-authority proof fails closed if the recognized origins drift from this canonical configuration.
 
 `FOUNDER_API_URL` points to the Pages origin intentionally. Supabase magic links return through Pages, Pages routes dynamic requests to the API Worker, and the Worker's relative `/control-room/` redirect lands back on the browser frontend.
 
