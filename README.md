@@ -3,6 +3,12 @@
 ## Governed execution candidate boundaries
 
 The governed-execution candidate binds every attempt to its project shell, mission, credential lane, provider, egress policy, and founder receipt. Matching blank targets or capabilities are denied; capability suitability cannot authorize an unbound effect. Private and local IPv6 literals remain denied even when listed as allowed hosts. Public literal allowlisting does not prove DNS resolution, redirect validation, or transport-level isolation; those require executor-side checks and separate runtime evidence. Source guards and unit tests never grant merge, deployment, provider mutation, or a verified production outcome.
+## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
+
+`main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
+
+`.github/workflows/pr-hygiene.yml` runs weekly using `scripts/pr-hygiene.mjs`: drafts with no new commit for 21 days are labelled `stale` and closed 7 days later (reversible, branches kept); ready pull requests with no new commit for 30 days are labelled `stale` but never closed automatically. Idle time is measured from the last non-merge commit, because automated merges of `main` into every open pull request reset GitHub's updated time; `keep-open` exempts any pull request. Manual runs default to dry run. Neither workflow grants merge, approval, or deploy authority.
+
 ## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
 
 The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list after any human authentication notice, validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
