@@ -588,26 +588,35 @@ export function createFounderContentLifecycleRouter(
     try {
       const post = await requireStoredPost(deps, req, res);
       if (!post) return;
-      if (post.platform !== 'linkedin' || post.provider !== 'linkedin') {
+      const directProviderReady =
+        (post.platform === 'linkedin' && post.provider === 'linkedin') ||
+        (post.platform === 'x' && post.provider === 'x');
+      if (!directProviderReady) {
         return res.status(409).json({
           ok: false,
           code: 'PROVIDER_PUBLISH_NOW_ADAPTER_NOT_READY',
           provider: post.provider,
           platform: post.platform,
           published: false,
-          reason: 'Current direct authoritative publish-now implementation is LinkedIn-only; other providers remain adapter-gated.',
+          reason: 'Direct authoritative publish-now supports LinkedIn or X; other destinations remain adapter-gated.',
         });
       }
       if (!['approved', 'scheduled'].includes(post.status)) {
         return res.status(409).json({ ok: false, code: 'POST_NOT_PUBLISHABLE', status: post.status, published: false });
       }
       const configuredLinkedInAccountId = text(process.env.LINKEDIN_AUTHOR_URN);
-      if (!configuredLinkedInAccountId || post.accountId !== configuredLinkedInAccountId) {
+      const configuredXAccountId = text(process.env.X_USER_ID);
+      const linkedinMismatch = post.platform === 'linkedin' &&
+        (!configuredLinkedInAccountId || post.accountId !== configuredLinkedInAccountId);
+      const xMismatch = post.platform === 'x' &&
+        (!configuredXAccountId || !/^[0-9]{1,24}$/.test(configuredXAccountId) ||
+          post.accountId !== configuredXAccountId);
+      if (linkedinMismatch || xMismatch) {
         return res.status(409).json({
           ok: false,
           code: 'POST_DESTINATION_ACCOUNT_MISMATCH',
           published: false,
-          reason: 'Stored lifecycle destination must match the server-owned LinkedIn author before provider mutation.',
+          reason: 'Stored lifecycle destination must match the server-owned provider account before mutation.',
         });
       }
       if (!post.approvalId || post.approvalId !== text(body.approval_id).toLowerCase()) {
