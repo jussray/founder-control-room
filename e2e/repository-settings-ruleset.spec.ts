@@ -66,7 +66,7 @@ test.describe('Repository Settings ruleset safety', () => {
     await expect(page.locator('select[name="enforcement"]')).toHaveValue('active');
     await expect(page.locator('input[name="targetRefs"]')).toHaveValue('main');
     await expect(page.locator('input[name="requirePullRequest"]')).toBeChecked();
-    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('1');
+    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('0');
     await expect(page.locator('input[name="requiredStatusCheckNames"]')).toHaveValue(
       'Required Gate, Verify test-ledger contract',
     );

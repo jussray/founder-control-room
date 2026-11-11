@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Document the candidate FCR Gmail AI Inbox source-only optional Cloudflare binding contract and metadata-read scope while preserving independent OAuth, founder approval, privacy, provider, runtime, and deployment evidence boundaries.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and exact-head asynchronous GitHub merge transport: source wiring, configured bindings, live provider invocation, mutation authority, and terminal provider outcome remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -120,7 +120,8 @@
         "`.github/workflows/ci.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
         "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation.",
         "`.github/workflows/ci.yml` must explicitly verify that the exact-SHA migration scope step output is true or false; a missing, malformed, or unevaluated decision cannot skip every database lint step while leaving Required Gate green.",
-        "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority."
+        "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority.",
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
       ]
     },
     {
@@ -239,7 +240,8 @@
         "README.md records the October 23 peer refresh to 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f, StoryEngine's exact-head 15/15 successful check state, PR #1004's failure at its old 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f pin, and the requirement that PR #1004 earn its own exact-head witness; no separate PR witness or production/deploy authority transfers.",
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
-        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail."
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
+        "`README.md` must describe FCR asynchronous GitHub merge as exact-head-bound provider transport only, with queued/request UUID state separated from terminal merge proof and with no authority widening beyond the existing exact candidate approval membrane."
       ]
     },
     {
@@ -484,7 +486,9 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence."
+        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence.",
+        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
+        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release."
       ]
     },
     {
@@ -613,7 +617,8 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
+        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
+        "`src/providers/providerFactory.ts` must keep Founder Control Room integration pinned to exact FCR repository identity and a provider-reviewed direct `main` base, require provider-backed PR context, re-read exact base and head immediately before mutation, route only that FCR path through bounded asynchronous GitHub merge, and leave non-FCR repository integration on its existing provider-neutral path; transport cannot replace deterministic independent review or fresh exact founder-final approval."
       ]
     },
     {
@@ -626,6 +631,12 @@
       "path": "src/lib/xFirstPartyAdapter.ts",
       "claims": [
         "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
+    },
+    {
+      "path": "src/providers/githubAsyncMerge.ts",
+      "claims": [
+        "`src/providers/githubAsyncMerge.ts` must bind GitHub asynchronous merge enqueue to the exact reviewed 40-character head SHA, reconcile an existing request by provider UUID instead of blindly replaying it, poll only to a terminal provider result, return only a valid terminal merged SHA, and fail closed on provider failure, malformed response, or unresolved pending state; an async UUID, queued state, or provider acceptance grants no merge authority."
       ]
     }
   ]
