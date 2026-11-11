@@ -1,4 +1,5 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
+import type { AiGatewayBinding } from '../http/routes/ownerInsights.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
 import {
@@ -15,6 +16,8 @@ export interface ChiefAiEvidenceServiceBinding {
 }
 
 export interface ControlRoomWorkerEnv {
+  /** Optional until a founder-authorized read/proposal-only release is proven. */
+  AI?: AiGatewayBinding;
   SUPABASE_URL: string;
   SUPABASE_PROJECT_REF: string;
   SUPABASE_SERVICE_ROLE_KEY: string;

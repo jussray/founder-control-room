@@ -1,5 +1,11 @@
 # Cloudflare Reasoning Contract
 
+## November 2, 2026: AI Gateway owner-evidence challenge boundary
+
+The owner-insights candidate introduces an optional Cloudflare `AI` binding on the canonical Founder Control Room Worker, configured through `[ai]` in `wrangler.worker.toml` and passed as `aiBinding` to the existing authenticated Express server. `POST /owner-insights/challenge` requires founder authentication, bounded submitted evidence and explicit disclosure consent before calling Workers AI with the AI Gateway `default` ID, no response caching, and no gateway request logging. The model output is treated as unverified text and limited to questions, evidence gaps, and a proposed **manual** next gate; it is not evidence of independent provider validation and never executes a release decision. Binding absence or malformed model output fails closed without a substitute success.
+
+The parallel `GET /owner-insights/search-console` requires an independently authorized, Worker-held read-only `GSC_SERVICE_ACCOUNT_JSON` credential; it cannot reveal indexing metrics without a real Google Search Console property response. Sitemaps, six sampled URL inspections and unknown/error states must be labeled as provider observations, not a property-wide index count. This source change does not demonstrate a live gateway invocation, provider grant, runtime activation, successful release, or safe tenant-level access. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md` for the missing gates.
+
 ## November 7, 2026 — candidate Gmail AI Inbox read boundary
 
 PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.

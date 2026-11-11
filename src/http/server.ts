@@ -61,6 +61,7 @@ import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
+import { createOwnerInsightsRouter, type AiGatewayBinding } from './routes/ownerInsights.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
@@ -156,6 +157,8 @@ export interface CreateServerOptions {
   serveStatic?: boolean;
   /** Private Cloudflare service binding used only for proposal-only PromptOS -> Chief intake. */
   chiefAiBinding?: ChiefAiEvidenceServiceBinding;
+  /** Optional Cloudflare Workers AI binding, routed through AI Gateway. */
+  aiBinding?: AiGatewayBinding;
 }
 
 export function createServer(options: CreateServerOptions = {}) {
@@ -412,6 +415,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
   app.use('/goalfix', goalfixRouter);
+  app.use('/owner-insights', createOwnerInsightsRouter({ aiBinding: options.aiBinding }));
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);

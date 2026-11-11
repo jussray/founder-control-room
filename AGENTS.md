@@ -261,9 +261,11 @@ Data Analytics is observation-only. It may measure safe counts, rates, comparabl
 
 ## FCR independent review and live GitHub
 
-Founder Control Room in-app merges have a current independent-review membrane. For FCR, reviewer trust is server-owned at evaluation through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`.
+Founder Control Room uses **deterministic independent exact-head review plus authenticated founder-final approval**, not a standing second human reviewer. The current founder-only native GitHub phase deliberately requires **zero native approving human reviews** while the deterministic witness, required checks, security protections, and exact repository/PR/base/head founder-final gate remain load-bearing. `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` is compatibility-only for historical missions pinned to the older reviewer model; it is not a current required reviewer list.
 
-Author self-review, stale-head review, generic comments, and app/bot substitution do not satisfy a qualifying non-author semantic-review requirement.
+Author self-review, stale-head review, generic comments, and app/bot substitution do not satisfy a genuinely required independent deterministic witness or an explicitly legacy non-author semantic-review requirement. Do not misclassify zero native approvals as zero systematic review.
+
+Apply `GLOBAL_AI.md` **Stale → fix to present** to present-tense repository/agent/docs claims. A founder-reported credential rotation is `USER-REPORTED` until independently verified; a workflow `APP_PRIVATE_KEY_SHAPE_INVALID:unknown` error is a runtime input-shape observation, not proof that the underlying GitHub App key is invalid or needs rotating. Preserve prior verified evidence and update the current authoritative project source under the existing action gates; blocked provider work must retain a precise next gate.
 
 The FCR in-app review membrane and live GitHub repository rulesets are separate provider surfaces. Source code does not prove live required approvals, stale-review dismissal, last-push approval, review-thread resolution, strict status checks, or bypass actor/mode configuration. Fresh GitHub provider readback is required for those claims.
 

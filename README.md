@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 2, 2026: Search Console and evidence challenge source candidate
+
+The existing PR #1055 branch includes a source-only Founder Control Room owner-insights screen at `/control-room/owner-insights.html` and founder-authenticated API endpoints `GET /owner-insights/search-console` and `POST /owner-insights/challenge`. The former makes read-only Google Search Console sitemap and *sampled* URL Inspection requests for `sc-domain:jussco.company`; absent or rejected service-account authority must remain a blocked/unknown state rather than a zero-indexing statistic. It requires an independent, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret and read access to that exact Search Console property. The latter sends only consented, bounded claim/evidence text to the configured Cloudflare Workers AI binding routed through AI Gateway; model gaps, adversarial questions, and manual gate suggestions are unverified recommendations, not founder authorization.
+
+The two features are **not production-verified**, and neither grants deployment, merge, customer-account access, or indexing. The first slice remains founder-only; general project owners require separate project-scoped authentication, RLS, billing and privacy verification. Keep Google credentials off public Pages and source control, and do not turn a green source check into a production claim. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
