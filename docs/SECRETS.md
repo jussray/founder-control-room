@@ -1,5 +1,22 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
+## Cloudflare Logpush workflow secrets
+
+These names are used only by the founder-gated Logpush workflow. Values must remain in GitHub/Cloudflare secret planes and must never be committed, printed, or copied into documentation.
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_LOGPUSH_READ_TOKEN` | Dedicated Cloudflare credential for non-mutating Logpush job inspection. |
+| `CLOUDFLARE_LOGPUSH_WRITE_TOKEN` | Separate Cloudflare credential allowed to create/update the bounded Logpush job during an approved manual apply. |
+| `CLOUDFLARE_LOGPUSH_DESTINATION_CONF` | Provider-held destination configuration for the Logpush job; treat the entire value as secret because it may contain endpoint credentials. |
+
+`CLOUDFLARE_ACCOUNT_ID` remains the account selector. Secret-name documentation proves only the expected binding names; it does not prove a value is configured, valid, authorized, or currently present in GitHub or Cloudflare.
+
 This repository has three separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
@@ -24,7 +41,7 @@ The output includes `public/_worker.js`, which forwards missing routes and brows
 
 ## GitHub Actions secrets
 
-Set GitHub Actions secrets in the scope actually consumed by each workflow. In particular, `.github/workflows/portfolio-evidence-sync.yml` and `.github/workflows/portfolio-actions-audit.yml` both use `environment: production` and reference `${{ secrets.APP_ID }}` / `${{ secrets.APP_PRIVATE_KEY }}`. If the same name exists in the `production` environment and at repository or organization scope, GitHub selects the **environment-level** secret. Replacing a same-named repository secret does not replace the value seen by those jobs. Environment secrets are read when a job starts; repository secrets are read when the run is queued. Read back secret **name and `updated_at` metadata**, not secret contents, before attributing a repeated failure to an unchanged value.
+Set these in **GitHub → Settings → Secrets and variables → Actions**, using the `production` environment where required by the workflow.
 
 Secrets marked required cause the named workflow job to fail if absent.
 
@@ -36,21 +53,59 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 
 | Secret | Required by | Description |
 |---|---|---|
-| `APP_ID` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml`, `github-app-secret-shape-diagnostic.yml`, and FCR governance reconciliation | Numeric GitHub App ID for the installed Founder Control Room App. Portfolio workflows read `secrets.APP_ID` directly; other trusted witness paths may map it to `GITHUB_APP_ID`. |
-| `APP_PRIVATE_KEY` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml`, `github-app-secret-shape-diagnostic.yml`, and FCR governance reconciliation | RSA private key for the same App in one of the transport formats accepted below. Portfolio workflows read `secrets.APP_PRIVATE_KEY` directly; other witness paths may map it to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+| `APP_ID` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Numeric GitHub App ID for the installed Founder Control Room App. The portfolio workflows read `secrets.APP_ID` directly; the trusted witness paths map it to `GITHUB_APP_ID`. |
+| `APP_PRIVATE_KEY` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | RSA private key for the same GitHub App, in one of the transport shapes accepted below. The portfolio workflows read `secrets.APP_PRIVATE_KEY` directly; the trusted witness paths map it to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
 
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 
-#### 2026-10-31 portfolio incident: replacement history is not key-shape proof
+#### Secret scope precedence
 
-The founder reports prior replacements of `APP_PRIVATE_KEY`. A failing run does **not** prove those replacements never occurred or that the founder failed to perform them. Secret values are deliberately unreadable after storage; this repository and the workflow log do not establish the provider-held secret's update timestamp or which earlier secret scope was changed.
+Set these secrets in the scope the consuming job actually reads. `portfolio-evidence-sync.yml`
+and `portfolio-actions-audit.yml` both declare `environment: production` and reference
+`secrets.APP_ID` / `secrets.APP_PRIVATE_KEY`. When a name exists both in the `production`
+environment and at repository or organization scope, GitHub supplies the **environment-level**
+value. Replacing a same-named repository secret therefore does not change what those jobs see.
 
-- [Run 41202399202, job 124585730361, step 6](https://github.com/jussray/founder-control-room/actions/runs/41202399202/job/124585730361#step:6:1) checked out `f957663c3a4e0520cc06d266203f212e288e498b`. Its portfolio self-test passed. GitHub App minting failed at `APP_PRIVATE_KEY_SHAPE_INVALID:unknown` with `begin=false`, `end=false`, `b64charset=true`, `escapedNewlines=false`, `multiline=false`. Evidence publication and Chromium/Playwright proof were **skipped**; the uploaded `BLOCKED` receipt is not a live-proof receipt.
-- The normalizer in that exact commit already attempts PEM, escaped newline, quoted PEM, Base64 PEM, Base64 DER (PKCS#1 and PKCS#8), and collapsed-whitespace PEM. Therefore the error cannot honestly be presented as proof that *missing support for these formats* caused this run. `b64charset=true` describes a character set, **not** proof the value is a complete key or valid DER.
-- **Next diagnostic, before requesting another replacement:** use GitHub's read-only `updated_at` metadata for both `production` environment secret `APP_PRIVATE_KEY` and any repository-scoped secret of that name. Compare their timestamps with the job start on **2026-10-31 at 16:03 UTC**, and use the documented environment-over-repository precedence. This differentiates a replacement after the failed job from a lower-scope replacement that never reached it. Do not claim either explanation without metadata.
-- If the effective secret was updated before the job, `unknown` means the bytes supplied to the normalizer were not recognized. The specific reason remains **UNKNOWN** without secret-safe provider-side validation. Do not print the value, add a PAT or `GITHUB_TOKEN` fallback, weaken the App-only policy, or call the subsequent skipped stages passing.
-- A corrected secret format is still only the first gate. An actual installation-token mint, cross-repository evidence sync, and deployed Playwright browser proof each require independent successful receipts.
+Environment secrets are read when the job starts; repository secrets are read when the run is
+queued. Before attributing a repeated failure to an unchanged value, read back secret **name and
+`updated_at` metadata** — never contents — for both scopes and compare against the failing job's
+start time.
+
+#### Portfolio evidence sync: App key not yet recognized
+
+Recorded 2026-10-31; **re-observed 2026-11-11 and still current**.
+
+`Juss & Co portfolio evidence sync` fails at its `Normalize key and mint portfolio GitHub App
+token` step, so evidence publication and the deployed Playwright proof are skipped and the
+uploaded `BLOCKED` receipt is not live proof. Scheduled runs 131 through 138 all failed, the
+latest at 2026-11-11T06:40Z on `777aa12b`.
+
+The reported shape facts are `begin=false`, `end=false`, `b64charset=true`,
+`escapedNewlines=false`, `multiline=false`.
+
+What that does and does not establish:
+
+- The minting classifier already accepts raw PEM, CRLF PEM, escaped-newline PEM, quoted PEM,
+  base64/base64url PEM, base64 DER (PKCS#1 and PKCS#8), and space-collapsed PEM. The failure is
+  therefore **not** evidence that support for those shapes is missing.
+- `b64charset=true` describes a character set only. It is not proof the stored value is a
+  complete key, or valid DER.
+- The founder reports prior replacements of `APP_PRIVATE_KEY`. A failing run does not prove a
+  replacement never happened. Stored secret values are deliberately unreadable, and neither this
+  repository nor the workflow log establishes the provider-held `updated_at` or which scope was
+  changed.
+- The specific reason remains **UNKNOWN** pending secret-safe provider-side validation. Do not
+  print the value, add a PAT or `GITHUB_TOKEN` fallback, weaken the App-only policy, or treat the
+  skipped downstream stages as passing.
+
+Next diagnostic, before requesting another replacement: compare `updated_at` metadata for the
+`production` environment secret against any repository-scoped secret of the same name, applying
+the precedence rule above. That distinguishes a replacement made after the failing job from a
+lower-scope replacement that never reached it.
+
+A corrected secret shape is only the first gate. An installation-token mint, the cross-repository
+evidence sync, and the deployed browser proof each still require their own successful receipt.
 
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 
@@ -291,11 +346,17 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
+| `SPRITES_TOKEN` | `bip-sprite-founder-dispatch.yml` | Required only for an explicitly founder-approved `execute=true` read-only proof mission on the fixed existing Se’kret Bip Sprite. Not needed for dry-run contract validation. Keep the bearer server-side; never log or expose it. This credential grants no FCR merge, deployment, or user-data access authority. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Provider credential used only by the bounded Claude second-pass repair job in the protected `production` environment. Its presence authorizes no merge, deployment, provider mutation, or publication, and its value must never appear in logs, artifacts, source, or chat. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
 | `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
+| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` | Dedicated short-lived Supabase OAuth access token for the canonical `POST /mcp` operator-relay witness. It must carry the configured MCP audience, an allowed `client_id`, `mcp:read`, at least one allowed `mcp_projects` grant, and a current founder identity. Do not reuse the founder browser bearer, static `/mcp/read` token, provider API key, deploy token, or service-role credential. Never log or expose the token value in artifacts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
+| `FCR_JIRA_AUTOMATION_INGRESS_TOKEN` | `jira-work-automation-live-probe.yml` | Required bearer credential for the bounded FCR Jira automation ingress. Never log or expose the value. |
+| `FCR_JIRA_AUTOMATION_INGRESS_URL` | `jira-work-automation-live-probe.yml` | Required HTTPS URL for the exact `/ingest/jira-work-automation` production route; name presence does not prove reachability. |
+| `JIRA_AUTOMATION_PROBE_ISSUE_KEY` | `jira-work-automation-live-probe.yml` | Protected identifier for the dedicated Jira control issue. It constrains the probe target and is not authority to select arbitrary issues. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
