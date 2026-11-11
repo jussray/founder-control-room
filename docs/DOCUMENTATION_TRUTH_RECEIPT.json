@@ -636,6 +636,13 @@
         "The Chief reconciliation plan must require zero desired bypass actors and strict status freshness, place `Verify candidate ProofMode runtime with Playwright` on exact-head ruleset `20818149` with GitHub Actions integration `15368`, and narrow governance-boundary unconditional checks to `Typecheck` plus `Verify operational authority`.",
         "The Chief reconciliation plan must remove production deployment environments from the pre-merge desired state while preserving `Cloudflare Production` plus `proofmode-access-admin` as post-merge/current-main proof obligations, preserve unmanaged security rules, and fail closed until a separately authorized drift-safe provider mutation is followed by fresh readback."
       ]
+    },
+    {
+      "path": "src/providers/jusscoRulesetPreflight.ts",
+      "claims": [
+        "`src/providers/jusscoRulesetPreflight.ts` must accept read-only provider observations only for active `jussray/jussray` branch rulesets Governance `26857902` and Production `26428639`, require exactly one native human approval, reject unauthorized targets and stale full-readback fingerprints before any suggested remediation, and never mint merge, deployment, or provider-update authority.",
+        "The JussCo ruleset preflight must preserve observed required check producer identities, deployment counts and bypass counts in its advisory output, never silently replace unrelated protection, and return `BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE` for needed provider changes because a fingerprint alone is not an atomic update precondition; source tests do not prove a live GitHub administrative change."
+      ]
     }
   ]
 }
