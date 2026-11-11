@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## October 29, 2026: Founder Proof Audit Shopify product-route candidate (not deployed)
+
+FCR Shopify Admin currently reports `Founder Proof Audit` as ACTIVE at $99 (SKU `FCR-PROOF-AUDIT-99`) with the product path `/products/founder-proof-audit`. Prior FCR Pages routing did not explicitly own that extensionless path. The candidate source adds a branded, inquiry-only public page under `public/products/founder-proof-audit/index.html`, routes both slash forms through `STATIC_EXACT_PATHS` in `public/_worker.js`, and adds `founderProofAuditPublicProduct.test.ts`.
+
+The inquiry page intentionally does not initiate checkout: the Shopify MAIN redirect was independently observed pointing to JBH, while the corrected FCR Shopify redirect theme targeting `www.foundercontrolroom.org` remains UNPUBLISHED. The candidate does not establish live DNS/Pages behavior, a sale, checkout, or fulfillment. Exact-head checks, browser and Cloudflare deployment proof, final reviewed merge approval, and a separate Shopify theme publication gate are outstanding. The Truthweaver store and JBH remain separate.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
