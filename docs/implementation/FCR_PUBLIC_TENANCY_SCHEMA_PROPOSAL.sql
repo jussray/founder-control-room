@@ -1,3 +1,8 @@
+-- HISTORICAL proposal, NOT executable release authority.
+-- A new stricter backend-only migration candidate exists at
+-- supabase/migrations/20261107164425_fcr_public_tenant_boundaries.sql
+-- This proposal's authenticated Data API reads are superseded by the safer
+-- service-role-only design. Do not apply this historical proposal.
 -- PRE-RELEASE SCHEMA PROPOSAL ONLY. This is NOT a migration and has NOT run.
 -- A separate founder-approved migration is required before activation.
 -- Public customers MUST NOT share the governed founder projects tables.

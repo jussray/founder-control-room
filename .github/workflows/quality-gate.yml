@@ -83,6 +83,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
+      - name: Verify site identity, wiring and customer tenancy defaults
+        run: node --experimental-strip-types --test tests/command-center-site-access.test.mjs tests/command-center-site-wiring.test.mjs tests/fcr-public-tenancy-migration.test.mjs tests/command-center-neon-preview-contract.test.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

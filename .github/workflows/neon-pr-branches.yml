@@ -96,6 +96,69 @@ jobs:
         shell: bash
         run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
+      # The pinned Neon v6 action overrides suspend_timeout_seconds: 0 on
+      # initial creation. This Free account rejects explicit suspend overrides.
+      # Pre-provision with the provider default, then let the pinned action
+      # reuse the exact PR branch and supply its private connection string.
+      - name: Provision PR preview with Neon default suspend settings
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          listing="$(mktemp)"
+          created="$(mktemp)"
+          trap 'rm -f "$listing" "$created"' EXIT
+          api="https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches"
+          status="$(curl --silent --show-error --max-time 20 --output "$listing" --write-out '%{http_code}' \
+            --header 'Accept: application/json' \
+            --header "Authorization: Bearer ${NEON_API_KEY}" "$api")"
+          if [ "$status" != 200 ]; then
+            echo "::error title=Neon preview lookup unavailable::HTTP ${status}; preview verification remains blocked." >&2
+            exit 1
+          fi
+          preview_name="preview/pr-${PR_NUMBER}"
+          default_id="$(jq -r '.branches | [.[] | select(.default == true) | .id] | first // empty' "$listing")"
+          if [[ ! "$default_id" =~ ^br-[a-z0-9-]+$ ]]; then
+            echo '::error title=Neon default branch unknown::Cannot validate preview parent.' >&2
+            exit 1
+          fi
+          existing="$(jq -c --arg name "$preview_name" \
+            '.branches | [.[] | select(.name == $name)] | first // empty' "$listing")"
+          if [ -n "$existing" ]; then
+            branch_id="$(jq -r '.id // empty' <<< "$existing")"
+            parent_id="$(jq -r '.parent_id // empty' <<< "$existing")"
+            if [[ ! "$branch_id" =~ ^br-[a-z0-9-]+$ ]] || [ "$parent_id" != "$default_id" ]; then
+              echo '::error title=Neon preview mismatch::Refusing a non-default parent or invalid identity.' >&2
+              exit 1
+            fi
+            echo 'Existing PR-scoped Neon preview verified; pinned action will resolve the connection.'
+            exit 0
+          fi
+          payload="$(jq -nc --arg name "$preview_name" --arg expires "$EXPIRES_AT" \
+            '{branch: {name: $name, expires_at: $expires}, endpoints: [{type: "read_write"}]}')"
+          # The request deliberately omits suspend_timeout_seconds, which is
+          # not configurable on this Neon account.
+          status="$(curl --silent --show-error --max-time 30 --output "$created" --write-out '%{http_code}' \
+            --request POST --header 'Accept: application/json' \
+            --header "Authorization: Bearer ${NEON_API_KEY}" \
+            --header 'Content-Type: application/json' --data "$payload" "$api")"
+          if [ "$status" != 201 ] && [ "$status" != 200 ]; then
+            # Do not print provider response bodies or connection credentials.
+            echo "::error title=Neon preview provisioning rejected::HTTP ${status}; migration proof stays blocked." >&2
+            exit 1
+          fi
+          created_id="$(jq -r '.branch.id // empty' "$created")"
+          created_parent="$(jq -r '.branch.parent_id // empty' "$created")"
+          if [[ ! "$created_id" =~ ^br-[a-z0-9-]+$ ]] || [ "$created_parent" != "$default_id" ]; then
+            echo '::error title=Neon preview creation unverified::Invalid branch identity or parent.' >&2
+            exit 1
+          fi
+          echo 'PR-scoped Neon preview provisioned; pinned action and migration tests remain mandatory.'
+
       - name: Create Neon Branch
         if: steps.neon_scope.outputs.needs_neon == 'true'
         id: create_neon_branch
@@ -105,6 +168,39 @@ jobs:
           branch_name: preview/pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_at: ${{ env.EXPIRES_AT }}
+
+      # A failed create stays red. Read back only enough metadata to distinguish
+      # an already-present PR branch from an absent branch or provider outage.
+      - name: Diagnose rejected Neon branch create without masking failure
+        if: failure() && steps.neon_scope.outputs.needs_neon == 'true' && steps.create_neon_branch.outcome == 'failure'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          # The API response, token and connection URLs are never printed.
+          http_status="$(curl --silent --show-error --max-time 20 \
+            --output "$response_file" --write-out '%{http_code}' \
+            --header 'Accept: application/json' \
+            --header "Authorization: Bearer ${NEON_API_KEY}" \
+            "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" || true)"
+          if [ "$http_status" != 200 ]; then
+            echo "::error title=Neon branch readback unavailable::Status ${http_status}; create rejection is still blocking."
+            exit 1
+          fi
+          if jq -e --arg name "preview/pr-${PR_NUMBER}" \
+            '.branches | if type == "array" then any(.[]; .name == $name) else false end' \
+            "$response_file" >/dev/null; then
+            echo "::error title=Existing Neon preview requires reconciliation::PR branch exists; the create action failed and no migration proof has run."
+          else
+            echo "::error title=Neon preview absent after failed create::Inspect provider limits or permissions; no preview was provisioned."
+          fi
+          # No successful fallback, deletion, or secret-bearing output.
+          exit 1
 
       - name: Verify branch creation result
         if: steps.neon_scope.outputs.needs_neon == 'true'

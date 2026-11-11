@@ -1,3 +1,7 @@
+## November 7, 2026 — Command Center external Site safety repair (PR #1002, branch only)
+
+A scoped source repair adds a read-only Site bootstrap with issuer-verified Supabase OAuth `client_id`, immutable `founder_users.user_id` owner matching, and an exact-origin GET-only CORS exception without credentials. It stages a separate, empty customer tenant migration at `supabase/migrations/20261107164425_fcr_public_tenant_boundaries.sql`; the legacy 5W1H customer MCP tool remains independently feature-gated. Live readback on November 7 confirmed FCR's Supabase customer tables are absent, FCR's production Worker is configured, and an apex Control Room Cloudflare Access application exists. The supplied ChatGPT Site URL and editor identity were **not** provider verified; neither the new migration nor the endpoint is applied/enabled in production. Unit/CI, exact-head PR review, Site OAuth client registration, live two-account RLS/browser proof, separate merge and release approval remain pending. No founder source data is exported to this Site.
+
 # Founder Control Room
 
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
