@@ -324,6 +324,12 @@ npx playwright test e2e/cloudflare-reasoning.spec.ts
 
 The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
 
+
+## Whop commerce webhook secret boundary
+
+The FCR Whop money path follows the same Cloudflare authority rule as other provider-held runtime credentials: `FCR_WHOP_WEBHOOK_SECRET` is named as a feature-gated secret in `wrangler.worker.toml [secrets].optional`, but its value must remain only in the surviving Founder Control Room Worker secret store. It must be installed before Whop activation, and moving it into `[secrets].required` (so canonical deploy fails closed on its absence) belongs to the separate activation change; repository source, CI, PR text, and documentation must never contain the `ws_...` value.
+
+The source-mounted endpoint is `POST /webhooks/whop/fcr/payments-succeeded`. Its presence in source proves only that the Worker candidate can accept and verify Whop Standard Webhooks when correctly configured. It does not prove provider webhook registration, secret installation, production migration, signed delivery, checkout completion, or collected revenue. A missing or unobserved provider binding leaves activation BLOCKED/UNKNOWN rather than authorizing a fallback or secret copy through GitHub Actions.
 ## OAuth consent browser-origin boundary
 
 For an external connector's authorization request, the Pages edge redirects only www consent GET navigation to canonical `https://foundercontrolroom.org/oauth/consent`, preserving the query string. On the apex, Pages forwards the consent GET, API-owned assets, and protected consent POST through its existing `FCR_API` service binding without changing the browser origin. The browser's host-only founder cookie and same-tab authorization ID therefore remain on the configured Pages origin; the API service still performs authentication, CSRF enforcement, and the server-to-Supabase consent request. Pages must never serve the consent assets from public `ASSETS` or mint its own founder authority. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.
