@@ -586,6 +586,21 @@ The read-only Se’kret Bip project adapter now stages an audit against independ
 
 The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
 
+## Portfolio repository authority tiers
+
+`src/config/portfolio.ts` is the authority-bearing repository registry. A governance profile, memory record, Council observation, historical alias, connector entry, or project name cannot promote a repository into FCR mutation authority by itself.
+
+The runtime distinction is fail-closed:
+
+- `PORTFOLIO_PROJECTS` are the only active repositories eligible for FCR portfolio/MCP mutation authority, subject to their separate action, proof, recovery, provider, and founder gates;
+- `EXTERNAL_PROJECTS` may contribute bounded identity, provenance, observation, or project-specific safety context but have **zero FCR mutation authority** until deliberately promoted into the active registry and freshly re-proven;
+- `CONTINUITY_ONLY_PROJECTS` are identity/continuity surfaces and likewise have **zero FCR mutation authority**;
+- `QUARANTINED_REPOSITORIES` remain denied even when a legacy alias resolves to a current project's safety profile; and
+- unknown repositories fail closed.
+
+Sync Party (`jussray/sync-party-game`) is active and therefore now has an explicit governance profile; its production claim requires exact deployed-version evidence plus multiplayer-runtime evidence. Bip Jr's canonical continuity identity is `jussray/Bip-Jr`; historical `jussray/Se-kretBip` may inherit Bip Jr safety constraints for classification only, while remaining quarantined and non-authorizing.
+
+Authority-tier movement is itself a truth transition. Promotion, demotion, alias change, or quarantine change invalidates assumptions that depended on the prior tier and requires successor proof before consequential work proceeds.
 ## September 30 CI snapshot testing
 
 FCR's CI pipeline now includes an external-site snapshot test (`fix/ci-run-external-site-snapshot-test`, merged as PR #903) that exercises the published artifact and verifies snapshot consistency across runs. The test is source/CI proof only: it exercises a bounded checkout state and does not prove the artifact is currently deployed to production, that the snapshot policy is active in Cloudflare, or that previous snapshots remain cached. Snapshot validation is independent verification for a pinned FCR head; movement of FCR or the external asset service invalidates the binding and requires rerun.
