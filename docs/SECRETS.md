@@ -325,3 +325,13 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 - Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
 - Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
 - Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.
+
+### Friend Intake provider-secret activation (source contract only)
+
+The governed Friend runtime uses server-held provider credentials only after an interactive founder session, non-sensitive input, allowlisting, and a successful atomic budget reservation. Source declaration does **not** prove a credential has been installed, validated, or authorized for production.
+
+- `OPENAI_API_KEY` — shared server-side OpenAI credential; never place in a browser bundle or PR logs.
+- `ANTHROPIC_API_KEY` — optional Friend Anthropic provider credential; must be installed before enabling that provider.
+- `PERPLEXITY_API_KEY` — optional Friend Perplexity provider credential; must be installed before enabling that provider.
+
+The required deployment secret list remains the canonical `[secrets].required` set in `wrangler.worker.toml`. Optional feature credentials do not become boot requirements without an independently authorized activation.

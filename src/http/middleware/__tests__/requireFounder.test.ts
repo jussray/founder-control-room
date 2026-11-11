@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import express, { type Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderRequest } from '../requireFounder.js';
@@ -151,8 +152,35 @@ function refreshedSession(): Session {
 
 function createProbeApp() {
   const app = express();
+  // Synthetic authorization probes are not production routes, but still
+  // explicitly exercise the same pre-auth request-limiting boundary.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  }));
   app.get('/protected', requireFounder, (req: FounderRequest, res) => {
     res.json({ founder: req.founder });
+  });
+  return app;
+}
+
+function createAuthChannelProbeApp() {
+  const app = express();
+  // Synthetic authorization probes are not production routes, but still
+  // explicitly exercise the same pre-auth request-limiting boundary.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  }));
+  app.get('/protected', requireFounder, (req: FounderRequest, res) => {
+    res.json({
+      founder: req.founder,
+      founderAuthChannel: req.founderAuthChannel,
+    });
   });
   return app;
 }
@@ -195,6 +223,17 @@ beforeEach(() => {
 });
 
 describe('requireFounder', () => {
+  it('probe throttles unauthorized requests before authentication', async () => {
+    const app = createAuthChannelProbeApp();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await request(app).get('/protected');
+      expect(response.status).toBe(401);
+    }
+    const limited = await request(app).get('/protected');
+    expect(limited.status).toBe(429);
+    expect(limited.headers['retry-after']).toBeDefined();
+  });
+
   it('requires a bearer token or founder cookie', async () => {
     const response = await request(createProbeApp()).get('/protected');
 
@@ -303,6 +342,34 @@ describe('requireFounder', () => {
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it('carries the interactive auth channel downstream after opaque-session refresh and rotation', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'expired access token' },
+    });
+    const session = refreshedSession();
+    mocks.refreshSession.mockResolvedValue({
+      data: { session, user: session.user },
+      error: null,
+    });
+    const cookie = await founderCookie();
+
+    const response = await request(createAuthChannelProbeApp())
+      .get('/protected')
+      .set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      founder: {
+        email: 'founder@example.com',
+        userId: 'founder-user-1',
+      },
+      founderAuthChannel: 'interactive',
+    });
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
   });
 
   it('does not renew a refreshed cookie for an authenticated nonfounder', async () => {

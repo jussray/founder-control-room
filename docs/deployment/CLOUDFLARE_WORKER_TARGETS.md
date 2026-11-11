@@ -286,3 +286,7 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+## Friend model deployment boundary
+
+The canonical Worker source pins Friend to `gpt-5.6-luna`, `claude-sonnet-5`, and `sonar` and requires the corresponding OpenAI, Anthropic, and Perplexity secret binding names. Those declarations must not be promoted into a claim that provider credentials are installed, the Friend database migration is applied, the Worker is deployed at the candidate SHA, or live model execution has been observed.

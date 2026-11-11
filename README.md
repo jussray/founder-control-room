@@ -686,6 +686,9 @@ The FCR source reconciler in `src/providers/GitHubProvider.ts` must preserve exi
 
 This changes candidate source policy, tests, and documentation only. It does **not** prove GitHub's live ruleset is reconciled or a deployment occurred. Authoritative evidence requires independently read-back provider state after explicitly authorized mutation; green PR checks and auto-merge intent do not substitute for merge or release authority.
 
+### Friend Intake runtime boundary
+
+Friend Intake is source-enabled for deterministic, OpenAI, Anthropic, and Perplexity inference, with explicit model IDs and provider-held credential names declared in `wrangler.worker.toml`. This source state does not prove those credentials are installed, the privacy-store migration is applied, the Worker is deployed at the candidate SHA, or any live provider call has succeeded; those remain separate configuration, database, deployment, and runtime proof gates.
 ## Gmail AI Inbox — candidate scoped runtime
 
 PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).

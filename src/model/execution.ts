@@ -1,4 +1,5 @@
 export type ModelExecutionState =
+  | 'not_used'
   | 'succeeded'
   | 'degraded'
   | 'blocked'
