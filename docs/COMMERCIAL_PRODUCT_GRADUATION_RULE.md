@@ -142,6 +142,20 @@ The smallest reversible test that can produce or falsify a real paid outcome
 
 A product without a repeat engine may still be a legitimate one-time business, but the one-time mechanism must be explicit. A recurring-revenue claim requires recurring payment or contract evidence, not a recurring-use hypothesis.
 
+## One-time versus subscription pricing rule
+
+When the same customer can choose between a materially comparable one-time offer and a recurring subscription, the subscription should normally carry a **lower entry price** in exchange for an explicit repeat-value loop. The recurring offer must not be a disguised discount with no continuing customer value.
+
+Required recurring proof:
+
+- the repeat engine is explicit;
+- the recurring deliverable is materially different from a one-off handoff;
+- the subscription entry price is lower than the comparable one-time price unless the founder explicitly approves a documented exception;
+- cancellation, renewal, billing interval, and delivery claims match the actual provider configuration;
+- recurring revenue is not claimed until recurring payment evidence exists.
+
+For service-led founder products, a valid repeat engine may include periodic review, maintenance, outcome-based refinement, refreshed deliverables, or ongoing operational support. Do not invent recurring work solely to justify a subscription.
+
 Content teardowns should use the same fields. A hook may simplify the language, but the underlying content artifact must preserve customer, payer, revenue mechanism, repeat engine, proof, unproven state, and next money test.
 
 ## Product fingerprint

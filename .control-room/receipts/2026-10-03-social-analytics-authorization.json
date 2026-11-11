@@ -1,0 +1,52 @@
+{
+  "contract": "juss/court-authorization-receipt@v1",
+  "observed_at": "2026-10-03T20:18:18Z",
+  "recorded_at": "2026-10-06T19:15:00Z",
+  "subject": {
+    "case": "social-analytics direct-to-main delivery, 2026-10-03",
+    "repos": {
+      "founder-control-room": {"head": "d52543fbfece", "commits": ["b40106f0479b", "95863df6cc79", "d52543fbfece"]},
+      "chief-ai-machine": {"head": "b4cc4b276172", "commits": ["1203a1fa8f6f", "b0032dcf887a", "324ca18718dd", "b4cc4b276172"]},
+      "solcontinuity": {"head": "f66a32685ed5", "commits": ["3a614d9559e4", "011426cda9b2", "b33c438ad36f", "46345ea5cee4", "45fb092652cb", "f66a32685ed5"]},
+      "promptos": {"head": "d39abe26ab8b", "commits": ["b3a04d4c1be4", "7dd25bfd44b3", "5127675548d8", "d39abe26ab8b"]}
+    },
+    "commit_count": 17
+  },
+  "court_ruling": {
+    "verdict": "AUTHORIZED_WORK__PROCESS_VIOLATION",
+    "founder_words": "Yes — I ruled Authorized. Record it.",
+    "ruling_time": "2026-10-03T20:18:18Z",
+    "disposition": "Code preserved. Delivery path recorded noncompliant. Authorization is distinct from delivery compliance.",
+    "authorization": "AUTHORIZED",
+    "delivery_compliance": "NO"
+  },
+  "governance_defects": {
+    "founder-control-room": "Ruleset active but contains no pull_request rule; direct pushes landed on main.",
+    "chief-ai-machine": "PR-rule ruleset present yet direct pushes landed; owner/admin bypass inferred.",
+    "solcontinuity": "Zero repository rulesets (protected=false).",
+    "promptos": "Zero repository rulesets."
+  },
+  "struck_fabrications": [
+    "Claude's attached timestamp '2026-10-03 16:13 ET' — manufactured, struck per DeepSeek correction.",
+    "Claude's 'EXECUTION: ACTIVE' — self-promoted from READY, struck.",
+    "Claude's 'Juss then said: Begin' and '16:25 ET' timestamp — unsupported in the primary record, struck.",
+    "Gemini's pre-issued ruling '(2) UNAUTHORIZED GATE BYPASS' — retracted.",
+    "Session '13 commits' count — arithmetic drift; superseded by SHA enumeration (17)."
+  ],
+  "witnesses": [
+    {"class": "repository_source", "state": "VERIFIED", "evidence": "github:jussray/founder-control-room@d52543fbfece, github:jussray/chief-ai-machine@b4cc4b276172, github:jussray/solcontinuity@f66a32685ed5, github:jussray/promptos@d39abe26ab8b", "scope": "All four heads verified as main via live clone 2026-10-03; commit SHAs enumerated via GitHub API."},
+    {"class": "human_observation", "state": "VERIFIED", "evidence": "Founder's own message in the primary Muse chat, 2026-10-03 16:18:18 EDT.", "scope": "The ruling itself — witnessed directly, not relayed."},
+    {"class": "independent_challenger", "state": "VERIFIED", "evidence": "Multi-model Court record: ChatGPT (coordinator), DeepSeek (governance/logic challenger), Gemini (witness), Claude (implementation witness); all chambers synchronized to AUTHORIZED by 2026-10-03 16:30 EDT.", "scope": "Ruling validity and struck fabrications."}
+  ],
+  "open_gates_at_record": [
+    "GitHub enforcement repair across all four repos (executor: founder-named; repair must go through the front door).",
+    "Chief CI: Quality Gate Typecheck failure caused by the social change (TS2339 in social-analytics-decision.js:138); one-line JSDoc fix identified, unapplied as of 2026-10-03.",
+    "Exact-head re-verification after repairs, then provider ingress (currently HOLD)."
+  ],
+  "limitations": [
+    "No claim is made about runtime behavior of the social-analytics chain; integration state is INTEGRATED, not VERIFIED, until one real provider observation reconciles hash-by-hash.",
+    "Commit authorship of the unsigned Oct 3 pushes is WHO=UNKNOWN; the ruling covers authorization, not attribution.",
+    "Mirror of the full case file at ~/workspace/social-audit-2026-10-03/RULING-2026-10-03-authorized.md."
+  ],
+  "next_gate": "Enforcement repair executor performs the GitHub ruleset repair; Chief one-line CI fix lands through a PR; heads re-verified; provider ingress unholds on founder word."
+}
