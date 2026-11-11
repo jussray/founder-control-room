@@ -271,7 +271,7 @@
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
         "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false.",
-        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in required-name policy may be verified by canonical deploy without copying, reading, or logging the `ws_...` value."
+        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in feature-gated name declaration may be verified without copying, reading, or logging the `ws_...` value."
       ]
     },
     {
@@ -491,7 +491,7 @@
         "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence.",
         "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
         "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release.",
-        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under `[secrets].required` so canonical exact-main Deploy fails closed when the Whop provider-held Worker signing-secret binding is absent; the required-name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
+        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under the feature-gated `[secrets].optional` registry (Founder Path B: deploy-required names stay boot-essential) until a separate Whop activation change moves it into `[secrets].required`; the name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
       ]
     },
     {
