@@ -92,7 +92,7 @@ describe('secret-rotation', () => {
   it('would fail if secrets table missing on worker init', async () => {
     const mockSupabaseNoTable = {
       from: (_table: string) => ({
-        select: (_column: string) => ({
+        select: (_columns: string) => ({
           limit: (_count: number) => Promise.resolve({ error: { message: 'Relation "public.secrets" does not exist' } }),
         }),
       }),

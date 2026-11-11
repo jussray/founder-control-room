@@ -288,14 +288,20 @@ export async function logIncidentToLinear(
       }),
     });
 
-    const body = (await response.json().catch(() => null)) as {
-      errors?: Array<{ message?: unknown }>;
-      data?: { issueCreate?: { issue?: { id?: unknown } } };
-    } | null;
+    const rawBody: unknown = await response.json().catch(() => null);
+    // Provider responses are untrusted. Decode the minimal fields we need and
+    // fail closed on malformed payloads rather than trusting response.json().
+    const body = rawBody !== null && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      ? rawBody as {
+          errors?: Array<{ message?: unknown }>;
+          data?: { issueCreate?: { issue?: { id?: unknown } } };
+        }
+      : null;
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
 
     // Linear may report GraphQL failure with HTTP 200. Provider-controlled
     // response text is intentionally not written to logs.
-    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+    if (errors.length > 0) {
       console.error('[incident-escalation] Linear GraphQL request rejected');
       return false;
     }
