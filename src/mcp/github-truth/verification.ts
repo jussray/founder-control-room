@@ -286,6 +286,9 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
     || expectedHeadMismatch
     || normalizedFindings.includes('pr_head_changed_during_collection')
     || normalizedFindings.includes('pr_identity_changed_during_collection')
+    || normalizedFindings.includes('ci_evidence_changed_during_collection')
+    || normalizedFindings.includes('required_check_policy_changed_during_collection')
+    || normalizedFindings.includes('review_evidence_changed_during_collection')
     || normalizedFindings.includes('duplicate_current_head_check_conflict');
 
   return {

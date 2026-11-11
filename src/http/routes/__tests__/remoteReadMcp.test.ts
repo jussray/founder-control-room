@@ -272,6 +272,7 @@ describe('Founder Control Room paired remote MCP', () => {
       'chief_preview_capability_plan',
       'fcr_list_projects',
       'fcr_get_current_truth',
+      'fcr_audit_change_genealogy',
       'fcr_preview_skill_route',
       'fcr_relay_operator',
     ]);
