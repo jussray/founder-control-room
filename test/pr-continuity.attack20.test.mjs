@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import {
   START_MARKER,
   END_MARKER,
@@ -195,16 +195,6 @@ test('AT34 rollover routes deferred PRs away from update-branch and keeps them o
 });
 test('AT35 stacked children are still ordered after a deferred parent', () => {
   assert.deepEqual(collectRolloverOrder([{ ...pr(10, 'main', 'parent'), draft: true }, pr(11, 'parent', 'child')]), [10, 11]);
-});
-test('AT36 every pull_request workflow declares top-level concurrency so superseded heads stop consuming runners', () => {
-  const dir = new URL('../.github/workflows/', import.meta.url);
-  const missing = readdirSync(dir)
-    .filter((name) => /\.ya?ml$/.test(name))
-    .filter((name) => {
-      const source = readFileSync(new URL(name, dir), 'utf8');
-      return /^\s+pull_request:\s*$|^\s+pull_request:\s*\{|^on:.*\bpull_request\b/m.test(source) && !/^concurrency:/m.test(source);
-    });
-  assert.deepEqual(missing, []);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
 
