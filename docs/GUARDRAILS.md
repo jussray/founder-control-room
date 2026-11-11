@@ -9,7 +9,7 @@ A status of `active` means the stated control is enforced on the relevant path. 
 | `FCR-AUTH-001` | `active` | Founder-only project reads require a valid session and founder allowlist authorization. | Existing `requireFounder` middleware; integration tests verify unauthenticated project access is denied. |
 | `FCR-BOUNDARY-001` | `active` | Control Room must use its own Supabase project and never borrow Bip service-role credentials. | `makeSupabaseClient` validates the code-owned Control Room project ref before creating a privileged client. Unexpected cloud projects, insecure cloud URLs, malformed origins, and production-local URLs fail closed. Local Supabase requires an explicit non-production opt-in. |
 | `FCR-DATA-001` | `active` | Raw teen journals, voice, media, companion memory, and private parent content must not enter Control Room operational storage. | GitHub webhook ingestion verifies the signature, resolves a registered project, then reduces the payload to typed, bounded, controller-required operational metadata before persistence. Route and sanitizer tests prove private and malformed fields are excluded. |
-| `FCR-APPROVAL-001` | `active` | Evidence-backed merges may use standing founder authority while deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates. | `docs/FOUNDER_MERGE_AUTHORITY.md`, active AI instruction files, and explicit public contract fields. |
+| `FCR-APPROVAL-001` | `active` | Merge authority is available, but every merge requires fresh explicit founder approval bound to the exact repository, pull request, base SHA, and head SHA. Approval does not carry across candidate movement. | `docs/FOUNDER_MERGE_AUTHORITY.md`, active AI instruction files, the merge runtime, and explicit public contract fields. Deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates. |
 | `FCR-PROVIDER-001` | `active` | Repository and AI providers remain replaceable adapters. | `RepositoryProvider` boundary and provider-neutral guardrail snapshot. |
 | `FCR-SECRET-001` | `active` | Provider tokens, service-role keys, founder sessions, and private project data never appear in public responses. | Public status exposes IDs, states, and summaries only; tests scan responses for secret markers. |
 | `FCR-RLS-001` | `partial` | Every final public migration table must have reviewed row-level-security state. | CI inventories create/drop/enable/disable operations across every authoritative migration and blocks new or stale gaps. Five legacy prototype tables remain without final RLS enablement pending an approved corrective migration. |
@@ -111,9 +111,12 @@ The failed transition still performs the status update and attempt increment as 
 
 - `sensitiveFieldsIncluded: false`
 - `standingMergeAuthority: true`
+- `mergeApprovalAlwaysRequired: true`
 - `approvalCarryForward: false`
 
-Standing merge authority means an appropriate repository integration can proceed without another merge-only prompt. It does not carry into deploy, migration, auth, secrets, billing, deletion, publication, distribution, or external action.
+Standing merge authority means the system has the merge capability/authority class available. It is **not** candidate approval and must never be treated as permission to integrate a specific PR. Before every merge, the founder must explicitly approve the exact repository, PR number, current base SHA, and current head SHA. If that approval is absent, ambiguous, or stale, the operator or agent must ask and stop. Any base/head movement expires the approval and requires a new explicit approval.
+
+Deployment, migration, auth, secrets, billing, deletion, publication, distribution, and external action remain separate gates even after a merge is approved.
 
 Neither surface may include environment values, founder identity, tokens, project secrets, private event payloads, or repository credentials.
 

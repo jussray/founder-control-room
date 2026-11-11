@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "contract": "founder-control-room/media-script-manifest@v1",
+  "projectId": "959a5532-da31-4bc8-af28-508ef1a2b640",
+  "projectSlug": "founder-control-room",
+  "repositoryFullName": "jussray/founder-control-room",
+  "targetBranch": "main",
+  "missionId": "167d89a2-f4e5-4670-833d-5650c53142cc",
+  "founderIntentId": "8f4ba218-01dd-44e1-b409-cecbbb6d3ef9",
+  "intent": {
+    "outcome": "Create a truth-guarded live-action Founder Control Room video that makes people curious about what the project actually does and could help with once fully launched.",
+    "truthBoundary": "Show current verified architecture and implementation without claiming the product is fully launched or that future outcomes have already occurred."
+  },
+  "subject": {
+    "name": "Founder Control Room",
+    "format": "live-action founder manifesto",
+    "stage": "script"
+  },
+  "direction": {
+    "liveActionOnly": true,
+    "avatarImpersonation": false,
+    "coreVisualLanguage": "real founder work, real screens, real evidence checks, restrained captions",
+    "noAnimatedExplainer": true,
+    "noHudAsPrimaryVisual": true,
+    "tone": "urgent, grounded, curious, evidence-bound"
+  },
+  "videoCommands": {
+    "authorityRule": "Video commands select review or production behavior but never create truth, render, spend, publication, provider, deployment, or merge authority.",
+    "frontAuthority": "gemini-command",
+    "commands": [
+      {
+        "command": "/LEEVIZE",
+        "role": "production-control",
+        "effect": "Enter the Gemini-first media workflow. Gemini owns intake, interpretation, story planning, shot routing, bounded budget allocation, repair decisions, and release disposition. /LEEVIZE remains the non-bypassable truth, provenance, canon, freshness, continuity, budget, and audit kernel beneath Gemini.",
+        "cannot": [
+          "promote-unverified-claims",
+          "mint-evidence-authority",
+          "authorize-external-publication"
+        ]
+      },
+      {
+        "command": "/truthmode",
+        "role": "claim-review",
+        "effect": "Audit spoken, on-screen, visual, and implied claims against current evidence receipts before they are permitted in the production plan.",
+        "cannot": [
+          "convert-inference-to-fact",
+          "treat-generated-ui-as-runtime-proof"
+        ]
+      },
+      {
+        "command": "/confess",
+        "role": "uncertainty-disclosure",
+        "effect": "Surface UNKNOWN, BLOCKED, stale, inferred, missing-provider, and missing-runtime evidence explicitly instead of smoothing uncertainty into a green status.",
+        "cannot": [
+          "hide-missing-proof",
+          "collapse-distinct-failures"
+        ]
+      },
+      {
+        "command": "/ULTRATHINK",
+        "role": "adversarial-preflight",
+        "effect": "Before generation or spend, apply consequence and authority checks, Lindy review, Red Team I, L99, Red Team II, OODA, Attack Ten, smallest reversible routing, proof requirements, and a stop condition.",
+        "cannot": [
+          "increase-authority-through-reasoning",
+          "bypass-policy-because-a-plan-is-persuasive"
+        ]
+      }
+    ]
+  },
+  "script": {
+    "durationTargetSeconds": 35,
+    "opening": {
+      "visual": "A founder working alone at a laptop. A screen appears to say DONE. The founder stops instead of celebrating, then checks the browser, commit, and evidence.",
+      "voiceover": "AI is getting very good at doing things. I am interested in whether it knows what actually happened."
+    },
+    "middle": {
+      "visual": "Fast live-action cuts of browser testing, code, project screens, a phone, infrastructure checks, and the founder comparing evidence before accepting a result.",
+      "voiceover": "I am building Founder Control Room so every system works toward one founder intent, and every claim has to survive the evidence.",
+      "captions": [
+        "VERIFIED",
+        "INFERRED",
+        "UNKNOWN",
+        "BLOCKED",
+        "BUILD · FIX · LAUNCH · GROW · DECIDE · OPERATE · PROVE"
+      ]
+    },
+    "truthDisclosure": {
+      "visual": "Hold briefly on the founder and the evidence screen instead of a product victory montage.",
+      "caption": "NOT FULLY LAUNCHED YET."
+    },
+    "closing": {
+      "visual": "Founder closes one evidence check, looks back to the work, then the Founder Control Room name appears over restrained live-action footage.",
+      "voiceover": "But if you want to understand where I think founder software is going, look closer.",
+      "caption": "Founder Control Room · AI that knows what it can prove."
+    }
+  },
+  "truthReview": {
+    "status": "reviewed",
+    "reviewer": "truthmode",
+    "rules": [
+      "Do not claim Founder Control Room is fully launched.",
+      "Do not claim a render, publication, customer outcome, or external action before outcome evidence exists.",
+      "Do not turn continuity evidence into action or publish authority.",
+      "Keep future usefulness framed as design intent or future capability, not present outcome.",
+      "Gemini may direct production but cannot manufacture, promote, or overwrite claim truth.",
+      "Gemini/Veo output receives the same evidence and canon gate as every delegated renderer.",
+      "The video command deck changes workflow behavior only; slash commands never create authority."
+    ],
+    "publicClaims": [
+      {
+        "claim": "Founder Control Room has mission-bound media continuity and proof-cookie contracts in the repository.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:src/lib/mediaContinuity.ts",
+          "github:src/lib/mediaMissionContinuity.ts",
+          "github:Founder Cookie Contract Mirror"
+        ]
+      },
+      {
+        "claim": "Founder Control Room has a Gemini-command /LEEVIZE-policy boundary that keeps production decisions separate from claim truth and publish authority.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:src/lib/mediaProductionAuthority.ts",
+          "github:src/lib/__tests__/mediaProductionAuthority.test.ts"
+        ]
+      },
+      {
+        "claim": "Founder Control Room has a policy-bound per-shot media execution layer that requires renderer receipts and never promotes render output into truth or publication authority.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:src/lib/mediaProductionExecution.ts",
+          "github:src/lib/__tests__/mediaProductionExecution.test.ts"
+        ]
+      },
+      {
+        "claim": "Founder Control Room is being built so internal capabilities work toward one founder intent and claims are evidence-bound.",
+        "classification": "VERIFIED",
+        "evidenceRefs": [
+          "github:founder-intent-runtime",
+          "supabase:founder-intent:8f4ba218-01dd-44e1-b409-cecbbb6d3ef9",
+          "supabase:mission:167d89a2-f4e5-4670-833d-5650c53142cc"
+        ]
+      },
+      {
+        "claim": "Once fully launched, the system could help founders coordinate Build, Fix, Launch, Grow, Decide, Operate, and Prove under one intent.",
+        "classification": "INFERRED",
+        "evidenceRefs": [
+          "fcr:product-design-intent"
+        ]
+      },
+      {
+        "claim": "This video has been rendered, published, or produced a customer outcome.",
+        "classification": "UNKNOWN",
+        "evidenceRefs": []
+      }
+    ]
+  },
+  "intelligence": {
+    "layer": "gemini-command",
+    "role": "foremost-operational-media-authority",
+    "responsibilities": [
+      "intake",
+      "interpretation",
+      "narrative-planning",
+      "shot-routing",
+      "budget-allocation",
+      "approve-or-block",
+      "targeted-repair",
+      "release-disposition"
+    ],
+    "cannot": [
+      "reclassify-truth",
+      "mint-evidence-authority",
+      "turn-continuity-into-publish-authority"
+    ]
+  },
+  "policyKernel": {
+    "layer": "leevize",
+    "role": "truth-policy-audit-kernel",
+    "nonBypassable": true,
+    "enforces": [
+      "claim-eligibility",
+      "evidence-freshness",
+      "strict-canon",
+      "budget-ceilings",
+      "continuity-lineage",
+      "verification-failures"
+    ]
+  },
+  "renderStack": {
+    "state": "router-defined",
+    "commandAuthority": "gemini-command",
+    "renderers": [
+      "gemini-veo",
+      "invideo",
+      "runway",
+      "runtime-capture",
+      "editor-compositor"
+    ],
+    "renderAuthorized": false
+  },
+  "runtime": {
+    "stage": "planning",
+    "renderExecuted": false
+  },
+  "authority": {
+    "draft": true,
+    "render": false,
+    "publish": false,
+    "sendExternal": false,
+    "billingChange": false
+  },
+  "evidenceRefs": [
+    "github:media-script-manifest",
+    "github:media-continuity-contract",
+    "github:media-mission-continuity-contract",
+    "github:media-production-authority-contract",
+    "github:media-production-execution-contract"
+  ]
+}

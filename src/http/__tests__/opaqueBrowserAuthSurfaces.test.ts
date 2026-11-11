@@ -17,7 +17,7 @@ const SURFACES = [
 describe('opaque founder browser auth surfaces', () => {
   it.each(SURFACES)('%s uses the HttpOnly same-origin session instead of a browser bearer', (path) => {
     const source = readFileSync(resolve(process.cwd(), path), 'utf8');
-    expect(source).toContain("credentials: 'same-origin'");
+    expect(source).toMatch(/credentials\s*:\s*['"]same-origin['"]/);
     expect(source).not.toContain('Authorization:');
     expect(source).not.toContain('access_token');
     expect(source).not.toContain("sessionStorage.getItem('fcr_session')");

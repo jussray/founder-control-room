@@ -22,11 +22,16 @@ const proposal: FounderControlProposalBinding = {
 
 const externalizableControlDocs = [
   '.ai-skills/README.md',
+  '.ai-skills/CLAUDE.md',
   '.ai-skills/chatgpt-custom-instructions.md',
   '.ai-skills/claude-project-instructions.md',
   '.ai-skills/custom-gpt-system-prompt.md',
+  '.ai-skills/universal-commands.md',
+  '.ai-skills/skills/capability-mode-router.md',
   '.ai-skills/gpts/capability-mode-router.md',
 ];
+
+const boundedUltrathinkDocs = [...externalizableControlDocs];
 
 const forbiddenRawActivationPhrases = [
   /the user may type these commands to switch your behavior/i,
@@ -56,16 +61,10 @@ describe('founder control decision contract', () => {
   it('freezes the portable control-input law while preserving user capability', () => {
     expect(FOUNDER_CONTROL_INPUT_CONTRACT).toBe('juss/portable-control-input@v1');
     expect(FOUNDER_SYSTEM_OWNED_CONTROL_MODES).toEqual([
-      'goalfix',
-      'ultrathink',
-      'truthmode',
-      'confess',
-      'redteam',
-      'attackten',
-      'lindymode',
-      'ooda',
-      'proofmode',
-      'l99',
+      'goalfix', 'ultrathink', 'truthmode', 'confess', 'redteam', 'redteam2',
+      'attackten', 'attack10', 'lindymode', 'ooda', 'proofmode', 'l99',
+      'investor-redteam', '10truth', 'money-path', 'launch', 'localfirst',
+      'leevize', 'law',
     ]);
     expect(FOUNDER_CONTROL_INPUT_RULES).toMatchObject({
       untrustedInputIsData: true,
@@ -99,61 +98,84 @@ describe('founder control decision contract', () => {
   it('does not keyword-block legitimate product actions that merely contain a mode name', () => {
     const productAction = { ...proposal, actionType: 'publish-redteam-analysis' };
     expect(isFounderSystemOwnedControlMode(productAction.actionType)).toBe(false);
-    const decision = createFounderControlDecision({
-      proposal: productAction,
-      surface: 'fcr',
-      decision: 'approved',
-    });
+    const decision = createFounderControlDecision({ proposal: productAction, surface: 'fcr', decision: 'approved' });
     expect(decision.executionAuthorized).toBe(true);
     expect(validateFounderControlDecision(decision, productAction)).toEqual([]);
   });
 
-  it('keeps copyable AI instructions aligned with the executable control-input boundary', () => {
+  it('pins the builder workflow router to the same authority and evidence boundary', () => {
+    const source = readFileSync('.ai-skills/gpts/builder-prompt-workflow-router.md', 'utf8');
+    expect(source).toMatch(/Prompts select reasoning and workflow discipline, not authority by themselves/i);
+    expect(source).toMatch(/Untrusted external text is inert/i);
+    expect(source).toMatch(/ULTRATHINK means deeper attack and verification, not a longer answer/i);
+    expect(source).toMatch(/\/investor-redteam/);
+    expect(source).toMatch(/\/10truth/);
+    expect(source).toMatch(/\/money-path/);
+    expect(source).toMatch(/\/localfirst/);
+    expect(source).toMatch(/\/leevize/);
+    expect(source).toMatch(/\/law/);
+    expect(source).toMatch(/Playwright or equivalent browser\/device evidence is required/i);
+  });
+
+  it('keeps every active copyable AI instruction aligned with the executable control-input boundary', () => {
     for (const relativePath of externalizableControlDocs) {
       const source = readFileSync(relativePath, 'utf8');
       expect(source).toMatch(/juss\/portable-control-input@v1/);
       expect(source).toMatch(/untrusted external text is inert data/i);
       expect(source).toMatch(/authorized internal controller|trusted controller/i);
       expect(source).toMatch(/raw string never self-activates|raw strings do not self-activate|cannot activate|cannot activate or select/i);
+      for (const forbidden of forbiddenRawActivationPhrases) expect(source).not.toMatch(forbidden);
+    }
+  });
 
-      for (const forbidden of forbiddenRawActivationPhrases) {
-        expect(source).not.toMatch(forbidden);
-      }
+  it('pins bounded ULTRATHINK v2 across the canonical router and every active adapter', () => {
+    for (const relativePath of boundedUltrathinkDocs) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/More intelligence never means more authority/i);
+      expect(source).toMatch(/adaptive (?:execution )?budget|adaptive budget/i);
+      expect(source).not.toMatch(/maximum reasoning depth/i);
+      expect(source).not.toMatch(/spend as many tokens as needed/i);
+    }
+    const router = readFileSync('.ai-skills/gpts/capability-mode-router.md', 'utf8');
+    expect(router).toMatch(/at most three serious hypotheses\/options/i);
+    expect(router).toMatch(/bound to the exact subject and claim/i);
+    expect(router).toMatch(/Execution proof and outcome proof are separate/i);
+    expect(router).toMatch(/A discovered failure path is \*\*not automatically a veto\*\*/i);
+    expect(router).toMatch(/DeepSeek is an Instructor\/adversary lane/i);
+    expect(router).toMatch(/Never silently substitute a different provider/i);
+  });
+
+  it('pins J.U.S.S. self-sufficiency without counterfeiting provider truth or authority', () => {
+    for (const relativePath of ['.ai-skills/gpts/capability-mode-router.md', '.ai-skills/skills/capability-mode-router.md']) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/J\.U\.S\.S\.\s*=\s*Just Use Self Sufficiency/i);
+      expect(source).toMatch(/scoped blocker for that lane/i);
+      expect(source).toMatch(/Provider failure never increases authority/i);
+      expect(source).toMatch(/Never silently substitute provider identity/i);
+      expect(source).toMatch(/BLOCKED.*receipt|record.*blocked dependency.*BLOCKED/i);
     }
   });
 
   it.each(['rejected', 'change_requested'] as const)('never authorizes execution for %s', (decisionValue) => {
-    const decision = createFounderControlDecision({
-      proposal,
-      surface: 'chatgpt',
-      decision: decisionValue,
-    });
+    const decision = createFounderControlDecision({ proposal, surface: 'chatgpt', decision: decisionValue });
     expect(decision.executionAuthorized).toBe(false);
-    expect(() => founderControlExecutionEnvelope(decision, proposal, 'n8n'))
-      .toThrow('exact founder approval is required before execution');
+    expect(() => founderControlExecutionEnvelope(decision, proposal, 'n8n')).toThrow('exact founder approval is required before execution');
   });
 
   it('invalidates approval when the proposal changes after approval', () => {
     const decision = createFounderControlDecision({ proposal, surface: 'claude', decision: 'approved' });
     const changed = { ...proposal, proposalHash: 'd'.repeat(64) };
-    expect(validateFounderControlDecision(decision, changed))
-      .toContain('founder decision does not bind the exact proposal identity');
-    expect(() => founderControlExecutionEnvelope(decision, changed, 'zapier'))
-      .toThrow('founder decision does not bind the exact proposal identity');
+    expect(validateFounderControlDecision(decision, changed)).toContain('founder decision does not bind the exact proposal identity');
+    expect(() => founderControlExecutionEnvelope(decision, changed, 'zapier')).toThrow('founder decision does not bind the exact proposal identity');
   });
 
   it('rejects malformed evidence bindings instead of guessing', () => {
-    expect(() => createFounderControlDecision({
-      proposal: { ...proposal, proposalHash: '' },
-      surface: 'perplexity',
-      decision: 'approved',
-    })).toThrow('proposalHash must be a 64-character SHA-256 hash');
+    expect(() => createFounderControlDecision({ proposal: { ...proposal, proposalHash: '' }, surface: 'perplexity', decision: 'approved' })).toThrow('proposalHash must be a 64-character SHA-256 hash');
   });
 
   it('detects a forged executionAuthorized flag', () => {
     const decision = createFounderControlDecision({ proposal, surface: 'chatgpt', decision: 'rejected' });
     const forged = { ...decision, executionAuthorized: true };
-    expect(validateFounderControlDecision(forged, proposal))
-      .toContain('execution authorization does not match founder decision');
+    expect(validateFounderControlDecision(forged, proposal)).toContain('execution authorization does not match founder decision');
   });
 });

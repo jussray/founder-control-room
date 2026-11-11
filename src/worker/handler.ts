@@ -7,6 +7,13 @@ import {
   type ProjectEmailBinding,
 } from './projectEmail.js';
 
+export interface ChiefAiEvidenceServiceBinding {
+  version(): Promise<unknown>;
+  ingestBipEvidence(input: unknown): Promise<unknown>;
+  /** Optional until the paired Chief runtime carrying the public-command RPC is deployed. */
+  acceptPromptOSCommandIntent?(input: unknown): Promise<unknown>;
+}
+
 export interface ControlRoomWorkerEnv {
   SUPABASE_URL: string;
   SUPABASE_PROJECT_REF: string;
@@ -23,6 +30,8 @@ export interface ControlRoomWorkerEnv {
   FOUNDER_API_URL: string;
   FCR_EMAIL: ProjectEmailBinding;
   FCR_EMAIL_FROM: string;
+  /** Private same-account RPC binding to Chief AI's evidence-only entrypoint. */
+  CHIEF_AI: ChiefAiEvidenceServiceBinding;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
   FCR_V10_CONVEYOR_CONTRACT: string;
   FCR_V10_MAX_RUNTIME_AUTHORITY: string;
@@ -59,6 +68,12 @@ function hasNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+function isChiefAiEvidenceServiceBinding(value: unknown): value is ChiefAiEvidenceServiceBinding {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ChiefAiEvidenceServiceBinding>;
+  return typeof candidate.version === 'function' && typeof candidate.ingestBipEvidence === 'function';
+}
+
 /** Fail closed before importing environment-backed application modules. */
 export function validateWorkerEnv(
   env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
@@ -72,24 +87,15 @@ export function validateWorkerEnv(
   if (!isProjectEmailBinding(env.FCR_EMAIL)) {
     throw new Error('Missing required Worker binding: FCR_EMAIL');
   }
-
-  const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
-  const hasGitHubAppId = hasNonEmptyString(env.GITHUB_APP_ID);
-  const hasGitHubPrivateKey = hasNonEmptyString(env.GITHUB_PRIVATE_KEY);
-
-  if (!hasGitHubToken && !hasGitHubAppId && !hasGitHubPrivateKey) {
-    throw new Error(
-      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
-    );
+  if (!isChiefAiEvidenceServiceBinding(env.CHIEF_AI)) {
+    throw new Error('Missing required Worker binding: CHIEF_AI');
   }
 
-  if (hasGitHubAppId !== hasGitHubPrivateKey) {
-    throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
-  }
+  // External repository credentials are capability-scoped, not core startup dependencies.
+  // FCR GitHub operations still require the complete trusted App pair in providerFactory.
 
-  // The complete-key check above is runtime proof that every required value is
-  // a non-empty string. TypeScript cannot derive that fact through the dynamic
-  // key iteration, so narrow once at this boundary.
+  // TypeScript cannot derive these nonempty guarantees from dynamic iteration,
+  // so narrow the validated core bindings once at this boundary.
   const validated = env as ControlRoomWorkerEnv;
 
   const founderSessionKey = validated.FOUNDER_SESSION_ENCRYPTION_KEY.trim();

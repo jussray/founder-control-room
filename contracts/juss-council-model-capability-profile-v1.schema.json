@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "github:jussray/founder-control-room/contracts/juss-council-model-capability-profile-v1.schema.json",
+  "title": "Juss Council Model Capability Profile v1",
+  "type": "object",
+  "required": [
+    "contract",
+    "repository",
+    "defaultBranch",
+    "preparedAgainstBaseSha",
+    "authorityHost",
+    "runtimeActivation",
+    "restrictedContextAllowed",
+    "lanes",
+    "authority",
+    "promotionGate"
+  ],
+  "properties": {
+    "contract": {
+      "const": "juss/council-model-capability-profile@v1"
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaultBranch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preparedAgainstBaseSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "authorityHost": {
+      "const": "jussray/founder-control-room"
+    },
+    "providerExecutionHost": {
+      "type": "string"
+    },
+    "projectRole": {
+      "type": "string"
+    },
+    "activation": {
+      "enum": [
+        "trial_profile_only",
+        "external_adapter_only",
+        "blocked_until_authority_confirmed"
+      ]
+    },
+    "runtimeActivation": {
+      "const": false
+    },
+    "restrictedContextAllowed": {
+      "const": false
+    },
+    "lanes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "model",
+          "role",
+          "status"
+        ],
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "const": "trial"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "required": [
+        "selectionAuthority",
+        "executionAuthority",
+        "mergeAuthority",
+        "deployAuthority",
+        "publishAuthority",
+        "spendAuthority",
+        "providerMutationAuthority"
+      ],
+      "properties": {
+        "selectionAuthority": {
+          "const": false
+        },
+        "executionAuthority": {
+          "const": false
+        },
+        "mergeAuthority": {
+          "const": false
+        },
+        "deployAuthority": {
+          "const": false
+        },
+        "publishAuthority": {
+          "const": false
+        },
+        "spendAuthority": {
+          "const": false
+        },
+        "providerMutationAuthority": {
+          "const": false
+        }
+      }
+    },
+    "promotionGate": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "projectGuards": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollback": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
