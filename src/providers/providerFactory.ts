@@ -9,6 +9,7 @@ import type {
   Patch,
   ProjectRepo,
   PullRequestReviewContext,
+  PullRequestObservation,
   RepositoryProvider,
   RepositoryRef,
   ReviewSignal,
@@ -198,6 +199,17 @@ class LazyRepositoryProvider implements RepositoryProvider {
       throw new Error(`${delegate.name}: does not support provider-backed pull-request reviews`);
     }
     return delegate.listReviewSignals(this.governanceProjectId(projectId), pullRequestNumber);
+  }
+
+  async observePullRequest(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestObservation> {
+    const delegate = await this.delegate();
+    if (!delegate.observePullRequest) {
+      throw new Error("Provider does not support read-only PR observations");
+    }
+    return delegate.observePullRequest(this.governanceProjectId(projectId), pullRequestNumber);
   }
 
   async getPullRequestReviewContext(
