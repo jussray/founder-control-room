@@ -85,6 +85,7 @@ describe('Worker build authority membrane', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('NATIVE_WORKER_GIT_PROMOTION_BLOCKED');
     expect(receipt).toMatchObject({
       ok: true,
       wranglerCommand: 'types',
@@ -107,8 +108,10 @@ describe('Worker build authority membrane', () => {
       WRANGLER_COMMAND: 'types',
     });
     expect(result.status).toBe(1);
+    expect(result.stderr).toContain('does not match checked-out source');
     expect(receipt).toMatchObject({
       ok: false,
+      wranglerCommand: 'types',
       authorityDecision: 'block',
       productionPromotionAuthorized: false,
       nativeWorkerGitPromotionAllowed: false,

@@ -283,8 +283,9 @@ export function requestAudit(
         path: req.path,
         status: res.statusCode,
         durationMs: Date.now() - start,
-        ip: req.ip,
-        ...(founder ? { founder: founder.email } : {}),
+        founderAuthenticated: Boolean(founder),
+        // The limiter may use req.ip, but generic audit logs must not
+        // persist raw addresses or founder identity.
       }),
     );
   });

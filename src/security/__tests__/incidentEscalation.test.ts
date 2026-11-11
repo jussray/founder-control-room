@@ -164,6 +164,19 @@ describe('incident-escalation', () => {
     expect(result).toBe(false); // Should detect the error and return false
   });
 
+  it('rejects malformed Linear JSON without claiming incident delivery', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('null', { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
+    const result = await logIncidentToLinear(createMockVerdict('REPAIR_REQUIRED'), {
+      LINEAR_API_KEY: 'not-a-real-key',
+    });
+    expect(result).toBe(false);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
   // IMPLANT 5 TEST: Critical escalation failure detection
   it('detects when all escalation channels fail on REPAIR_REQUIRED', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

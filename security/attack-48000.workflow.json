@@ -1,0 +1,81 @@
+{
+  "schema": "juss/attack-48000-security-workflow@v1",
+  "name": "ATTACK-48000",
+  "status": "POLICY_ONLY_UNVERIFIED",
+  "owner": "founder-control-room",
+  "purpose": "Bounded, authorized defensive red-team review and incident-response hardening across independently owned Juss & Co. systems.",
+  "pressureLabel": "48000",
+  "pressureMeaning": "A reasoning and adversarial-review budget; not 48000 requests, scans, exploit attempts, or attacker-directed actions.",
+  "lineage": {
+    "firewall": "security/firewall-v10.policy.json",
+    "attackSuite": "security/attack-20-v3.policy.json",
+    "personalPrivacy": "juss-protect-me",
+    "infrastructureShield": "juss-protect-me-2"
+  },
+  "phases": [
+    "OBSERVE",
+    "BOUND_SCOPE",
+    "ORIENT",
+    "REDTEAM_REVIEW",
+    "DECIDE",
+    "PERMIT",
+    "PATCH_ONE",
+    "VERIFY",
+    "RECORD",
+    "ROLLBACK_READY"
+  ],
+  "stateSemantics": {
+    "VERIFIED": "Exact approved outcome independently observed on the intended deployed subject.",
+    "INFERRED": "Supported by source or partial evidence; not proof of live behavior.",
+    "UNKNOWN": "Necessary evidence has not been collected.",
+    "BLOCKED": "Authorization, compatibility, testing, or provider prerequisites are missing."
+  },
+  "controls": {
+    "authorizedAssetsOnly": true,
+    "noExternalHackBack": true,
+    "noProductionStressOrFloodTests": true,
+    "noUnapprovedCredentialUse": true,
+    "noSecretsOrPrivateConversationExports": true,
+    "noAutomaticProviderMutation": true,
+    "noAutomaticMergeOrDeploy": true,
+    "dryRunAndCompatibilityBeforeEnforcement": true,
+    "perProductOwnershipPreserved": true,
+    "protectModelsRemainSeparate": true,
+    "providerReadbackBeforeLiveClaims": true,
+    "independentBrowserEvidenceForUiClaims": true,
+    "noStaleProofInheritance": true,
+    "failClosedOnMissingAuthority": true,
+    "reversibleSingleCauseFixes": true
+  },
+  "productionGate": [
+    "Confirm exact owned domain or runtime and founder-approved action scope.",
+    "Capture the current provider configuration and precise rollback before a write.",
+    "Prove legitimate users and machine clients remain compatible.",
+    "Apply one minimal change and read back provider state.",
+    "Run focused source checks plus independent live/browser verification where applicable.",
+    "Preserve redacted evidence and mark unknown or blocked proof honestly."
+  ],
+  "receiptFields": [
+    "asset",
+    "repo",
+    "branch",
+    "sourceSha",
+    "providerSnapshot",
+    "approvedAction",
+    "testEvidence",
+    "browserEvidenceOrBlocker",
+    "risk",
+    "rollback",
+    "proofState",
+    "continuityFingerprint"
+  ],
+  "excludes": [
+    "raw_secrets",
+    "customer_content",
+    "chat_transcripts",
+    "unredacted_personal_data",
+    "retaliatory_actions"
+  ],
+  "deploymentAuthorized": false,
+  "mergesAuthorized": false
+}
