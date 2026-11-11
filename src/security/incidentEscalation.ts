@@ -288,46 +288,37 @@ export async function logIncidentToLinear(
       }),
     });
 
-    const rawBody: unknown = await response.json();
+    const rawBody: unknown = await response.json().catch(() => null);
     // Provider responses are untrusted. Decode the minimal fields we need and
     // fail closed on malformed payloads rather than trusting response.json().
     const body = rawBody !== null && typeof rawBody === 'object' && !Array.isArray(rawBody)
       ? rawBody as {
-          errors?: Array<{ message?: string }>;
-          data?: { issueCreate?: { issue?: { id?: string } } };
+          errors?: Array<{ message?: unknown }>;
+          data?: { issueCreate?: { issue?: { id?: unknown } } };
         }
       : null;
     const errors = Array.isArray(body?.errors) ? body.errors : [];
 
-    // GraphQL can report a permission/validation failure with HTTP 200.
+    // Linear may report GraphQL failure with HTTP 200. Provider-controlled
+    // response text is intentionally not written to logs.
     if (errors.length > 0) {
-      console.error(
-        '[incident-escalation] Linear GraphQL error (permission/validation):',
-        typeof errors[0]?.message === 'string' ? errors[0].message : 'unknown error',
-      );
+      console.error('[incident-escalation] Linear GraphQL request rejected');
       return false;
     }
 
     if (!response.ok) {
-      console.error(
-        '[incident-escalation] Linear HTTP error:',
-        response.status,
-        JSON.stringify(rawBody),
-      );
+      console.error('[incident-escalation] Linear HTTP error:', response.status);
       return false;
     }
 
-    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || !body.data.issueCreate.issue.id) {
-      console.error('[incident-escalation] Linear response missing issue ID:', body);
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || body.data.issueCreate.issue.id.length === 0) {
+      console.error('[incident-escalation] Linear response missing issue ID');
       return false;
     }
 
     return true;
-  } catch (error) {
-    console.error(
-      '[incident-escalation] Linear error:',
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error('[incident-escalation] Linear delivery error');
     return false;
   }
 }

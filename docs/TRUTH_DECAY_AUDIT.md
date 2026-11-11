@@ -603,6 +603,11 @@ The successor StoryEngine head is strictly forward of the predecessor pin and ha
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
 
+## GitHub App setup and StoryEngine browser peer (2026-10-16)
+
+The GitHub installation Setup URL is a founder-facing Plugin Center entry point, not an MCP OAuth callback. Local UI Playwright success, App permission readback, authenticated FCR API handling, actual GitHub App installation, and live production MCP OAuth are different evidence subjects. A successful mocked browser response cannot establish provider truth or founder authorization.
+
+The StoryEngine peer pin in `.github/workflows/playwright.yml` moves to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` only after provider readback showed 22 descendant commits on `jussray/StoryEngine main`. The pin alone is **not** current browser federation proof: GitHub Actions must re-observe the live peer ref on the exact FCR PR head and complete the entire browser/runtime receipt loop. Prior green results are historical and cannot grant deploy or merge authority.
 ## 2026-10-24 StoryEngine relay-proof peer refresh
 
 The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.
