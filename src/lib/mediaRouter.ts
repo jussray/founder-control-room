@@ -5,6 +5,7 @@ import type {
   DomainMediaContextV1,
   MediaIntentV1,
 } from './mediaRouterDomainProtocol.js';
+import type { MediaExecutionReceiptV1 } from './mediaRouterPhase1Contracts.js';
 
 export const MEDIA_ROUTER_POLICY_VERSION = 'fcr/media-routing@v1' as const;
 
@@ -128,9 +129,46 @@ export interface MediaAttackFlowRecordV1 {
   rationale: string;
 }
 
+export const MEDIA_REQUIRED_FOUNDER_SKILLS = Object.freeze([
+  { id: 'juss-founder-os', version: '1.0', sourcePath: '.ai/skills/juss-founder-os/SKILL.md' },
+  { id: 'ultrathink-devil', version: '1.0.0', sourcePath: 'skills/ultrathink-devil/SKILL.md' },
+  { id: 'goalfix', version: '2.2', sourcePath: '.ai/skills/goalfix/SKILL.md' },
+  { id: 'juss-flow-launch-loop', version: '1.2', sourcePath: '.ai/skills/juss-flow-launch-loop/SKILL.md' },
+  { id: 'outcome-first', version: '1.0.0', sourcePath: 'skills/outcome-first/SKILL.md' },
+] as const);
+
+export type MediaFounderSkillId = (typeof MEDIA_REQUIRED_FOUNDER_SKILLS)[number]['id'];
+
+export interface MediaFounderSkillRecordV1 {
+  skillId: MediaFounderSkillId;
+  version: string;
+  sourcePath: string;
+  sourceRecordIds: string[];
+  assertedAt: string;
+}
+
+export interface MediaFounderSkillBundleV1 {
+  version: 'media-founder-skills-v1';
+  records: MediaFounderSkillRecordV1[];
+}
+
+export function mediaFounderSkillBundle(assertedAt: string): MediaFounderSkillBundleV1 {
+  return {
+    version: 'media-founder-skills-v1',
+    records: MEDIA_REQUIRED_FOUNDER_SKILLS.map((skill) => ({
+      skillId: skill.id,
+      version: skill.version,
+      sourcePath: skill.sourcePath,
+      sourceRecordIds: [`skill:${skill.id}@${skill.version}`],
+      assertedAt,
+    })),
+  };
+}
+
 export interface MediaAttackFlowBundleV1 {
   version: 'media-attack-flow-v1';
   records: MediaAttackFlowRecordV1[];
+  founderSkills: MediaFounderSkillBundleV1;
 }
 
 export type MediaCapability =
@@ -335,6 +373,31 @@ export function receiptFingerprint(input: {
 export function validateMediaAttackFlowBundle(bundle: MediaAttackFlowBundleV1): string[] {
   const errors: string[] = [];
   if (bundle.version !== 'media-attack-flow-v1') errors.push('unsupported attack-flow bundle version');
+
+  if (bundle.founderSkills?.version !== 'media-founder-skills-v1') {
+    errors.push('unsupported or missing founder skill bundle version');
+  } else {
+    for (const required of MEDIA_REQUIRED_FOUNDER_SKILLS) {
+      const matches = bundle.founderSkills.records.filter((record) => record.skillId === required.id);
+      if (matches.length !== 1) {
+        errors.push(`founder skill ${required.id} must appear exactly once`);
+        continue;
+      }
+      const record = matches[0];
+      if (record.version !== required.version) {
+        errors.push(`founder skill ${required.id} must use version ${required.version}`);
+      }
+      if (record.sourcePath !== required.sourcePath) {
+        errors.push(`founder skill ${required.id} must bind canonical source ${required.sourcePath}`);
+      }
+      if (record.sourceRecordIds.length === 0 || record.sourceRecordIds.some((id) => !id.trim())) {
+        errors.push(`founder skill ${required.id} requires source record evidence`);
+      }
+      if (!Number.isFinite(Date.parse(record.assertedAt))) {
+        errors.push(`founder skill ${required.id} requires timestamp`);
+      }
+    }
+  }
   for (const flow of MEDIA_ATTACK_FLOW_IDS) {
     if (bundle.records.filter((record) => record.flow === flow).length !== 1) {
       errors.push(`attack flow ${flow} must appear exactly once`);
@@ -372,25 +435,35 @@ const POST_PRODUCIBLE_INTENTS = new Set<MediaIntentV1>([
 export function canCompleteWithPostProduction(
   request: MediaRoutingRequestV1,
   availableAssets: AssetRegistryEntryV1[],
+  context?: MediaRouterDomainContextV1,
 ): { ok: true } | { ok: false; reason: 'INTENT_NOT_POST_PRODUCIBLE' | 'POST_INPUTS_MISSING' | 'IDENTITY_SOURCE_MISSING' | 'REFERENCE_SOURCE_MISSING' } {
   if (!POST_PRODUCIBLE_INTENTS.has(request.intent)) return { ok: false, reason: 'INTENT_NOT_POST_PRODUCIBLE' };
   if (request.referenceAssetIds.length === 0) return { ok: false, reason: 'POST_INPUTS_MISSING' };
 
+  const approvedInputById = new Map((context?.assetInputs ?? []).map((asset) => [asset.assetId, asset]));
   const usable = availableAssets.filter((asset) =>
     asset.workspaceId === request.workspaceId
     && asset.status !== 'revoked'
     && asset.status !== 'quarantined'
+    && asset.status !== 'archived'
     && (
       asset.projectId === request.projectId
-      || (asset.rights.reusableAcrossProjects && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId))
+      || (
+        request.referencePolicy.mayReuseCrossProject
+        && asset.rights.reusableAcrossProjects
+        && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId)
+        && Boolean(approvedInputById.get(asset.assetId)?.domainApprovalSourceRecordId)
+      )
     ),
   );
   const byId = new Map(usable.map((asset) => [asset.assetId, asset]));
   if (request.referenceAssetIds.some((assetId) => !byId.has(assetId))) {
     return { ok: false, reason: 'POST_INPUTS_MISSING' };
   }
-  const selected = request.referenceAssetIds.map((assetId) => byId.get(assetId)!);
-  if (request.constraints.needsIdentityConsistency && !selected.some((asset) => asset.tags.includes('identity_reference'))) {
+  if (
+    request.constraints.needsIdentityConsistency
+    && !request.referenceAssetIds.some((assetId) => approvedInputById.get(assetId)?.role === 'identity_reference')
+  ) {
     return { ok: false, reason: 'IDENTITY_SOURCE_MISSING' };
   }
   if (request.constraints.needsReferenceFidelity && request.referenceAssetIds.length === 0) {
@@ -478,18 +551,49 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   }
   trace.push({ gate: 'domain_authority', result: 'pass' });
 
-  const post = canCompleteWithPostProduction(request, availableAssets);
+  if (!Number.isFinite(request.budget.maxCostUsd) || request.budget.maxCostUsd < 0) {
+    return blocked('POLICY_DENIED', 'request budget must be a finite nonnegative amount');
+  }
+  const dailyHeadroom = Math.max(0, budget.dailyCapUsd - budget.spentTodayUsd - budget.activeReservationsUsd);
+  const monthlyHeadroom = Math.max(0, budget.monthlyCapUsd - budget.spentThisMonthUsd - budget.activeReservationsUsd);
+  const budgetCeiling = Math.min(request.budget.maxCostUsd, dailyHeadroom, monthlyHeadroom);
+  const storageAndEgressUsd = 0.01;
+
+  const post = canCompleteWithPostProduction(request, availableAssets, context);
   if (post.ok) {
     trace.push({ gate: 'post_producible', result: 'select', detail: 'ffmpeg' });
     const deterministicComputeUsd = (request.output.durationSeconds ?? 30) * 1.5 * 0.0005;
+    const deterministicTotalUsd = deterministicComputeUsd + storageAndEgressUsd;
+    if (deterministicTotalUsd > budgetCeiling) {
+      return blocked('OVER_BUDGET', `Deterministic route exceeds available budget headroom (${budgetCeiling.toFixed(4)} USD)`);
+    }
     return terminal(
       { kind: 'DETERMINISTIC_POST', tool: 'ffmpeg', requiredInputAssetIds: [...request.referenceAssetIds] },
-      { generativeProviderUsd: 0, deterministicComputeUsd, storageAndEgressUsd: 0.01 },
+      { generativeProviderUsd: 0, deterministicComputeUsd, storageAndEgressUsd },
     );
   }
   trace.push({ gate: 'post_producible', result: 'skip', detail: post.reason });
 
   if (request.referenceAssetIds.length > 0) {
+    const availableById = new Map(availableAssets.map((asset) => [asset.assetId, asset]));
+    const unavailableReference = request.referenceAssetIds.find((assetId) => {
+      const asset = availableById.get(assetId);
+      if (!asset || asset.workspaceId !== request.workspaceId) return true;
+      if (asset.status === 'revoked' || asset.status === 'quarantined' || asset.status === 'archived') return true;
+      if (asset.projectId === request.projectId) return false;
+      return !(
+        request.referencePolicy.mayReuseCrossProject
+        && asset.rights.reusableAcrossProjects
+        && Boolean(asset.rights.reusableAcrossProjectsAuthorityRecordId)
+      );
+    });
+    if (unavailableReference) {
+      return blocked(
+        'REFERENCE_NOT_APPROVED',
+        `Reference asset ${unavailableReference} is missing, unusable, or outside the approved project boundary`,
+      );
+    }
+
     const policyById = new Map(context.assetInputs.map((asset) => [asset.assetId, asset]));
     const missingPolicy = request.referenceAssetIds.find((assetId) => !policyById.has(assetId));
     if (missingPolicy) {
@@ -524,10 +628,13 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
       && entry.balance > 0,
     ));
     if (!freeOffer) return blocked('NO_ELIGIBLE_FREE_ROUTE', 'No verified API allowance satisfies this request');
+    if (storageAndEgressUsd > budgetCeiling) {
+      return blocked('OVER_BUDGET', `Free provider route still exceeds non-provider budget headroom (${budgetCeiling.toFixed(4)} USD)`);
+    }
     trace.push({ gate: 'free_allowance', result: 'select', detail: `${freeOffer.providerId}/${freeOffer.modelId}` });
     return terminal(
       { kind: 'DIRECT_PROVIDER', providerId: freeOffer.providerId, modelId: freeOffer.modelId, providerOfferFingerprint: providerOfferFingerprint(freeOffer) },
-      { generativeProviderUsd: 0, deterministicComputeUsd: 0, storageAndEgressUsd: 0.01 },
+      { generativeProviderUsd: 0, deterministicComputeUsd: 0, storageAndEgressUsd },
       { freeAllowanceUsed: true, qualityFit: freeOffer.constraints.qualityRank ?? 0.5, speedFit: freeOffer.constraints.speedRank ?? 0.5 },
     );
   }
@@ -535,11 +642,8 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   const costKnown = rightsEligible.filter((offer) => estimateOfferCost(offer, request) !== null);
   if (costKnown.length === 0) return blocked('UNKNOWN_COST', 'No matching direct provider has verifiable cost');
 
-  const dailyHeadroom = Math.max(0, budget.dailyCapUsd - budget.spentTodayUsd - budget.activeReservationsUsd);
-  const monthlyHeadroom = Math.max(0, budget.monthlyCapUsd - budget.spentThisMonthUsd - budget.activeReservationsUsd);
-  const ceiling = Math.min(request.budget.maxCostUsd, dailyHeadroom, monthlyHeadroom);
-  const underBudget = costKnown.filter((offer) => estimateOfferCost(offer, request)! <= ceiling);
-  if (underBudget.length === 0) return blocked('OVER_BUDGET', `No candidate route fits available budget headroom (${ceiling.toFixed(4)} USD)`);
+  const underBudget = costKnown.filter((offer) => estimateOfferCost(offer, request)! + storageAndEgressUsd <= budgetCeiling);
+  if (underBudget.length === 0) return blocked('OVER_BUDGET', `No candidate route fits available all-in budget headroom (${budgetCeiling.toFixed(4)} USD)`);
 
   const sorted = [...underBudget].sort((left, right) => {
     const leftCost = estimateOfferCost(left, request)!;
@@ -558,7 +662,7 @@ export function evaluateMediaRoute(input: EvaluateMediaRouteInputV1): MediaRoute
   trace.push({ gate: 'select', result: 'select', detail: `${chosen.providerId}/${chosen.modelId}` });
   return terminal(
     { kind: 'DIRECT_PROVIDER', providerId: chosen.providerId, modelId: chosen.modelId, providerOfferFingerprint: providerOfferFingerprint(chosen) },
-    { generativeProviderUsd: estimateOfferCost(chosen, request)!, deterministicComputeUsd: 0, storageAndEgressUsd: 0.01 },
+    { generativeProviderUsd: estimateOfferCost(chosen, request)!, deterministicComputeUsd: 0, storageAndEgressUsd },
     { qualityFit: chosen.constraints.qualityRank ?? 0.5, speedFit: chosen.constraints.speedRank ?? 0.5 },
   );
 }
@@ -595,6 +699,7 @@ export type ReservationResultV1 =
 
 export class InMemoryMediaBudgetReservationService {
   private readonly reservations = new Map<string, { requestId: string; amountUsd: number; state: 'active' | 'released' | 'committed' }>();
+  private readonly reservationByRequestId = new Map<string, string>();
   private spentTodayUsd = 0;
   private spentThisMonthUsd = 0;
   private sequence = 0;
@@ -602,6 +707,16 @@ export class InMemoryMediaBudgetReservationService {
   constructor(private readonly caps: { dailyCapUsd: number; monthlyCapUsd: number }) {}
 
   async reserve(args: { requestId: string; amountUsd: number }): Promise<ReservationResultV1> {
+    if (!args.requestId.trim() || !Number.isFinite(args.amountUsd) || args.amountUsd < 0) {
+      return { ok: false, reason: 'LEDGER_ERROR' };
+    }
+    const priorId = this.reservationByRequestId.get(args.requestId);
+    if (priorId) {
+      const prior = this.reservations.get(priorId);
+      if (!prior || prior.amountUsd !== args.amountUsd) return { ok: false, reason: 'LEDGER_ERROR' };
+      return { ok: true, reservationId: priorId };
+    }
+
     const active = [...this.reservations.values()]
       .filter((reservation) => reservation.state === 'active')
       .reduce((sum, reservation) => sum + reservation.amountUsd, 0);
@@ -609,6 +724,7 @@ export class InMemoryMediaBudgetReservationService {
     if (this.spentThisMonthUsd + active + args.amountUsd > this.caps.monthlyCapUsd) return { ok: false, reason: 'EXCEEDS_MONTHLY' };
     const reservationId = `media_res_${++this.sequence}`;
     this.reservations.set(reservationId, { ...args, state: 'active' });
+    this.reservationByRequestId.set(args.requestId, reservationId);
     return { ok: true, reservationId };
   }
 
@@ -620,6 +736,9 @@ export class InMemoryMediaBudgetReservationService {
   async commit(args: { reservationId: string; actualUsd: number }): Promise<void> {
     const reservation = this.reservations.get(args.reservationId);
     if (!reservation || reservation.state !== 'active') return;
+    if (!Number.isFinite(args.actualUsd) || args.actualUsd < 0 || args.actualUsd > reservation.amountUsd) {
+      throw new Error('actualUsd must be finite, nonnegative, and no greater than the reserved amount');
+    }
     reservation.state = 'committed';
     this.spentTodayUsd += args.actualUsd;
     this.spentThisMonthUsd += args.actualUsd;
@@ -689,18 +808,6 @@ export async function revokeMediaAsset(args: {
   if (!asset) throw new Error(`Cannot revoke unknown asset ${args.revocation.assetId}`);
   await args.ledger.append(args.revocation);
   if (asset.status !== 'revoked') await args.registry.updateStatus(asset.assetId, 'revoked');
-}
-
-export interface MediaExecutionReceiptV1 {
-  receiptId: string;
-  correlationId: string;
-  workspaceId: string;
-  projectId: string;
-  requestId: string;
-  routeRecommendationId: string;
-  status: 'VERIFIED' | 'INFERRED' | 'FAILED' | 'BLOCKED' | 'CANCELLED' | 'TRUNCATED';
-  recommendationFingerprint: string;
-  receiptFingerprint: string;
 }
 
 export class InMemoryMediaReceiptLedger {

@@ -54,6 +54,21 @@ export function assessProjectAdapterFreshness(
   const contractPathsRequired = Object.keys(input.auditedContractBlobs);
   const shared = base(input, contractPathsRequired);
 
+  if (contractPathsRequired.length === 0) {
+    return {
+      ...shared,
+      state: 'unknown',
+      freshness: 'missing',
+      recommendation: 'hold',
+      sourceHeadMatchesAudited: false,
+      contractPathsMissing: [],
+      contractPathsDrifted: [],
+      blocker: 'The audited project adapter has no required contract blobs.',
+      nextAction: 'Define and audit at least one required project contract before claiming freshness.',
+      reasons: ['An empty contract manifest cannot prove project adapter freshness.'],
+    };
+  }
+
   if (!EXACT_GIT_OBJECT_SHA.test(input.auditedHead)) {
     return {
       ...shared,

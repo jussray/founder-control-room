@@ -18,6 +18,9 @@ describe('founder repository index', () => {
       ['solcontinuity', 'jussray/solcontinuity'],
       ['sleepwealth-agent', 'jussray/SleepWealth-Agent'],
       ['sweats', 'jussray/Sweats'],
+      ['truth-compass', 'jussray/truth-compass'],
+      ['truth-weaver', 'jussray/truth-weaver'],
+      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
     ] as const;
 
     for (const [slug, repository] of expectedExternal) {
@@ -33,12 +36,26 @@ describe('founder repository index', () => {
     }
   });
 
+  it('tracks current Truth Weaver product identity without expanding authority', () => {
+    expect(getKnownProject('truth-weaver')).toMatchObject({
+      name: 'Truth Weaver Counsel',
+      repository: 'jussray/truth-weaver',
+      status: 'external',
+    });
+    expect(getKnownProject('truth-weaver')?.capabilities).toEqual([
+      'legal-knowledge',
+      'decision-support',
+      'evidence',
+      'continuity',
+    ]);
+    expect(getPortfolioProject('truth-weaver')).toBeUndefined();
+  });
+
   it('indexes unverified portfolio subjects for continuity without claiming inherited challenge-stack state', () => {
     const expectedContinuityOnly = [
       ['bip-jr', 'jussray/Bip-Jr'],
-      ['truth-compass', 'jussray/truth-compass'],
-      ['truth-weaver', 'jussray/truth-weaver'],
-      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
+      ['exact-match-engine', 'jussray/exact-match-engine'],
+      ['ayure', 'jussray/Ayure-'],
     ] as const;
 
     for (const [slug, repository] of expectedContinuityOnly) {
@@ -64,6 +81,7 @@ describe('founder repository index', () => {
       'l99',
       'promptos',
       'sekret-bip',
+      'sync-party',
       'untold-stories',
     ]);
   });
