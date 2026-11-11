@@ -105,5 +105,90 @@ class VerifyWorkflowYamlTests(unittest.TestCase):
         self.assertEqual(code, 0)
 
 
+class WorkerReconcileSecretReceiptTests(unittest.TestCase):
+    """Run the actual inline Python gate against synthetic, name-only Wrangler receipts."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import tomllib
+
+        cls.root = Path(__file__).resolve().parent.parent
+        workflow = (cls.root / ".github/workflows/worker-reconcile.yml").read_text(
+            encoding="utf-8"
+        )
+        anchor = """          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+"""
+        if anchor not in workflow or "\n          PY\n" not in workflow.split(anchor, 1)[1]:
+            raise AssertionError("worker reconcile secret-name gate not found")
+        import textwrap
+
+        cls.gate = textwrap.dedent(
+            workflow.split(anchor, 1)[1].split("\n          PY\n", 1)[0]
+        )
+        with (cls.root / "wrangler.worker.toml").open("rb") as config_file:
+            config = tomllib.load(config_file)
+        cls.names = sorted(set(config["secrets"]["required"]) - {
+            "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON"
+        })
+
+    def run_receipt(self, receipt: str):
+        import os
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt_path = Path(tmp) / "wrangler-secret-names.txt"
+            receipt_path.write_text(receipt, encoding="utf-8")
+            return subprocess.run(
+                [sys.executable, "-c", self.gate],
+                cwd=self.root,
+                env={**os.environ, "SECRET_RECEIPT": str(receipt_path)},
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+
+    def entries(self):
+        import json
+
+        return [{"name": name, "type": "secret_text"} for name in self.names]
+
+    def test_plain_json_receipt_accepted(self) -> None:
+        import json
+
+        result = self.run_receipt(json.dumps(self.entries()))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_wranger_stdout_notice_before_json_accepted(self) -> None:
+        import json
+
+        receipt = "Wrangler authenticating with an API token...\n" + json.dumps(
+            self.entries()
+        ) + "\n"
+        result = self.run_receipt(receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_missing_required_name_is_rejected(self) -> None:
+        import json
+
+        result = self.run_receipt(json.dumps(self.entries()[1:]))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing provider-held Worker secret", result.stdout)
+
+    def test_duplicate_entries_are_rejected(self) -> None:
+        import json
+
+        entries = self.entries()
+        result = self.run_receipt(json.dumps(entries + entries[:1]))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Invalid Cloudflare secret receipt", result.stdout)
+
+    def test_malformed_provider_receipt_fails_closed_without_echo(self) -> None:
+        receipt = "auth banner\n[SECRET_DO_NOT_ECHO\n"
+        result = self.run_receipt(receipt)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Invalid Cloudflare secret receipt", result.stdout)
+        self.assertNotIn("SECRET_DO_NOT_ECHO", result.stdout + result.stderr)
+
 if __name__ == "__main__":
     unittest.main()
