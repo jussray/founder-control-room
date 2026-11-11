@@ -29,3 +29,6 @@ footer{border-top:1px solid var(--stroke);padding:24px 0 10px;display:flex;justi
 @media(max-width:950px){.main-grid{grid-template-columns:1fr}.details{position:static}.metrics{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1.4fr .6fr}.hero-graphic{opacity:.68;transform:scale(.88)}}
 @media(max-width:620px){.topbar{height:70px;padding:0 16px}.brand{font-size:1rem}.brand small{font-size:.61rem}.brand-mark{width:35px;height:35px}.private-flag{font-size:.54rem;letter-spacing:.05em;padding:.35rem .47rem}.shell{padding:14px 14px 32px}.hero{display:block;min-height:0}.hero-copy{padding:28px 22px}.hero h1{font-size:2.72rem}.hero-copy>p{font-size:.88rem}.hero-graphic{display:none}.metrics{gap:8px;margin:10px 0 35px}.metric{min-height:100px;padding:14px}.metric strong{font-size:1.4rem}.section-heading{display:block}.date-note{display:inline-block;margin-top:13px}.toolbar{flex-direction:column}.select-wrap select{width:100%}.op-card{padding:16px}.card-row{flex-wrap:wrap}.details{padding:18px}.card-deadline{margin:0}footer{line-height:2}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* HTML hidden attribute must override styled access screen. */
+#access[hidden],#workspace[hidden]{display:none!important}
