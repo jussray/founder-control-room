@@ -1,5 +1,32 @@
 # Cloudflare Reasoning Contract
 
+## November 7, 2026 — candidate Gmail AI Inbox read boundary
+
+PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
+
+Only an exact-head authorized release, Cloudflare Worker binding/source readback, Google consent/scope and account verification, and founder-only runtime request can substantiate operational Gmail metadata reads. AI reply drafts, multi-account connection, scheduled synchronization, automated outreach, dispatch and revenue results are not established by this PR; the existing one-reply approval gate remains independent. See [Gmail AI Inbox runtime](GMAIL_AI_INBOX_RUNTIME.md).
+
+## November 2, 2026 — FCR Council Bus and search evidence source candidate
+
+The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
+
+## November 1, 2026 UTC: exact-head MCP credential preflight
+
+The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
+
+The Deploy authority gate's secret-name verification follows the same reasoning. Wrangler's stdout is a human interface as well as a machine one: when Wrangler authenticates through an environment-variable API token, it prints authentication notices ahead of the JSON it was asked to emit. Treating that whole stream as pure JSON makes a healthy enumeration look corrupt. The gate therefore separates the channels by extracting the JSON name list from the receipt text, and it still fails closed, with the receipt's opening characters named for diagnosis, when no JSON list can be found. Parsing tolerance applies to the envelope only; the required-name comparison itself stays exact.
+
+
+## Logpush portfolio authority
+
+Founder Control Room owns the source contract for the portfolio Logpush desired state in `config/cloudflare-logpush.portfolio.json`. The first bounded dataset is account-scoped `workers_trace_events`; product repositories participate without receiving FCR Cloudflare write credentials.
+
+Participation is subordinate to repository-local governance. Historical or investigate-only repositories must stay outside the active participant registry. Under their current `AGENTS.md` contracts, `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge` are provenance/investigation-only and are not active Logpush participants. `jussray/jussray-bip-and-seek` is separately excluded because current `main` is a Roblox/Rojo runtime with no Cloudflare Worker; its Cloudflare model profile is trial-only with runtime activation disabled. `jussray/Sekret-Bip-Parents` is a static Cloudflare Pages entry site with no Worker execution surface, and `jussray/Sekret-Bip-Gov` is a governance/control repository with no Worker runtime. Cloudflare product references, Pages hosting, or governance metadata alone do not make `workers_trace_events` applicable.
+
+The Logpush workflow must keep pull-request execution read-only. Manual inspection may observe matching provider jobs with a dedicated read token, but inspection without access to the destination secret cannot claim full destination verification. Manual apply requires exact-current-main binding, a founder approval reference, a separate write token, destination configuration, and post-write provider readback.
+
+Repository source, workflow success, or a configured secret name cannot establish that Logpush is enabled in Cloudflare or that logs reached storage/SIEM. Provider job readback and destination-side receipt are separate evidence scopes. Destination networking may require Cloudflare Logpush IP allowlisting or dedicated egress; that remains destination-specific provider configuration.
+
 The Control Room treats Cloudflare as a replaceable execution and evidence provider, not as the owner of project truth or founder authority.
 
 The command-shaped contract is:
@@ -15,6 +42,29 @@ Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bil
 ```
 
 The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
+
+The Control Room treats Cloudflare as a replaceable execution and evidence provider, not as the owner of project truth or founder authority.
+
+The command-shaped contract is:
+
+```text
+:cloudflare reason <project>
+```
+
+It runs the implementation sequence:
+
+```text
+Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Elon Musk → Proof → Rollback → Next gate
+```
+
+The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
+
+### External MCP deployment and identity proof
+
+The canonical FCR Worker is intended to serve `POST /mcp` as the Supabase OAuth-protected connector and `POST /mcp/read` as its exact-static-token compatibility alias. The repository's `wrangler.worker.toml` declares public-safe resource, issuer, audience, and scope configuration; `FCR_REMOTE_MCP_READ_TOKEN` remains a provider-held secret, never a source literal. The `founder_users` allowlist, server-owned project scope, consent, and redacted evidence persistence must remain independent of connector or browser identity.
+
+Treat a passing OAuth bootstrap or Playwright harness as candidate-source proof only. Before any production-ready claim, observe the current Cloudflare deployment and Worker bindings, confirm the OAuth provider consent and issued-token behavior, then exercise tools/list and an authorized read through the actual ChatGPT client with a durable redacted receipt. Missing or stale provider proof is `UNKNOWN/BLOCKED`, not success; publication, provider mutation, and deployment each require their separate approval gate.
+
 
 ## Why this exists
 
@@ -112,6 +162,8 @@ Those remain separate founder approval gates. Approval never carries forward.
 
 `public/_worker.js` must treat public discovery files such as `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` as static Pages assets and serve them through `env.ASSETS`. API-owned callback assets stay on `env.FCR_API`; the presence of crawler policy metadata never becomes authentication, write authority, provider-mutation authority, deployment authority, or publication authority.
 
+The same classification covers the public work page: the Pages asset layer canonicalizes `/work.html` to `/work` with a 308, and `public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through `env.ASSETS` — requesting the `/work.html` filename returns that 308 to the browser and loops `/work` onto itself. Falling through to the `FCR_API` proxy answers that public page without the service identity header and yields a degraded 503, so the canonical static request is the only correct route for it. The public welcome page has the same shape with a different symptom: no rule classified the extensionless `/welcome` path at all, so it fell through to the `FCR_API` proxy and returned a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`) while the asset layer canonicalized `/welcome.html` to `/welcome` with a 308; `public/_worker.js` now serves the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through `env.ASSETS`.
+
 That routing distinction is source truth only. A repository diff or green unit test cannot prove the deployed Pages artifact currently serves the exact file, so the applicable Pages deployment and browser/runtime witness remain separate evidence gates.
 
 ## HTTP surfaces
@@ -199,6 +251,14 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Review-email inbound routing boundary
+
+`wrangler.email.toml` is source truth for the `founder-control-room-review-email` Worker identity, source entrypoint, Cloudflare account, public-route posture, private `FOUNDER_CONTROL_ROOM_API -> founder-control-room` Service Binding, and one bounded Email Routing desired-state declaration: `addresses = ["review@foundercontrolroom.org"]`. Cloudflare documents top-level `addresses` for Worker Email Routing on Wrangler 4.113+; the pinned review-email deploy uses Wrangler 4.129.0.
+
+A successful `wrangler deploy --config wrangler.email.toml` may reconcile that literal address-to-Worker rule, but deploy output is still not independent provider readback. The live Cloudflare rule, zone-level `support_subaddress` setting required for `review+<context-uuid>@...`, and an actual inbound-email invocation remain separate evidence planes. The lane also consumes Wrangler structured deploy telemetry: if Wrangler records a completed Worker deployment and then exits nonzero during a later reconciliation phase, the receipt must preserve `provider_deploy_succeeded=true` and a post-deploy blocked stage instead of falsely recording no production mutation. First deployment is two-phase: when the Worker is absent, the trusted reconciliation lane creates it from a temporary config with `addresses` removed and stops at `provider_secret_bootstrap`; only a later authorized canonical deploy may reconcile `review@` after required secrets exist.
+
+The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_trigger_reconciled`, and `runtime_email_invocation_proven` independent. Worker/managed-route deployment must never promote provider readback or runtime invocation to green without their own evidence.
+
 ## Worker build authority membrane
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
@@ -209,9 +269,9 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 Canonical Deploy now separates **deployment-plane credentials** from **Worker runtime secrets**. The GitHub `production` authority gate needs only `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` to prove the release can perform its database and Cloudflare operations. Runtime secret values remain provider-held in the canonical Cloudflare Worker and are not copied through the Deploy workflow. `wrangler.worker.toml [secrets].required` names the required runtime bindings, including `FOUNDER_SESSION_ENCRYPTION_KEY`, so Wrangler is the fail-closed binding-name membrane at deployment time.
 
-For TinyFish, that same membrane now includes `TINYFISH_API_KEY`. The provider-held value must remain only in Cloudflare; canonical Deploy may verify its binding name but cannot read or re-upload the value. Green source, CI, or Playwright therefore does not establish live TinyFish activation until a key-backed Search or Fetch is separately observed on the applicable runtime.
+FCR public-web observation no longer has a dedicated provider secret in the Worker membrane. The product contract is `public-web-observation-v1`; current read-only discovery/fetch adapters are resolved through FCR's governed research hub and remain replaceable implementation details. Source, adapter availability, returned evidence, and downstream truth remain separate proof planes.
 
-The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Canonical Deploy must fail closed when either binding name is absent, but binding-name presence cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
+The FCR Shopify money path uses the same provider-held runtime-secret membrane: `FCR_SHOPIFY_WEBHOOK_SECRET` is required to authenticate the exact Shopify webhook bytes, and `FCR_COMMERCE_HASH_SALT` is required to derive privacy-safe order references. Since the founder Path B ruling (2026-10-30), both names are declared in `wrangler.worker.toml [secrets].optional`: they remain required before the Shopify money path is activated and the commerce ingress must fail closed while either name is absent, but their absence no longer blocks canonical Deploy, because `[secrets].required` now declares only the boot-essential binding names. Binding-name presence still cannot prove Shopify webhook registration, callback delivery, production database migration, or collected revenue. Those remain independent provider/runtime/database/outcome receipts.
 
 The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
@@ -267,6 +327,13 @@ The browser/API suite verifies the public-safe contract, founder protection, abs
 
 ## Whop commerce webhook secret boundary
 
-The FCR Whop money path follows the same Cloudflare authority rule as other provider-held runtime credentials: `FCR_WHOP_WEBHOOK_SECRET` is named in `wrangler.worker.toml [secrets].required`, but its value must remain only in the surviving Founder Control Room Worker secret store. Canonical deploy may verify required binding-name presence before promotion; repository source, CI, PR text, and documentation must never contain the `ws_...` value.
+The FCR Whop money path follows the same Cloudflare authority rule as other provider-held runtime credentials: `FCR_WHOP_WEBHOOK_SECRET` is named as a feature-gated secret in `wrangler.worker.toml [secrets].optional`, but its value must remain only in the surviving Founder Control Room Worker secret store. It must be installed before Whop activation, and moving it into `[secrets].required` (so canonical deploy fails closed on its absence) belongs to the separate activation change; repository source, CI, PR text, and documentation must never contain the `ws_...` value.
 
 The source-mounted endpoint is `POST /webhooks/whop/fcr/payments-succeeded`. Its presence in source proves only that the Worker candidate can accept and verify Whop Standard Webhooks when correctly configured. It does not prove provider webhook registration, secret installation, production migration, signed delivery, checkout completion, or collected revenue. A missing or unobserved provider binding leaves activation BLOCKED/UNKNOWN rather than authorizing a fallback or secret copy through GitHub Actions.
+## OAuth consent browser-origin boundary
+
+For an external connector's authorization request, the Pages edge redirects only www consent GET navigation to canonical `https://foundercontrolroom.org/oauth/consent`, preserving the query string. On the apex, Pages forwards the consent GET, API-owned assets, and protected consent POST through its existing `FCR_API` service binding without changing the browser origin. The browser's host-only founder cookie and same-tab authorization ID therefore remain on the configured Pages origin; the API service still performs authentication, CSRF enforcement, and the server-to-Supabase consent request. Pages must never serve the consent assets from public `ASSETS` or mint its own founder authority. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.
+
+## Production Deploy parser recovery and authority boundary (2026-11-04 candidate)
+
+`deploy.yml` includes a Python gate that compares the provider-observed Cloudflare Worker secret names with `wrangler.worker.toml`'s required-name registry without reading credential values. The parser must stay correctly indented within the GitHub Actions script; otherwise GitHub rejects the workflow itself and production dispatch can fail with HTTP 422 before the authority gate executes. PR #1067 repairs that syntax error and documents the distinction between candidate source and observed release. Production readiness still requires the accepted exact-commit workflow, a separate founder authorization receipt, successful gated dispatch, and direct Worker plus Pages `/version` identity readback. A successful Pages deployment or a present secret binding name cannot substitute for those observations.

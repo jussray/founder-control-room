@@ -64,7 +64,7 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under `[secrets].required` so canonical exact-main Deploy fails closed when the Whop provider-held Worker signing-secret binding is absent; the required-name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
+        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under the feature-gated `[secrets].optional` registry (Founder Path B: deploy-required names stay boot-essential) until a separate Whop activation change moves it into `[secrets].required`; the name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
       ]
     },
     {
@@ -191,7 +191,7 @@
       "path": "docs/CLOUDFLARE_REASONING.md",
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
-        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in required-name policy may be verified by canonical deploy without copying, reading, or logging the `ws_...` value."
+        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in feature-gated name declaration may be verified without copying, reading, or logging the `ws_...` value."
       ]
     },
     {
