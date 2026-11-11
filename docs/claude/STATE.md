@@ -1,6 +1,15 @@
 # Claude session state — Founder Control Room
 
-Last verified: 2026-10-09
+## 2026-11-04 — SleepWealth account-model governance on branch (not merged)
+
+- REALITY: branch `claude/fcr-sleepwealth-account-models` at `2ed6df87`, based on `main` `c16212e` (main unchanged as of this check). Pushed to origin as a feature branch. No PR opened, nothing merged, nothing deployed. VERIFIED by `git ls-remote` and `git rev-list --count HEAD..origin/main` = 0.
+- FIX: `src/governance/portfolioGovernanceProfiles.ts` adds `customer_scope_eligibility` and `pooled_scope_eligibility` claims for `jussray/SleepWealth-Agent`. Adds blocked actions `accept-pooled-funds` and `cross-account-credential-use`. Live trading, broker enablement and ceiling increases stay blocked. A regression test is in `portfolioGovernanceProfiles.test.ts`.
+- PROOF: `npx vitest run src/governance` = 118 of 118 passed, after `npm ci`. The proof covers the local branch only. Exact-head CI on the pushed head has not run.
+- RISK: FCR does not yet mint the receipts the SleepWealth, SolWealth or SideShift evaluators check. The profile's `preparedAgainstBaseSha` still names `bec4e0f`, which is in history but not on current main. Live GitHub rules (required reviews, stale-review dismissal, strict status checks) are not verified by this branch.
+- ROLLBACK: delete `claude/fcr-sleepwealth-account-models`, or revert `2ed6df87` on that branch. Nothing has reached `main`.
+- NEXT GATE: founder decision on opening a draft PR for exact-head CI and independent review. No merge or deploy is authorized. Receipt issuance needs a separate founder-authorized FCR feature.
+
+Last verified: 2026-10-09 (earlier content below is historical)
 
 ## Current architecture truth
 
