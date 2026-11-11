@@ -7,6 +7,7 @@ Authoritative code:
 - `src/lib/socialCampaignPolicy.ts`
 - `src/lib/__tests__/socialCampaignPolicy.test.ts`
 - `config/social-campaign-repositories.json`
+- `src/lib/perplexityContentGenerator.ts` and `src/lib/__tests__/perplexityContentGenerator.test.ts` — the Perplexity generation step described in [Generation status](#generation-status) below.
 
 ## Portfolio coverage
 
@@ -55,6 +56,22 @@ Repository-specific sanitized-path status must be read from `config/social-campa
 - This module does not own ledger persistence, Supabase schema changes, HTTP routes, provider credentials, scheduling, publication execution, or provider receipts.
 - Whether any provider integration, generation path, runtime, or publication lane is currently configured, enabled, healthy, or authorized is a temporal claim and must be revalidated from its authoritative code and provider/runtime evidence before reuse.
 
+## Generation status
+
+Juss approved a bounded build scope on 2026-11-11: Perplexity generation plus Buffer distribution, with every individual post still requiring his explicit per-post approval — no standing or auto-publish grant.
+
+`src/lib/perplexityContentGenerator.ts` is the resulting generation step. `generatePerplexityDraftMaterial()`:
+
+- calls `classifyRepositoryForContent()` first and refuses to call Perplexity at all when the repository is not eligible;
+- requires both `PERPLEXITY_API_KEY` and a separate explicit `PERPLEXITY_CONTENT_GENERATION_ENABLED=true` opt-in, so a key provisioned for an unrelated capability (e.g. the operator-relay peer-review adapter in `operatorRelayModelProviders.ts`, which shares the same key name for a different purpose) can never silently enable spend here;
+- builds its prompt only from verified `RepositoryEvidence` fields and the repository's own already-approved public proof URL — never from private data, and never trusting prompt-side instructions as a safety control, consistent with why this module exists (see "Why this exists" above);
+- strictly parses the model's output as a fixed five-field JSON object and rejects anything else (extra fields, missing fields, non-JSON prose);
+- always finishes by calling the existing `buildFirstPartySocialPostInput()` on whatever Perplexity returned, so the pre-existing `neverClaim`/`neverExpose` output firewall still runs over generated text exactly as it does over any other caller-supplied draft. This function cannot return anything other than `mode: 'draft'`, `publishAllowed: false`, `founderApprovalId: null`.
+
+This closes the generation gap, but does not create a generation→publish pipeline by itself: nothing currently calls `generatePerplexityDraftMaterial()` from an HTTP route, schedule, or automation trigger. Wiring that call site, and binding its output to the founder's own per-post approval and downstream dispatch, remains separate work.
+
+The Buffer side of the approved scope was already substantially built before this change: `automation/n8n/founder-content-buffer.workflow.json` calls Buffer's real GraphQL `createPost` mutation, but only in `mode: customScheduled` for LinkedIn/Facebook — it is schedule-only and explicitly forbids `shareNowAllowed`. It requires `fcrAuthorization.mode === 'exact-current-you'` with matching authorization/proposal/public-payload hashes, i.e. the founder's exact per-post approval, before n8n will call Buffer at all, and its receipt always reports `published: false, state: 'scheduled'` — never a terminal publish claim. `src/lib/n8nFounderContentOrchestrator.ts` and `src/lib/n8nProviderNeutralFounderContentOrchestrator.ts` build and dispatch that signed request, but — like this generator — they take already-approved `text` as caller-supplied input; neither one generates content or calls classification itself.
+
 ## Next gate
 
-Any **new or expanded** provider, data-source, generation, scheduling, or publication authority remains separately approval-gated. Existing capabilities must be evaluated through their own current contracts and receipts. This document is authoritative only for repository content classification and shaping; it must not be used as present-state evidence for the capabilities of Founder Control Room as a whole.
+Any **new or expanded** provider, data-source, generation, scheduling, or publication authority beyond the bounded Perplexity-generation / Buffer-schedule-only scope above remains separately approval-gated. Existing capabilities must be evaluated through their own current contracts and receipts. This document is authoritative only for repository content classification, shaping, and the generation step described above; it must not be used as present-state evidence for the capabilities of Founder Control Room as a whole.
