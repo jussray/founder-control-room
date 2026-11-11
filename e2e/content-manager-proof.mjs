@@ -281,6 +281,16 @@ try {
   assert.equal(await controlPlane.locator('[data-lifecycle-runtime]').getAttribute('data-state'), 'ready');
   assert.match(await controlPlane.locator('[data-lifecycle-runtime]').innerText(), /Authenticated lifecycle ready/i);
   assert.match(await controlPlane.locator('[data-adapter-note]').innerText(), /No provider lifecycle adapters are registered/i);
+
+  const postizDraftOption = controlPlane.locator('#lifecycle-provider option[value="postiz"]');
+  const postizAccountOption = controlPlane.locator('#account-provider option[value="postiz"]');
+  assert.equal(await postizDraftOption.count(), 1, 'Postiz must be founder-visible in the lifecycle provider selector');
+  assert.equal(await postizAccountOption.count(), 1, 'Postiz must be founder-visible in the account readback selector');
+  assert.match(await postizDraftOption.innerText(), /readback only/i);
+  assert.match(await postizAccountOption.innerText(), /readback only/i);
+  assert.match(await controlPlane.locator('[data-postiz-readback-note]').innerText(), /does not expose scheduling or publication authority/i);
+  assert.match(await controlPlane.innerText(), /Postiz account connection and provider writes are not enabled here and fail closed/i);
+
   assert.equal(await controlPlane.locator('[data-metric-total]').innerText(), '1');
   assert.equal(await controlPlane.locator('[data-metric-posted]').innerText(), '0');
   assert.equal(await controlPlane.locator('[data-metric-scheduled]').innerText(), '0');
@@ -361,6 +371,8 @@ try {
       hydrated: true,
       mockedReadPosts: 1,
       providerAdapters: 0,
+      postizReadbackVisible: true,
+      postizPublicationAuthority: false,
       selectedStatus: 'approved',
       explicitPublishConfirmationRequired: true,
       mutationRequestsBeforeConfirmation: mutationRequests.length,

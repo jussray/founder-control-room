@@ -16,7 +16,10 @@ Verified in authoritative FCR source:
 - the current provider-cost gate can reject paid semantic `review` before the provider is called and the relay cannot bypass that blocker;
 - the Cloudflare Worker Git authority audit can append a read-only `workerBindings` child receipt after its core read token is verified;
 - global required Worker bindings continue to come only from `wrangler.worker.toml [secrets].required`, while `workerBindings.relayReady` independently observes `GEMINI_API_KEY`, `FCR_RELAY_GEMINI_MODEL`, and `FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP` by binding name only;
-- relay binding drift cannot change the core Worker Git authority audit `ok`/`error` verdict and does not become global Worker-startup or global deploy authority.
+- relay binding drift cannot change the core Worker Git authority audit `ok`/`error` verdict and does not become global Worker-startup or global deploy authority;
+- adapter normalization preserves all four configured peer adapters and invents no fallback provider;
+- contract preflight covers all four peer operators while retaining the zero-authority ceiling;
+- exact current-main CI/check evidence exists independently of the older relay preflight.
 
 The standalone `/api/operator-relay` router remains an unmounted test scaffold. It is not the canonical authority path and must not be mounted merely to create a second relay surface. The authenticated `/mcp` tool is the authoritative relay entry point.
 

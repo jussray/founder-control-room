@@ -5,9 +5,19 @@ import {
   type YouTubeGrowthPhase,
   type YouTubeMeasurement,
 } from '../../ultrathink-core/youtubeGrowthLoop.js';
+import {
+  CONTENT_LANE_SHARED_SYSTEM,
+  contentLaneSystemSnapshot,
+  getContentLane,
+} from '../../lib/contentLaneSystem.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const YOUTUBE_GROWTH_EVALUATION_CONTRACT = 'fcr/youtube-growth-evaluation@v1' as const;
+
+export const YOUTUBE_CHANNEL_SYSTEM = Object.freeze({
+  ...CONTENT_LANE_SHARED_SYSTEM,
+  lane: getContentLane('youtube'),
+});
 
 const YOUTUBE_GROWTH_PHASES: readonly YouTubeGrowthPhase[] = [
   'TEST_AND_VALIDATE',
@@ -155,8 +165,10 @@ youtubeGrowthRouter.use(requireFounder);
 youtubeGrowthRouter.get('/', (_req: FounderRequest, res) => res.json({
   contract: YOUTUBE_GROWTH_EVALUATION_CONTRACT,
   route: '/automation/conveyor/founder-content/youtube-growth/evaluate',
-  workflow: 'LEEVIZE -> measure -> diagnose -> double-down/repair/kill',
+  workflow: 'audience/problem/promise -> repeatable format -> LEEVIZE -> publish approval -> measure -> return loop -> diagnose -> money path -> double-down/repair/kill',
   phases: YOUTUBE_GROWTH_PHASES,
+  channelSystem: YOUTUBE_CHANNEL_SYSTEM,
+  contentLaneSystem: contentLaneSystemSnapshot(),
   authority: {
     advisoryOnly: true,
     publish: false,
@@ -189,6 +201,7 @@ youtubeGrowthRouter.post('/evaluate', (req: FounderRequest, res) => {
   return res.json({
     ok: true,
     contract: YOUTUBE_GROWTH_EVALUATION_CONTRACT,
+    channelSystem: YOUTUBE_CHANNEL_SYSTEM,
     result,
     published: false,
     providerMutationAttempted: false,
