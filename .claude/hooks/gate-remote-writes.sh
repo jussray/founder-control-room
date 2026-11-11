@@ -4,10 +4,12 @@
 #    ordered (`-u`, `-C dir`, `--force-with-lease`, `HEAD:refs/heads/main`, `+main`),
 #    and a bare `git push` while the checked-out branch is main/production.
 #    Prefix permission rules cannot catch reordered flags; this can.
-#  - ASK before every other remote write: git push, PR update-branch, PR merge,
-#    ruleset API calls. Ruleset 20819094 targets ~ALL and this credential can
-#    bypass it, so the prompt is the visible checkpoint. In auto mode an "ask"
-#    may be resolved without a human; only the DENY branch is a hard stop.
+#  - ALLOW (founder approval line, 2026-11-11: "Branches + PRs only"): ordinary
+#    pushes to PR/feature branches and PR update-branch run without a prompt.
+#  - ASK for force pushes to any branch, PR merges, ruleset API calls and
+#    production workflow dispatches (Deploy, Worker Reconcile, Access recovery).
+#    Merge, deploy, publish, spend, secrets and delete stay founder-approved.
+#    In auto mode an "ask" may be resolved without a human; only DENY is a hard stop.
 cmd=$(jq -r '.tool_input.command // ""')
 emit() {
   jq -n --arg d "$1" --arg r "$2" \
@@ -26,10 +28,12 @@ while IFS= read -r seg; do
     (( i++ ))
   done
   (( i < n )) || continue
-  positional=()
+  positional=(); force=0
   for (( j=i+1; j<n; j++ )); do
     t="${tok[j]}"
+    [[ "$t" == --force* || "$t" == -f || "$t" =~ ^-[a-zA-Z]*f[a-zA-Z]*$ ]] && force=1
     [[ "$t" == -* ]] && continue
+    [[ "$t" == +* ]] && force=1
     positional+=("$t")
   done
   # positional[0] = remote, rest = refspecs
@@ -40,10 +44,10 @@ while IFS= read -r seg; do
     cur=$(git -C "${dir:-${CLAUDE_PROJECT_DIR:-.}}" rev-parse --abbrev-ref HEAD 2>/dev/null)
     [[ "$cur" == main || "$cur" == production ]] && emit deny "Bare git push from protected branch $cur is denied."
   fi
-  emit ask "Remote write to GitHub. Ruleset 20819094 targets ~ALL and this credential can bypass it: confirm the exact branch/PR/SHA before allowing."
+  (( force )) && emit ask "Force push rewrites branch history. Confirm the exact branch and why before allowing."
 done < <(printf '%s\n' "$cmd" | sed -E 's/(&&|\|\||;|\|)/\n/g' | sed -E 's/^[[:space:]]*(cd [^ ]+[[:space:]]*)?//')
 
-if printf '%s' "$cmd" | grep -Eq 'update-branch|/pulls/[0-9]+/merge|/rulesets( |/|$)'; then
-  emit ask "GitHub PR/ruleset write. Confirm the exact PR/SHA before allowing."
+if printf '%s' "$cmd" | grep -Eq '/pulls/[0-9]+/merge|/rulesets( |/|$)|actions/workflows/(deploy|worker-reconcile|fcr-access-front-door-recovery)\.yml/dispatches'; then
+  emit ask "Merge, ruleset or production dispatch: founder approval required for the exact PR/SHA."
 fi
 exit 0
