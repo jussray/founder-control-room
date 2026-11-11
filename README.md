@@ -1,5 +1,17 @@
 # Founder Control Room
 
+## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
+
+`main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
+
+`.github/workflows/pr-hygiene.yml` runs weekly using `scripts/pr-hygiene.mjs`: drafts with no new commit for 21 days are labelled `stale` and closed 7 days later (reversible, branches kept); ready pull requests with no new commit for 30 days are labelled `stale` but never closed automatically. Idle time is measured from the last non-merge commit, because automated merges of `main` into every open pull request reset GitHub's updated time; `keep-open` exempts any pull request. Manual runs default to dry run. Neither workflow grants merge, approval, or deploy authority.
+
+## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
+
+The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list after any human authentication notice, validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
+
+The existing exact-current-main founder approval requirement, bounded removal of the stale undeclared `CF_API_TOKEN` plaintext binding, strict post-deployment binding-type check, and direct API + public Pages identity proofs remain mandatory. No value migration or secret rotation is authorized by this candidate; the canonical Worker Reconcile workflow is the only approved execution path for legacy-binding removal.
+
 ## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
 
 The founder-only `/integration-cockpit/projects` and `/integration-cockpit/inspect/:id/:number` endpoints operate alongside the existing Control Room on its authenticated origin. The read-only diagnostic `observePullRequest` capability includes draft and closed PR identities so an operator can see blocked work. The existing independent `getPullRequestReviewContext` gate still rejects draft or closed PRs and exclusively controls the review context used by merge authority. Read-only observation must never populate that review context, grant merge or deployment authority, or treat skipped checks as proof. Exact-head checks, current base/head, and browser session are separate observations; live FCR/Cloudflare/Supabase production proof is not established by a local fixture, passing CI slice, or preview build. Games Hub repository mapping remains unresolved and is not guessed.
