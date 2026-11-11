@@ -5,6 +5,10 @@ const playwrightWorkflow = readFileSync(
   new URL('../../../.github/workflows/playwright.yml', import.meta.url),
   'utf8',
 );
+const manualWitnessWorkflow = readFileSync(
+  new URL('../../../.github/workflows/exact-sha-production-witness.yml', import.meta.url),
+  'utf8',
+);
 const witness = readFileSync(
   new URL('../../../e2e/production-release-sha.spec.ts', import.meta.url),
   'utf8',
@@ -57,5 +61,25 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(witness).toContain('directWorkerGitShaAfter');
     expect(witness).toContain('publicProxyGitShaAfter');
     expect(witness).toContain('production-release-witness.png');
+  });
+
+  it('offers a manual current-main witness without deploy or publication authority', () => {
+    expect(manualWitnessWorkflow).toContain('workflow_dispatch:');
+    expect(manualWitnessWorkflow).toContain('contents: read');
+    expect(manualWitnessWorkflow).toContain("if: github.ref == 'refs/heads/main'");
+    expect(manualWitnessWorkflow).toContain('ref: ${{ github.sha }}');
+    expect(manualWitnessWorkflow).toContain(
+      'EXPECTED_RELEASE_SHA: ${{ inputs.expected_sha }}',
+    );
+    expect(manualWitnessWorkflow).toContain('test "$EXPECTED_RELEASE_SHA" = "$GITHUB_SHA"');
+    expect(manualWitnessWorkflow).toContain(
+      'npx playwright test e2e/production-release-sha.spec.ts --reporter=list',
+    );
+    expect(manualWitnessWorkflow).not.toContain('PUBLISH_ALLOWED');
+    expect(manualWitnessWorkflow).not.toContain('secrets.');
+    expect(manualWitnessWorkflow).not.toContain('wrangler deploy');
+    expect(manualWitnessWorkflow).not.toContain('cloudflare/pages-action');
+    expect(manualWitnessWorkflow).not.toContain('ZAPIER');
+    expect(manualWitnessWorkflow).not.toContain('POSTIZ');
   });
 });
