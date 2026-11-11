@@ -120,7 +120,8 @@
         "`.github/workflows/ci.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
         "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation.",
         "`.github/workflows/ci.yml` must explicitly verify that the exact-SHA migration scope step output is true or false; a missing, malformed, or unevaluated decision cannot skip every database lint step while leaving Required Gate green.",
-        "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority."
+        "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority.",
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
       ]
     },
     {
@@ -239,7 +240,8 @@
         "README.md records the October 23 peer refresh to 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f, StoryEngine's exact-head 15/15 successful check state, PR #1004's failure at its old 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f pin, and the requirement that PR #1004 earn its own exact-head witness; no separate PR witness or production/deploy authority transfers.",
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
-        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail."
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
+        "`README.md` must document Whop as a bounded external commerce witness, keep FCR as the verification/truth plane, and separate source route/secret-name declaration from Cloudflare binding presence, Whop webhook registration, migration state, signed delivery, checkout-return proof, and revenue outcome."
       ]
     },
     {
@@ -268,7 +270,8 @@
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
-        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false.",
+        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in required-name policy may be verified by canonical deploy without copying, reading, or logging the `ws_...` value."
       ]
     },
     {
@@ -293,7 +296,8 @@
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must bind the Whop webhook route and `FCR_WHOP_WEBHOOK_SECRET` to the canonical Founder Control Room API Worker only, not Pages, browser code, GitHub Actions substitution, or any sibling project runtime."
       ]
     },
     {
@@ -484,7 +488,10 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence."
+        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence.",
+        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
+        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release.",
+        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under `[secrets].required` so canonical exact-main Deploy fails closed when the Whop provider-held Worker signing-secret binding is absent; the required-name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
       ]
     },
     {
@@ -626,77 +633,6 @@
       "path": "src/lib/xFirstPartyAdapter.ts",
       "claims": [
         "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
-      ]
-    },
-    {
-      "path": ".github/workflows/playwright.yml",
-      "claims": [
-        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
-        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer.",
-        "Refreshing `STORYENGINE_PEER_SHA` after independently observing StoryEngine main is recovery setup only; pin alignment must not carry predecessor Playwright green or founder approval onto the successor FCR head.",
-        "The September 24, 2026 StoryEngine peer refresh after Council residency moved the peer head selects a new evidence subject only; predecessor browser green remains historical until the exact successor FCR head reruns the complete federation witness.",
-        "`.github/workflows/playwright.yml` must treat the pinned StoryEngine peer as an exact evidence subject, verify the live ref still resolves to that SHA before starting the peer runtime, and expire predecessor browser proof whenever either repository head advances.",
-        "`.github/workflows/playwright.yml` must treat an exact ref/pin match as an identity prerequisite only; a cancelled, skipped, or non-executed exact-head Playwright run cannot renew browser-federation proof and must leave the successor claim UNKNOWN.",
-        "The September 27, 2026 transition from StoryEngine `d0689af02675b2d278654ca37ba727dd8d2b6836` to independently observed `e2473a10945b57bb7abedba6d45ea0dbacbd904a` selected a new evidence subject; FCR exact head `c75a361cdee0a56ccd4351c48f38231429cf9e74` then completed Playwright run `36344620958` successfully, including the live-ref check and FCR-to-StoryEngine receipt/browser loop. That proof is exact-pair evidence only and grants no production, merge, deploy, publication, or provider-mutation authority.",
-        "The September 27, 2026 evening transition from StoryEngine `e2473a10945b57bb7abedba6d45ea0dbacbd904a` to independently observed `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` (git ls-remote of `refs/heads/main`) selects a new evidence subject only; run `36344620958` becomes historical for the previous pair, and the successor FCR head has no federation proof until its own exact-head Playwright job completes against `0a1d3b5`.",
-        "The October 2, 2026 transition from StoryEngine `0a1d3b521967a3643daf56cf2ad60b1392bb6e0c` to independently observed `4ec29c1821de8c7bb8c381df31e3f98d0c6016f4` selects a new evidence subject after bounded review of the fail-closed Cloudflare front door, hashed API rate-limit identity, and focused Node tests; predecessor federation proof remains historical, and the successor FCR head must earn its own complete exact-head Playwright witness before the pair is current."
-      ]
-    },
-    {
-      "path": "wrangler.worker.toml",
-      "claims": [
-        "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
-        "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
-        "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must list `FCR_WHOP_WEBHOOK_SECRET` under `[secrets].required` so canonical exact-main Deploy fails closed when the Whop provider-held Worker signing-secret binding is absent; the required-name declaration never proves the secret value, provider webhook registration, signed delivery, database migration, checkout completion, or collected revenue."
-      ]
-    },
-    {
-      "path": "README.md",
-      "claims": [
-        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
-        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
-        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
-        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
-        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
-        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
-        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
-        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
-        "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
-        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
-        "`README.md` must describe the proof-weighted model capability market as task-specific advisory routing where public benchmarks remain bounded priors, local receipts govern promotion, stale proof expires, false-green and authority violations are penalized, and routing never grants execution authority.",
-        "`README.md` must keep exact predecessor/successor StoryEngine SHAs in audit/receipt provenance rather than durable current-state prose; a peer refresh selects a new evidence subject only and never carries predecessor green forward.",
-        "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
-        "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
-        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim any required Worker secret absent when the provider-held target set was never observed.",
-        "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
-        "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
-        "`README.md` must document Whop as a bounded external commerce witness, keep FCR as the verification/truth plane, and separate source route/secret-name declaration from Cloudflare binding presence, Whop webhook registration, migration state, signed delivery, checkout-return proof, and revenue outcome."
-      ]
-    },
-    {
-      "path": "docs/CLOUDFLARE_REASONING.md",
-      "claims": [
-        "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
-        "`docs/CLOUDFLARE_REASONING.md` must treat `FCR_WHOP_WEBHOOK_SECRET` as a provider-held Worker secret whose checked-in required-name policy may be verified by canonical deploy without copying, reading, or logging the `ws_...` value."
-      ]
-    },
-    {
-      "path": "docs/TRUTH_DECAY_AUDIT.md",
-      "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness, then scope any success to that exact evidence pair only.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat external model benchmarks and prior local wins as decaying evidence rather than permanent routing truth; task-specific fresh receipts, false-green history, authority violations, cost, latency, and proof quality must be re-evaluated before promotion.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must treat Cowork workspace copies, attachments, model memory, prior branch observations, connector availability, and generic FCR Activity as non-authoritative context until reconciled with the current exact GitHub repository/branch/head and, for receipts, a separately implemented Cowork receipt adapter.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held runtime secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record that FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74` Playwright run `36344620958` succeeded against StoryEngine `e2473a10945b57bb7abedba6d45ea0dbacbd904a`, while explicitly refusing to convert that browser-federation proof into production or provider authority."
-      ]
-    },
-    {
-      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
-      "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must bind the Whop webhook route and `FCR_WHOP_WEBHOOK_SECRET` to the canonical Founder Control Room API Worker only, not Pages, browser code, GitHub Actions substitution, or any sibling project runtime."
       ]
     }
   ]
