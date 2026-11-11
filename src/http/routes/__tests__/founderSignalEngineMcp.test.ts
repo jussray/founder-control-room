@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -79,6 +80,13 @@ function buildApp(
   app.use(express.json());
   app.post(
     ENDPOINT,
+    rateLimit({
+      windowMs: 60 * 1_000,
+      limit: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Rate limit exceeded.' },
+    }),
     (_req, res, next) => {
       if (standingPolicyAuthorization) {
         res.locals.founderSignalAutomationAuthorization = standingPolicyAuthorization;
@@ -121,6 +129,16 @@ beforeEach(() => {
 });
 
 describe('Founder Signal Engine remote MCP', () => {
+  it('caps repeated unauthenticated MCP requests before any handler or provider work', async () => {
+    const app = buildApp();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const denied = await request(app).post(ENDPOINT).send(rpc('ping'));
+      expect(denied.status).toBe(401);
+    }
+    const limited = await request(app).post(ENDPOINT).send(rpc('ping'));
+    expect(limited.status).toBe(429);
+  });
+
   it('rejects requests without the dedicated MCP bearer token', async () => {
     const response = await request(buildApp()).post(ENDPOINT).send(rpc('tools/list'));
 
@@ -128,7 +146,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(response.body.error.message).toBe('Unauthorized');
   });
 
-  it('supports initialize and exposes exactly one scoped mutating tool', async () => {
+  it('supports initialize, a scoped invocation tool and one read-only campaign planner', async () => {
     const app = buildApp();
     const initialized = await request(app)
       .post(ENDPOINT)
@@ -142,7 +160,19 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-06-18');
     expect(listed.status).toBe(200);
-    expect(listed.body.result.tools).toHaveLength(1);
+    expect(listed.body.result.tools).toHaveLength(4);
+    expect(listed.body.result.tools[3]).toMatchObject({
+      name: 'verify_founder_signal_public_source',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    });
+    expect(listed.body.result.tools[2]).toMatchObject({
+      name: 'review_founder_signal_draft_handoff',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    });
+    expect(listed.body.result.tools[1]).toMatchObject({
+      name: 'plan_founder_signal_campaign',
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    });
     expect(listed.body.result.tools[0]).toMatchObject({
       name: 'invoke_founder_signal_engine',
       annotations: {
@@ -157,6 +187,136 @@ describe('Founder Signal Engine remote MCP', () => {
       type: 'object',
       additionalProperties: false,
     });
+  });
+
+  it('plans native image/video and hashtag packages through the MCP with no provider writes', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('unexpected provider call'); });
+    const resolveProjectId = vi.fn(async () => { throw new Error('unexpected database read'); });
+    const writeAuditEvent = vi.fn(async () => { throw new Error('unexpected database write'); });
+    const app=buildApp({fetchFn,resolveProjectId,writeAuditEvent});
+    const campaign={
+      source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+        proofUrl:'https://github.com/jussray/founder-control-room/commit/' + 'a'.repeat(40),visibility:'public'},
+      strategy:{intent:'proof-update',audience:'Developers reviewing ethical tooling',
+        observation:'The strongest update is the one people can actually verify.',
+        fact:'The project added a source-bound draft checking module.',
+        audienceValue:'Builders can inspect what happened without trusting marketing language.',
+        truthBoundary:'No live Buffer delivery or audience impact is proved by this code.',
+        callToAction:'What would you want to inspect next?',thesis:'Make proof accessible'},
+      topics:['BuildInPublic','DevTools','ResponsibleAI','ProductDesign','Learning'],
+      platforms:['linkedin','instagram','youtube'],
+    };
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'plan_founder_signal_campaign',arguments:campaign}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.contract).toBe('fcr/founder-signal-campaign@v1');
+    expect(response.body.result.structuredContent.variants).toHaveLength(3);
+    expect(response.body.result.structuredContent.variants[1].media.state).toBe('NOT_RENDERED');
+    expect(response.body.result.structuredContent.authority.canPublish).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('previews source-bound image media handoff under first-party draft contract without provider calls', async () => {
+    const fetchFn=mockFetch(async () => { throw new Error('unwanted network call'); });
+    const resolveProjectId=vi.fn(async () => { throw new Error('unwanted db read'); });
+    const writeAuditEvent=vi.fn(async () => { throw new Error('unwanted db write'); });
+    const app=buildApp({fetchFn,resolveProjectId,writeAuditEvent});
+    const campaign={
+      source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+        proofUrl:'https://github.com/jussray/founder-control-room/commit/'+'a'.repeat(40),visibility:'public'},
+      strategy:{intent:'proof-update',audience:'Builders who value truth',
+        observation:'A useful update explains its uncertainty.',
+        fact:'This project includes a reversible, testable content control boundary.',
+        audienceValue:'A builder can check facts before sharing them.',
+        truthBoundary:'The bridge is source code, not confirmed social-provider execution.',
+        callToAction:'What would you verify next?',thesis:'Show verifiable progress'},
+      topics:['BuildInPublic','DevTools','Transparency','ContentStrategy','ProductDesign'],
+      platforms:['linkedin'],
+    };
+    const asset={
+      type:'image',url:'https://cdn.example.org/draft/founder-image.png',sha256:'b'.repeat(64),
+      altText:'An accessible diagram of a review first publishing boundary.',
+      rights:{basis:'original',receiptUrl:'https://cdn.example.org/rights/founder-image',permissionGranted:true},
+      visualVerdict:{contract:'juss/visual-wonder-artifact-verdict',
+        state:'PASSED',artifactSha256:'b'.repeat(64)},
+    };
+    const result=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'review_founder_signal_draft_handoff',
+        arguments:{campaign,platform:'linkedin',accountId:'founder-profile-001',media:[asset]}}));
+    expect(result.status).toBe(200);
+    expect(result.body.result.structuredContent.status).toBe('LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED');
+    expect(result.body.result.structuredContent.preview.mode).toBe('draft');
+    expect(result.body.result.structuredContent.authority.canCreateBufferDraft).toBe(false);
+    expect(result.body.result.structuredContent.renderedMediaBytesChecked).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('verifies exact public GitHub commit readbacks through MCP without database writes', async () => {
+    const repo='jussray/founder-control-room';
+    const sha='a'.repeat(40);
+    const proof='https://github.com/' + repo + '/commit/' + sha;
+    const fetchFn=vi.fn(async (url: string | URL | Request) => {
+      const value=String(url);
+      if(value==='https://api.github.com/repos/'+repo) {
+        return new globalThis.Response(JSON.stringify({full_name:repo,private:false}),{
+          status:200,headers:{'content-type':'application/json'},
+        });
+      }
+      if(value==='https://api.github.com/repos/'+repo+'/git/commits/'+sha) {
+        return new globalThis.Response(JSON.stringify({sha,html_url:proof}),{
+          status:200,headers:{'content-type':'application/json'},
+        });
+      }
+      throw new Error('Unexpected source or provider');
+    });
+    const resolveProjectId=vi.fn(async () => {throw new Error('No DB lookup allowed');});
+    const writeAuditEvent=vi.fn(async () => {throw new Error('No DB write allowed');});
+    const app=buildApp({fetchFn:fetchFn as unknown as typeof fetch,resolveProjectId,writeAuditEvent});
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'verify_founder_signal_public_source',arguments:{
+        repository:repo,commitSha:sha,proofUrl:proof,
+      }}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.status).toBe('VERIFIED_PUBLIC_GITHUB_COMMIT');
+    expect(response.body.result.structuredContent.authorizesPublish).toBe(false);
+    expect(response.body.result.structuredContent.sourceClaimVerified).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('holds forged GitHub public-source evidence with no external request', async () => {
+    const fetchFn=vi.fn(async () => {throw new Error('No provider request should occur');});
+    const app=buildApp({fetchFn:fetchFn as unknown as typeof fetch});
+    const response=await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'verify_founder_signal_public_source',arguments:{
+        repository:'unowned/example',commitSha:'a'.repeat(40),proofUrl:'https://example.org/not-github',
+      }}));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.status).toBe('HOLD_UNVERIFIED');
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe MCP campaign facts before any provider interaction', async () => {
+    const fetchFn=mockFetch(async () => { throw new Error('unexpected provider call'); });
+    const response=await request(buildApp({fetchFn})).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call',{name:'plan_founder_signal_campaign',arguments:{
+        source:{repository:'jussray/founder-control-room',commitSha:'a'.repeat(40),
+          proofUrl:'https://github.com/jussray/founder-control-room/commit/'+'a'.repeat(40),
+          visibility:'private'},strategy:{},platforms:['instagram'],topics:['Tech','Build','Trust'],
+      }}));
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toBe('Invalid campaign brief');
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('blocks secret-like material and unexpected arguments before any provider call', async () => {

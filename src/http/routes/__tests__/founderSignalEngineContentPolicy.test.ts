@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,6 +75,13 @@ function buildApp(options: {
   app.use(express.json());
   app.post(
     ENDPOINT,
+    rateLimit({
+      windowMs: 60 * 1_000,
+      limit: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Rate limit exceeded.' },
+    }),
     (_req, res, next) => {
       if (options.standingPolicy) {
         res.locals.founderSignalAutomationAuthorization = options.standingPolicy;

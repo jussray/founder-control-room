@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Document the candidate FCR Gmail AI Inbox source-only optional Cloudflare binding contract and metadata-read scope while preserving independent OAuth, founder approval, privacy, provider, runtime, and deployment evidence boundaries.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -45,8 +45,7 @@
       "claims": [
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
         "A passing Worker-only secret-name preflight proves binding-name presence, not credential validity, source-to-runtime identity, live service-health, or production V4 conformance; those require independent exact-source provider/runtime receipts.",
-        "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority.",
-        "`worker-reconcile.yml` must accept a valid Cloudflare secret-name JSON list even when Wrangler precedes it with human authentication notices, reject missing or duplicate required names and malformed receipts without echoing provider text, and retain the exact-main approval, bounded legacy plaintext-removal exception, strict post-deploy binding-type verification, and live API/Pages proof requirements."
+        "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority."
       ]
     },
     {
@@ -129,8 +128,7 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
-        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release."
+        "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live."
       ]
     },
     {
@@ -142,8 +140,7 @@
     {
       "path": "src/http/routes/approvals.ts",
       "claims": [
-        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration.",
-        "`src/http/routes/approvals.ts` must re-resolve the live base ref immediately before FCR provider integration and must fail closed with `Base moved after verification` (HTTP 409) when it does not equal the pinned reviewed base SHA, so a merge never lands on a base nobody reviewed; source and mock-test proof never proves live GitHub ruleset enforcement."
+        "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration."
       ]
     },
     {
@@ -617,15 +614,79 @@
       ]
     },
     {
-      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "path": "src/http/routes/founderSignalEngineMcp.ts",
       "claims": [
-        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post."
+        "`src/http/routes/founderSignalEngineMcp.ts` retains `invoke_founder_signal_engine` under the exact standing write-policy boundary while adding `plan_founder_signal_campaign` as an authenticated read-only local editorial tool. A submitted campaign package is USER_SUPPLIED_UNVERIFIED and grants no Buffer, HubSpot, Zapier, publication, schedule, media or model side effect.",
+        "The MCP route now also exposes authenticated `review_founder_signal_draft_handoff` as an isolated read-only tool while retaining the original invoke and campaign-plan tools; it must not use Zapier, HubSpot, provider writes or local persistence.",
+        "`src/http/routes/founderSignalEngineMcp.ts` now also exposes authenticated read-only `verify_founder_signal_public_source` without Zapier, Buffer, HubSpot, model, media or database writes; a GitHub public commit source readback never grants publishing authority."
       ]
     },
     {
-      "path": "src/lib/xFirstPartyAdapter.ts",
+      "path": "src/http/middleware/founderSignalEngineWriteGate.ts",
       "claims": [
-        "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+        "`src/http/middleware/founderSignalEngineWriteGate.ts` routes only the named review-only campaign tool without standing-grant resolution or write-side policy audit; the downstream tool schema rejects unexpected fields. This is not a caller-supplied standing publication approval.",
+        "The write gate exempts only the specifically named read-only campaign and handoff preview tools from mutation policy processing, while the original invocation still obeys exact standing authorization and audited provider boundaries.",
+        "`src/http/middleware/founderSignalEngineWriteGate.ts` must isolate only the named read-only source verification from standing write authorization, preserving the existing separate approval and provider policy boundary for mutation."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalCampaignPlanner.ts",
+      "claims": [
+        "`src/lib/founderSignalCampaignPlanner.ts` uses existing platform/capability registry to create distinct proposed copy, relevant hashtags, media directions, 5W1H, documented founder style, and non-authorizing continuity markers. Media remains NOT_RENDERED, recent posting style requires provenance-linked provider history, and outcome/performance claims require independent live proof; reputational heuristics do not certify safety."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/media-reputation-mcp-v1.md",
+      "claims": [
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must separate source proposal, approved rendered media, exact founder review, Buffer draft-only native readback, HubSpot/FCR receipts, and provider-native outcome evidence; no planning output can promote itself to live publication or business growth.",
+        "The media handoff documented in `docs/founder-signal-engine/media-reputation-mcp-v1.md` is only a self-attested source, licensed-media and draft-shape review; actual bytes, legal rights, live accounts, founder approval, Buffer-native draft and business outcomes must be independently proven.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must state public GitHub commit readback is time-bounded and independently verified for existence only, not proof of source claim, rendered/licensed media, account permission, Buffer draft, business impact, merge or deployment.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` must distinguish local byte-integrity matching from separately authenticated media storage, origin, decoder, licensing and visual inspection; no media validation grants draft/publish authority.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` separates a mock-injected authenticated reader contract from a real audited asset storage reader, provenance and rights evidence, decoder and visual inspection, founder review and native Buffer provider readback. Passing mock unit tests cannot prove storage, brand safety or publication.",
+        "`docs/founder-signal-engine/media-reputation-mcp-v1.md` now distinguishes real local FFmpeg file-byte readback and a conditional real-render integration test from rights/decoder/brand review, authenticated external asset storage, founder approval, and Buffer-native delivery; R2 had no buckets in the observed account and Supabase discovery was unverified."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalDraftHandoff.ts",
+      "claims": [
+        "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalPublicSourceCheck.ts",
+      "claims": [
+        "`src/lib/founderSignalPublicSourceCheck.ts` must verify exact owned public GitHub repository visibility and immutable commit SHA/permalink using bounded GET-only GitHub API reads, never trust caller-supplied public/source proofs, and always distinguish exact commit existence from deployed features, outcomes, visual media and release authority."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalMediaByteCheck.ts",
+      "claims": [
+        "`src/lib/founderSignalMediaByteCheck.ts` implements only a bounded offline stream hash/PNG-JPEG-WebP-MP4 signature check, not trusted source identity, full media decoding, copyrights/usage rights, content-safety verification, founder approval, Buffer/provider actions, production Media Router wiring or permission to publish."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalAuthenticatedMediaReader.ts",
+      "claims": [
+        "`src/lib/founderSignalAuthenticatedMediaReader.ts` supplies an isolated dependency-injected, read-only media reader bridge. It requires a server-owned principal/workspace/project, promoted same-project FCR asset registry record, asserted commercial-use permission and domain authority receipt, immutable object version, matching metadata SHA and exact streamed byte count/hash. It never grants media uploads, Buffer draft writes, scheduling, publication or account authority; no live storage adapter is implemented."
+      ]
+    },
+    {
+      "path": "src/lib/founderSignalLocalRenderInspection.ts",
+      "claims": [
+        "`src/lib/founderSignalLocalRenderInspection.ts` verifies local FFmpeg MP4 output bytes against its renderer receipt and explicit server-owned output directory, rejects traversal, symlinks, modified files and digest/size mismatches, and returns only LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF without any rights, publication, media upload or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/mediaFfmpegRender.ts",
+      "claims": [
+        "The existing `src/lib/mediaFfmpegRender.ts` local renderer remains the independent receipt producer: its generated MP4 and FFprobe/sha256 receipt can now be tested against a separate read-only FSE byte-inspection bridge, but neither code path proves release permission or social distribution."
+      ]
+    },
+    {
+      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "claims": [
+        "`src/lib/firstPartyFounderContentExecutor.ts` must preserve canonical exact-current-founder approval, bounded approval freshness, exact public copy and payload hashes, source SHA, one durable idempotency reservation and provider-native outcome receipt for both LinkedIn and X; an X developer app API key alone must never grant publishing authority.",
+        "For X, FCR requires server-held X_USER_ACCESS_TOKEN and X_USER_ID, verifies user-context account identity before any post write, consumes ambiguous write/readback reservations without a blind retry, and never emits token material in public results. Passing source tests does not establish live X authentication or publication."
       ]
     }
   ]

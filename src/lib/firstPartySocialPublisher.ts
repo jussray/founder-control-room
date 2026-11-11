@@ -174,8 +174,11 @@ export const FIRST_PARTY_PLATFORM_CAPABILITIES: Record<
     accountBoundary: 'authenticated X user',
     safeCharacterLimit: 270,
     requiresMedia: false,
-    credentialRefs: ['X_USER_ACCESS_TOKEN'],
-    notes: ['Reserve 10 characters below the standard 280-character ceiling.'],
+    credentialRefs: ['X_USER_ACCESS_TOKEN', 'X_USER_ID'],
+    notes: [
+      'Requires a user-context OAuth access token and matching numeric account ID; developer API keys cannot publish.',
+      'Reserve 10 characters below the standard 280-character ceiling.',
+    ],
   },
   tiktok: {
     platform: 'tiktok',
