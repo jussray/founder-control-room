@@ -618,6 +618,15 @@ StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902f
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+## Deploy credential receipts: evidence boundary (October 13, 2026)
+
+The manual-only `.github/workflows/deploy.yml` authority gate verifies exact current `main` and production approval before any provider mutation. After credential-shape validation and Cloudflare Worker secret-name readback, its `if: always()` upload step retains any generated `fcr-deploy-credential-shape.json` and `fcr-worker-secret-names.json` runner-temp receipts as a 90-day `fcr-deploy-credential-audit-<run_id>-<attempt>` artifact. The credential-shape receipt classifies input shape, while the Worker receipt contains secret **names**, never values.
+
+The upload reports a warning if neither file exists; it cannot manufacture evidence when checkout, authorization, or required configuration fails before files are written. An artifact or preview build is not a live Cloudflare deploy, full provider observation, or authorization for production mutation. Actual artifact retention on an authority run must be confirmed with that exact run's artifacts and logs; PR CI can verify only source and contracts.
+
+## October 13 StoryEngine federation peer freshness transition
+
+FCR's exact-head Playwright E2E harness passed locally on `e4a366e6fed071464ee5cd1ae2b1cd3851dbc5ae`, but the independent live StoryEngine `refs/heads/main` check blocked the federation: workflow pin `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`, observed peer `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. The new peer is 19 commits forward, and the source comparison did not change a named product-build federation endpoint; that alone does not prove runtime compatibility. This refresh binds the successor peer SHA, preserving the fail-closed exact-ref comparison and requiring the full FCR-to-StoryEngine Playwright/browser witness again at the new FCR head. It does not authorize merge, deploy, production, or publication.
 
 ## Portfolio conversion tracking contract
 

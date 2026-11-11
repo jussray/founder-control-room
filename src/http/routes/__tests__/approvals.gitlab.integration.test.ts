@@ -311,6 +311,7 @@ describe("GitLab approvals routing", () => {
       .send({ message: "edit via GitLab", idempotencyKey: "gitlab-patch-test-1", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
 
     expect(response.status).toBe(201);
+    expect(supabaseMock.from).toHaveBeenCalledWith("approval_executions");
     expect(mockCommitPatch).toHaveBeenCalledWith(
       "gitlab-project",
       "mission/gitlab",

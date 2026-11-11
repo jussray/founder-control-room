@@ -283,6 +283,12 @@ Current executable source and authoritative provider readback outrank an older v
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
 
+## Manual Deploy authority audit artifacts
+
+The production `.github/workflows/deploy.yml` remains manual-dispatch and exact-current-main-gated. After the provider credential-shape validator, the Worker secret-name preflight saves `fcr-deploy-credential-shape.json` and `fcr-worker-secret-names.json` under `RUNNER_TEMP`. The `authority-gate` then invokes pinned `actions/upload-artifact` with `if: always()`, a per-run/per-attempt artifact name, 90-day retention, and a warning if neither file was generated. This preserves available name/shape evidence on failed preflight runs while never including raw tokens, keys, or Worker secret values.
+
+Failing before a receipt is written must remain BLOCKED/UNKNOWN, not “verified absent” or “artifact uploaded.” A PR preview or YAML check cannot prove production dispatch, provider-held secret state, or retained artifact availability; verify the specific manual run and provider readback before strengthening any claim. The upload does not grant merge, production mutation, or rotation authority.
+
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
