@@ -126,6 +126,7 @@ function startServer(mode) {
       '/authority-levels': { levels: FIXTURE.levels },
       '/promptos': { templates: FIXTURE.templates },
     };
+    if (path === '/version') return json(res, 200, { gitSha: 'c'.repeat(40), service: 'fixture' });
     if (path === '/l99/status') {
       return mode === 'l99-down' ? json(res, 503, { error: 'L99 status unavailable' }) : json(res, 200, FIXTURE.l99);
     }
@@ -197,173 +198,165 @@ async function withPage(browser, viewport, fn) {
 mkdirSync(OUT_DIR, { recursive: true });
 const browser = await chromium.launch();
 
-console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×720, the run.mjs viewport)');
+console.log('\n[1] Home summary uses current data and drills into visible Control / Proof navigation');
 {
-  const { server, baseUrl } = await startServer('full');
-  const { pageErrors, consoleErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
-    let releaseApi;
-    const apiGate = new Promise((r) => { releaseApi = r; });
-    await page.route((url) => /\/(projects|dashboard\/tasks|dashboard\/activity|dashboard\/costs|l99\/status)$/.test(url.pathname), async (route) => { await apiGate; await route.continue(); });
-    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('.topbar', { timeout: 10_000 });
-    await page.waitForSelector('[data-home-kpis] [data-kpi="projects"]', { timeout: 10_000 });
-    const firstPaint = await page.locator('[data-kpi]').evaluateAll((nodes) => nodes.map((n) => [n.dataset.kpi, n.dataset.truth, n.querySelector('.kpi-value').textContent.trim()]));
-    assert(firstPaint.filter(([, truth]) => truth === 'observed').length === 0, `first paint claims nothing as observed (${JSON.stringify(firstPaint)})`);
-    assert(firstPaint.every(([, truth, value]) => truth === 'not-wired' || value === 'UNKNOWN'), 'every unread KPI shows UNKNOWN before its read settles');
-    releaseApi();
-    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
-    await page.waitForSelector('[data-kpi="spend"][data-truth="observed"]', { timeout: 10_000 });
+  const {server,baseUrl}=await startServer('full');
+  const {pageErrors,consoleErrors}=await withPage(browser,{width:1280,height:720},async(page)=>{
+    let release;
+    const apiGate=new Promise((resolveGate)=>{release=resolveGate;});
+    await page.route((url)=>/\/(projects|dashboard\/tasks|dashboard\/activity|version)$/.test(url.pathname),
+      async(route)=>{await apiGate;await route.continue();});
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('.founder-home',{state:'visible'});
+    assert(JSON.stringify(await page.locator('.founder-screen-nav button').allInnerTexts())
+      ===JSON.stringify(['Home','Control','Chief','PromptOS','Proof']),
+      'exactly five founder screens are visible');
+    assert(await page.locator('.tabs[data-legacy-tabs=true]').isHidden(),
+      'original tabs exist for compatibility but are not visible primary navigation');
+    assert((await page.locator('.founder-home-grid').count())===0,
+      'unread data is never presented as an observed metric');
+    release();
+    await page.waitForSelector('.founder-home-grid',{state:'visible',timeout:15000});
+    const cards=await page.locator('.founder-home-card').allInnerTexts();
+    assert(cards.length===4,'Home exposes exactly four summary metrics');
+    assert(cards[0].includes('Projects')&&cards[0].includes(String(FIXTURE.projects.length)),
+      'project count matches the served projects');
+    assert(cards[1].includes('Active work')&&cards[1].includes('5'),
+      'active work excludes deployed and rejected tasks');
+    assert(cards[2].includes('Needs founder')&&cards[2].includes('2'),
+      'in-review and approved work remain founder attention items');
+    assert(cards[3].includes('Runtime SHA')&&cards[3].includes('cccccccccccc'),
+      'runtime SHA is the observed (fixture) identity, not an invented version');
+    const gate=await page.locator('.founder-next-gate').innerText();
+    assert(gate.includes('Review Bip partnership proposal')&&gate.includes('Recent evidence events: 9'),
+      'next gate and evidence count match the served mission and activity records');
+    assert((await page.locator('.founder-email').innerText())===FOUNDER_EMAIL,
+      'Home retains the founder-only session');
+    await noOverflow(page,'desktop Home');
+    await page.screenshot({path:join(OUT_DIR,'founder-home-desktop.png'),fullPage:true});
 
-    assert((await page.locator('.founder-email').innerText()) === FOUNDER_EMAIL, 'topbar shows the founder email');
-    assert((await page.locator('.tabs button[data-tab="home"].active').count()) === 1, 'Home is the active tab without any click');
-    const tabIds = await page.locator('.tabs button[data-tab]').evaluateAll((nodes) => nodes.map((n) => n.dataset.tab));
-    assert(JSON.stringify(tabIds) === JSON.stringify(['home', 'projects', 'missions', 'activity', 'l99', 'promptos', 'analytics', 'terminal', 'truth-dashboard', 'truth-claims', 'truth-evidence', 'truth-reconcile', 'truth-attacks', 'truth-world', 'truth-continuity']), `sidebar keeps the tab-id contract (${tabIds.join(', ')})`);
-    assert((await page.locator('.sidebar .side-link').count()) >= 4, 'sidebar links the sibling Control Room surfaces');
-    assert((await page.locator('[data-systems-truth="unknown"]').count()) === 1, 'systems status is rendered as not observed, not as a green light');
-
-    const heroText = (await page.locator('.hero-title').innerText()).replace(/\s+/g, '');
-    assert(heroText === 'SAMETRUTH.HIGHEROUTCOMES.', 'hero renders the approved Same Truth / Higher Outcomes headline');
-    assert(!heroText.includes('ULTRATHINK'), 'ULTRATHINK stays behind the founder-facing UI');
-    assert((await page.locator('.hero-greeting').innerText()).toLowerCase().includes('good '), 'hero greets the founder');
-    assert((await page.locator('.chief-prompt').innerText()) === 'Ask the Council anything…', 'AI Council exposes the approved founder prompt');
-    assert((await page.locator('[data-council-roster]').count()) === 1, 'AI Council roster renders once');
-    assert((await page.locator('.fcr-nav-search').count()) === 1, 'founder navigation search renders once');
-    assert((await page.locator('.chief-route').count()) === 6, 'AI Council exposes six routes');
-
-    const kpi = async (id) => (await page.locator(`[data-kpi="${id}"] .kpi-value`).innerText()).trim();
-    assert((await kpi('projects')) === String(FIXTURE.projects.length), `Projects KPI equals served project count (${FIXTURE.projects.length})`);
-    assert((await kpi('missions')) === String(expectedInFlight), `Missions-in-flight KPI equals served in-flight count (${expectedInFlight})`);
-    assert((await page.locator('[data-kpi="missions"] .kpi-sub').innerText()).includes(`${expectedInReview} in review`), 'in-review sub-count matches');
-    assert((await kpi('landed')) === String(expectedLanded), `Integrated KPI equals integrated+deployed (${expectedLanded})`);
-    assert((await kpi('signals')) === String(LIVE_SIGNALS.length), `Live-signals KPI counts served events minus the *_read audit rows (${LIVE_SIGNALS.length} of ${FIXTURE.activity.length})`);
-    assert(!(await page.locator('[data-home-signals]').innerText()).includes('_read'), 'Live signals panel hides the read-audit rows this page load produced');
-    assert((await kpi('l99')) === '2/3', 'L99 KPI equals passing/total gates from served status');
-    assert((await kpi('spend')) === '$1.2345', 'Spend KPI equals served totalUsd at the Analytics tab precision (4dp)');
-    for (const id of ['revenue', 'community']) {
-      const value = await kpi(id);
-      const truth = await page.locator(`[data-kpi="${id}"]`).getAttribute('data-truth');
-      assert(truth === 'not-wired' && !/\d/.test(value), `${id} tile is marked not-wired and shows no number (got "${value}")`);
-    }
-    assert((await page.locator('[data-kpi][data-truth="observed"]').count()) === 6, 'six KPIs are observed from served data');
-
-    assert((await page.locator('#new-project-form').isVisible()), 'register-project form is present on Home without a click (run.mjs contract)');
-    assert((await page.locator('#project-list .card').count()) === FIXTURE.projects.length, 'Active projects lists every served project through the real projects module');
-    assert((await page.locator('[data-home-focus] .focus-item').count()) === expectedInFlight, `Today's focus lists the ${expectedInFlight} in-flight missions`);
-    assert((await page.locator('[data-home-signals] .signal').count()) === Math.min(6, LIVE_SIGNALS.length), 'Live signals shows the latest six non-audit events');
-    assert((await page.locator('.home-tiles .tile').count()) === 8, 'eight section tiles render');
-
-    await noOverflow(page, 'desktop');
-    await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop.png'), fullPage: true });
-
-    await page.click('#project-list .card >> nth=0');
-    await page.waitForSelector('#project-detail', { state: 'visible', timeout: 10_000 });
-    assert((await page.locator('[data-home-detail] #project-detail').count()) === 1, 'selecting a project opens its detail panel full-width under the grid, still on Home');
-
-    await page.click('[data-focus-mission="m-1"]');
-    await page.waitForSelector('.tabs button[data-tab="missions"].active', { timeout: 10_000 });
-    await page.waitForSelector('#mission-detail', { state: 'visible', timeout: 10_000 });
-    assert((await page.locator('#mission-lanes .lane').count()) === 8, 'focus item routes to the Missions board (8 lanes)');
-    assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'), 'the clicked mission is selected in its detail panel');
-
-    for (const selector of ['#log-council-form button[type=submit]', '#log-cost-form button[type=submit]']) {
-      await page.locator(selector).scrollIntoViewIfNeeded();
-      const box = await page.locator(selector).boundingBox();
-      const dock = await page.locator('.launch-dock').boundingBox();
-      const overlaps = Boolean(box && dock) && box.x < dock.x + dock.width && box.x + box.width > dock.x && box.y < dock.y + dock.height && box.y + box.height > dock.y;
-      assert(box && dock && !overlaps, `${selector} scrolls clear of the fixed launch dock (button y=${box && Math.round(box.y)}, dock top=${dock && Math.round(dock.y)})`);
+    await page.locator('[data-home-target=control]').click();
+    await page.waitForSelector('#new-project-form',{state:'visible'});
+    await page.waitForSelector('#project-list .card',{state:'visible'});
+    assert((await page.locator('#project-list .card').count())===FIXTURE.projects.length,
+      'Control Overview preserves the existing founder project registry');
+    assert((await page.locator('[data-control-view=overview][aria-current=page]').count())===1,
+      'Control Overview is the active secondary screen');
+    await page.locator('#project-list .card').first().click();
+    await page.waitForSelector('#project-detail',{state:'visible'});
+    assert((await page.locator('#project-detail').innerText()).includes('Se’kret Bip'),
+      'project detail is operational through Control');
+    await page.locator('[data-control-view=work]').click();
+    await page.waitForSelector('#mission-lanes .card[data-id="m-1"]',{state:'visible'});
+    assert((await page.locator('#mission-lanes .lane').count())===8,
+      'all eight mission lanes remain available');
+    await page.locator('#mission-lanes .card[data-id="m-1"]').click();
+    await page.waitForSelector('#mission-detail',{state:'visible'});
+    assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'),
+      'selected mission details remain visible');
+    for(const selector of ['#log-council-form button[type=submit]','#log-cost-form button[type=submit]']){
+      const button=page.locator(selector);
+      await button.scrollIntoViewIfNeeded();
+      const a=await button.boundingBox(),b=await page.locator('.launch-dock').boundingBox();
+      const covered=Boolean(a&&b&&a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y);
+      assert(Boolean(a&&b&&!covered),selector+' is not covered by founder dock');
     }
 
-    await page.click('.tabs button[data-tab="home"]');
-    await page.waitForSelector('[data-home-kpis]');
-    await page.click('[data-kpi="signals"]');
-    await page.waitForSelector('.tabs button[data-tab="activity"].active');
-    assert((await page.locator('#activity-list .card').count()) === FIXTURE.activity.length, 'KPI tile routes to the Signals tab with the full activity list (audit rows included there)');
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Proof$/}).click();
+    await page.waitForSelector('#activity-list .card',{state:'visible'});
+    assert((await page.locator('#activity-list .card').count())===FIXTURE.activity.length,
+      'Proof retains full source audit history');
+    assert((await page.locator('[data-proof-view=truth-dashboard]').count())===1,
+      'Truth Console is reachable from Proof without another primary screen');
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
-  assert(consoleErrors.length === 0, `no console errors (saw: ${JSON.stringify(consoleErrors)})`);
+  assert(pageErrors.length===0,'no unexpected JS exceptions on desktop: '+JSON.stringify(pageErrors));
+  assert(consoleErrors.length===0,'no unexpected console errors on desktop: '+JSON.stringify(consoleErrors));
   server.close();
 }
 
-console.log('\n[2] ?tab= deep link still activates a tab through stack-router.js (mobile 390)');
+console.log('\n[2] Old deep links migrate to five-screen routes on mobile');
 {
-  const { server, baseUrl } = await startServer('full');
-  const { pageErrors } = await withPage(browser, { width: 390, height: 844 }, async (page) => {
-    await page.goto(`${baseUrl}/control-room/?tab=terminal`, { waitUntil: 'load' });
-    await page.waitForSelector('.tabs button[data-tab="terminal"].active', { timeout: 10_000 });
-    assert((await page.locator('.tabs button.active').count()) === 1 && (await page.locator('#terminal-project-slug').count()) === 1, 'terminal tab activated from the URL and rendered its form');
-    await page.click('.tabs button[data-tab="home"]');
-    await page.waitForSelector('[data-home-kpis]');
-    await noOverflow(page, 'mobile');
-    const sidebarBox = await page.locator('.sidebar').boundingBox();
-    assert(sidebarBox && sidebarBox.width >= 380, 'sidebar collapses to a full-width strip on mobile');
-    await page.screenshot({ path: join(OUT_DIR, 'founder-home-mobile.png'), fullPage: true });
+  const {server,baseUrl}=await startServer('full');
+  const {pageErrors}=await withPage(browser,{width:390,height:844},async(page)=>{
+    await page.goto(baseUrl+'/control-room/?tab=terminal',{waitUntil:'load'});
+    await page.waitForSelector('#terminal-project-slug',{state:'visible'});
+    assert(new URL(page.url()).searchParams.get('screen')==='control'
+      &&new URL(page.url()).searchParams.get('view')==='execution',
+      'legacy terminal URL migrates to Control Execution');
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Home$/}).click();
+    await page.waitForSelector('.founder-home-grid',{state:'visible'});
+    await noOverflow(page,'mobile Home');
+    await page.screenshot({path:join(OUT_DIR,'founder-home-mobile.png'),fullPage:true});
+    await page.goto(baseUrl+'/control-room/?tab=truth-claims',{waitUntil:'load'});
+    await page.waitForSelector('[data-truth-screen=truth-claims]',{state:'visible'});
+    assert(new URL(page.url()).searchParams.get('screen')==='proof'
+      &&new URL(page.url()).searchParams.get('view')==='truth-claims',
+      'legacy Truth Console URL migrates to Proof Claims');
+    await noOverflow(page,'mobile Proof Claims');
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  assert(pageErrors.length===0,'no unexpected JS exceptions on mobile: '+JSON.stringify(pageErrors));
   server.close();
 }
 
-console.log('\n[2b] Desktop 1440 overflow pass');
+console.log('\n[3] Desktop 1440 Home proof');
 {
-  const { server, baseUrl } = await startServer('full');
-  const { pageErrors, consoleErrors } = await withPage(browser, { width: 1440, height: 960 }, async (page) => {
-    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
-    await noOverflow(page, 'desktop 1440');
-    await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop-1440.png'), fullPage: true });
+  const {server,baseUrl}=await startServer('full');
+  const {pageErrors,consoleErrors}=await withPage(browser,{width:1440,height:960},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('.founder-home-grid',{state:'visible'});
+    await noOverflow(page,'desktop 1440');
+    await page.screenshot({path:join(OUT_DIR,'founder-home-desktop-1440.png'),fullPage:true});
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
-  assert(consoleErrors.length === 0, `no console errors under the production CSP (saw: ${JSON.stringify(consoleErrors)})`);
+  assert(pageErrors.length===0,'no JS exceptions at 1440: '+JSON.stringify(pageErrors));
+  assert(consoleErrors.length===0,'no console errors at 1440: '+JSON.stringify(consoleErrors));
   server.close();
 }
 
-console.log('\n[3] A failed L99 read renders UNKNOWN, never a number');
+console.log('\n[4] Unavailable L99 remains unavailable, not launch-ready');
 {
-  const { server, baseUrl } = await startServer('l99-down');
-  const { pageErrors } = await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('[data-kpi="projects"][data-truth="observed"]', { timeout: 10_000 });
-    const value = (await page.locator('[data-kpi="l99"] .kpi-value').innerText()).trim();
-    const truth = await page.locator('[data-kpi="l99"]').getAttribute('data-truth');
-    assert(value === 'UNKNOWN' && truth === 'unknown', `L99 KPI shows UNKNOWN with data-truth=unknown after the other reads settled (got "${value}", ${truth})`);
-    assert((await page.locator('[data-kpi="l99"] .kpi-sub').innerText()).includes('read failed'), 'and says the read failed, not "not read yet"');
-    assert((await page.locator('[data-kpi="spend"][data-truth="observed"]').count()) === 1, 'a sibling read that succeeded is still observed');
+  const {server,baseUrl}=await startServer('l99-down');
+  const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('.founder-home-grid',{state:'visible'});
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Chief$/}).click();
+    await page.waitForSelector('.founder-screen-intro',{state:'visible'});
+    const response=await page.request.get(baseUrl+'/l99/status');
+    assert(response.status()===503,'L99 down is HTTP 503, never a synthetic readiness pass');
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  assert(pageErrors.length===0,'no JS exceptions when L99 is down: '+JSON.stringify(pageErrors));
   server.close();
 }
 
-console.log('\n[3b] Failed project and activity reads render UNKNOWN, not an observed zero, and the banner names both');
+console.log('\n[5] Missing essential reads never become observed zero');
 {
-  const { server, baseUrl } = await startServer('reads-down');
-  const { pageErrors } = await withPage(browser, { width: 1280, height: 720 }, async (page) => {
-    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('[data-kpi="missions"][data-truth="observed"]', { timeout: 10_000 });
-    for (const id of ['projects', 'signals']) {
-      const truth = await page.locator(`[data-kpi="${id}"]`).getAttribute('data-truth');
-      const value = (await page.locator(`[data-kpi="${id}"] .kpi-value`).innerText()).trim();
-      const sub = await page.locator(`[data-kpi="${id}"] .kpi-sub`).innerText();
-      assert(truth === 'unknown' && value === 'UNKNOWN' && sub.includes('read failed'), `${id} KPI is UNKNOWN / read failed after a 503 (got ${truth} "${value}" "${sub}")`);
-    }
-    assert((await page.locator('[data-kpi="missions"] .kpi-value').innerText()).trim() === String(expectedInFlight), 'missions KPI is still observed from its own successful read');
-    const banner = await page.locator('#tab-content > .error').first().innerText();
-    assert(banner.includes('/projects') && banner.includes('/dashboard/activity'), `banner names every failed read (got "${banner}")`);
-    assert((await page.locator('[data-home-focus] .focus-item').count()) === expectedInFlight, "Today's focus still renders from the successful missions read");
+  const {server,baseUrl}=await startServer('reads-down');
+  const {pageErrors}=await withPage(browser,{width:1280,height:720},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('.founder-home > .error',{state:'visible'});
+    const text=await page.locator('.founder-home > .error').innerText();
+    assert(text.includes('Home reality could not be established')&&text.includes('HTTP 503'),
+      'Home visibly labels the missing data instead of showing an invented count');
+    assert((await page.locator('.founder-home-card').count())===0,
+      'no observed metric is fabricated after a failed essential read');
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  assert(pageErrors.length===0,'no JS exceptions during read failure: '+JSON.stringify(pageErrors));
   server.close();
 }
 
-console.log('\n[4] Signed-out surface is the unchanged magic-link card');
+console.log('\n[6] Signed-out founder cannot view private screens');
 {
-  const { server, baseUrl } = await startServer('signed-out');
-  const { pageErrors } = await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-    await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'load' });
-    await page.waitForSelector('#magic-link-form', { timeout: 10_000 });
-    assert((await page.locator('.sign-in-card h2').innerText()) === 'Founder Control Room', 'sign-in card still renders with its heading and form');
-    assert((await page.locator('[data-home]').count()) === 0, 'no dashboard is rendered without a founder session');
-    await page.screenshot({ path: join(OUT_DIR, 'founder-home-signed-out.png'), fullPage: true });
+  const {server,baseUrl}=await startServer('signed-out');
+  const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('#magic-link-form',{timeout:10000});
+    assert((await page.locator('.sign-in-card h2').innerText())==='Founder Control Room',
+      'real sign-in card remains the only entry path');
+    assert((await page.locator('.founder-screen-nav').count())===0
+      &&(await page.locator('.founder-home').count())===0,
+      'private navigation is never rendered for signed-out visitors');
+    await page.screenshot({path:join(OUT_DIR,'founder-home-signed-out.png'),fullPage:true});
   });
-  assert(pageErrors.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(pageErrors)})`);
+  assert(pageErrors.length===0,'no JS exceptions signed-out: '+JSON.stringify(pageErrors));
   server.close();
 }
 
