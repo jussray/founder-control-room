@@ -28,6 +28,10 @@ import {
   validateWorkerEnv,
   type ControlRoomWorkerEnv,
 } from './handler.js';
+import {
+  MEDIA_ASSET_INGRESS_PATH_PREFIX,
+  handleMediaAssetIngress,
+} from './mediaAssetIngress.js';
 import { assertScheduledTaskResults } from './scheduledTaskResults.js';
 
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
@@ -96,6 +100,9 @@ const worker: ExportedHandler<ControlRoomWorkerEnv> = {
     const url = new URL(request.url);
     if (url.pathname === BIP_PROOF_INGRESS_PATH) {
       return handleBipControlRoomProofIngress(request, workerEnv);
+    }
+    if (url.pathname.startsWith(MEDIA_ASSET_INGRESS_PATH_PREFIX)) {
+      return handleMediaAssetIngress(request, workerEnv);
     }
     return composedFetch.call(composed, request, workerEnv, ctx);
   },

@@ -57,6 +57,17 @@ allowed_sender_addresses = ["welcome@api.foundercontrolroom.org"]
 pattern = "api.foundercontrolroom.org"
 custom_domain = true
 
+# Hosts AI-generated post images/video (src/lib/mediaContentGenerator.ts) at a
+# stable HTTPS URL via GET /media-assets/:key (src/worker/mediaAssetIngress.ts).
+# The binding alone writes/serves nothing by itself and grants no publish
+# authority. The bucket itself must still be created in Cloudflare out of
+# band before this binding resolves to anything live; until then the route
+# returns 503, and Worker startup does not depend on it (MEDIA_ASSETS is
+# optional in ControlRoomWorkerEnv).
+[[r2_buckets]]
+binding = "MEDIA_ASSETS"
+bucket_name = "founder-control-room-media-assets"
+
 # Public-safe runtime variables. Auth callbacks intentionally return through
 # the Pages origin so browser sessions and relative /control-room redirects
 # remain same-origin from the founder's point of view.

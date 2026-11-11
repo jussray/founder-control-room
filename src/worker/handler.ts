@@ -1,4 +1,4 @@
-import type { ExportedHandler } from '@cloudflare/workers-types';
+import type { ExportedHandler, R2Bucket } from '@cloudflare/workers-types';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
 import {
@@ -39,6 +39,12 @@ export interface ControlRoomWorkerEnv {
   FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: string;
   /** HMAC secret for POST /ingest/repository-verification. Optional — that route 401s without it. */
   REPOSITORY_INGEST_SECRET?: string;
+  /**
+   * Hosts generated post images/video from src/lib/mediaContentGenerator.ts.
+   * Optional — GET /media-assets/:key returns 503 without it, and startup
+   * must not fail before the bucket is actually provisioned in Cloudflare.
+   */
+  MEDIA_ASSETS?: R2Bucket;
 }
 
 interface ReconcilerModule {
