@@ -190,5 +190,35 @@ class WorkerReconcileSecretReceiptTests(unittest.TestCase):
         self.assertIn("Invalid Cloudflare secret receipt", result.stdout)
         self.assertNotIn("SECRET_DO_NOT_ECHO", result.stdout + result.stderr)
 
+    def test_bracketed_warning_notice_before_json_accepted(self) -> None:
+        import json
+
+        receipt = "▲ [WARNING] You are logged in with an API Token.\n\n" + json.dumps(
+            self.entries()
+        ) + "\n"
+        result = self.run_receipt(receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_bracketed_log_line_after_json_accepted(self) -> None:
+        import json
+
+        receipt = json.dumps(self.entries()) + "\n[wrangler] done\n"
+        result = self.run_receipt(receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_notice_that_parses_as_a_non_receipt_list_is_skipped(self) -> None:
+        import json
+
+        receipt = "step [1, 2] of setup\n" + json.dumps(self.entries())
+        result = self.run_receipt(receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_bracketed_notices_without_a_receipt_fail_closed_without_echo(self) -> None:
+        receipt = "▲ [WARNING] SECRET_DO_NOT_ECHO\n[1, 2]\n[wrangler] done\n"
+        result = self.run_receipt(receipt)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Invalid Cloudflare secret receipt", result.stdout)
+        self.assertNotIn("SECRET_DO_NOT_ECHO", result.stdout + result.stderr)
+
 if __name__ == "__main__":
     unittest.main()
