@@ -41,6 +41,23 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(witness).toContain("'CF-Access-Client-Secret': accessClientSecret");
   });
 
+  it('fails closed on anonymous API Access gate before release evidence can count', () => {
+    expect(witness).toContain('    request,');
+    expect(witness).toContain('const anonymousApiResponse = await request.get(');
+    expect(witness).toContain('maxRedirects: 0');
+    expect(witness).toContain('cloudflareaccess\\\\.com');
+    expect(witness).toContain('Anonymous direct API must show an Access-specific gate');
+    expect(witness.indexOf('const anonymousApiResponse')).toBeLessThan(
+      witness.indexOf("readDirectIdentity('before-browser')"),
+    );
+    const anonymousBlock = witness.slice(
+      witness.indexOf('const anonymousApiResponse'),
+      witness.indexOf("readDirectIdentity('before-browser')"),
+    );
+    expect(anonymousBlock).not.toContain('accessClientSecret');
+    expect(anonymousBlock).not.toContain('CF-Access-Client-Secret');
+  });
+
   it('proves one exact release before and after the browser journey', () => {
     const beforeDirect = witness.indexOf("readDirectIdentity('before-browser')");
     const beforePublic = witness.indexOf("readPublicIdentity('before-browser')");
