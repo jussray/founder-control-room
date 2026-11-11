@@ -54,10 +54,15 @@ async function waitForBridge() {
 }
 
 async function openTruthTab(page, tab) {
-  const selector = `.tabs button[data-tab="${tab}"]`;
-  await page.waitForSelector(selector);
-  await page.click(selector);
-  await page.waitForSelector(`[data-truth-screen="${tab}"]`);
+  // The legacy tab buttons remain present only for compatibility. Founders
+  // navigate through the visible five-screen Proof surface and its subviews.
+  const proof = page.locator('.founder-screen-nav button').filter({ hasText: /^Proof$/ });
+  if ((await proof.getAttribute('aria-current')) !== 'page') await proof.click();
+  await page.locator(`.founder-subnav button[data-proof-view="${tab}"]`).click();
+  await page.waitForSelector(`[data-truth-screen="${tab}"]`, { state: 'visible' });
+  const url = new URL(page.url());
+  assert(url.searchParams.get('screen') === 'proof'
+    && url.searchParams.get('view') === tab, `${tab} is reachable under the public Proof navigation`);
 }
 
 async function waitForReceipt(page, text) {
@@ -124,7 +129,11 @@ try {
 
   console.log('\n[truth-2] Canonical GitHub project identity is registered before truth work');
   await page.goto(`${BASE_URL}/control-room/`);
-  await page.waitForSelector('#new-project-form');
+  await page.waitForSelector('.founder-screen-nav button');
+  await page.locator('.founder-screen-nav button').filter({ hasText: /^Control$/ }).click();
+  await page.waitForSelector('#new-project-form', { state: 'visible' });
+  assert((await page.locator('.founder-screen-nav button[aria-current="page"]').innerText()) === 'Control',
+    'project registration uses the visible Control overview, not a hidden legacy tab');
   await page.fill('#new-project-form input[name="slug"]', 'demo-project');
   await page.fill('#new-project-form input[name="name"]', 'Demo Project');
   await page.fill('#new-project-form input[name="repoIdentifier"]', 'jussray/demo-project');
