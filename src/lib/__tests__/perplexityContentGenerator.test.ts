@@ -212,6 +212,64 @@ describe('generatePerplexityDraftMaterial', () => {
     ).rejects.toThrow('HTTP 500');
   });
 
+  it('returns a non-duplicate audit when prior posts are dissimilar', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const result = await generatePerplexityDraftMaterial(
+      input({
+        priorPosts: [{
+          postId: 'post-unrelated',
+          platform: 'linkedin',
+          sourceRepository: 'jussray/example',
+          text: 'A completely unrelated update about a different feature entirely.',
+        }],
+      }),
+      { env: BASE_ENV, fetchImpl: fetchMock },
+    );
+    expect(result.duplicateAudit.isDuplicate).toBe(false);
+  });
+
+  it('skips the duplicate audit cleanly when no prior posts are supplied', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const result = await generatePerplexityDraftMaterial(input(), { env: BASE_ENV, fetchImpl: fetchMock });
+    expect(result.duplicateAudit.isDuplicate).toBe(false);
+    expect(result.duplicateAudit.reason).toMatch(/no prior posts were supplied/);
+  });
+
+  it('refuses to return a draft that duplicates an already-posted item', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    await expect(
+      generatePerplexityDraftMaterial(
+        input({
+          priorPosts: [{
+            postId: 'post-already-said',
+            platform: 'linkedin',
+            sourceRepository: 'jussray/example',
+            // Same text the mock will generate, so the two are identical once the proof URL is stripped.
+            text: VALID_FIELDS.text,
+          }],
+        }),
+        { env: BASE_ENV, fetchImpl: fetchMock },
+      ),
+    ).rejects.toThrow(/duplicates prior content/);
+  });
+
+  it('does not treat a duplicate that was previously rejected as a block', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const result = await generatePerplexityDraftMaterial(
+      input({
+        priorPosts: [{
+          postId: 'post-rejected',
+          platform: 'linkedin',
+          sourceRepository: 'jussray/example',
+          text: VALID_FIELDS.text,
+          status: 'rejected',
+        }],
+      }),
+      { env: BASE_ENV, fetchImpl: fetchMock },
+    );
+    expect(result.duplicateAudit.isDuplicate).toBe(false);
+  });
+
   it('is a PerplexityContentGenerationError on rejection', async () => {
     const fetchMock = vi.fn() as unknown as typeof fetch;
     await expect(

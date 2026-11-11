@@ -10,6 +10,11 @@ import type {
   FirstPartySocialPostInput,
   SocialMediaAsset,
 } from './firstPartySocialPublisher.js';
+import {
+  auditForDuplicatePost,
+  type DuplicatePostAuditResult,
+  type PriorPostSummary,
+} from './founderContentDuplicateAudit.js';
 
 /**
  * Generates the caller-supplied `DraftMaterial` that `socialCampaignPolicy.ts`
@@ -45,6 +50,15 @@ export interface GeneratePerplexityDraftInput {
   accountId: string;
   platformCharacterLimit?: number | null;
   media?: SocialMediaAsset[];
+  /**
+   * Prior drafted/posted items to audit the new candidate against, so the
+   * same progress never goes out twice under different wording. Caller
+   * supplied — this module has no database access of its own. Omit or pass
+   * an empty array to skip the audit (e.g. when the caller has no history
+   * to check yet); duplication is only ever checked when history is given.
+   */
+  priorPosts?: readonly PriorPostSummary[];
+  duplicateSimilarityThreshold?: number;
 }
 
 export interface PerplexityContentGeneratorOptions {
@@ -55,6 +69,7 @@ export interface PerplexityContentGeneratorOptions {
 export interface GeneratedPerplexityDraft {
   classification: CampaignClassification;
   postInput: FirstPartySocialPostInput;
+  duplicateAudit: DuplicatePostAuditResult;
 }
 
 function text(value: unknown): string {
@@ -226,13 +241,16 @@ function buildContentPrompt(
     `Classification: ${classificationResult.mode} — ${classificationResult.reason}`,
     `Approved public proof URL (include this exact URL once in "text"): ${approvedProofUrl}`,
     '',
+    'Write for a mixed audience in the same post: customers, prospective partners, and investors are all',
+    'reading this at once. Do not write an investor-only or customer-only post — make the value legible to all three.',
+    '',
     'Respond with ONLY a single JSON object and no other text, markdown, or commentary.',
     'The object must have exactly these five string keys and no others:',
-    '"text" (the full post body, honest and specific, including the approved proof URL once),',
+    '"text" (the full post body, honest and specific, including the approved proof URL once, written for customers, partners, and investors together),',
     '"traction" (one concrete, verifiable thing that shipped),',
     '"governanceAdvantage" (why the verification/approval process behind this is itself a differentiator),',
-    '"audienceValue" (why a reader should care),',
-    '"investorSignal" (what this demonstrates about shipping cadence or discipline).',
+    '"audienceValue" (why this matters to a customer deciding whether to rely on this product, AND to a prospective partner evaluating whether to integrate or collaborate — address both explicitly),',
+    '"investorSignal" (what this demonstrates to an investor about shipping cadence or discipline).',
   ].join('\n');
 }
 
@@ -330,5 +348,13 @@ export async function generatePerplexityDraftMaterial(
   };
 
   const postInput = buildFirstPartySocialPostInput(classificationResult, input.evidence, draft);
-  return { classification: classificationResult, postInput };
+
+  const duplicateAudit = auditForDuplicatePost(postInput.text, input.priorPosts ?? [], {
+    similarityThreshold: input.duplicateSimilarityThreshold,
+  });
+  if (duplicateAudit.isDuplicate) {
+    rejected(`generated draft duplicates prior content: ${duplicateAudit.reason}`);
+  }
+
+  return { classification: classificationResult, postInput, duplicateAudit };
 }
