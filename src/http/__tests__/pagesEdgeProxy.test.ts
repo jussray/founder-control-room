@@ -241,6 +241,67 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(fcrApiFetch).not.toHaveBeenCalled();
   });
 
+  it('fails closed on all unlisted administrative MCP paths and encoded variants', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('unexpected Pages asset'));
+    const api = vi.fn(async () => identifiedResponse('unsafe API execution'));
+    const env = { ASSETS: { fetch: assets }, FCR_API: { fetch: api } };
+
+    for (const path of [
+      '/mcp/vault',
+      '/mcp/vault/connections',
+      '/mcp/founder-permissions',
+      '/mcp/servers',
+      '/mcp/servers/test/tools/read/invoke',
+      '/MCP/VAULT/',
+      '/mcp%2fvault',
+      '/%6dcp/servers',
+      '/mcp/founder-signal-engine/',
+    ]) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`, {
+          method: 'POST', body: '{}',
+        }),
+        env,
+      );
+      expect(response.status, path).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'DIRECT_API_ACCESS_REQUIRED',
+      });
+    }
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('preserves only the declared public MCP protocol routes', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('unexpected Pages asset'));
+    const api = vi.fn(async () => identifiedResponse('public MCP protocol'));
+    const env = { ASSETS: { fetch: assets }, FCR_API: { fetch: api } };
+
+    for (const path of [
+      '/mcp',
+      '/mcp/read',
+      '/mcp/founder-signal-x-engagement',
+      '/mcp/registry/v0.1/servers',
+      '/mcp/portfolio/founder-control-room',
+      '/mcp/portfolio/solcontinuity',
+      '/mcp/portfolio/promptos',
+      '/MCP/READ/',
+    ]) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`, {
+          method: 'POST', body: '{}',
+        }),
+        env,
+      );
+      expect(response.status, path).toBe(200);
+      expect(await response.text()).toBe('public MCP protocol');
+    }
+    expect(api).toHaveBeenCalledTimes(8);
+    expect(assets).not.toHaveBeenCalled();
+  });
+
   it('continues to proxy the read-only X engagement MCP exception through the public service binding', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
