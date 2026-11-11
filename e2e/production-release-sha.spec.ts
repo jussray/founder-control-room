@@ -12,6 +12,7 @@ test.describe('production exact-SHA release witness', () => {
 
   test('binds Worker identity, public proxy, and browser proof to one exact release', async ({
     page,
+    request,
   }, testInfo) => {
     expect(deployUrl, 'DEPLOY_URL must be supplied by the production environment').not.toBe('');
     expect(expectedReleaseSha, 'EXPECTED_RELEASE_SHA must be the exact approved commit').toMatch(
@@ -68,6 +69,24 @@ test.describe('production exact-SHA release witness', () => {
       expect(body.gitSha).toBe(expectedReleaseSha);
       return body;
     };
+
+    // Verify the protected API is not reachable anonymously before any release proof.
+    // Generic 401/403 statuses do not demonstrate Cloudflare Access enforcement.
+    // No Access credentials are attached to this Playwright request or its trace.
+    const anonymousApiResponse = await request.get(
+      `${deployUrl}/version?release_witness=anonymous-${Date.now()}`,
+      {
+        headers: { 'cache-control': 'no-cache' },
+        maxRedirects: 0,
+        timeout: 20_000,
+      },
+    );
+    const accessGateEvidence =
+      `${anonymousApiResponse.url()}\n${anonymousApiResponse.headers()['location'] ?? ''}`;
+    expect(
+      /cloudflareaccess\\.com|\\/cdn-cgi\\/access\\//i.test(accessGateEvidence),
+      'Anonymous direct API must show an Access-specific gate, not a generic rejection',
+    ).toBe(true);
 
     const directVersionBefore = await readDirectIdentity('before-browser');
     const publicVersionBefore = await readPublicIdentity('before-browser');
