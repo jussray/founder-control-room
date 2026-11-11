@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof. Document the candidate FCR Gmail AI Inbox source-only optional Cloudflare binding contract and metadata-read scope while preserving independent OAuth, founder approval, privacy, provider, runtime, and deployment evidence boundaries.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -626,6 +626,12 @@
       "path": "src/lib/xFirstPartyAdapter.ts",
       "claims": [
         "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        "`.github/workflows/deploy.yml` must upload the credential-shape and Worker secret-name receipts from `RUNNER_TEMP` with `if: always()` immediately after the provider-held Worker secret-name preflight, so a failed preflight still preserves the names-only receipt; the artifact must never contain secret values, is retained for 90 days, and grants no authority and no runtime proof."
       ]
     }
   ]
