@@ -142,6 +142,14 @@ const CAPABILITIES = Object.freeze({
     requiresEvidence: true,
     separateFounderGate: true,
   },
+  generatePaidAvatarVideo: {
+    id: 'generate_paid_avatar_video',
+    label: 'Generate a chargeable avatar video through an approved backend',
+    authorityLevel: 'L6',
+    risk: 'critical',
+    requiresEvidence: true,
+    separateFounderGate: true,
+  },
 } satisfies Record<string, PluginCapabilityDescriptor>);
 
 export const PLUGIN_CATALOG = [
@@ -192,6 +200,26 @@ export const PLUGIN_CATALOG = [
     ],
   },
   {
+    type: 'heygen',
+    label: 'HeyGen',
+    description:
+      'Optional paid speaking-avatar video provider. Provider status is not verified media, release approval, or permission to publish.',
+    defaultAuthorityLevel: 'L6',
+    defaultDataBoundary:
+      'Project-scoped, sanitized video attempt IDs, status and evidence references only. No raw media URLs, scripts containing private user data, or credentials mirrored into FCR.',
+    secretsPolicy:
+      'Provider API keys remain in the Story Engine backend secret store; FCR stores only an opaque secret reference and configured state, never credential values.',
+    capabilities: [CAPABILITIES.inspectData, CAPABILITIES.generatePaidAvatarVideo],
+    blockedByDefault: [
+      'client_side_key',
+      'generate_without_explicit_spend_gate',
+      'automatic_paid_retry',
+      'cross_project_video_access',
+      'store_raw_provider_credentials',
+      'publish_without_separate_release_approval',
+    ],
+  },
+  {
     type: 'anthropic',
     label: 'Anthropic',
     description: 'Replaceable long-context model capability behind server-side adapters.',
@@ -230,6 +258,25 @@ export const PLUGIN_CATALOG = [
     secretsPolicy: 'OAuth connection is provider-held; never persist tokens in Control Room tables.',
     capabilities: [CAPABILITIES.inspectData, CAPABILITIES.sendExternalMessage],
     blockedByDefault: ['send_without_founder_instruction', 'delete_email', 'bulk_forward_private_threads'],
+  },
+  {
+    type: 'granola',
+    label: 'Granola',
+    description: 'Founder-authorized meeting note metadata and selected AI summaries; Claude and ChatGPT use separate per-user MCP OAuth.',
+    defaultAuthorityLevel: 'L1',
+    defaultDataBoundary: 'An explicitly authorized folder subtree for metadata; exact folder membership required for individual summaries. No automatic private content ingestion.',
+    secretsPolicy: 'Dedicated API key is a server-side secret. No OAuth token reuse, secret values in application data, or browser credentials.',
+    capabilities: [CAPABILITIES.inspectData],
+    blockedByDefault: [
+      'account_wide_scan',
+      'transcript_fetch',
+      'private_note_export',
+      'auto_forward_to_models',
+      'create_or_update_crm',
+      'auto_create_task',
+      'send_external_message',
+      'webhook_ingress_without_replay_proof',
+    ],
   },
   {
     type: 'hubspot',

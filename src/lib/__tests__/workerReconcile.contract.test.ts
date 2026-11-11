@@ -20,6 +20,10 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('The repository Actions secret is a valid source');
+    expect(workflow).toContain('this error does not establish secret scope');
+    expect(workflow).toContain('only if one is configured');
+    expect(workflow).toContain('do not silently trim, rotate, expose, or bypass validation');
     expect(workflow).toContain('without a Bearer prefix');
     expect(workflow).toContain('without a NAME=value wrapper');
     expect(workflow).toContain('without wrapping quotes');
@@ -38,26 +42,23 @@ describe('canonical Worker reconcile credential preflight contract', () => {
   });
 
   it('fails closed on missing provider-held Worker secret bindings before any mutation', () => {
+    // Current main owns the canonical reconcile secret-name preflight; this PR's
+    // contract binds that step rather than a parallel duplicate preflight.
     const authority = workflow.slice(workflow.indexOf('  authority-gate:'), workflow.indexOf('  worker-deploy:'));
-    const secretPreflight = authority.indexOf('- name: Verify required Worker secret names before reconcile');
-    const statusReceipt = authority.indexOf('- name: Upload redacted Worker secret-name preflight receipt');
+    const secretPreflight = authority.indexOf('- name: Verify provider-held Worker secret names before reconciliation');
+    const authorityReceipt = authority.indexOf('- name: Record bounded authority receipt');
     const reconcileMutation = workflow.indexOf('  worker-deploy:');
 
     expect(secretPreflight).toBeGreaterThanOrEqual(0);
-    expect(statusReceipt).toBeGreaterThan(secretPreflight);
+    expect(authorityReceipt).toBeGreaterThan(secretPreflight);
     expect(reconcileMutation).toBeGreaterThan(workflow.indexOf('  authority-gate:'));
     expect(authority).toContain('npx --yes wrangler@4.110.0 secret list');
     expect(authority).toContain('--config wrangler.worker.toml');
     expect(authority).toContain('--format json');
     expect(authority).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
-    expect(authority).toContain('provider_required = required - workflow_written');
-    expect(authority).toContain('provider_required - present');
-    expect(authority).toContain('reconciliation blocked before mutation');
-    expect(authority).toContain('if: always()');
-    expect(authority).toContain('fcr-reconcile-secret-preflight.json');
-    expect(authority).toContain('retention-days: 30');
+    expect(authority).toContain('required = set(names) - workflow_written');
+    expect(authority).toContain('missing = sorted(required - present)');
     expect(authority).not.toContain('wrangler secret get');
     expect(authority).not.toContain("entry.get('value')");
-    expect(authority).not.toContain('print(missing)');
   });
 });

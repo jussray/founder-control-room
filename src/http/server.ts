@@ -29,6 +29,7 @@ import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
+import { publicMcpRouter } from './routes/publicMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -51,6 +52,7 @@ import {
   handleProofOfShipReceiptLookup,
 } from './routes/proofOfShipReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
+import { exactHeadCockpitRouter } from './routes/exactHeadCockpit.js';
 import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
@@ -275,6 +277,11 @@ export function createServer(options: CreateServerOptions = {}) {
     handleRemoteMcpProtectedResourceMetadata,
   );
 
+  // Separate OAuth-scoped customer MCP. Parsing is limited to this path;
+  // existing founder-cookie/browser-CSRF routes remain unchanged.
+  app.use('/mcp/public', express.json({ type: 'application/json', limit: '64kb' }));
+  app.use(publicMcpRouter);
+
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
 
@@ -379,6 +386,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/integration-cockpit', exactHeadCockpitRouter);
   app.use('/switchboard', switchboardRouter);
   app.use('/security-posture', securityPostureRouter);
   app.use('/projects', repositoryVerificationRouter);
