@@ -84,7 +84,7 @@ test.describe('production exact-SHA release witness', () => {
     const accessGateEvidence =
       `${anonymousApiResponse.url()}\n${anonymousApiResponse.headers()['location'] ?? ''}`;
     expect(
-      /cloudflareaccess\\.com|\\/cdn-cgi\\/access\\//i.test(accessGateEvidence),
+      /cloudflareaccess\.com|\/cdn-cgi\/access\//i.test(accessGateEvidence),
       'Anonymous direct API must show an Access-specific gate, not a generic rejection',
     ).toBe(true);
 
