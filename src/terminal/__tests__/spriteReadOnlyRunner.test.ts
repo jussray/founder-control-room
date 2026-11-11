@@ -77,6 +77,26 @@ describe('FCR Sprite read-only execution transport', () => {
       await expect(runner.run(REQUEST)).rejects.toMatchObject({code:'SPAWN_FAILED'});
     }
   });
+  it('rejects a valid PASS receipt followed by a nonzero Sprite exit frame', async () => {
+    const base = fakeTransport();
+    for (const exitFrame of ['\u0003\u0001', '\u0003\u0002', '\u0003']) {
+      const transport: SpriteTransport = async (url, options) => {
+        const response = await base(url, options);
+        return { ...response, body: '\u0001' + response.body + exitFrame };
+      };
+      await expect(new SpriteReadOnlyRunner(TOKEN, transport).run(REQUEST))
+        .rejects.toMatchObject({ code: 'SPAWN_FAILED' });
+    }
+  });
+  it('accepts a valid PASS receipt with a zero Sprite exit frame', async () => {
+    const base = fakeTransport();
+    const transport: SpriteTransport = async (url, options) => {
+      const response = await base(url, options);
+      return { ...response, body: '\u0001' + response.body + '\u0003\u0000' };
+    };
+    await expect(new SpriteReadOnlyRunner(TOKEN, transport).run(REQUEST))
+      .resolves.toMatchObject({ status: 'passed', exitCode: 0, stdout: SHA });
+  });
   it('does not retry ambiguous provider timeouts', async () => {
     const transport = vi.fn(async()=>{throw new Error('provider said sensitive token string');});
     const runner = new SpriteReadOnlyRunner(TOKEN, transport);
