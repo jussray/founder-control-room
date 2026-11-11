@@ -130,4 +130,28 @@ describe('operator relay', () => {
     expect(validateOperatorRelayResponse(malformedResponse, req)).toContain('response evidenceRefs must be a string array');
   });
 
+  it('rejects a response that claims completion before the request existed', () => {
+    const req = request();
+    const early = response(req, { completedAt: '2026-09-16T06:29:59.999Z' });
+
+    expect(validateOperatorRelayResponse(early, req)).toContain(
+      'relay response completed before request creation',
+    );
+  });
+
+  it('rejects a response that arrives after the request validity lease expired', () => {
+    const req = request();
+    const late = response(req, { completedAt: '2026-09-16T06:40:00.001Z' });
+
+    expect(validateOperatorRelayResponse(late, req)).toContain(
+      'relay response completed after request expiry',
+    );
+  });
+
+  it('accepts completion exactly at the request expiry boundary', () => {
+    const req = request();
+    expect(
+      validateOperatorRelayResponse(response(req, { completedAt: EXPIRES_AT }), req),
+    ).toEqual([]);
+  });
 });

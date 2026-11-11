@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OPERATOR_RELAY_REQUEST_CONTRACT,
   OPERATOR_RELAY_RESPONSE_CONTRACT,
@@ -45,6 +45,16 @@ function anthropicAdapter(usage: unknown) {
 }
 
 describe('operator relay usage receipt', () => {
+  // The relay fixture carries a bounded ten-minute lease; pin the clock inside
+  // it so adapter-stamped completedAt stays within the request validity window.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T18:01:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('binds provider-reported Anthropic token usage into a valid, hash-bound receipt', async () => {
     const request = relay();
     const response = await anthropicAdapter({

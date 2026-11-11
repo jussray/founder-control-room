@@ -330,8 +330,20 @@ export function validateOperatorRelayResponse(value: unknown, request: OperatorR
 
   if (value.authorityRequested !== 'none') errors.push('relay response cannot request authority');
 
-  const completedAt = typeof value.completedAt === 'string' ? value.completedAt : '';
-  if (!Number.isFinite(Date.parse(completedAt))) errors.push('completedAt must be RFC3339-compatible');
+  const completedAtText = typeof value.completedAt === 'string' ? value.completedAt : '';
+  const completedAt = Date.parse(completedAtText);
+  const createdAt = Date.parse(request.createdAt);
+  const expiresAt = Date.parse(request.expiresAt);
+  if (!Number.isFinite(completedAt)) {
+    errors.push('completedAt must be RFC3339-compatible');
+  } else {
+    if (Number.isFinite(createdAt) && completedAt < createdAt) {
+      errors.push('relay response completed before request creation');
+    }
+    if (Number.isFinite(expiresAt) && completedAt > expiresAt) {
+      errors.push('relay response completed after request expiry');
+    }
+  }
 
   const responseHash = typeof value.responseHash === 'string' ? value.responseHash : '';
   if (!SHA256.test(responseHash)) errors.push('responseHash must be sha256');

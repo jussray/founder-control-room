@@ -1,5 +1,11 @@
 # Cloudflare Reasoning Contract
 
+## November 7, 2026 — candidate Gmail AI Inbox read boundary
+
+PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
+
+Only an exact-head authorized release, Cloudflare Worker binding/source readback, Google consent/scope and account verification, and founder-only runtime request can substantiate operational Gmail metadata reads. AI reply drafts, multi-account connection, scheduled synchronization, automated outreach, dispatch and revenue results are not established by this PR; the existing one-reply approval gate remains independent. See [Gmail AI Inbox runtime](GMAIL_AI_INBOX_RUNTIME.md).
+
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
 The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
@@ -7,6 +13,8 @@ The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinne
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
 The canonical `.github/workflows/deploy.yml` and `.github/workflows/worker-reconcile.yml` must run the reviewed `scripts/verify-worker-binding-types.mjs` before any Cloudflare Worker mutation. This preflight inspects only Worker binding names and type classifications; a credential binding classified `plain_text`, a malformed provider response, or unavailable provider metadata must block the release without revealing values, provider response bodies, or arbitrary binding names in logs. A source-green preflight is not evidence that the observed `CF_API_TOKEN` binding has been remediated, that OAuth works, or that production is deployed.
+
+The Deploy authority gate's secret-name verification follows the same reasoning. Wrangler's stdout is a human interface as well as a machine one: when Wrangler authenticates through an environment-variable API token, it prints authentication notices ahead of the JSON it was asked to emit. Treating that whole stream as pure JSON makes a healthy enumeration look corrupt. The gate therefore separates the channels by extracting the JSON name list from the receipt text, and it still fails closed, with the receipt's opening characters named for diagnosis, when no JSON list can be found. Parsing tolerance applies to the envelope only; the required-name comparison itself stays exact.
 
 
 ## Logpush portfolio authority
@@ -319,3 +327,7 @@ The browser/API suite verifies the public-safe contract, founder protection, abs
 ## OAuth consent browser-origin boundary
 
 For an external connector's authorization request, the Pages edge redirects only www consent GET navigation to canonical `https://foundercontrolroom.org/oauth/consent`, preserving the query string. On the apex, Pages forwards the consent GET, API-owned assets, and protected consent POST through its existing `FCR_API` service binding without changing the browser origin. The browser's host-only founder cookie and same-tab authorization ID therefore remain on the configured Pages origin; the API service still performs authentication, CSRF enforcement, and the server-to-Supabase consent request. Pages must never serve the consent assets from public `ASSETS` or mint its own founder authority. Full acceptance requires current Supabase OAuth settings, Access routing readback, a real authenticated consent decision, and a subsequent scoped MCP tool receipt; source testing is not deployment proof.
+
+## Production Deploy parser recovery and authority boundary (2026-11-04 candidate)
+
+`deploy.yml` includes a Python gate that compares the provider-observed Cloudflare Worker secret names with `wrangler.worker.toml`'s required-name registry without reading credential values. The parser must stay correctly indented within the GitHub Actions script; otherwise GitHub rejects the workflow itself and production dispatch can fail with HTTP 422 before the authority gate executes. PR #1067 repairs that syntax error and documents the distinction between candidate source and observed release. Production readiness still requires the accepted exact-commit workflow, a separate founder authorization receipt, successful gated dispatch, and direct Worker plus Pages `/version` identity readback. A successful Pages deployment or a present secret binding name cannot substitute for those observations.
