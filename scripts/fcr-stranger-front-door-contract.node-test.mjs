@@ -184,3 +184,26 @@ test('sanitized stranger receipt publishes only bounded containment evidence', (
   assert.doesNotMatch(workflow, /\n\s*error,\s*\n/);
   assert.doesNotMatch(workflow, /cat "\$browser_receipt"/);
 });
+
+test('canonical Access token preflight blocks Deploy and Worker Reconcile before any mutation', () => {
+  for (const [workflowName, source, mutationJob] of [
+    ['Deploy', deployWorkflow, '  supabase-migrate:'],
+    ['Worker Reconcile', workerReconcileWorkflow, '  worker-deploy:'],
+  ]) {
+    const authority = source.indexOf('  authority-gate:');
+    const preflight = source.indexOf('      - name: Verify canonical Access service identity before mutation');
+    const secretNames = source.indexOf('      - name: Verify provider-held Worker secret names', preflight);
+    const mutation = source.indexOf(mutationJob);
+    assert.ok(authority >= 0 && preflight > authority && secretNames > preflight && mutation > secretNames,
+      `${workflowName} must verify Access before database or Worker mutation`);
+    const preflightStep = source.slice(preflight, secretNames);
+    assert.match(preflightStep, /FCR_CLOUDFLARE_ACCESS_CLIENT_ID/);
+    assert.match(preflightStep, /FCR_CLOUDFLARE_ACCESS_CLIENT_SECRET/);
+    assert.match(preflightStep, /https:\/\/api\.foundercontrolroom\.org\/version/);
+    assert.match(preflightStep, /redirect: 'manual'/);
+    assert.match(preflightStep, /response\.status !== 200/);
+    assert.match(preflightStep, /x-founder-control-room-service/);
+    assert.doesNotMatch(preflightStep, /DEPLOY_URL/);
+    assert.doesNotMatch(preflightStep, /\b(?:PUT|PATCH|DELETE|POST)\b/);
+  }
+});
