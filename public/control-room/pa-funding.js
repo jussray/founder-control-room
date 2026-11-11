@@ -12,7 +12,7 @@ const PROGRAMS = [
     summary:'Funding for creative-business sustainability and market expansion, not a general grant for any AI startup.',
     eligibility:'Applicant at least 18, PA resident and operating a PA creative business for at least one year; annual business revenue $10,000–$2,000,000; tax documentation; creative authorship must qualify.',
     cea:'UNKNOWN · revenue, tenure and creative-fit evidence needed', kiz:'NOT A PREREQUISITE',
-    materials:['Confirm 18+ age eligibility and creative business type','Confirm business type and original creative output','Locate business start date and PA operating proof','Confirm annual revenue range with tax records','Outline creative-business growth goal, narrative and project budget','Review Blackbaud eligibility screener and official terms'],
+    materials:['Confirm 18+ age eligibility and creative business type','Confirm business type and original creative output','Locate business start date and PA operating proof','Confirm annual revenue range with tax records','Outline creative-business growth goal, narrative and project budget','Start at Keystone Creatives; review the linked Blackbaud screener and official terms'],
     facts:[['VERIFIED','2026–27 Growth tier has a $10k–$2m revenue band; up to $4k.'],['VERIFIED','Application closes December 31, 2026, 9 p.m. ET.'],['UNKNOWN','Juss & Co. business revenue, age, creative-sector acceptance and tax documentation are not established.']],
     proof:'Current 2026–27 application guidelines, pp. 1, 5, 6, 8–9. Older 2025–26 CEA summaries are not controlling.',
     next:'Privately confirm revenue band, one-year business history and creative industry fit against the 2026–27 guidelines.',
@@ -26,7 +26,7 @@ const PROGRAMS = [
     summary:'Competitive funding for established creative businesses pursuing sustainability plus measurable community benefit.',
     eligibility:'Applicant at least 18, PA residency and creative business operation at least one year; annual business revenue $50,000–$2,000,000 with tax documentation; community impact rationale.',
     cea:'UNKNOWN · $50k revenue and impact evidence needed',kiz:'NOT A PREREQUISITE',
-    materials:['Confirm 18+ age eligibility','Verify annual creative-business revenue and operating history','Map a concrete community-impact project','Prepare budget and narrative about proposed use','Read peer-cohort and coaching commitments','Review Blackbaud eligibility screener'],
+    materials:['Confirm 18+ age eligibility','Verify annual creative-business revenue and operating history','Map a concrete community-impact project','Prepare budget and narrative about proposed use','Read peer-cohort and coaching commitments','Start at Keystone Creatives, then review the linked Blackbaud eligibility screener'],
     facts:[['VERIFIED','Impact tier up to $17k; annual revenue $50k–$2m.'],['VERIFIED','Deadline December 31, 2026, 9 p.m. ET.'],['UNKNOWN','Applicant’s revenue, eligible creative activity and cohort capacity are unverified.']],
     proof:'Current 2026–27 CEA guidelines, pp. 1, 4, 6, 8–9.',
     next:'Check the $50k revenue floor and whether the software or game project can demonstrate the required creative/community impact.',
@@ -77,15 +77,15 @@ const PROGRAMS = [
   },
   {
     id:'alphalab',name:'AlphaLab · 2027 Startup Cohort',lane:'partners',type:'Accelerator + potential investment',
-    amount:'Up to $100,000 investment',deadline:'UNKNOWN · latest closing date unverified',window:'INTAKE NEEDS RECHECK',
+    amount:'Up to $100,000 investment',deadline:'Jul 17, 2026 · passed',window:'2027 COHORT · CLOSED',
     open:false,label:'AI/software startup fit',source:'https://www.innovationworks.org/about/news/alphalab-opens-application-window-for-2027-cohort/',agency:'Innovation Works / AlphaLab',
     summary:'Pittsburgh-based accelerator emphasizing software and AI-native founders, customer acquisition and fundraising preparation.',
     eligibility:'Startup and cohort residency, stage, attendance, founder eligibility and current application timing need confirmation in current terms.',
     cea:'NOT A PREREQUISITE',kiz:'NOT A PREREQUISITE',
-    materials:['Confirm current cohort deadline and whether intake remains open','Review location and participation requirements','Select one existing product for fit evaluation','Prepare existing product demo and market evidence inventory','Check equity/investment terms before any commitment'],
-    facts:[['VERIFIED','Innovation Works announced the 2027 application window on April 20, 2026.'],['VERIFIED','Announcement describes up to $100k in investment, not grant funding.'],['UNKNOWN','Whether the window remains open and whether the applicant fits the cohort.']],
+    materials:['Check whether a new cohort cycle has been announced; 2027 intake closed Jul 17, 2026','Review location and participation requirements','Select one existing product for fit evaluation','Prepare existing product demo and market evidence inventory','Check equity/investment terms before any commitment'],
+    facts:[['VERIFIED','Innovation Works announced the 2027 application window on April 20, 2026.'],['VERIFIED','Announcement describes up to $100k in investment, not grant funding.'],['VERIFIED','2027 cohort application deadline was July 17, 2026 and has passed.'],['UNKNOWN','Future intake dates and applicant fit have not been established.']],
     proof:'Innovation Works 2027 cohort launch announcement, April 20, 2026.',
-    next:'Recheck the current 2027 cohort intake deadline and founder attendance requirements from the program.',
+    next:'Watch for an officially announced future AlphaLab cohort; the 2027 deadline has passed. Review participation and investment terms only when new intake opens.',
     risk:'Investment terms, equity dilution and travel obligations must be reviewed before any application.',
     materialNote:'No acceptance, funding or open intake is inferred from the announcement alone.'
   },
@@ -106,7 +106,7 @@ const PROGRAMS = [
   {
     id:'ssbci',name:'PA-SSBCI · Loans and tech equity',lane:'capital',type:'State-backed financing network',
     amount:'Region- and administrator-specific',deadline:'UNKNOWN · administrator-specific',window:'FINANCING NETWORK',
-    open:false,label:'Loan or equity',source:'https://dced.pa.gov/programs-funding/federal-funding-opportunities/pennsylvania-state-small-business-credit-initiative-pa-ssbci/',agency:'PA Department of Community & Economic Development',
+    open:false,label:'Loan or equity',source:'https://dced.pa.gov/pa-state-small-business-credit-initiative-pa-ssbci/',agency:'PA Department of Community & Economic Development',
     summary:'Financing through regional administrators, including small-business lending and equity for technology companies.',
     eligibility:'Company region, finance need, existing-stage criteria, repayment or equity terms vary by program administrator.',
     cea:'NOT A PREREQUISITE',kiz:'NOT A PREREQUISITE',
@@ -119,7 +119,7 @@ const PROGRAMS = [
   },
   {
     id:'creative-loan',name:'Creative Business Loan Fund',lane:'capital',type:'Creative-sector loan',
-    amount:'Few thousand to $250,000',deadline:'UNKNOWN · lending process',window:'LOAN PROGRAM',
+    amount:'Few thousand to $250,000',deadline:'Rolling · lender-specific',window:'LOAN PROGRAM',
     open:false,label:'Creative businesses',source:'https://www.pa.gov/agencies/coa/funding/creative-business-loan-fund',agency:'PA Creative Industries',
     summary:'Affordable and flexible loan program for qualified Pennsylvania creative small businesses.',
     eligibility:'Creative-business qualification, lender service area, underwriting and proposed use; actual rates and availability must be verified.',
@@ -144,6 +144,7 @@ let activeTab='checklist';
 let selectionFilter='all';
 let searchValue='';
 let sessionData={};
+let sessionKey=null;
 const root=document.getElementById('workspace');
 const access=document.getElementById('access');
 const list=document.getElementById('list');
@@ -152,12 +153,12 @@ function esc(value){return String(value==null?'':value).replace(/[&<>"']/g,funct
 function getProgram(){return PROGRAMS.find(function(x){return x.id===selected;})||PROGRAMS[0];}
 function state(id){return sessionData[id]||{checks:{},stage:'REVIEW'};}
 function save(){
-  try{sessionStorage.setItem('juss-pa-funding-2026-session',JSON.stringify(sessionData));}
+  try{if(sessionKey)sessionStorage.setItem(sessionKey,JSON.stringify(sessionData));}
   catch(_error){/* Read-only browsing remains available when storage is disabled. */}
 }
 function load(){
   try{
-    const saved=JSON.parse(sessionStorage.getItem('juss-pa-funding-2026-session')||'{}');
+    const saved=JSON.parse(sessionKey?sessionStorage.getItem(sessionKey)||'{}':'{}');
     if(saved&&typeof saved==='object'&&!Array.isArray(saved)){sessionData=saved;}
   }catch(_error){sessionData={};}
 }
@@ -248,6 +249,7 @@ async function start(){
     access.innerHTML='<div class="access-denied"><p class="eyebrow">FOUNDER-ONLY WORKSPACE</p><h2>Founder session required.</h2><p>Funding preparation records stay behind the existing Founder Control Room session. No program list or private checklist is displayed until sign-in.</p><a href="/control-room/">Return to Founder Control Room ↗</a></div>';
     root.hidden=true;return;
   }
+  sessionKey='juss-pa-funding-2026-session:'+encodeURIComponent(identity.toLowerCase());
   load();
   access.hidden=true;root.hidden=false;
   refresh();
