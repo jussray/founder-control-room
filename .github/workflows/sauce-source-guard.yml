@@ -15,6 +15,11 @@ permissions:
 env:
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
+# Superseded pull_request runs are cancelled: only the newest head's result can count.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify-sauce-source-guard:
     name: Verify Sauce Guard + Source Guard source contract

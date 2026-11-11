@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import {
   START_MARKER,
   END_MARKER,
@@ -15,6 +15,10 @@ import {
   observedAutoMerge,
   collectRolloverOrder,
   sameRepositoryPull,
+  rolloverDeferral,
+  deferralAlreadyRecorded,
+  ROLLOVER_DEFER_LABEL,
+  DEFERRED_PROOF_STATE,
 } from '../scripts/pr-continuity.mjs';
 
 const repo = 'jussray/example';
@@ -164,6 +168,43 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /failureReceiptCount/);
   assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
+});
+test('AT31 drafts are deferred from rollover instead of rolled forward', () => {
+  assert.equal(rolloverDeferral({ ...pr(1, 'main', 'a'), draft: true, labels: [] }), 'DEFERRED_DRAFT');
+});
+test('AT32 stale-labelled ready PRs are deferred; other labels are not', () => {
+  assert.equal(ROLLOVER_DEFER_LABEL, 'stale');
+  assert.equal(rolloverDeferral({ ...pr(2, 'main', 'b'), draft: false, labels: [{ name: 'stale' }] }), 'DEFERRED_STALE');
+  assert.equal(rolloverDeferral({ ...pr(3, 'main', 'c'), draft: false, labels: [{ name: 'keep-open' }] }), null);
+  assert.equal(rolloverDeferral({ ...pr(4, 'main', 'd'), draft: false }), null);
+  assert.equal(rolloverDeferral(undefined), null);
+});
+test('AT33 deferred receipts never claim current proof and are written once', () => {
+  assert.equal(DEFERRED_PROOF_STATE, 'REVERIFY_OR_ROLLOVER_REQUIRED');
+  const block = continuityBlock({ repository: repo, prNumber: 5, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'DEFERRED_DRAFT', proofState: DEFERRED_PROOF_STATE });
+  assert.match(block, /continuity: \*\*DEFERRED_DRAFT\*\*/);
+  assert.match(block, /authorizes_merge: \*\*false\*\*/);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_DRAFT'), true);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_STALE'), false);
+  assert.equal(deferralAlreadyRecorded('', 'DEFERRED_DRAFT'), false);
+});
+test('AT34 rollover routes deferred PRs away from update-branch and keeps them out of blocked debt', () => {
+  assert.match(continuitySource, /const deferral = rolloverDeferral\(byNumber\.get\(number\)\)/);
+  assert.match(continuitySource, /deferredCount: deferred\.length/);
+  assert.match(continuitySource, /const blocked = results\.filter\(\(item\) => item\.state\.startsWith\('BLOCKED'\)\)/);
+});
+test('AT35 stacked children are still ordered after a deferred parent', () => {
+  assert.deepEqual(collectRolloverOrder([{ ...pr(10, 'main', 'parent'), draft: true }, pr(11, 'parent', 'child')]), [10, 11]);
+});
+test('AT36 every pull_request workflow declares top-level concurrency so superseded heads stop consuming runners', () => {
+  const dir = new URL('../.github/workflows/', import.meta.url);
+  const missing = readdirSync(dir)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .filter((name) => {
+      const source = readFileSync(new URL(name, dir), 'utf8');
+      return /^\s+pull_request:\s*$|^\s+pull_request:\s*\{|^on:.*\bpull_request\b/m.test(source) && !/^concurrency:/m.test(source);
+    });
+  assert.deepEqual(missing, []);
 });
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
 

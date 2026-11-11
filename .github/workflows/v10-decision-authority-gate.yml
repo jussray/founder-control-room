@@ -31,6 +31,11 @@ env:
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Superseded pull_request runs are cancelled: only the newest head's result can count.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     name: Verify independent V10 decision gate
