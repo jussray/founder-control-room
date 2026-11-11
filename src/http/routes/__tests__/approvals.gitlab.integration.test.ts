@@ -290,15 +290,17 @@ describe("GitLab approvals routing", () => {
           select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: GITLAB_PROJECT, error: null }) }) }),
         };
       }
+      if (table === "project_events") {
+        return { insert: () => Promise.resolve({ error: null }) };
+      }
       if (table === "approval_executions") {
         return {
           select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
-          insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }) }),
-          update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+          insert: () => ({
+            select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }),
+          }),
+          update: () => twoEqUpdate(),
         };
-      }
-      if (table === "project_events") {
-        return { insert: () => Promise.resolve({ error: null }) };
       }
       return {};
     });
