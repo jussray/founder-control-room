@@ -33,6 +33,15 @@ function digest(text: string): string {
 }
 
 function parseSpriteResponse(raw: string): Record<string, unknown> {
+  // Sprite exec may append an exit control frame: 0x03 followed by an exit-code byte.
+  // Inspect the original bytes before normalizing controls or a failed process could
+  // append a nonzero exit after a valid PASS receipt and be misreported as successful.
+  for (let i = 0; i < raw.length; i += 1) {
+    if (raw.charCodeAt(i) !== 3) continue;
+    if (++i >= raw.length || raw.charCodeAt(i) !== 0) {
+      reject('SPAWN_FAILED', 'Sprite process exited unsuccessfully or without a valid exit code.');
+    }
+  }
   // The Sprite exec API may stream stdout as plain text or numbered control frames.
   // Never infer success from an HTTP 200, an empty stream, or an unrecognized event.
   const candidates = raw.replace(/[\u0000-\u001f]/g, '\n').split('\n').map(line => line.trim()).filter(Boolean);
