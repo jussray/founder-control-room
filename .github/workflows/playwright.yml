@@ -99,6 +99,13 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: Prove Exact-Head Cockpit fail-closed witness UI (synthetic fixture)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          node e2e/exact-head-cockpit-ui-fixture.mjs 2>&1 | tee logs/exact-head-cockpit-fixture.log
+
       - name: Verify live StoryEngine peer ref still pinned
         shell: bash
         run: |
