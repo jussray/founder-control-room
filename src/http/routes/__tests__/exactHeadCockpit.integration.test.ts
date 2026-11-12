@@ -82,6 +82,32 @@ describe('exact-head cockpit founder read boundary', () => {
     expect(fixtures.providerForProject).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps runner, logs, deployment, screenshots and review UNKNOWN without independent proof', async () => {
+    fixtures.provider.listVerificationSignals.mockResolvedValue([
+      { id:'90', name:'Historical CI Accountability', status:'failed',
+        commitSha:fixtures.context.headSha, provider:'github',
+        detailsUrl:'https://github.com/jussray/founder-control-room/actions/runs/123' },
+      { id:'91', name:'Playwright E2E', status:'passed',
+        commitSha:fixtures.context.headSha, provider:'github',
+        detailsUrl:'https://github.com/jussray/founder-control-room/actions/runs/124' },
+    ]);
+    const response=await request(app()).get('/integration-cockpit/inspect/fcr/832').set('x-fixture-founder','yes');
+    expect(response.status).toBe(200);
+    expect(response.body.releaseProof.witnesses.run).toMatchObject({
+      status:'FAIL',subjectSha:fixtures.context.headSha,
+    });
+    expect(response.body.releaseProof.witnesses.e2e).toMatchObject({
+      status:'PASS',subjectSha:fixtures.context.headSha,
+    });
+    for(const key of ['runner','logs','ancestry','deploy','browser','review']){
+      expect(response.body.releaseProof.witnesses[key]).toEqual({status:'UNKNOWN'});
+    }
+    expect(response.body.releaseProof).toMatchObject({
+      releaseAuthorized:false,mergeAuthorized:false,productionAccepted:false,
+    });
+    expect(response.body.gate).toMatchObject({merge:false,deploy:false,requiredChecksVerified:false});
+  });
+
   it('treats a moving PR head as stale instead of authorizing any action', async () => {
     fixtures.provider.observePullRequest.mockResolvedValueOnce(fixtures.context)
       .mockResolvedValueOnce({...fixtures.context,headSha:'c'.repeat(40)});
