@@ -145,3 +145,23 @@ test('redirect cookies from validated hops are carried into the browser context 
   assert.equal(cookies.find((c) => c.name === 'lang').domain, 'www.example.com');
   assert.equal(cookies.every((c) => c.domain !== 'example.com'), true);
 });
+
+import { parseSetCookie, defaultCookiePath } from '../external-site-snapshot.mjs';
+
+test('a cookie without Path is scoped to the response directory, not the whole host', async () => {
+  assert.equal(defaultCookiePath('https://example.com/account/start'), '/account');
+  assert.equal(defaultCookiePath('https://example.com/start'), '/');
+  assert.equal(defaultCookiePath('https://example.com/'), '/');
+  assert.equal(parseSetCookie('sid=1', 'https://example.com/account/start').path, '/account');
+  assert.equal(parseSetCookie('sid=1; Path=/', 'https://example.com/account/start').path, '/');
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://a.example.com/account/start') return { status: 302, headers: { get: () => 'https://a.example.com/public', getSetCookie: () => ['sid=1'] }, body: null };
+    return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+  };
+  const walk = await walkRedirects('https://a.example.com/account/start', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  assert.equal(seen[1].cookie, null);
+  assert.equal(cookiesFromWalk(walk).find((c) => c.name === 'sid').path, '/account');
+});

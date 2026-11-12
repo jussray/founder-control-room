@@ -80,12 +80,22 @@ export async function checkRequestUrl(raw, lookupFn = dnsLookup) {
 // Location is validated before anything follows it. Returns the validated final URL the
 // browser should navigate to. Limits: sub-resource redirects and DNS rebinding between this
 // check and the browser connection are not covered here (see the URLFIX contract).
+// RFC 6265 5.1.4 default-path: the directory of the request path, or '/'.
+export function defaultCookiePath(requestUrl) {
+  let path = '/';
+  try { path = new URL(requestUrl).pathname; } catch { return '/'; }
+  if (!path.startsWith('/')) return '/';
+  const last = path.lastIndexOf('/');
+  return last <= 0 ? '/' : path.slice(0, last);
+}
+
 // Parses one Set-Cookie line. Domain is deliberately ignored so scope stays host-bound.
-export function parseSetCookie(raw) {
+// Without a Path attribute the cookie is scoped to the response URL's directory, as a browser would.
+export function parseSetCookie(raw, requestUrl) {
   const [pair, ...attrs] = String(raw).split(';').map((x) => x.trim());
   const eq = pair.indexOf('=');
   if (eq <= 0) return null;
-  const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), path: '/', secure: false, httpOnly: false, expired: false };
+  const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), path: defaultCookiePath(requestUrl), secure: false, httpOnly: false, expired: false };
   for (const a of attrs) {
     const [k, ...rest] = a.split('=');
     const key = k.toLowerCase();
@@ -141,7 +151,7 @@ export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsL
     // Keep Set-Cookie from every validated hop. Values are held in memory only.
     const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
     for (const raw of setCookies) {
-      const parsed = parseSetCookie(raw);
+      const parsed = parseSetCookie(raw, verdict.url);
       if (!parsed) continue;
       const key = `${verdict.host}|${parsed.path}|${parsed.name}`;
       if (parsed.expired) jar.delete(key);
