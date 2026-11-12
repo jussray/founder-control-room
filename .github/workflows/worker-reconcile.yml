@@ -173,15 +173,42 @@ jobs:
               sys.exit(1)
 
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
-              observed = json.load(handle)
+              receipt_text = handle.read()
+          # Wrangler can surround the JSON list with notices that themselves
+          # contain brackets ("▲ [WARNING] ...", "[wrangler] done"). Decode at
+          # each '[' and keep the first list made only of objects; never log the
+          # provider response or secret values.
+          decoder = json.JSONDecoder()
+          observed = None
+          position = receipt_text.find('[')
+          while position >= 0:
+              try:
+                  candidate, _ = decoder.raw_decode(receipt_text, position)
+              except ValueError:
+                  candidate = None
+              if (
+                  isinstance(candidate, list) and candidate and
+                  all(isinstance(entry, dict) for entry in candidate)
+              ):
+                  observed = candidate
+                  break
+              position = receipt_text.find('[', position + 1)
+          if observed is None:
+              print('::error title=Invalid Cloudflare secret receipt::No JSON list of provider entries returned.')
+              sys.exit(1)
           if not isinstance(observed, list) or any(
-              not isinstance(entry, dict) or not isinstance(entry.get('name'), str)
+              not isinstance(entry, dict) or
+              not isinstance(entry.get('name'), str) or not entry['name']
               for entry in observed
           ):
-              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain name-bearing entries.')
+              print('::error title=Invalid Cloudflare secret receipt::Provider list must contain valid name-bearing entries.')
+              sys.exit(1)
+          observed_names = [entry['name'] for entry in observed]
+          if len(observed_names) != len(set(observed_names)):
+              print('::error title=Invalid Cloudflare secret receipt::Duplicate binding names.')
               sys.exit(1)
 
-          present = {entry['name'] for entry in observed}
+          present = set(observed_names)
           required = set(names) - workflow_written
           missing = sorted(required - present)
           if missing:
