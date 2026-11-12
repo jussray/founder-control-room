@@ -2,7 +2,7 @@ name: Playwright E2E
 
 on:
   push:
-    branches: [main]
+    branches: [main, work/release-proof-evidence-20261111]
   pull_request:
     branches: [main]
   workflow_run:
@@ -98,6 +98,12 @@ jobs:
           exit "${status}"
         env:
           NODE_ENV: test
+
+      - name: Verify Exact-Head Cockpit backend fail-closed regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vitest run src/http/routes/__tests__/exactHeadCockpit.integration.test.ts
 
       - name: Prove Exact-Head Cockpit fail-closed witness UI (synthetic fixture)
         shell: bash
