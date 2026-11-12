@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Replace the StoryEngine live-ref equality gate with an ancestry gate so forward peer merges stop failing FCR CI while history rewrites still fail closed.",
+  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -704,7 +704,8 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
+        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
+        "`src/providers/providerFactory.ts` must require exactly one native approving review for active canonical FCR main governance, reject a weaker caller-supplied review count, and preserve all exact-head status checks and other provider authority boundaries."
       ]
     },
     {
@@ -792,6 +793,30 @@
       "path": "src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts",
       "claims": [
         "`src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts` must verify the Playwright StoryEngine gate fails closed unless the pin is an ancestor of live main, binds fetched history to the live SHA, drops exact live equality, and still verifies the exact pinned checkout."
+      ]
+    },
+    {
+      "path": "scripts/audit-github-governance-preflight.mjs",
+      "claims": [
+        "`scripts/audit-github-governance-preflight.mjs` must treat one eligible non-owner human reviewer as a prerequisite for READY when canonical FCR native approvals equals one, and must never call owner-only or bot-only collaboration independent review proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        "`.github/workflows/deterministic-review-core-advisory.yml` must perform a trusted read-only non-owner reviewer availability check and re-read exact main before any GitHub ruleset provider mutation, preserving current-main founder command authorization and post-write provider proof."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
+      "claims": [
+        "`docs/FOUNDER_MERGE_AUTHORITY.md` must distinguish the approved one-review source phase from live provider enforcement and keep independent human GitHub approval separate from deterministic review and founder-final authority."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "`docs/PROVIDERS.md` must describe one native independent human approval, Code Owner and last-push requirements, and fail-closed reviewer eligibility before FCR ruleset mutation, without claiming that provider state has been changed."
       ]
     }
   ]
