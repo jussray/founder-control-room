@@ -123,6 +123,14 @@ export function parseSetCookie(raw, requestUrl, nowMs = Date.now()) {
   return cookie;
 }
 
+// RFC 7231 7.1.2: a Location without a fragment inherits the request's fragment, as a browser
+// does; an explicit fragment, including an empty '#', replaces it.
+export function resolveRedirect(location, fromUrl) {
+  const next = new URL(location, fromUrl);
+  if (!String(location).includes('#')) next.hash = new URL(fromUrl).hash;
+  return next.toString();
+}
+
 // RFC 6265 5.1.4 path-match: exact, or a prefix that ends at a '/' boundary.
 export function cookiePathMatches(requestPath, cookiePath) {
   if (requestPath === cookiePath) return true;
@@ -186,7 +194,7 @@ export async function walkRedirects(startUrl, { fetchFn = fetch, lookupFn = dnsL
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
       if (!location) return { ok: true, finalUrl: verdict.url, hops, cookies: finalCookies() };
-      current = new URL(location, verdict.url).toString();
+      current = resolveRedirect(location, verdict.url);
       continue;
     }
     return { ok: true, finalUrl: verdict.url, hops, cookies: finalCookies() };

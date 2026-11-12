@@ -216,3 +216,18 @@ test('same-name cookies are sent most specific path first, as a browser orders t
   assert.equal(walk.ok, true);
   assert.equal(seen[2].cookie, 'sid=account; sid=root');
 });
+
+import { resolveRedirect } from '../external-site-snapshot.mjs';
+
+test('a redirect without a fragment keeps the original fragment; an explicit one replaces it', async () => {
+  assert.equal(resolveRedirect('https://www.example.com/', 'https://example.com/#/checkout'), 'https://www.example.com/#/checkout');
+  assert.equal(resolveRedirect('/next#/cart', 'https://example.com/#/checkout'), 'https://example.com/next#/cart');
+  assert.equal(resolveRedirect('/next#', 'https://example.com/#/checkout'), 'https://example.com/next#');
+  const fetchFn = fakeFetch({
+    'https://example.com/#/checkout': { status: 301, location: 'https://www.example.com/' },
+    'https://www.example.com/#/checkout': { status: 200 },
+  });
+  const walk = await walkRedirects('https://example.com/#/checkout', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  assert.equal(walk.finalUrl, 'https://www.example.com/#/checkout');
+});
