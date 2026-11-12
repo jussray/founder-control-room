@@ -204,10 +204,10 @@ test('wrong native-review phase or stale-review policy cannot satisfy the curren
 test('review membrane requires the exact phase flags and exact CodeQL security floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
 
-  const unexpectedCodeOwner = canonicalRuleset();
-  unexpectedCodeOwner.rules[0].parameters.require_code_owner_review = true;
-  const unexpectedCodeOwnerSnapshot = rulesetSnapshot(unexpectedCodeOwner, 'main', 'main');
-  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, true);
+  const missingCodeOwner = canonicalRuleset();
+  missingCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  const unexpectedCodeOwnerSnapshot = rulesetSnapshot(missingCodeOwner, 'main', 'main');
+  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, false);
   assert.equal(canonicalFloorSatisfied(unexpectedCodeOwnerSnapshot, expectedBypass), false);
 
   const futureMissingCodeOwner = canonicalRuleset();
