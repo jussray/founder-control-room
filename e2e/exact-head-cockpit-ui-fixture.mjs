@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 
 const fixtureShaA='a'.repeat(40),fixtureShaB='b'.repeat(40);
 const root=resolve(process.cwd(),'public/control-room/exact-head');
-const output=resolve(process.cwd(),'evidence');
+const output=resolve(process.cwd(),'test-results/exact-head-fixture');
 const projects=[{id:'fcr',name:'Founder Control Room',repository:'jussray/founder-control-room'},
 {id:'bip',name:'Se’kret Bip',repository:'jussray/Sekret-Bip'},
 {id:'chief',name:'Chief AI Machine',repository:'jussray/chief-ai-machine'},
