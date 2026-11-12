@@ -1,14 +1,11 @@
 name: PA Funding Browser Proof
 
 on:
+  # Always replay proof on this isolated work branch, including when a
+  # reconciliation brings new main changes without touching funding files.
   push:
     branches:
       - work/pa-funding-workspace-20261111
-    paths:
-      - '.github/workflows/pa-funding-browser-proof.yml'
-      - 'public/control-room/pa-funding.*'
-      - 'e2e/pa-funding-workspace-proof.mjs'
-      - 'scripts/build-pages.mjs'
   pull_request:
     branches: [main]
     paths:
