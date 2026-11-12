@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Repin the FCR Playwright StoryEngine federation peer to independently observed StoryEngine main after a forward four-commit runtime-changing transition.",
+  "purpose": "Repin the FCR Playwright StoryEngine federation peer to independently observed StoryEngine main after a forward one-commit receipt-only transition.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -721,19 +721,37 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must pin StoryEngine `1a4a581687481b2ec2025539efae02032bef5287` only as the new exact peer evidence subject after a forward one-commit, zero-behind transition from `1730f316b74bdb9b638312c57987dc2897953948` that adds only a truth-gate receipt; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification."
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1730f316b74bdb9b638312c57987dc2897953948` only as the new exact peer evidence subject after a forward four-commit, zero-behind transition from `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5` that includes runtime code; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must state that the StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287` transition adds only a truth-gate receipt and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility."
+        "`README.md` must state that the StoryEngine peer `1730f316b74bdb9b638312c57987dc2897953948` transition changes runtime code and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility."
       ]
     },
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 11, 2026 StoryEngine peer drifts found on FCR PR #1083 and PR #969 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 11, 2026 StoryEngine peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1a4a581687481b2ec2025539efae02032bef5287` only as the new exact peer evidence subject after a forward one-commit, zero-behind receipt-only transition from `1730f316b74bdb9b638312c57987dc2897953948`; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must state that the StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287` transition is receipt-only and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the later November 11, 2026 StoryEngine receipt-only peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
       ]
     }
   ]
