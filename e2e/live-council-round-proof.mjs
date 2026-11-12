@@ -73,6 +73,7 @@ try {
   assert.equal(hops.length, 3);
   for (let i = 1; i < hops.length; i += 1) assert.equal(hops[i].inputSha256, hops[i - 1].answerSha256);
   assert.equal(hops.every((hop) => hop.liveProviderEvidence === false), true);
+  const councilChain = seen.map(({ source, target }) => `${source}>${target}`);
 
   // Synthetic-only confidentiality attack, executed through a real Chromium
   // fetch into the compiled FCR HTTP router. A valid hash does not authorize
@@ -141,7 +142,7 @@ try {
     restrictedRelay: { httpStatus: blocked.status, code: blocked.body.code, adapterCalls: 0 },
     internalRelay: { httpStatus: allowed.status, adapterCalls: 1 },
     sourceRef: result.body.transcript.sourceRef,
-    chain: seen.map(({ source, target }) => `${source}>${target}`),
+    chain: councilChain,
   }, null, 2));
 } finally {
   await browser.close();
