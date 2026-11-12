@@ -65,6 +65,11 @@ jobs:
           node --check public/control-room/pa-funding.js
           node --check e2e/pa-funding-workspace-proof.mjs
 
+      - name: Verify independent human-review governance contracts
+        run: |
+          node --test scripts/audit-github-governance-preflight.node-test.mjs
+          npx vitest run src/providers/__tests__/providerFactory.rulesetGovernance.test.ts src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts src/lib/__tests__/trustedReviewWitnessCommand.contract.test.ts
+
       - name: Verify public Pages bundle
         run: npm run build:pages
 
