@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Repin the FCR Playwright StoryEngine federation peer to independently observed StoryEngine main after a forward one-commit receipt-only transition.",
+  "purpose": "Replace the StoryEngine live-ref equality gate with an ancestry gate so forward peer merges stop failing FCR CI while history rewrites still fail closed.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -662,6 +662,30 @@
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
         "`docs/TRUTH_DECAY_AUDIT.md` must record the later November 11, 2026 StoryEngine receipt-only peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 12, 2026 move from StoryEngine live-ref equality to ancestry as preserving the pin-disappearance failure mode without widening what the exact-pin witnesses prove."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts",
+      "claims": [
+        "`src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts` must verify the Playwright StoryEngine gate fails closed unless the pin is an ancestor of live main, binds fetched history to the live SHA, drops exact live equality, and still verifies the exact pinned checkout."
       ]
     }
   ]

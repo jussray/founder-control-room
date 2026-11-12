@@ -38,6 +38,8 @@ FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `s
 
 FCR Playwright selects the newly observed StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287`, one commit ahead and zero behind the prior pin `1730f316b74bdb9b638312c57987dc2897953948`. The changed peer file is a governance receipt (no runtime code), but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
 
+The live-peer gate requires the pinned StoryEngine commit to be equal to, or an ancestor of, live StoryEngine `main`, so ordinary forward StoryEngine merges no longer turn FCR CI red. A force-push, rollback or rewrite that drops the pin from StoryEngine history still fails closed, and all federation and browser proof still runs against the exact pinned commit; compatibility with newer StoryEngine commits is not claimed until the pin is moved and re-witnessed.
+
 The existing Portfolio Actions and Stale Evidence Audit is configured to observe
 default-branch GitHub Actions daily, in parallel batches of six repositories.
 Its receipt includes a prioritized, non-authorizing next-task handoff bound to
