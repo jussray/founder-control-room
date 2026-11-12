@@ -122,6 +122,21 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
       counts.queued?'Finish queued checks; avoid duplicate reruns.':
       counts.cancelled?'Investigate cancelled workflows before rerunning.':
       'Revalidate required rulesets, independent review and FCR authority.';
+    // Read-only witness projection. GitHub checks do not prove runner logs,
+    // deployment identity, or browser screenshots. Keep those UNKNOWN.
+    const failedCheck=checks.find(v=>v.status==='failed') ?? null;
+    const e2eCheck=checks.find(v=>/playwright|e2e/i.test(v.name)) ?? null;
+    const asWitness=(v:VerificationSignal|null)=>v?{
+      status:v.status==='failed'?'FAIL':v.status==='passed'?'PASS':'UNKNOWN',
+      subjectSha:v.commitSha,
+      observedAt:v.completedAt??v.startedAt??null,
+      url:v.detailsUrl??null,
+    }:{status:'UNKNOWN' as const};
+    const releaseProof={witnesses:{
+      run:asWitness(failedCheck), runner:{status:'UNKNOWN'}, logs:{status:'UNKNOWN'},
+      ancestry:{status:'UNKNOWN'}, e2e:asWitness(e2eCheck),
+      deploy:{status:'UNKNOWN'}, browser:{status:'UNKNOWN'}, review:{status:'UNKNOWN'},
+    },releaseAuthorized:false,mergeAuthorized:false,productionAccepted:false};
     return res.json({
       contract:'fcr/exact-head-cockpit-inspection@v1',observedAt:new Date().toISOString(),
       project:{id:project.id,name:project.name,repository:project.repo},
@@ -135,7 +150,7 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
       gate:{observedChecksPassed:allPassed,requiredChecksVerified:false,merge:false,deploy:false,
         cloudflare:'unknown',supabase:'unknown',productionProof:'unknown'},
       evidenceStatus:baseMatches===true&&headMatches===true?'partial_current':'stale_or_unknown',
-      blockers,nextReversibleFix,authority:'read_only',
+      releaseProof,blockers,nextReversibleFix,authority:'read_only',
     });
   } catch {
     return res.status(503).json({code:'GITHUB_READ_FAILED',evidenceStatus:'unknown',blocked:true});
