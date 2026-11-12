@@ -270,6 +270,88 @@ describe('generatePerplexityDraftMaterial', () => {
     expect(result.duplicateAudit.isDuplicate).toBe(false);
   });
 
+  it('refuses a media-required platform when no media and no generator are supplied', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    await expect(
+      generatePerplexityDraftMaterial(
+        input({ platform: 'instagram', platformCharacterLimit: 2200 }),
+        { env: BASE_ENV, fetchImpl: fetchMock },
+      ),
+    ).rejects.toThrow(/requires at least one media asset/);
+  });
+
+  it('calls generateMediaIfRequired for a media-required platform and attaches the result', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const generateMediaIfRequired = vi.fn(async () => [
+      { type: 'image' as const, url: 'https://api.foundercontrolroom.org/media-assets/test.png', altText: null },
+    ]);
+    const result = await generatePerplexityDraftMaterial(
+      input({ platform: 'instagram', platformCharacterLimit: 2200, generateMediaIfRequired }),
+      { env: BASE_ENV, fetchImpl: fetchMock },
+    );
+    expect(generateMediaIfRequired).toHaveBeenCalledTimes(1);
+    expect(result.postInput.media).toEqual([
+      { type: 'image', url: 'https://api.foundercontrolroom.org/media-assets/test.png', altText: null },
+    ]);
+  });
+
+  it('does not call generateMediaIfRequired when media is already supplied', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const generateMediaIfRequired = vi.fn(async () => [
+      { type: 'image' as const, url: 'https://example.com/should-not-be-called.png', altText: null },
+    ]);
+    const result = await generatePerplexityDraftMaterial(
+      input({
+        platform: 'instagram',
+        platformCharacterLimit: 2200,
+        media: [{ type: 'image', url: 'https://api.foundercontrolroom.org/media-assets/already-have.png', altText: null }],
+        generateMediaIfRequired,
+      }),
+      { env: BASE_ENV, fetchImpl: fetchMock },
+    );
+    expect(generateMediaIfRequired).not.toHaveBeenCalled();
+    expect(result.postInput.media).toEqual([
+      { type: 'image', url: 'https://api.foundercontrolroom.org/media-assets/already-have.png', altText: null },
+    ]);
+  });
+
+  it('does not call generateMediaIfRequired for a platform that does not require media', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const generateMediaIfRequired = vi.fn(async () => [
+      { type: 'image' as const, url: 'https://example.com/unused.png', altText: null },
+    ]);
+    const result = await generatePerplexityDraftMaterial(
+      input({ generateMediaIfRequired }),
+      { env: BASE_ENV, fetchImpl: fetchMock },
+    );
+    expect(generateMediaIfRequired).not.toHaveBeenCalled();
+    expect(result.postInput.media).toBeUndefined();
+  });
+
+  it('propagates a media-generation failure as a specific, attributable rejection', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const generateMediaIfRequired = vi.fn(async () => {
+      throw new Error('Gemini video generation did not complete within the bounded poll window');
+    });
+    await expect(
+      generatePerplexityDraftMaterial(
+        input({ platform: 'instagram', platformCharacterLimit: 2200, generateMediaIfRequired }),
+        { env: BASE_ENV, fetchImpl: fetchMock },
+      ),
+    ).rejects.toThrow(/media generation required for instagram failed: Gemini video generation did not complete/);
+  });
+
+  it('rejects when generateMediaIfRequired resolves with no media', async () => {
+    const fetchMock = vi.fn(async () => agentResponse(VALID_FIELDS)) as typeof fetch;
+    const generateMediaIfRequired = vi.fn(async () => []);
+    await expect(
+      generatePerplexityDraftMaterial(
+        input({ platform: 'instagram', platformCharacterLimit: 2200, generateMediaIfRequired }),
+        { env: BASE_ENV, fetchImpl: fetchMock },
+      ),
+    ).rejects.toThrow(/returned no media/);
+  });
+
   it('is a PerplexityContentGenerationError on rejection', async () => {
     const fetchMock = vi.fn() as unknown as typeof fetch;
     await expect(

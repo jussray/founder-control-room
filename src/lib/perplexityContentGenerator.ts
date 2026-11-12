@@ -5,10 +5,11 @@ import {
   type DraftMaterial,
   type RepositoryEvidence,
 } from './socialCampaignPolicy.js';
-import type {
-  FirstPartySocialPlatform,
-  FirstPartySocialPostInput,
-  SocialMediaAsset,
+import {
+  FIRST_PARTY_PLATFORM_CAPABILITIES,
+  type FirstPartySocialPlatform,
+  type FirstPartySocialPostInput,
+  type SocialMediaAsset,
 } from './firstPartySocialPublisher.js';
 import {
   auditForDuplicatePost,
@@ -59,6 +60,19 @@ export interface GeneratePerplexityDraftInput {
    */
   priorPosts?: readonly PriorPostSummary[];
   duplicateSimilarityThreshold?: number;
+  /**
+   * Called only when the target platform requires media
+   * (`FIRST_PARTY_PLATFORM_CAPABILITIES[platform].requiresMedia`) and no
+   * `media` was already supplied. Deliberately a caller-supplied closure
+   * rather than an import of `mediaContentGenerator.ts`'s specific
+   * providers: this module stays decoupled from which provider generated
+   * the asset, how it was uploaded, or how many were tried. The caller
+   * binds the provider call + prompt + upload target (e.g. one of
+   * `generateOpenAiImage`/`generateGeminiImage`/etc. plus
+   * `uploadGeneratedMediaAsset`) and returns finished `SocialMediaAsset[]`,
+   * or throws/rejects — a throw is treated the same as returning no media.
+   */
+  generateMediaIfRequired?: () => Promise<SocialMediaAsset[]>;
 }
 
 export interface PerplexityContentGeneratorOptions {
@@ -334,6 +348,25 @@ export async function generatePerplexityDraftMaterial(
     ? fields.text
     : `${fields.text}\n\n${approvedProofUrl}`;
 
+  let media = input.media;
+  if ((!media || media.length === 0) && FIRST_PARTY_PLATFORM_CAPABILITIES[input.platform].requiresMedia) {
+    if (!input.generateMediaIfRequired) {
+      rejected(
+        `${input.platform} requires at least one media asset; no media or generateMediaIfRequired was supplied`,
+      );
+    }
+    try {
+      media = await input.generateMediaIfRequired();
+    } catch (error) {
+      rejected(
+        `media generation required for ${input.platform} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+    if (!media || media.length === 0) {
+      rejected(`media generation required for ${input.platform} returned no media`);
+    }
+  }
+
   const draft: DraftMaterial = {
     platform: input.platform,
     accountId: input.accountId,
@@ -343,7 +376,7 @@ export async function generatePerplexityDraftMaterial(
     audienceValue: fields.audienceValue,
     investorSignal: fields.investorSignal,
     proofLinks: [{ label: `${input.evidence.fullName} proof`, url: approvedProofUrl }],
-    media: input.media,
+    media,
     platformCharacterLimit: input.platformCharacterLimit ?? null,
   };
 
