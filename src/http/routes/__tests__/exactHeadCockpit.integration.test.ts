@@ -109,6 +109,9 @@ describe('exact-head cockpit founder read boundary', () => {
   });
 
   it('treats a moving PR head as stale instead of authorizing any action', async () => {
+    fixtures.provider.listVerificationSignals.mockResolvedValue([
+      { id:'90', name:'Required Gate', status:'passed', commitSha:fixtures.context.headSha, provider:'github' },
+    ]);
     fixtures.provider.observePullRequest.mockResolvedValueOnce(fixtures.context)
       .mockResolvedValueOnce({...fixtures.context,headSha:'c'.repeat(40)});
     const response=await request(app()).get('/integration-cockpit/inspect/fcr/832').set('x-fixture-founder','yes');
@@ -116,6 +119,7 @@ describe('exact-head cockpit founder read boundary', () => {
     expect(response.body.live.headMatches).toBe(false);
     expect(response.body.evidenceStatus).toBe('stale_or_unknown');
     expect(response.body.blockers).toContain('Current PR head could not be confirmed');
+    expect(response.body.gate.observedChecksPassed).toBe(false);
     expect(response.body.gate.merge).toBe(false);
   });
 
