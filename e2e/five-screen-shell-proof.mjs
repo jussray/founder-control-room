@@ -31,6 +31,25 @@ const mission = {
   project: { slug: project.slug },
 };
 
+const projectB = {
+  slug: 'story-engine',
+  name: 'StoryEngine',
+  repo_provider: 'github',
+  risk_level: 'medium',
+  status: 'active',
+};
+const missionB = {
+  id: 'mission-2',
+  title: 'Verify independent StoryEngine deployment',
+  description: 'Verify StoryEngine production proof.',
+  status: 'in_review',
+  risk_level: 'medium',
+  branch_ref: 'proof/storyengine',
+  builder_agent: 'codex',
+  reviewer_agent: 'redteam',
+  project: { slug: projectB.slug },
+};
+
 const activity = [{
   created_at: '2026-09-17T18:30:00.000Z',
   project: { slug: project.slug },
@@ -63,7 +82,7 @@ function recordRead(readCounts, pathname, method) {
   readCounts.set(pathname, (readCounts.get(pathname) ?? 0) + 1);
 }
 
-async function installRoutes(page, readCounts = null) {
+async function installRoutes(page, readCounts = null, options = {}) {
   await page.route('https://fcr.test/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -86,7 +105,19 @@ async function installRoutes(page, readCounts = null) {
         readiness: { state: 'not-configured' },
       });
     }
-    if (url.pathname === '/projects' && request.method() === 'GET') return json(route, { projects: [project] });
+    if (url.pathname === '/projects' && request.method() === 'GET') return json(route, { projects: [project, projectB] });
+    if (url.pathname === '/projects/story-engine' && request.method() === 'GET') {
+      if (options.failProjectB) {
+        options.projectBReadCount = (options.projectBReadCount ?? 0) + 1;
+        return json(route, { error: 'Unavailable test project' }, 503);
+      }
+      return json(route, { project: projectB, live: { defaultBranch: 'main' } });
+    }
+    if (url.pathname.startsWith('/projects/story-engine/')) {
+      if (url.pathname.endsWith('/files')) return json(route, { ref: 'main', path: '', entries: [] });
+      if (url.pathname.endsWith('/releases')) return json(route, { releases: [] });
+      if (url.pathname.endsWith('/connections')) return json(route, { connections: [] });
+    }
     if (url.pathname === '/projects/sekret-bip' && request.method() === 'GET') {
       return json(route, { project, live: { defaultBranch: 'main' } });
     }
@@ -98,7 +129,7 @@ async function installRoutes(page, readCounts = null) {
     if (url.pathname === '/projects/sekret-bip/missions' && request.method() === 'POST') {
       return json(route, { mission: { id: 'created-mission' } }, 201);
     }
-    if (url.pathname === '/dashboard/tasks') return json(route, { tasks: [mission] });
+    if (url.pathname === '/dashboard/tasks') return json(route, { tasks: [mission, missionB] });
     if (url.pathname === '/dashboard/activity') return json(route, { activity });
     if (url.pathname === '/dashboard/costs') return json(route, { totalUsd: 1.25, byAgent: [] });
     if (url.pathname === '/l99/status') {
@@ -110,6 +141,9 @@ async function installRoutes(page, readCounts = null) {
     if (url.pathname === '/version') {
       return json(route, { service: 'founder-control-room', gitSha: 'b'.repeat(40) });
     }
+    if (url.pathname === '/missions/mission-2/council') return json(route, { conversations: [] });
+    if (url.pathname === '/missions/mission-2/runs') return json(route, { runs: [] });
+    if (url.pathname === '/missions/mission-2/costs') return json(route, { costs: [], totalUsd: 0 });
     if (url.pathname === '/missions/mission-1/council') return json(route, { conversations: [] });
     if (url.pathname === '/missions/mission-1/runs') return json(route, { runs: [] });
     if (url.pathname === '/missions/mission-1/costs') return json(route, { costs: [], totalUsd: 0 });
@@ -236,9 +270,54 @@ async function proveLegacyRouteAndMobile(browser) {
   await page.close();
 }
 
+async function proveCrossProjectIsolation(browser) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await installRoutes(page);
+  await page.goto('https://fcr.test/control-room/', { waitUntil: 'networkidle' });
+  await page.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
+  await page.locator('#project-list .card[data-slug="sekret-bip"]').click();
+  await page.locator('#project-detail h2').waitFor();
+  await page.locator('.founder-subnav button', { hasText: 'Work' }).click();
+  await page.locator('#mission-lanes .card[data-id="mission-2"]').click();
+  await page.locator('#mission-detail h2').waitFor();
+  const firstContext = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_founder_context') || '{}'));
+  assert.equal(firstContext.projectSlug, 'story-engine');
+  assert.notEqual(firstContext.projectName, project.name,
+    'selecting another project mission must not reuse the previous project name');
+  const ribbon = await page.locator('.founder-context').innerText();
+  assert(!ribbon.includes("Se'kret Bip"),
+    'ribbon must not attribute StoryEngine mission to Se’kret Bip');
+
+  await page.locator('.founder-subnav button', { hasText: 'Overview' }).click();
+  await page.locator('#project-detail h2').filter({ hasText: 'StoryEngine' }).waitFor({ timeout: 6000 });
+  const heading = await page.locator('#project-detail h2').innerText();
+  assert(heading.includes('story-engine') && !heading.includes('sekret-bip'),
+    'rendered details must match the selected project context');
+  await page.close();
+
+  const failedPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const options = { failProjectB: true, projectBReadCount: 0 };
+  await installRoutes(failedPage, null, options);
+  await failedPage.goto('https://fcr.test/control-room/', { waitUntil: 'networkidle' });
+  await failedPage.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
+  await failedPage.locator('#project-list .card[data-slug="sekret-bip"]').click();
+  await failedPage.locator('#project-detail h2').waitFor();
+  await failedPage.locator('.founder-subnav button', { hasText: 'Work' }).click();
+  await failedPage.locator('#mission-lanes .card[data-id="mission-2"]').click();
+  await failedPage.locator('#mission-detail h2').waitFor();
+  await failedPage.locator('.founder-subnav button', { hasText: 'Overview' }).click();
+  await failedPage.waitForTimeout(700);
+  assert.equal(options.projectBReadCount, 1,
+    'failed automatic restoration must not refetch an unavailable project indefinitely');
+  assert(await failedPage.locator('#project-detail').isHidden(),
+    'failed project-B restoration must hide stale project-A details');
+  await failedPage.close();
+}
+
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--no-proxy-server'] });
 try {
   await proveDesktop(browser);
+  await proveCrossProjectIsolation(browser);
   await proveLegacyRouteAndMobile(browser);
 } finally {
   await browser.close();

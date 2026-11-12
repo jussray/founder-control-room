@@ -80,6 +80,8 @@ try {
   await installRoutes(first);
   await first.goto('https://fcr.test/control-room/', { waitUntil: 'networkidle' });
   await first.locator('.founder-screen-nav button', { hasText: 'Control' }).click();
+  await first.waitForFunction(() => localStorage.getItem('fcr_founder_screen') === 'control',
+    { timeout: 2000 });
   await first.locator('#project-list .card[data-slug="sekret-bip"]').click();
   await first.locator('#project-detail h2').waitFor();
 

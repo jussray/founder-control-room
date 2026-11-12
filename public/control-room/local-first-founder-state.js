@@ -140,15 +140,16 @@ export function installFounderLocalFirstState() {
   const scheduleSnapshot = () => {
     if (snapshotQueued) return;
     snapshotQueued = true;
-    queueMicrotask(() => {
+    // A capture-phase microtask can execute before the shell's later click
+    // handlers. A task-level write observes the fully dispatched event.
+    setTimeout(() => {
       snapshotQueued = false;
       snapshotFounderLocalState();
-    });
+    }, 0);
   };
 
-  // The five-screen shell changes founder state through user navigation clicks.
-  // Queue the durable write after the event so its existing session write lands
-  // first, then mirror only the explicit non-sensitive allowlist above.
+  // Snapshot only the bounded non-sensitive allowlist after the UI commits its
+  // navigation. Pagehide and visibilitychange retain synchronous persistence.
   document.addEventListener('click', scheduleSnapshot, true);
   window.addEventListener('popstate', scheduleSnapshot);
   window.addEventListener('pagehide', () => snapshotFounderLocalState());
