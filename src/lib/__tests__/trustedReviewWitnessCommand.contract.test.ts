@@ -238,7 +238,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded',
+      'Human review phase: founder-plus-independent; one native human approval plus Code Owner and last-push review required',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',

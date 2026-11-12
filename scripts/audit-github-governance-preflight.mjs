@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
-export const CANONICAL_NATIVE_APPROVAL_COUNT = 0;
+export const CANONICAL_NATIVE_APPROVAL_COUNT = 1;
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
   'required_linear_history',
@@ -279,6 +279,7 @@ export function buildReport({
         && activeTargetingRef.length === 2
         && canonicalFloor
         && freshnessFloor
+        && (CANONICAL_NATIVE_APPROVAL_COUNT === 0 || eligibleReviewers.length > 0)
           ? 'READY'
           : 'NOT_READY',
   };
