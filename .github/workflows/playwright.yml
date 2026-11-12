@@ -68,6 +68,19 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      - name: Verify Exact-Head Cockpit backend fail-closed regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vitest run src/http/routes/__tests__/exactHeadCockpit.integration.test.ts
+
+      - name: Prove Exact-Head Cockpit fail-closed witness UI (synthetic fixture)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          node e2e/exact-head-cockpit-ui-fixture.mjs 2>&1 | tee logs/exact-head-cockpit-fixture.log
+
       - name: Verify FCR welcome login and server-revoked logout
         shell: bash
         env:
@@ -98,19 +111,6 @@ jobs:
           exit "${status}"
         env:
           NODE_ENV: test
-
-      - name: Verify Exact-Head Cockpit backend fail-closed regression
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx vitest run src/http/routes/__tests__/exactHeadCockpit.integration.test.ts
-
-      - name: Prove Exact-Head Cockpit fail-closed witness UI (synthetic fixture)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p logs
-          node e2e/exact-head-cockpit-ui-fixture.mjs 2>&1 | tee logs/exact-head-cockpit-fixture.log
 
       - name: Verify live StoryEngine peer ref still pinned
         shell: bash
