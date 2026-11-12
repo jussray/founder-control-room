@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 4, 2026: Chief AI project-adapter source reconciliation
+
+The Chief AI project adapter is an **inspect/plan-only, read-only source snapshot**, not a shared runtime or a deployment signal. Its independently observed main-head and five contract-blob fingerprints are pinned in `src/founder-os-lab/projectAdapters.ts` and checked by `chiefAiProjectAdapter.test.ts` plus the live adapter freshness job. The new Chief capability registry carries non-authorizing continuity fingerprints, and merge-intent evaluation treats draft status as a blocker. Chief's pair contract preserves standalone product and technical independence, although its default commercial-packaging label changed; that change does **not** authorize bundling, change pricing, or collapse product identity.
+
+The Chief source refresh expires prior adapter evidence and cannot donate CI, Playwright, Cloudflare, live ProofMode MCP, production, merge, or founder approval. Separate Chief production ProofMode checks remain separately gated. Future head/blob changes require another semantic comparison and new exact-head checks.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.

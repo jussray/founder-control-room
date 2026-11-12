@@ -48,6 +48,7 @@ export interface FounderOsLabActionRoute {
 export const FOUNDER_OS_LAB_SKILLS: readonly FounderOsLabSkillDescriptor[] = [
   { id: 'juss-chief-ai', role: 'Chief AI capability selection and founder-intent translation.', mayExecute: false },
   { id: 'goalfix', role: 'Founder-native focused diagnosis capability inventory entry.', mayExecute: false },
+  { id: 'urlfix', role: 'Founder-native live-URL browser diagnosis and same-path repair-verification capability.', mayExecute: false },
   { id: 'repo-truth', role: 'Founder-native repository truth capability inventory entry.', mayExecute: false },
   { id: 'truth-decay-audit', role: 'Explain why once-verified evidence is no longer safe for current use without becoming a second truth authority.', mayExecute: false },
   { id: 'proof-led-publishing', role: 'Founder-native proof-led publishing capability inventory entry.', mayExecute: false },
