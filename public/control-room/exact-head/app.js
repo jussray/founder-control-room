@@ -3,7 +3,7 @@
   const el=id=>document.getElementById(id);
   const mk=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text??'UNKNOWN');return n};
   const clear=n=>n.replaceChildren();
-  const STAGES=['Find failure','Diagnose','Fix','Verify','Harden','Reverify','Deploy','Production proof'];
+  const STAGES=['FIND FAILURE','DIAGNOSE','VERIFY','ACCEPT OR BLOCK'];
   const FIELDS=['REALITY','FIX','PROOF','RISK','ROLLBACK','NEXT GATE'];
   let projects=[],selected=null,inspected=null,stage=0,inspectionGeneration=0;
   const note={};
@@ -42,15 +42,45 @@
       const input=document.getElementById('n-'+k.replaceAll(' ','_'));
       if(input)input.value='';
     }
+    renderWitnesses(null);
     pipeline();
     message('');
     return inspectionGeneration;
   }
   function pipeline(){const root=el('pipeline');clear(root);STAGES.forEach((name,i)=>{
     const b=mk('button',stage===i?'active':'',name);b.type='button';b.prepend(mk('span','',String(i+1).padStart(2,'0')));
-    b.disabled=i>Math.min(stage+1,5);b.title=i>=6?'Requires FCR production proof':'Operator work stage only';
+    b.disabled=i>Math.min(stage+1,STAGES.length-1);b.title='Operator classification only; never a release authorization';
     b.onclick=()=>{stage=i;pipeline()};root.append(b)
   })}
+  const WITNESSES=[
+    ['Current run','run'],['Runner startup','runner'],['Failure log','logs'],
+    ['Live main + merge-base','ancestry'],['Exact-head E2E','e2e'],
+    ['Cloudflare deploy identity','deploy'],['Production browser screenshot','browser'],
+    ['Independent review','review']
+  ];
+  function renderWitnesses(d){
+    const root=el('witness-grid');clear(root);
+    const observed=d?.releaseProof?.witnesses;
+    for(const [name,key] of WITNESSES){
+      const source=observed && typeof observed==='object' ? observed[key] : null;
+      const identity=typeof source?.subjectSha==='string' ? source.subjectSha : null;
+      const status=source?.status==='PASS' && identity && identity===d?.exact?.headSha ? 'PASS' :
+        source?.status==='STALE' || (identity && identity!==d?.exact?.headSha) ? 'STALE' :
+        source?.status==='FAIL' || source?.status==='BLOCKED' ? 'BLOCKED' : 'UNKNOWN';
+      const row=mk('div','witness'),top=mk('div','witness-top');
+      top.append(mk('strong','',name),mk('b',status.toLowerCase(),status));
+      row.append(top,mk('small','',status==='UNKNOWN'?'No authoritative evidence supplied':(source?.observedAt||'Observation time unknown')));
+      if(identity)row.append(mk('code','',identity));
+      if(typeof source?.url==='string'){
+        try{const u=new URL(source.url);
+          if(u.protocol==='https:' && ['github.com','www.foundercontrolroom.org','foundercontrolroom.org'].includes(u.hostname)){
+            const a=mk('a','','Inspect source ↗');a.href=u.toString();a.target='_blank';a.rel='noopener noreferrer';row.append(a);
+          }
+        }catch{}
+      }
+      root.append(row);
+    }
+  }
   function renderRegistry(){const menu=el('project-nav'),select=el('project');clear(menu);clear(select);for(const p of projects){
     const item=mk('button',p.id===selected?'chosen':'',p.name);item.type='button';item.disabled=!p.repository;
     item.onclick=()=>{selected=p.id;select.value=p.id;reset();renderRegistry();message('Enter a PR number to inspect.')};menu.append(item);
@@ -60,6 +90,7 @@
     inspected=d;el('detail').hidden=false;
     el('identity').textContent=d.project.name+' / PR #'+d.pullRequest
       +(d.pr?.draft?' / DRAFT':'')+(d.pr?.state==='closed'?' / CLOSED':'');
+    renderWitnesses(d);
     const sha=el('sha');clear(sha);sha.append(cell('BASE SHA',d.exact.baseSha),cell('HEAD SHA',d.exact.headSha),cell('LIVE BASE',d.live.currentBaseSha),cell('LIVE HEAD',d.live.currentHeadSha));
     const counts=el('counts');clear(counts);counts.append(count('FAILING',d.counts.failing),count('QUEUED',d.counts.queued),count('CANCELLED',d.counts.cancelled),count('DUPLICATES',d.counts.duplicate));
     const checks=el('checks');clear(checks);if(!d.checks.length)checks.append(mk('p','unknown','No check evidence. Unknown is not green.'));
@@ -69,11 +100,11 @@
     const gates=el('gates');clear(gates);for(const [k,v] of [['GitHub checks',d.gate.observedChecksPassed?'PASS (PARTIAL)':'BLOCKED'],['Required rulesets','UNKNOWN'],['FCR founder approval','NOT GRANTED'],['Cloudflare production','UNKNOWN'],['Supabase / runtime','UNKNOWN']]){
       const row=mk('div','gate');row.append(mk('span','',k),mk('b','',v));gates.append(row)}
     el('next').textContent=d.nextReversibleFix;const bs=el('blockers');clear(bs);for(const b of d.blockers)bs.append(mk('li','',b));
-    el('source').textContent=d.evidenceStatus==='partial_current'?'PARTIAL':'STALE';
+    el('source').textContent=d.evidenceStatus==='partial_current'?'PARTIAL':d.evidenceStatus==='stale'?'STALE':'UNKNOWN';
     message('Observed '+new Date(d.observedAt).toLocaleString()+'. Release authority remains blocked.');
   }
   function records(){const root=el('fields');for(const name of FIELDS){const box=mk('div'),label=mk('label','',name),area=mk('textarea');area.id='n-'+name.replaceAll(' ','_');label.htmlFor=area.id;area.rows=3;area.maxLength=2500;area.placeholder='Verified / inferred / unknown';area.oninput=()=>{note[name]=area.value};box.append(label,area);root.append(box)}
-    el('record').onsubmit=e=>{e.preventDefault();const payload={contract:'fcr/cockpit-operator-handoff@v1',authority:'none',evidenceClassification:'operator_only',observedAt:inspected?.observedAt||null,project:inspected?.project||null,exact:inspected?.exact||null,stage:STAGES[stage],notes:note};
+    el('record').onsubmit=e=>{e.preventDefault();const payload={contract:'fcr/cockpit-operator-handoff@v1',authority:'none',evidenceClassification:'operator_only',observedAt:inspected?.observedAt||null,project:inspected?.project||null,exact:inspected?.exact||null,stage:STAGES[stage],releaseWitnesses:inspected?.releaseProof?.witnesses||null,notes:note};
       const object=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
       const a=mk('a');a.href=object;a.download='fcr-exact-head-record.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),1000);message('Local handoff exported. This is not a verified FCR receipt.')}}
   async function boot(){pipeline();records();try{
