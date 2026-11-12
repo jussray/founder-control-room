@@ -1,0 +1,56 @@
+{
+  "contract": "juss/fcr-continuity-receipt@v1",
+  "observed_at": "2026-10-24T00:00:00Z",
+  "envelope": {
+    "schema": "juss/chief-adapter-drift-review@v1",
+    "reviewer": "read-only semantic review by FCR session",
+    "subject_repo": "jussray/chief-ai-machine",
+    "audited_head": "4c126a442522b006d499170a812fcd5b80355bf0",
+    "observed_head": "fabc221920d9dbe4c1db068384ca71dad64a32cf",
+    "observed_head_is_main": true,
+    "files": [
+      {
+        "path": "src/domain/capability-registry.js",
+        "audited_blob": "83592043323fe08258dc93778300151e21ac70ae",
+        "observed_blob": "abb2daf0ee7ce85442cd4b04588b4881cc4b9b53",
+        "finding": "continuity-cookie contract, executionContinuityFingerprint, executionSlotKey and handoff cookie fields removed; capabilityIds no longer frozen",
+        "severity": "review-required"
+      },
+      {
+        "path": "src/domain/merge-intent.js",
+        "audited_blob": "16c1d3380f8471097709b8d247ca0f1f33207857",
+        "observed_blob": "ba7b3d1ff4dbc846d79489ec9ffb0c346597b559",
+        "finding": "directiveLines no longer strips numbered-list prefixes; a line such as \"1. Do not merge\" no longer matches the explicit do-not-merge marker (fail-open); draft status no longer blocks merge intent",
+        "severity": "regression-suspected"
+      },
+      {
+        "path": "config/founder-chief-pair.contract.json",
+        "audited_blob": "dd008420e1a91e78516b45d9e27de89344abf432",
+        "observed_blob": "7aaff727e0b460e42cf7a2a27d57381ce9f0a59a",
+        "finding": "contract version 2026-08-09.1 to 2026-10-06.1; adds candidate pairing, commercial packaging, PromptOS handoff contracts; tightens automated posting approval to execution-time reread",
+        "severity": "informational-tightening"
+      },
+      {
+        "path": "e2e/chief-capability-plan.pw.mjs",
+        "audited_blob": "a2d42aeb4cdf6d7a69235bfa6a61b2194a8f20c4",
+        "observed_blob": "ad41d9f614dc94df7d5ebde3d9b3a8cefd96e39b",
+        "finding": "adds trustTransition assertions; test of Chief runtime, not run by FCR",
+        "severity": "informational"
+      }
+    ],
+    "not_verified": [
+      "callers of executionSlotKey and the removed cookie in Chief",
+      "whether provider draft gates in FCR still block drafts independent of merge-intent",
+      "numbered-list regression executed rather than read from source"
+    ],
+    "recommendation": "Do not refresh the FCR adapter snapshot to fabc221. Chief owner to restore numbered-list stripping, confirm draft behavior, and decide whether the control removals were intended. Refresh only after a semantic re-review.",
+    "authority": "none: this receipt is evidence only and cannot approve, merge, deploy, or change the adapter snapshot"
+  },
+  "fingerprint_sha256": "99d487f5e8da51fbbf41abe5f90230352207b63136d27461dcb0f7bfebd26c80",
+  "continuity_cookie": {
+    "cookie_id": "chief-review-99d487f5e8da51fbbf41abe5",
+    "type": "continuity-proof-cookie",
+    "mode": "EVIDENCE_ONLY",
+    "grants": "none"
+  }
+}
