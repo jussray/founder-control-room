@@ -99,7 +99,7 @@ exactHeadCockpitRouter.get('/inspect/:id/:number', async(req,res)=>{
       duplicate:null, // latest-only Check Run evidence cannot establish duplicate count
     };
     const reviews=(reviewSignals||[]).filter((v:ReviewSignal)=>v.state==='approved'&&v.commitSha.toLowerCase()===ctx.headSha.toLowerCase()).length;
-    const allPassed=checks.length>0&&checks.every(v=>v.status==='passed');
+    const allPassed=baseMatches===true&&headMatches===true&&checks.length>0&&checks.every(v=>v.status==='passed');
     const blockers=[
       ctx.state!=='open'?'PR is closed and cannot be reviewed or merged':'',
       ctx.draft?'PR is draft and not review eligible':'',
