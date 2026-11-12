@@ -1,0 +1,1699 @@
+{
+  "contract": "juss/fcr-gpt-skill-source-catalog@v1",
+  "provenance": "Immutable GitHub source references at observed commits, not a certified ownership/license inventory, installed GPT Knowledge, or current head state. Every actual skill body needs owner, visibility, license and secret-screen review before export.",
+  "executionRule": "All catalog entries are non-authorizing, and all body exports require explicit owner/share-scope review. Eligible real executors must verify current runtime permissions, target, policy, approval and receipt. The catalog never grants them.",
+  "sources": [
+    {
+      "repo": "jussray/founder-control-room",
+      "sha": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "sourceSkillCount": 90
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sha": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "sourceSkillCount": 31
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sha": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "sourceSkillCount": 13
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sha": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "sourceSkillCount": 26
+    }
+  ],
+  "count": {
+    "discovered": 160,
+    "catalogReferences": 117,
+    "heldForReview": 43
+  },
+  "held": [
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/juss-flow-launch-loop/SKILL.md",
+      "reason": "private or owner-only skill review required"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/juss-founder-os/SKILL.md",
+      "reason": "private or owner-only skill review required"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/agents-sdk/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/artifact-template-creator-response/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/agents-sdk/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/artifact-template-creator-response/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/agents-sdk/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-email-service/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-one-migrations/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare-one/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/cloudflare/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/durable-objects/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-migrate-to-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-next/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/sandbox-stable/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/turnstile-spin/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/web-perf/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/workers-best-practices/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    },
+    {
+      "repo": "jussray/SolContinuity",
+      "sourceHead": "855cc8a79f1ea06006c812ec9efb08864a1d55b9",
+      "path": ".agents/skills/wrangler/SKILL.md",
+      "reason": "bundled third-party/reference skill requires license and redistribution review"
+    }
+  ],
+  "skills": [
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/browser-reality-inspector/SKILL.md",
+      "gitBlobSha": "81e7ebc028298d5a0720e214115b5bd81fe9a3b5",
+      "name": "browser-reality-inspector",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/goalfix/SKILL.md",
+      "gitBlobSha": "226fb3282c12de1694b7b83ec72109ddc43c6886",
+      "name": "goalfix",
+      "kind": "skill",
+      "executionEligibility": "scoped-branch",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/humanizer/SKILL.md",
+      "gitBlobSha": "883a7bb684aab3cc31a742d9a1b98647996b161b",
+      "name": "humanizer",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/nvidia-capability-evaluation/SKILL.md",
+      "gitBlobSha": "7a1fb4820895c2f9eab85a1c7ad58680a08c88fa",
+      "name": "nvidia-capability-evaluation",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".agents/skills/ultrathink-devil/SKILL.md",
+      "gitBlobSha": "cc0c984751e2e7c010c62ed4c817603466448fb8",
+      "name": "ultrathink-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/evidence-decision-loop/SKILL.md",
+      "gitBlobSha": "db23ec07798195690234ae727937efeef95c2ed5",
+      "name": "evidence-decision-loop",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/goalfix/SKILL.md",
+      "gitBlobSha": "5aee5f9d64cc813f5ce2c3299c95209b5530c25b",
+      "name": "goalfix",
+      "kind": "skill",
+      "executionEligibility": "scoped-branch",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/juss-chief-ai/SKILL.md",
+      "gitBlobSha": "9718e7e89f8ec7ca13c7808d0e25d80c3c9f6dfe",
+      "name": "juss-chief-ai",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/playwright-proof/SKILL.md",
+      "gitBlobSha": "ac3f89b450e562e4e0f3897a24cb4aa7063d9a7a",
+      "name": "playwright-proof",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/pr-autopilot-triage/SKILL.md",
+      "gitBlobSha": "48becc7d6b52372f2e7e5c371055c50569ba7027",
+      "name": "pr-autopilot-triage",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/proof-led-publishing/SKILL.md",
+      "gitBlobSha": "1e104b45e6ea01a16b13e5edac8b2760b0218ad4",
+      "name": "proof-led-publishing",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/repo-truth/SKILL.md",
+      "gitBlobSha": "4b8849357189dda8427c29a9e0fd58a867e3eb52",
+      "name": "repo-truth",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/review-verify-merge/SKILL.md",
+      "gitBlobSha": "3f42d0159a61c27e0a4a20f8631869ab37e993cd",
+      "name": "review-verify-merge",
+      "kind": "skill",
+      "executionEligibility": "consequential-gated",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/sekret-bip-canon/SKILL.md",
+      "gitBlobSha": "2e1522b1bc503530fdecc908c1601b2f596af36d",
+      "name": "sekret-bip-canon",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/ultrathink-devil/SKILL.md",
+      "gitBlobSha": "cc0c984751e2e7c010c62ed4c817603466448fb8",
+      "name": "ultrathink-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": ".claude/skills/ultrathink/SKILL.md",
+      "gitBlobSha": "682d3196ce2004a7429aa0a36629cfeedb335f03",
+      "name": "ultrathink",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/chief-ai-machine",
+      "sourceHead": "ae6c366b0bc262ed61f01112ed44dd85f544324f",
+      "path": "skills/gmail-resolve/SKILL.md",
+      "gitBlobSha": "c39b5a5c5758d8e84ccf2d4e3d153b30a733a7fc",
+      "name": "gmail-resolve",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/change-genealogy-audit/SKILL.md",
+      "gitBlobSha": "3d79f0acbb8956538190eb91aab0334ed8c01225",
+      "name": "change-genealogy-audit",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-agent-handoff/SKILL.md",
+      "gitBlobSha": "5edf6150f90400af4dd6a96acc12ccd4bea34620",
+      "name": "control-room-agent-handoff",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-agent-router/SKILL.md",
+      "gitBlobSha": "29c95b0888ede17f69f9aa5a07ec2c3fad973305",
+      "name": "control-room-agent-router",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-cloudflare-agent-fleet/SKILL.md",
+      "gitBlobSha": "5131537d853429c925bcfbcbff00b78a37fb6b31",
+      "name": "control-room-cloudflare-agent-fleet",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-design-implementation/SKILL.md",
+      "gitBlobSha": "be251e41bda983d984b3e005f294b0bc6394bc9c",
+      "name": "control-room-design-implementation",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-figma-builder/SKILL.md",
+      "gitBlobSha": "6e23315a5dbfbfd4608ada5c371d8969b664edfd",
+      "name": "control-room-figma-builder",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-futureyou-leverage/SKILL.md",
+      "gitBlobSha": "cfcae1a7e3f0316c9f758550529ac07fd693f82b",
+      "name": "control-room-futureyou-leverage",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-incident-triage/SKILL.md",
+      "gitBlobSha": "6edaf7abedf48a77ab641246dbc7da85f939f6d6",
+      "name": "control-room-incident-triage",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-proof-ladder/SKILL.md",
+      "gitBlobSha": "55dcb155465d7959911d1ce6ee3ebe9a2d5362fa",
+      "name": "control-room-proof-ladder",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-repo-contract/SKILL.md",
+      "gitBlobSha": "5ff0ea47bfc6bdd29e94675eefc1a8cac71a3f6c",
+      "name": "control-room-repo-contract",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-skill-router/SKILL.md",
+      "gitBlobSha": "8712264b3a757c4734b9de41fa8c91b2321a0469",
+      "name": "control-room-skill-router",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/control-room-token-efficient-execution/SKILL.md",
+      "gitBlobSha": "987c54ae4fc1c57eddfd6bdca4ee3fad28d2039d",
+      "name": "control-room-token-efficient-execution",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/devil/SKILL.md",
+      "gitBlobSha": "59eeba6a21adf5194d31412c97f7b835a7ac3f00",
+      "name": "devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/fact-check-every-claim/SKILL.md",
+      "gitBlobSha": "90bf0e469ef9a00b701504271ec7f6a65e64e6f4",
+      "name": "fact-check-every-claim",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/figma-build-implement/SKILL.md",
+      "gitBlobSha": "b3a71bcc9a3e4af39ce4639b4fbd89181729b9ba",
+      "name": "figma-build-implement",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/founder-control-room-operator/SKILL.md",
+      "gitBlobSha": "0ce43c8dbb01dddcd02d0fec1cb0ff4bfc8d0b44",
+      "name": "founder-control-room-operator",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/l99-v21-transactional-authority/SKILL.md",
+      "gitBlobSha": "10eceef2936f997dbca119b544f221eb2101e506",
+      "name": "l99-v21-transactional-authority",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/outcome-first/SKILL.md",
+      "gitBlobSha": "d52cac7c03aab3000fe111e61cf480467cb1ab42",
+      "name": "outcome-first",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sales/SKILL.md",
+      "gitBlobSha": "7d22d0b4f3316b1712ad8ba3dfdf093775d46d4c",
+      "name": "sales",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/sauce-guard/SKILL.md",
+      "gitBlobSha": "4f94279ebe57cbace05fa5e36e25cd7c4cb594a2",
+      "name": "sauce-guard",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".agents/skills/truth-decay/SKILL.md",
+      "gitBlobSha": "8b787299706fc7db1051c04063f8c0303c01b476",
+      "name": "truth-decay",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md",
+      "gitBlobSha": "d6caae2daa4298faee5945dd2c0fbd2b94108614",
+      "name": "chatgpt-openai-developers-zapier-bridge",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/claude-zapier-founder-operator/SKILL.md",
+      "gitBlobSha": "35582f9866956e0ade62859bc69abac834f4f5bf",
+      "name": "claude-zapier-founder-operator",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/fact-check-every-claim/SKILL.md",
+      "gitBlobSha": "b082b975391b272502fc3dcb77f351de5703edb8",
+      "name": "fact-check-every-claim",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/goalfix/SKILL.md",
+      "gitBlobSha": "440bcecf6edc37226989f042e84f0bb0f0ca43df",
+      "name": "goalfix",
+      "kind": "skill",
+      "executionEligibility": "scoped-branch",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/truth-decay-audit/SKILL.md",
+      "gitBlobSha": "ba0758b52d5746a09b2868d3b6d06f6da7694a6b",
+      "name": "truth-decay-audit",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/ultrathink-devil/SKILL.md",
+      "gitBlobSha": "cc0c984751e2e7c010c62ed4c817603466448fb8",
+      "name": "ultrathink-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".ai/skills/unified-growth-inbox/SKILL.md",
+      "gitBlobSha": "d35cd2234d519b81dac198dc5ddb71bff6cd42d8",
+      "name": "unified-growth-inbox",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/goalfix/SKILL.md",
+      "gitBlobSha": "ad98549169946b5b69a9a073811eadb4669c8b1a",
+      "name": "goalfix",
+      "kind": "skill",
+      "executionEligibility": "scoped-branch",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/juss-chief-ai/SKILL.md",
+      "gitBlobSha": "e625a7fd7762a0cae8bd42853d6768b220ece538",
+      "name": "juss-chief-ai",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/makevideo/SKILL.md",
+      "gitBlobSha": "1bc4b55f7887c113377668c00996d48ef5cdff30",
+      "name": "makevideo",
+      "kind": "skill",
+      "executionEligibility": "media-generation",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/outcome-first/SKILL.md",
+      "gitBlobSha": "004a0a73cc48c121f1676dba08609cd159fc89d1",
+      "name": "outcome-first",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/playwright-proof/SKILL.md",
+      "gitBlobSha": "ac3f89b450e562e4e0f3897a24cb4aa7063d9a7a",
+      "name": "playwright-proof",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/proof-led-publishing/SKILL.md",
+      "gitBlobSha": "cf1baf9b672dfe7fc550388f60feaaf054d4c094",
+      "name": "proof-led-publishing",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/repo-truth/SKILL.md",
+      "gitBlobSha": "cd5061021f78b1cdd176bc669ac06bc9577cc3df",
+      "name": "repo-truth",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/review-verify-merge/SKILL.md",
+      "gitBlobSha": "3f42d0159a61c27e0a4a20f8631869ab37e993cd",
+      "name": "review-verify-merge",
+      "kind": "skill",
+      "executionEligibility": "consequential-gated",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/sekret-bip-canon/SKILL.md",
+      "gitBlobSha": "2e1522b1bc503530fdecc908c1601b2f596af36d",
+      "name": "sekret-bip-canon",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": ".claude/skills/ultrathink/SKILL.md",
+      "gitBlobSha": "682d3196ce2004a7429aa0a36629cfeedb335f03",
+      "name": "ultrathink",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "plugins/buffer-control/skills/buffer-control/SKILL.md",
+      "gitBlobSha": "af2375742db22f33a797bacff7107eebb986a0cc",
+      "name": "buffer-control",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "plugins/fcr-public/skills/fcr-public-workflows/SKILL.md",
+      "gitBlobSha": "41eda0048f9d86ced54b418df3c072a140fc1f92",
+      "name": "fcr-public-workflows",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/devil/SKILL.md",
+      "gitBlobSha": "ebb9a2331bfba80ac5e9497ce0cca015914576e9",
+      "name": "devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/fact-check-every-claim/SKILL.md",
+      "gitBlobSha": "18d44e2719aa21714faeb5ef6bf5c0403b9548aa",
+      "name": "fact-check-every-claim",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/outcome-first/SKILL.md",
+      "gitBlobSha": "b19d58afa39dcaa53e97243c684fcaaf4e0e289a",
+      "name": "outcome-first",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/portfolio-control-plane/SKILL.md",
+      "gitBlobSha": "8aed3f38145fc61d3ec5195e8444ddaf559a08fc",
+      "name": "portfolio-control-plane",
+      "kind": "skill",
+      "executionEligibility": "consequential-gated",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/product-design-gate/SKILL.md",
+      "gitBlobSha": "7836baac587f6213934dd53a9e816c4f5a181458",
+      "name": "product-design-gate",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/sales/SKILL.md",
+      "gitBlobSha": "7bfa980bcd00be89cd411d9ccc7454d1c1cc70f9",
+      "name": "sales",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/typescript-audit/SKILL.md",
+      "gitBlobSha": "151a278c6f003d0ede06acba752f2107d5674ba9",
+      "name": "typescript-audit",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/typescript-behavior-tests/SKILL.md",
+      "gitBlobSha": "aba94ababb70f729c34a542af48f5e1048484a6e",
+      "name": "typescript-behavior-tests",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/typescript-minimal-patch/SKILL.md",
+      "gitBlobSha": "e8525ec71bd9c3e89dfdcedbd3162e3fca938872",
+      "name": "typescript-minimal-patch",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/typescript-root-cause-debugger/SKILL.md",
+      "gitBlobSha": "f0ecad72df51ec5a0cfa97877d13aa727ac57142",
+      "name": "typescript-root-cause-debugger",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/typescript-strict-review/SKILL.md",
+      "gitBlobSha": "3c63ae2e80523370d538e6bd72c9f228c73cae50",
+      "name": "typescript-strict-review",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "skills/ultrathink-devil/SKILL.md",
+      "gitBlobSha": "cc0c984751e2e7c010c62ed4c817603466448fb8",
+      "name": "ultrathink-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-80-20/SKILL.md",
+      "gitBlobSha": "36ff07a75e44caf4b7684e9eddc1e060ea7087e0",
+      "name": "local-80-20",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-antiadvice/SKILL.md",
+      "gitBlobSha": "819d8588ba72f435153e135c7a673cd2303ba35d",
+      "name": "local-antiadvice",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-build/SKILL.md",
+      "gitBlobSha": "70ed7fb5244670e1e7895825ff3e81c6124185e9",
+      "name": "local-build",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-capability-mode-router/SKILL.md",
+      "gitBlobSha": "540282c9e07da93faf6e2011ef93b4d52af90c03",
+      "name": "local-capability-mode-router",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-cortex/SKILL.md",
+      "gitBlobSha": "3cc684afe649e954a5dc82b4f5feb94cb9b5cd93",
+      "name": "local-cortex",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-devil/SKILL.md",
+      "gitBlobSha": "fed9bcc2c1379a674feddfe27b85af9c5d11818c",
+      "name": "local-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-first-principles/SKILL.md",
+      "gitBlobSha": "d6b35d11d03fa6b28c68d3457a27534d08874edd",
+      "name": "local-first-principles",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-futureyou/SKILL.md",
+      "gitBlobSha": "d5350374d0925564ebc84691fc4246efdf608232",
+      "name": "local-futureyou",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-goalfix/SKILL.md",
+      "gitBlobSha": "466854235eeb7a029c3cebe5fa1f38a5f9e2e2fd",
+      "name": "local-goalfix",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-hormozi/SKILL.md",
+      "gitBlobSha": "35fc262a4747b8607cdf250099527dc2e6ab12bf",
+      "name": "local-hormozi",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-humanize/SKILL.md",
+      "gitBlobSha": "5fc6166d8090c6ca7feeec9f86f31e39f00090e6",
+      "name": "local-humanize",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-intent-repair-reader/SKILL.md",
+      "gitBlobSha": "8d9867abe343c5be5843b84be5ce7b15197670d5",
+      "name": "local-intent-repair-reader",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-lean-build-orchestrator/SKILL.md",
+      "gitBlobSha": "54d912543aa027dc841c530d073f9fb8bbd84471",
+      "name": "local-lean-build-orchestrator",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-minimal-token-protocol/SKILL.md",
+      "gitBlobSha": "e8c1b42efc8e5b1d2e0170d4bf2372d1875818d5",
+      "name": "local-minimal-token-protocol",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-moscow/SKILL.md",
+      "gitBlobSha": "e3c8f888757002ece60090d7e597f7fa4f3e0703",
+      "name": "local-moscow",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-prompts/SKILL.md",
+      "gitBlobSha": "f552b6b55e6f76e8679418dc45ced323ceb4f9c4",
+      "name": "local-prompts",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-regression-stagnation-guard/SKILL.md",
+      "gitBlobSha": "a35e5fa4256834231f588589397cf865f74aa092",
+      "name": "local-regression-stagnation-guard",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-runtime-kernel/SKILL.md",
+      "gitBlobSha": "3597261771abac7ebeaab866818cd3a82460bf9e",
+      "name": "local-runtime-kernel",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-socrates/SKILL.md",
+      "gitBlobSha": "96db3d9677fa18f82701f2268ce594866c3942d9",
+      "name": "local-socrates",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-truth-research-optimizer/SKILL.md",
+      "gitBlobSha": "66212a0ad9886293846b608d2418f1d21ee6e7e3",
+      "name": "local-truth-research-optimizer",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-truthmode/SKILL.md",
+      "gitBlobSha": "658accf770e5300da54d13a51cdf30c9def3ac88",
+      "name": "local-truthmode",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/founder-control-room",
+      "sourceHead": "c157e061ff7939591a6da4fc99ebf1e0b01045f6",
+      "path": "systems/skills/local-urlfix/SKILL.md",
+      "gitBlobSha": "ff1b93ec08fa1a64707d787d3b0aea3a92601277",
+      "name": "local-urlfix",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": ".claude/skills/goalfix/SKILL.md",
+      "gitBlobSha": "ad98549169946b5b69a9a073811eadb4669c8b1a",
+      "name": "goalfix",
+      "kind": "skill",
+      "executionEligibility": "scoped-branch",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "skills/artifact-template-creator-response/SKILL.md",
+      "gitBlobSha": "e011cf3e3a065fe19ac28c5f9ff90e97916007df",
+      "name": "artifact-template-creator-response",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "skills/browser-reality-inspector/SKILL.md",
+      "gitBlobSha": "f051514290025ca21f3b9b18117bfecd105a6399",
+      "name": "browser-reality-inspector",
+      "kind": "skill",
+      "executionEligibility": "verification",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "skills/evidence-decision-loop/SKILL.md",
+      "gitBlobSha": "0ac0179672664886430ba54eace0d242d88d0f4e",
+      "name": "evidence-decision-loop",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-80-20/SKILL.md",
+      "gitBlobSha": "36ff07a75e44caf4b7684e9eddc1e060ea7087e0",
+      "name": "local-80-20",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-antiadvice/SKILL.md",
+      "gitBlobSha": "819d8588ba72f435153e135c7a673cd2303ba35d",
+      "name": "local-antiadvice",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-build/SKILL.md",
+      "gitBlobSha": "70ed7fb5244670e1e7895825ff3e81c6124185e9",
+      "name": "local-build",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-capability-mode-router/SKILL.md",
+      "gitBlobSha": "540282c9e07da93faf6e2011ef93b4d52af90c03",
+      "name": "local-capability-mode-router",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-cortex/SKILL.md",
+      "gitBlobSha": "3cc684afe649e954a5dc82b4f5feb94cb9b5cd93",
+      "name": "local-cortex",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-devil/SKILL.md",
+      "gitBlobSha": "fed9bcc2c1379a674feddfe27b85af9c5d11818c",
+      "name": "local-devil",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-first-principles/SKILL.md",
+      "gitBlobSha": "d6b35d11d03fa6b28c68d3457a27534d08874edd",
+      "name": "local-first-principles",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-futureyou/SKILL.md",
+      "gitBlobSha": "d5350374d0925564ebc84691fc4246efdf608232",
+      "name": "local-futureyou",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-goalfix/SKILL.md",
+      "gitBlobSha": "466854235eeb7a029c3cebe5fa1f38a5f9e2e2fd",
+      "name": "local-goalfix",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-hormozi/SKILL.md",
+      "gitBlobSha": "35fc262a4747b8607cdf250099527dc2e6ab12bf",
+      "name": "local-hormozi",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-humanize/SKILL.md",
+      "gitBlobSha": "5fc6166d8090c6ca7feeec9f86f31e39f00090e6",
+      "name": "local-humanize",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-intent-repair-reader/SKILL.md",
+      "gitBlobSha": "8d9867abe343c5be5843b84be5ce7b15197670d5",
+      "name": "local-intent-repair-reader",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-lean-build-orchestrator/SKILL.md",
+      "gitBlobSha": "54d912543aa027dc841c530d073f9fb8bbd84471",
+      "name": "local-lean-build-orchestrator",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-minimal-token-protocol/SKILL.md",
+      "gitBlobSha": "e8c1b42efc8e5b1d2e0170d4bf2372d1875818d5",
+      "name": "local-minimal-token-protocol",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-moscow/SKILL.md",
+      "gitBlobSha": "e3c8f888757002ece60090d7e597f7fa4f3e0703",
+      "name": "local-moscow",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-prompts/SKILL.md",
+      "gitBlobSha": "f552b6b55e6f76e8679418dc45ced323ceb4f9c4",
+      "name": "local-prompts",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-regression-stagnation-guard/SKILL.md",
+      "gitBlobSha": "a35e5fa4256834231f588589397cf865f74aa092",
+      "name": "local-regression-stagnation-guard",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-runtime-kernel/SKILL.md",
+      "gitBlobSha": "3597261771abac7ebeaab866818cd3a82460bf9e",
+      "name": "local-runtime-kernel",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-socrates/SKILL.md",
+      "gitBlobSha": "96db3d9677fa18f82701f2268ce594866c3942d9",
+      "name": "local-socrates",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-truth-research-optimizer/SKILL.md",
+      "gitBlobSha": "66212a0ad9886293846b608d2418f1d21ee6e7e3",
+      "name": "local-truth-research-optimizer",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-truthmode/SKILL.md",
+      "gitBlobSha": "658accf770e5300da54d13a51cdf30c9def3ac88",
+      "name": "local-truthmode",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    },
+    {
+      "repo": "jussray/PromptOS",
+      "sourceHead": "3e024edf7e123eef88753b4f140cf3c97dfa28df",
+      "path": "systems/skills/local-urlfix/SKILL.md",
+      "gitBlobSha": "ff1b93ec08fa1a64707d787d3b0aea3a92601277",
+      "name": "local-urlfix",
+      "kind": "skill",
+      "executionEligibility": "advisory",
+      "executionAuthorized": false,
+      "publicationCleared": false,
+      "exportMode": "catalog-reference-only"
+    }
+  ],
+  "reviewedForPublication": false
+}
