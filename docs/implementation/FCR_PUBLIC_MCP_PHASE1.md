@@ -14,6 +14,10 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
   founder portfolio list, raw repository patches, credentials, or cross-project reads.
 - Authenticated membership changes control access. A caller-supplied project ID
   cannot expand authority, and unknown/foreign IDs share a generic denial.
+- Tenant SELECTs use a per-request Supabase publishable-key client carrying the
+  already-verified OAuth bearer. The service-role client is not used for public
+  tenant reads, so the final migration's `auth.uid()` RLS remains load-bearing;
+  explicit tenant/project filters remain defense-in-depth.
 - Opt-in activation only: `FCR_PUBLIC_MCP_ENABLED=true` **after** independent proof.
 
 ## Source-level environment configuration (not production proof)
@@ -21,7 +25,8 @@ connected, sanitized project records, without exposing FCR's founder portfolio.
 - `FCR_PUBLIC_MCP_OAUTH_CLIENT_IDS`: allowlisted OAuth client identifiers,
   e.g. a verified provided client or verified CIMD URL; never copy passwords or secrets.
 - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and service-role key continue to be
-  server-held bindings. The public client must never receive service-role access.
+  server-held bindings. Public tenant SELECTs use only the publishable key plus
+  the verified OAuth bearer; the service-role key is never used for those reads.
 - `GET /.well-known/oauth-protected-resource/mcp/public` advertises the issuer.
 
 ## Blockers BEFORE enabling

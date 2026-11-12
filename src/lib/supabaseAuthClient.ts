@@ -33,3 +33,25 @@ export function createSupabaseAuthClient() {
  * Request paths that call setSession or refreshSession must use the factory.
  */
 export const supabaseAuth = createSupabaseAuthClient();
+
+/**
+ * Public tenant data reads must execute as the already-verified OAuth user so
+ * Postgres RLS remains load-bearing. This client uses only the publishable key;
+ * it never receives or falls back to the service-role credential.
+ */
+export function createSupabaseBearerClient(accessToken: string) {
+  const token = accessToken.trim();
+  if (!token || /\s/.test(token)) {
+    throw new Error('Supabase bearer token must be one non-empty token');
+  }
+  return createClient(resolvedSupabaseUrl, resolvedPublishableAuthKey, {
+    global: {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
