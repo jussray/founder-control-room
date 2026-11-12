@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve current workflow, Cloudflare, Shopify, founder-merge, Chief ruleset reconciliation, content-evidence, public-discovery, and cross-repository StoryEngine federation truth boundaries without converting source, analytics, crawler policy, peer pinning, provider observation, reconciliation planning, provider configuration, mergeability, candidate/browser proof, or growth recommendations into publication, production, provider-mutation, merge, deploy, spend, or external-contact authority.",
+  "purpose": "Repin the FCR Playwright StoryEngine federation peer to independently observed StoryEngine main after a forward one-commit receipt-only transition.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -10,6 +10,7 @@
     "merge-authority",
     "workflow-authority",
     "truth-governance",
+    "capability-authority",
     "founder-permission-authority"
   ],
   "changes": [
@@ -17,6 +18,12 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+      ]
+    },
+    {
+      "path": ".github/workflows/pr-continuity.yml",
+      "claims": [
+        "`.github/workflows/pr-continuity.yml` names the exact-head job from its event: the pull_request run keeps the name `PR Continuity Exact-Head Gate`, and the pull_request_target copy is labeled as not gating so it cannot shadow the real gate. Trigger set, job condition, steps, and permissions are unchanged; a skipped pull_request_target copy is not evidence of gate success or failure."
       ]
     },
     {
@@ -385,6 +392,7 @@
       "claims": [
         "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
         "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must classify every mandatory ULTRATHINK governance companion under `skills/` as truth-sensitive and record these Markdown paths in changed documentation, rejecting future rule changes lacking path-bound receipt claims and substantive README/truth-decay refresh.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
         "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
@@ -394,6 +402,88 @@
       "path": "tools/zapier/founder-content-outcome-contract.cjs",
       "claims": [
         "`tools/zapier/founder-content-outcome-contract.cjs` must bind founder-content metrics to the exact observed network, lane, account identity, connector identity, and coverage state; out-of-scope metrics must remain UNKNOWN, cross-account metric donation is forbidden, and these receipts can never grant publication, provider-write, merge, deploy, spend, or external-contact authority."
+      ]
+    },
+    {
+      "path": "skills/ultrathink-attack-godmode/SKILL.md",
+      "claims": [
+        "`skills/ultrathink-attack-godmode/SKILL.md` must preserve the canonical `.ai/skills/goalfix/SKILL.md` ownership of `/goalfix`, avoid duplicate activations, and never treat an operator shorthand, skill file, or green check as merge, deploy, provider, or production authority.",
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not advertise `/repair-to-proof` or the unprefixed `repair-to-proof` as an activation or frontmatter trigger: `skills/repair-to-proof/SKILL.md` alone handles the proof command, with an explicit non-authorizing handoff from investigative ULTRATHINK work.",
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not register `/ultrathink`, which is owned by `.claude/skills/ultrathink/SKILL.md` in Claude Code; this companion only accepts its distinct `/godmode` or `attack/godmode` activation or an explicitly authorized canonical handoff.",
+        "`skills/ultrathink-attack-godmode/SKILL.md` must not advertise `implant fixes` or `fix merge review` as activation phrases; only `/godmode` and `attack/godmode` are routed by the companion, and merge review belongs to `repair-to-proof`.",
+        "The existing repair companion requires 5W1H, evidence-scoped accuracy, 80/20 cause selection, paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes, hostile candidate handling and exact-head Playwright for user-facing browser-path repairs (other layers need layer-appropriate read-back); none grants effect, review, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "skills/repair-to-proof/SKILL.md",
+      "claims": [
+        "`skills/repair-to-proof/SKILL.md` must require exact-head CI evidence, independent review, founder-final candidate approval and post-action provider readback; companion skill text cannot grant a repository merge, deployment, or verified production outcome."
+      ]
+    },
+    {
+      "path": "skills/continuity-proof-ledger/SKILL.md",
+      "claims": [
+        "`skills/continuity-proof-ledger/SKILL.md` must treat fingerprints, continuity cookies, and predecessor receipts as resumable evidence pointers only; they never authenticate the founder, mint permission, or transfer verification across moved heads."
+      ]
+    },
+    {
+      "path": "skills/ultrathink-suite/README.md",
+      "claims": [
+        "`skills/ultrathink-suite/README.md` must route `/goalfix` through `.ai/skills/goalfix/SKILL.md` as canonical owner, treat ULTRATHINK skills as optional governed companions, and never grant a second execution authority or falsely certify runtime installation.",
+        "`skills/ultrathink-suite/README.md` must route exact `/ultrathink` to the existing `.claude/skills/ultrathink/SKILL.md` entrypoint in Claude Code rather than direct activation of a second ULTRATHINK execution contract.",
+        "The existing repair companion requires 5W1H, evidence-scoped accuracy, 80/20 cause selection, paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes, hostile candidate handling and exact-head Playwright for user-facing browser-path repairs (other layers need layer-appropriate read-back); none grants effect, review, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "skills/urlfix/SKILL.md",
+      "claims": [
+        "`skills/urlfix/SKILL.md` must keep live-site repair evidence-bound: ownership and runtime identity are prerequisites to source mutation, external or unowned URLs remain observation-only, the same failing browser path must be rerun after a repair, and URLFIX itself never grants merge, deploy, provider-write, payment, publication, credential, or production-mutation authority.",
+        "`skills/urlfix/SKILL.md` requires DNS-resolved public-address checks before every browser request (including redirects and sub-resources) and artifact hygiene: synthetic identities only, no persisted cookies, headers, bodies or private text, and BLOCKED when redaction cannot be verified. `scripts/external-site-snapshot.mjs` enforces the same destination guard in code and fails closed.",
+        "`scripts/external-site-snapshot.mjs` walks the top-level redirect chain one hop at a time with redirect handling disabled, validating each Location (literal and DNS public-address checks) before navigating to the validated final URL. Sub-resource redirects and DNS rebinding between the check and the browser connection remain documented limitations, not covered guarantees.",
+        "Set-Cookie values from validated redirect hops are sent back to later validated hops on the same host during the walk, then carried into the ephemeral browser context; they are host-bound, never widened by Domain attributes, scoped to the response URL's directory when Path is absent (RFC 6265 default-path), path-matched only at '/' boundaries and sent longest path first, dropped when expired by Max-Age or Expires with Max-Age taking precedence, and never written to reports or artifacts."
+      ]
+    },
+    {
+      "path": "src/lib/fcrSkillRouter.ts",
+      "claims": [
+        "`src/lib/fcrSkillRouter.ts` must require repository context before any mutating URLFIX or GODMODE repair can reach runtime discovery; the GODMODE branch fails closed without repository proof and grants no execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "src/lib/fcrStandingCommandRegistry.ts",
+      "claims": [
+        "`src/lib/fcrStandingCommandRegistry.ts` must route URLFIX only for an actual https URL or explicit live-site wording (website, live site, site url, deployed url) with repair or verification intent; a repository browser-test or audit request cannot promote URLFIX into a policy-required live-runtime capability."
+      ]
+    },
+    {
+      "path": "src/founder-os-lab/registry.ts",
+      "claims": [
+        "`src/founder-os-lab/registry.ts` must register the GODMODE, repair-to-proof and continuity-proof-ledger companions as founder-control-room workflows with mayExecute false; registration cannot widen execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "src/founder-os-lab/contracts.ts",
+      "claims": [
+        "`src/founder-os-lab/contracts.ts` must keep the GODMODE, repair-to-proof and continuity-proof-ledger companion identifiers within the governed skill contract; the identifiers cannot widen execution, merge, deploy or provider authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-ai-skill-contract.mjs",
+      "claims": [
+        "The AI-skill verifier must reject missing paired hostile-PR workflow instructions; this static instruction-presence gate cannot prove agent compliance, runtime adoption, independent review, tests, Playwright or production outcome."
+      ]
+    },
+    {
+      "path": "config/cloudflare-logpush.portfolio.json",
+      "claims": [
+        "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-logpush.yml",
+      "claims": [
+        "`.github/workflows/cloudflare-logpush.yml` must keep pull-request checks non-mutating and must require exact-current-main binding plus an auditable founder approval reference before any provider apply; workflow green cannot substitute for provider readback or destination-side delivery evidence."
       ]
     },
     {
@@ -627,6 +717,42 @@
       "path": "src/lib/xFirstPartyAdapter.ts",
       "claims": [
         "`src/lib/xFirstPartyAdapter.ts` must require authenticated X user-context identity to match the server-held numeric account before any POST, must verify returned post ID, author, exact text and creation timestamp before claiming publication, and must not leak tokens or auto-retry uncertain writes."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1730f316b74bdb9b638312c57987dc2897953948` only as the new exact peer evidence subject after a forward four-commit, zero-behind transition from `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5` that includes runtime code; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must state that the StoryEngine peer `1730f316b74bdb9b638312c57987dc2897953948` transition changes runtime code and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 11, 2026 StoryEngine peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1a4a581687481b2ec2025539efae02032bef5287` only as the new exact peer evidence subject after a forward one-commit, zero-behind receipt-only transition from `1730f316b74bdb9b638312c57987dc2897953948`; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must state that the StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287` transition is receipt-only and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the later November 11, 2026 StoryEngine receipt-only peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes."
       ]
     },
     {

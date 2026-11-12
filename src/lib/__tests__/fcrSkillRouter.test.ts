@@ -241,6 +241,125 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredTools).toContain('github');
   });
 
+
+  it('binds explicit Attack/godmode to the non-authorizing companion skill', () => {
+    const goal = 'Attack/godmode repair this repository and prove the exact result.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.missingPolicyCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['ultrathink-attack-godmode'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(ready.requiredProof).toContain('action-specific authority, approval, rollback, and execution receipt');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+
+  it('makes natural-language URL repair intent policy-required before Chief plan validation', () => {
+    const goal = 'Test this website URL in the browser, find issues, and repair verified defects.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('urlfix');
+    expect(blocked.missingPolicyCapabilityIds).toContain('urlfix');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['urlfix'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(ready.requiredProof.join(' ')).toMatch(/ownership and live runtime identity/);
+    expect(ready.requiredProof.join(' ')).toMatch(/same failing browser path/);
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context before a mutating GODMODE repair can reach runtime discovery', () => {
+    const goal = '/godmode fix this';
+
+    const withoutRepository = route(goal, 'write', ['ultrathink-attack-godmode']);
+    expect(withoutRepository.status).not.toBe('ready_for_runtime_discovery');
+    expect(withoutRepository.executionAllowed).toBe(false);
+
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+    const withRepository = route(goal, 'write', ['ultrathink-attack-godmode'], { repository });
+    expect(withRepository.executionAllowed).toBe(false);
+  });
+
+  it('routes /urlfix through Playwright, ownership proof, and same-path regression proof', () => {
+    const goal = '/urlfix https://foundercontrolroom.org repair verified browser defects.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('urlfix');
+    expect(blocked.missingPolicyCapabilityIds).toContain('urlfix');
+    expect(blocked.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['urlfix'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(ready.requiredProof.join(' ')).toMatch(/ownership and live runtime identity/);
+    expect(ready.requiredProof.join(' ')).toMatch(/same failing browser path/);
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('does not read command aliases inside URL path segments', () => {
+    const decision = route('Test https://example.com/receipt in the browser and repair verified defects.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('continuity-proof-ledger');
+  });
+
+  it('ignores GODMODE and other markers that appear only inside URLs', () => {
+    const decision = route('Test https://example.com/godmode and repair the issue in the browser.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('ultrathink-attack-godmode');
+  });
+
+  it('requires repository context for GODMODE regardless of action', () => {
+    const review = route('/godmode audit this implementation.', 'review', ['ultrathink-attack-godmode']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context for repair-to-proof regardless of action', () => {
+    const review = route('/repair-to-proof release proof.', 'review', ['repair-to-proof']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context before a mutating repair-to-proof route is accepted', () => {
+    const ready = route('repair-to-proof confirm the exact head.', 'write', ['repair-to-proof']);
+    expect(ready.status).not.toBe('ready_for_runtime_discovery');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('requires the proof and continuity companions when they are explicitly named', () => {
+    for (const [goal, skill] of [
+      ['/repair-to-proof confirm the exact head.', 'repair-to-proof'],
+      ['/continuity record the handoff state.', 'continuity-proof-ledger'],
+      ['/receipt record the handoff state.', 'continuity-proof-ledger'],
+    ] as const) {
+      const decision = route(goal, 'write', ['juss-chief-ai']);
+      expect(decision.policyRequiredCapabilityIds).toContain(skill);
+      expect(decision.missingPolicyCapabilityIds).toContain(skill);
+      expect(decision.status).toBe('blocked');
+    }
+  });
+
+  it('honors a leading unprefixed repair-to-proof but not prose mentions', () => {
+    const blocked = route('repair-to-proof confirm the exact head.', 'write', ['juss-chief-ai']);
+    expect(blocked.policyRequiredCapabilityIds).toContain('repair-to-proof');
+    expect(blocked.status).toBe('blocked');
+
+    const prose = route('Yesterday the repair-to-proof run was discussed in the review notes.', 'write', ['juss-chief-ai']);
+    expect(prose.policyRequiredCapabilityIds).not.toContain('repair-to-proof');
+  });
+
   it('requires explicitly named skills to be present in the Chief AI plan', () => {
     const goal = '/goalfix repair this regression.';
     const decision = route(goal, 'write', ['juss-chief-ai']);
