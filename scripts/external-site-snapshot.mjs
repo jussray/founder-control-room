@@ -91,21 +91,43 @@ export function defaultCookiePath(requestUrl) {
 
 // Parses one Set-Cookie line. Domain is deliberately ignored so scope stays host-bound.
 // Without a Path attribute the cookie is scoped to the response URL's directory, as a browser would.
-export function parseSetCookie(raw, requestUrl) {
+// Expiry follows RFC 6265 5.2.1-5.2.2 and 5.3: Max-Age wins over Expires; a past or zero
+// lifetime marks the cookie expired. expiresAt is epoch seconds, or undefined for a session cookie.
+export function parseSetCookie(raw, requestUrl, nowMs = Date.now()) {
   const [pair, ...attrs] = String(raw).split(';').map((x) => x.trim());
   const eq = pair.indexOf('=');
   if (eq <= 0) return null;
-  const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), path: defaultCookiePath(requestUrl), secure: false, httpOnly: false, expired: false };
+  const cookie = { name: pair.slice(0, eq), value: pair.slice(eq + 1), path: defaultCookiePath(requestUrl), secure: false, httpOnly: false, expired: false, expiresAt: undefined };
+  let maxAge;
+  let expiresMs;
   for (const a of attrs) {
     const [k, ...rest] = a.split('=');
-    const key = k.toLowerCase();
-    const val = rest.join('=');
+    const key = k.trim().toLowerCase();
+    const val = rest.join('=').trim();
     if (key === 'path' && val.startsWith('/')) cookie.path = val;
     else if (key === 'httponly') cookie.httpOnly = true;
     else if (key === 'secure') cookie.secure = true;
-    else if (key === 'max-age' && Number(val) <= 0) cookie.expired = true;
+    else if (key === 'max-age' && /^-?\d+$/.test(val)) maxAge = Number(val);
+    else if (key === 'expires') {
+      const t = Date.parse(val);
+      if (!Number.isNaN(t)) expiresMs = t;
+    }
+  }
+  if (maxAge !== undefined) {
+    if (maxAge <= 0) cookie.expired = true;
+    else cookie.expiresAt = Math.floor(nowMs / 1000) + maxAge;
+  } else if (expiresMs !== undefined) {
+    if (expiresMs <= nowMs) cookie.expired = true;
+    else cookie.expiresAt = Math.floor(expiresMs / 1000);
   }
   return cookie;
+}
+
+// RFC 6265 5.1.4 path-match: exact, or a prefix that ends at a '/' boundary.
+export function cookiePathMatches(requestPath, cookiePath) {
+  if (requestPath === cookiePath) return true;
+  if (!requestPath.startsWith(cookiePath)) return false;
+  return cookiePath.endsWith('/') || requestPath[cookiePath.length] === '/';
 }
 
 // Cookie header for the next validated hop: host-only, path-prefix, and Secure-aware.
@@ -116,7 +138,8 @@ function cookieHeaderFor(jar, host, urlString) {
   for (const c of jar.values()) {
     if (c.host !== host) continue;
     if (c.secure && !isSecure) continue;
-    if (!pathname.startsWith(c.path)) continue;
+    if (!cookiePathMatches(pathname, c.path)) continue;
+    if (c.expiresAt !== undefined && c.expiresAt * 1000 <= Date.now()) continue;
     pairs.push(`${c.name}=${c.value}`);
   }
   return pairs.join('; ');
@@ -181,6 +204,7 @@ export function cookiesFromWalk(walk) {
     path: c.path,
     secure: c.secure,
     httpOnly: c.httpOnly,
+    ...(c.expiresAt !== undefined ? { expires: c.expiresAt } : {}),
   }));
 }
 

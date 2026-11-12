@@ -165,3 +165,41 @@ test('a cookie without Path is scoped to the response directory, not the whole h
   assert.equal(seen[1].cookie, null);
   assert.equal(cookiesFromWalk(walk).find((c) => c.name === 'sid').path, '/account');
 });
+
+import { cookiePathMatches } from '../external-site-snapshot.mjs';
+
+test('cookie paths match only at directory boundaries', async () => {
+  assert.equal(cookiePathMatches('/account', '/account'), true);
+  assert.equal(cookiePathMatches('/account/x', '/account'), true);
+  assert.equal(cookiePathMatches('/accounting', '/account'), false);
+  assert.equal(cookiePathMatches('/anything', '/'), true);
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://a.example.com/account/start') return { status: 302, headers: { get: () => 'https://a.example.com/accounting', getSetCookie: () => ['sid=1; Path=/account'] }, body: null };
+    return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+  };
+  const walk = await walkRedirects('https://a.example.com/account/start', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  assert.equal(seen[1].cookie, null);
+});
+
+test('Expires drops a cookie like Max-Age does, and Max-Age wins over Expires', async () => {
+  const now = Date.parse('2026-11-12T00:00:00Z');
+  assert.equal(parseSetCookie('sid=old; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/', 'https://a.example.com/', now).expired, true);
+  const future = parseSetCookie('sid=1; Expires=Fri, 01 Jan 2100 00:00:00 GMT', 'https://a.example.com/', now);
+  assert.equal(future.expired, false);
+  assert.equal(future.expiresAt, Date.parse('2100-01-01T00:00:00Z') / 1000);
+  assert.equal(parseSetCookie('sid=1; Max-Age=60; Expires=Thu, 01 Jan 1970 00:00:00 GMT', 'https://a.example.com/', now).expired, false);
+  assert.equal(parseSetCookie('sid=1; Max-Age=0; Expires=Fri, 01 Jan 2100 00:00:00 GMT', 'https://a.example.com/', now).expired, true);
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://a.example.com/') return { status: 302, headers: { get: () => 'https://a.example.com/b', getSetCookie: () => ['sid=1; Path=/'] }, body: null };
+    if (url === 'https://a.example.com/b') return { status: 302, headers: { get: () => 'https://a.example.com/c', getSetCookie: () => ['sid=old; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/'] }, body: null };
+    return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+  };
+  const walk = await walkRedirects('https://a.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(seen[2].cookie, null);
+  assert.equal(cookiesFromWalk(walk).find((c) => c.name === 'sid'), undefined);
+});
