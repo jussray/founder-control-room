@@ -203,3 +203,16 @@ test('Expires drops a cookie like Max-Age does, and Max-Age wins over Expires', 
   assert.equal(seen[2].cookie, null);
   assert.equal(cookiesFromWalk(walk).find((c) => c.name === 'sid'), undefined);
 });
+
+test('same-name cookies are sent most specific path first, as a browser orders them', async () => {
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url, cookie: init?.headers?.cookie ?? null });
+    if (url === 'https://a.example.com/') return { status: 302, headers: { get: () => 'https://a.example.com/account/step', getSetCookie: () => ['sid=root; Path=/'] }, body: null };
+    if (url === 'https://a.example.com/account/step') return { status: 302, headers: { get: () => 'https://a.example.com/account/final', getSetCookie: () => ['sid=account; Path=/account'] }, body: null };
+    return { status: 200, headers: { get: () => null, getSetCookie: () => [] }, body: null };
+  };
+  const walk = await walkRedirects('https://a.example.com/', { fetchFn, lookupFn: publicLookup });
+  assert.equal(walk.ok, true);
+  assert.equal(seen[2].cookie, 'sid=account; sid=root');
+});

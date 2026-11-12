@@ -140,9 +140,11 @@ function cookieHeaderFor(jar, host, urlString) {
     if (c.secure && !isSecure) continue;
     if (!cookiePathMatches(pathname, c.path)) continue;
     if (c.expiresAt !== undefined && c.expiresAt * 1000 <= Date.now()) continue;
-    pairs.push(`${c.name}=${c.value}`);
+    pairs.push(c);
   }
-  return pairs.join('; ');
+  // RFC 6265 5.4 step 2: longer paths first; the stable sort keeps creation order for ties.
+  pairs.sort((a, b) => b.path.length - a.path.length);
+  return pairs.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
 // Walks the top-level redirect chain one hop at a time with redirect:'manual', so every
