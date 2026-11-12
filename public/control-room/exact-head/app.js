@@ -64,8 +64,9 @@
     for(const [name,key] of WITNESSES){
       const source=observed && typeof observed==='object' ? observed[key] : null;
       const identity=typeof source?.subjectSha==='string' ? source.subjectSha : null;
-      const status=source?.status==='PASS' && identity && identity===d?.exact?.headSha ? 'PASS' :
-        source?.status==='STALE' || (identity && identity!==d?.exact?.headSha) ? 'STALE' :
+      const moved=d && (d.live?.headMatches!==true || d.live?.baseMatches!==true);
+      const status=source?.status==='STALE' || (identity && (identity!==d?.exact?.headSha || moved)) ? 'STALE' :
+        source?.status==='PASS' && identity && identity===d?.exact?.headSha && !moved ? 'PASS' :
         source?.status==='FAIL' || source?.status==='BLOCKED' ? 'BLOCKED' : 'UNKNOWN';
       const row=mk('div','witness'),top=mk('div','witness-top');
       top.append(mk('strong','',name),mk('b',status.toLowerCase(),status));
@@ -100,7 +101,7 @@
     const gates=el('gates');clear(gates);for(const [k,v] of [['GitHub checks',d.gate.observedChecksPassed?'PASS (PARTIAL)':'BLOCKED'],['Required rulesets','UNKNOWN'],['FCR founder approval','NOT GRANTED'],['Cloudflare production','UNKNOWN'],['Supabase / runtime','UNKNOWN']]){
       const row=mk('div','gate');row.append(mk('span','',k),mk('b','',v));gates.append(row)}
     el('next').textContent=d.nextReversibleFix;const bs=el('blockers');clear(bs);for(const b of d.blockers)bs.append(mk('li','',b));
-    el('source').textContent=d.evidenceStatus==='partial_current'?'PARTIAL':d.evidenceStatus==='stale'?'STALE':'UNKNOWN';
+    el('source').textContent=d.evidenceStatus==='partial_current'?'PARTIAL':d.live?.headMatches===false||d.live?.baseMatches===false?'STALE':'UNKNOWN';
     message('Observed '+new Date(d.observedAt).toLocaleString()+'. Release authority remains blocked.');
   }
   function records(){const root=el('fields');for(const name of FIELDS){const box=mk('div'),label=mk('label','',name),area=mk('textarea');area.id='n-'+name.replaceAll(' ','_');label.htmlFor=area.id;area.rows=3;area.maxLength=2500;area.placeholder='Verified / inferred / unknown';area.oninput=()=>{note[name]=area.value};box.append(label,area);root.append(box)}
