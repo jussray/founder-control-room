@@ -100,11 +100,11 @@ A caller cannot turn deterministic review off, weaken P2 handling, substitute mo
 
 ### Current native GitHub human-review phase
 
-The canonical **current** provider-governance target is `founder-plus-independent`. GitHub's pull-request membrane must require **one independent human approving review** in addition to deterministic review and authenticated Founder Final. Code Owner and last-push review remain required by the existing provider implementation. When no eligible non-owner reviewer is available, governance is NOT_READY rather than silently lowering this floor.
+The canonical **current** provider-governance target is `founder-plus-independent`. GitHub's pull-request membrane must require **one independent human approving review** in addition to deterministic review and authenticated Founder Final. Last-push approval remains required, while Code Owner review is disabled until a legitimate independent CODEOWNERS owner is configured. When no eligible non-owner reviewer is available, governance is NOT_READY rather than silently lowering this floor.
 
 This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
 
-A future count increase may only strengthen independent review. The provider must preserve Code Owner review, last-push approval and every existing machine, freshness, CodeQL, founder-final and rollback boundary.
+A future count increase may only strengthen independent review. The provider must preserve last-push approval and every existing machine, freshness, CodeQL, founder-final and rollback boundary, without inventing Code Owner authority.
 
 Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the one-independent-review phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
 

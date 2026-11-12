@@ -34,7 +34,7 @@ function canonicalRuleset(overrides = {}) {
         type: 'pull_request',
         parameters: {
           dismiss_stale_reviews_on_push: true,
-          require_code_owner_review: true,
+          require_code_owner_review: false,
           require_last_push_approval: true,
           required_approving_review_count: 1,
           required_review_thread_resolution: true,
@@ -114,7 +114,7 @@ test('canonical FCR governance requires independent approval and preserves zero-
   assert.deepEqual(review.ruleTypes, ['code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
   assert.equal(review.requiredApprovingReviewCount, 1);
   assert.equal(review.dismissStaleReviewsOnPush, true);
-  assert.equal(review.requireCodeOwnerReview, true);
+  assert.equal(review.requireCodeOwnerReview, false);
   assert.equal(review.requireLastPushApproval, true);
   assert.equal(review.requiredReviewThreadResolution, true);
   assert.equal(review.strictRequiredStatusChecks, false);
@@ -172,7 +172,7 @@ test('future-team phase is representable without weakening any machine or provid
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const future = rulesetSnapshot(futureTeamRuleset(), 'main', 'main');
   assert.equal(future.requiredApprovingReviewCount, 2);
-  assert.equal(future.requireCodeOwnerReview, true);
+  assert.equal(future.requireCodeOwnerReview, false);
   assert.equal(future.requireLastPushApproval, true);
   assert.equal(canonicalFloorSatisfied(future, expectedBypass, 2), true);
   assert.equal(codeQLSecurityFloorSatisfied(future), true);
@@ -205,13 +205,13 @@ test('review membrane requires the exact phase flags and exact CodeQL security f
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
 
   const unexpectedCodeOwner = canonicalRuleset();
-  unexpectedCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  unexpectedCodeOwner.rules[0].parameters.require_code_owner_review = true;
   const unexpectedCodeOwnerSnapshot = rulesetSnapshot(unexpectedCodeOwner, 'main', 'main');
-  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, false);
+  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, true);
   assert.equal(canonicalFloorSatisfied(unexpectedCodeOwnerSnapshot, expectedBypass), false);
 
   const futureMissingCodeOwner = futureTeamRuleset();
-  futureMissingCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  futureMissingCodeOwner.rules[0].parameters.require_code_owner_review = true;
   assert.equal(
     canonicalFloorSatisfied(rulesetSnapshot(futureMissingCodeOwner, 'main', 'main'), expectedBypass, 2),
     false,

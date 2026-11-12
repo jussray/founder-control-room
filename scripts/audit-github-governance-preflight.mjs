@@ -173,7 +173,7 @@ export function canonicalFloorSatisfied(
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
     && snapshot.dismissStaleReviewsOnPush === true
-    && snapshot.requireCodeOwnerReview === requireNativeHumanReview
+    && snapshot.requireCodeOwnerReview === false
     && snapshot.requireLastPushApproval === requireNativeHumanReview
     && snapshot.requiredReviewThreadResolution === true
     && snapshot.strictRequiredStatusChecks === false

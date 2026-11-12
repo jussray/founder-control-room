@@ -238,7 +238,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-plus-independent; one native human approval plus Code Owner and last-push review required',
+      'Human review phase: founder-plus-independent; one independent human approval plus last-push review required (no CODEOWNERS file)',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',
