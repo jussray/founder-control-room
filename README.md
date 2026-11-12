@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 1, 2026: repository-owned Actions Mail Audit candidate
+
+The existing draft PR #965 exports an on-demand GitHub Actions notification auditor as a repository skill and Copilot agent. Its bounded `.github/skills/actions-mail-audit/scripts/triage.mjs` reads a GitHub run and current branch head, distinguishes stale failures from exact-head failures, and treats GitGuardian messages as **unverified security signals** even if unrelated CI is green. The optional Gmail adapter validates a separately authorized account, uses Gmail read-only scope, queries Inbox/Spam/Trash, and emits sanitized metadata; it does not export email bodies, change message state, or reuse an existing reply/send grant.
+
+The repository-owned `.github/workflows/actions-mail-audit-monitor.yml` defines an hourly schedule that is **off unless** `FCR_GMAIL_AUDIT_ENABLED=true` and the code is on trusted `main`. The OAuth grants, protected secrets, and live scheduled execution have not been independently verified. CI success proves only the candidate contract tests, **not** mailbox access, organization-wide incident coverage, production activation, automatic repair, or delivery to the public UI. FCR's existing verified GitHub webhook evidence remains the provider event authority. Do not merge, activate, or treat an email as proof without separate current-head, provider, and review gates.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.

@@ -288,6 +288,22 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 
 ---
 
+## FCR Actions Mail Audit (read-only, inactive until enabled)
+
+The existing PR #965 includes `.github/workflows/actions-mail-audit-monitor.yml` as a **repository-owned** hourly schedule. Its job executes only on trusted `main` when the repository **variable** `FCR_GMAIL_AUDIT_ENABLED` is explicitly `true`. This is a future activation requirement, not proof that a Gmail grant, secret value, schedule, mailbox read, or production monitoring exists. The associated PR contract tests run separately without production credentials.
+
+The following five **dedicated** Actions secrets are referenced by the monitor. Names may be present in source even if no secret exists at GitHub. Each mailbox grant must be separately authorized with the Gmail `gmail.readonly` scope. Never substitute an existing Gmail send/reply token, copy ChatGPT connector credentials, or print protected values.
+
+| Secret | Referenced by | Requirement / boundary |
+|---|---|---|
+| `FCR_GMAIL_AUDIT_CLIENT_ID` | `actions-mail-audit-monitor.yml` | Dedicated Google OAuth client identity for read-only mail audit; source wiring does not establish an active OAuth grant. |
+| `FCR_GMAIL_AUDIT_CLIENT_SECRET` | `actions-mail-audit-monitor.yml` | Protected OAuth client credential; never log, expose in artifacts, or reuse broader Gmail reply authority. |
+| `FCR_GMAIL_AUDIT_MAIN_REFRESH_TOKEN` | `actions-mail-audit-monitor.yml` | Protected grant for the named primary notification mailbox, subject to exact Gmail profile verification. |
+| `FCR_GMAIL_AUDIT_BIP_REFRESH_TOKEN` | `actions-mail-audit-monitor.yml` | Protected grant for the Se'kret Bip mailbox, with no teen/guardian content export or message mutation. |
+| `FCR_GMAIL_AUDIT_RAY_REFRESH_TOKEN` | `actions-mail-audit-monitor.yml` | Protected grant for the named secondary notification mailbox; independently validated profile and read-only scope required. |
+
+A Gmail API query, Google refresh-token exchange, and GitHub Actions branch-head read are distinct proof planes. The adapter scans Gmail metadata and temporarily parses notification content in memory to extract run URLs. It emits only canonical GitHub run links, counts, and state classifications to the GitHub job summary, never raw message bodies or tokens. GitHub API permissions remain `contents: read` and `actions: read`; the monitor cannot repair code, acknowledge incidents, or certify live deployments.
+
 ## Complete workflow secret-name coverage
 
 This table covers GitHub Actions secret names that are referenced outside the canonical deploy registry above. A name appearing here documents wiring only; it does not prove that a value exists, is valid, or has sufficient provider permissions.
