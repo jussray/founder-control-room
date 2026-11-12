@@ -12,6 +12,7 @@ const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
+  '/auth/member/callback.js',
   '/assets/control-room.css',
   '/assets/oauth-consent.js',
   '/assets/oauth-consent.css',
@@ -23,6 +24,7 @@ const STATIC_EXACT_PATHS = new Set([
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
+  '/member',
   '/portable-founder-console',
   '/juss-rayy',
 ];
@@ -310,6 +312,29 @@ export default {
     // browser origin as the __Host-fcr_session cookie and same-origin CSRF
     // checks. They are served by FCR_API, never by public Pages ASSETS.
 
+    // Browser sessions use host-only cookies on the apex Pages hostname.
+    // Normalize only top-level www login/navigation GETs before collecting
+    // credentials; do not redirect login POSTs or claim cross-origin authority.
+    if ((request.method === 'GET' || request.method === 'HEAD') &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org' &&
+        (requestUrl.pathname === '/welcome' ||
+         requestUrl.pathname === '/welcome/' ||
+         requestUrl.pathname === '/member' ||
+         requestUrl.pathname === '/member/')) {
+      const canonicalPath = requestUrl.pathname.startsWith('/member') ? '/member/' : '/welcome';
+      const destination = new URL(canonicalPath, 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
+    }
+
     // Canonical founder OAuth/session origin is the apex Pages hostname.
     // A www entry must move to apex *before* collecting pending auth state.
     if (request.method === 'GET' &&
@@ -330,6 +355,16 @@ export default {
 
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
       return relaySyncControl(request, env);
+    }
+
+    // The canonical FCR domain is a private product entrypoint, not a public
+    // marketing surface. Keep the URL stable while serving the single
+    // invitation-only sign-in door; authenticated routing remains owned by
+    // the existing FCR session flow.
+    if (requestUrl.pathname === '/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
     }
 
     // The Pages asset layer canonicalizes /work.html -> /work with a 308,

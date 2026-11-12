@@ -23,6 +23,10 @@ const requiredAssets = [
   '.well-known/security.txt',
   '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
+  'member/index.html',
+  'member/member.js',
+  'member/projects.js',
+  'member/styles.css',
   'control-room/app.js',
   'control-room/styles.css',
   // These four files are load-bearing for the five-screen cockpit/runtime seam.

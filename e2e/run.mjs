@@ -388,7 +388,7 @@ async function runGuardedTerminalProof(page) {
     'replayed patch did not create another Git commit');
 }
 
-async function verifyLogoutAndProtectedBoundary(page) {
+async function verifyLogoutAndProtectedBoundary(page, priorSessionCookie) {
   console.log('\n[logout] Server-revoked logout returns to welcome and denies the private shell');
   // The same origin and per-IP limiter protect subsequent real page/script requests.
   // Observe its own remaining quota and wait for a bounded reset when needed;
@@ -397,6 +397,11 @@ async function verifyLogoutAndProtectedBoundary(page) {
   if (logoutHeadroom.waited) console.log(`  rate-limit reset observed before logout browser proof: ${logoutHeadroom.waitedMs}ms`);
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#sign-out');
+  // Capture the callback-issued capability, already paired with a successful
+  // authenticated /auth/me response, without logging or persisting its value.
+  if (!/^__Host-fcr_session=v1\.[A-Za-z0-9_-]{43}$/.test(priorSessionCookie ?? '')) {
+    throw new Error('Expected a callback-issued founder cookie for the logout replay test');
+  }
   await page.click('#sign-out');
   await page.waitForURL(`${BASE_URL}/welcome`);
   await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
@@ -406,6 +411,18 @@ async function verifyLogoutAndProtectedBoundary(page) {
     return response.status;
   });
   assert(identityAfterLogout === 401, 'revoked browser cookie no longer authorizes founder identity');
+  // A copied pre-logout cookie must be invalid on the server too. A fresh
+  // isolated BrowserContext makes this fail if logout only clears client state.
+  const replayContext = await page.context().browser().newContext();
+  try {
+    const replayIdentity = await replayContext.request.get(`${BASE_URL}/auth/me`, {
+      headers: { Cookie: priorSessionCookie },
+      failOnStatusCode: false,
+    });
+    assert(replayIdentity.status() === 401, 'the pre-logout cookie is rejected in an isolated browser context');
+  } finally {
+    await replayContext.close();
+  }
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
@@ -491,6 +508,11 @@ async function main() {
     'authenticated browser identity matches the allowlisted founder',
   );
   const callbackCookies = await callbackResponse.headerValues('set-cookie');
+  // Preserve only the server-issued cookie pair in test memory, not in logs.
+  // Browser cookie listings can vary for Secure cookies on HTTP loopback.
+  const callbackSessionCookie = callbackCookies
+    .map((value) => value.split(';', 1)[0])
+    .find((value) => /^__Host-fcr_session=v1\.[A-Za-z0-9_-]{43}$/.test(value));
   assert(
     callbackCookies.some((value) =>
       /^__Host-fcr_session=[^;]+;/i.test(value) &&
@@ -512,7 +534,7 @@ async function main() {
   );
 
   if (E2E_SCENARIO === 'auth-lifecycle') {
-    await verifyLogoutAndProtectedBoundary(page);
+    await verifyLogoutAndProtectedBoundary(page, callbackSessionCookie);
     assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
     await browser.close();
     return;
@@ -606,7 +628,7 @@ async function main() {
 
   if (E2E_SCENARIO === 'guarded-terminal') {
     await runGuardedTerminalProof(page);
-    await verifyLogoutAndProtectedBoundary(page);
+    await verifyLogoutAndProtectedBoundary(page, callbackSessionCookie);
     assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
     if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
     await browser.close();

@@ -63,8 +63,7 @@ function decorateSidebar() {
 function decorateCouncil(chief) {
   if (!(chief instanceof HTMLElement)) return;
   chief.classList.add('fcr-council');
-  const kicker = chief.querySelector('.chief-kicker');
-  if (kicker) kicker.innerHTML = 'AI COUNCIL <span class="fcr-online">3 online</span>';
+  // Availability and route semantics belong to the application, not this visual layer.
   const heading = chief.querySelector('h2');
   if (heading) heading.textContent = 'Strategy · Build · Intelligence · Automation';
   const prompt = chief.querySelector('.chief-prompt');
@@ -78,15 +77,6 @@ function decorateCouncil(chief) {
     const promptNode = chief.querySelector('.chief-prompt');
     chief.insertBefore(roster, promptNode ?? chief.firstChild);
   }
-
-  const commandLabels = ['Strategize', 'Build', 'Create', 'Analyze', 'Solve', 'Launch'];
-  chief.querySelectorAll('.chief-route strong').forEach((strong, index) => {
-    const desired = commandLabels[index];
-    if (desired && strong.textContent !== desired) strong.textContent = desired;
-  });
-  chief.querySelectorAll('.chief-route span').forEach((span) => {
-    if (span.textContent !== '') span.textContent = '';
-  });
 }
 
 function decorateHome() {
