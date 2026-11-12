@@ -106,6 +106,12 @@ const DESIGN_COMMAND_ALIASES: Readonly<Record<string, string>> = Object.fromEntr
 
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: 'goalfix',
+  godmode: 'ultrathink-attack-godmode',
+  'attack-godmode': 'ultrathink-attack-godmode',
+  urlfix: 'urlfix',
+  'repair-to-proof': 'repair-to-proof',
+  continuity: 'continuity-proof-ledger',
+  receipt: 'continuity-proof-ledger',
   fixfast: 'goalfix',
   'repair-verify-merge': 'goalfix',
   goal: 'goalfix',
@@ -126,6 +132,11 @@ const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   ...DESIGN_COMMAND_ALIASES,
 };
 
+// URL path segments are not commands; composed commands such as /truthmode/confess stay parseable.
+function withoutUrls(goal: string): string {
+  return goal.replace(/https?:\/\/\S+/gi, ' ');
+}
+
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
@@ -140,16 +151,18 @@ function canonicalCapabilityId(value: string): string {
 
 function explicitSkillsFromGoal(goal: string): string[] {
   const required: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     const skill = EXPLICIT_SKILL_ALIASES[match[1]];
     if (skill) pushUnique(required, skill);
   }
+  // Unprefixed invocation is honored only when the request starts with it; prose mentions do not bind a companion.
+  if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(required, 'repair-to-proof');
   return required;
 }
 
 function explicitDesignCommandsFromGoal(goal: string): string[] {
   const commands: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     if (DESIGN_COMMAND_IDS.has(match[1])) pushUnique(commands, match[1]);
   }
   return commands;
@@ -177,17 +190,22 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  if (/\bgodmode\b/.test(withoutUrls(goal))) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
+  const standingCommands = routeFcrStandingCommands(input.goal, input.action);
+  if (standingCommands.standingCommandIds.includes('urlfix')) pushUnique(policyRequiredCapabilityIds, 'urlfix');
   const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
+  const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
+  const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
+  const repairToProofGoal = policyRequiredCapabilityIds.includes('repair-to-proof');
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || repairToProofGoal || godmodeGoal || (urlfixGoal && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
   const contentFoundry = routeContentFoundryCouncil(input.goal, input.action);
-  const standingCommands = routeFcrStandingCommands(input.goal, input.action);
 
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
   pushUnique(requiredProof, 'Standing command routing is inferred from founder intent and action; manual slash invocation is emphasis or override, not an activation requirement');
@@ -243,6 +261,12 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   if (uiGoal) {
     pushUnique(requiredTools, 'playwright');
     pushUnique(requiredProof, 'exact-head Playwright evidence for UI/runtime claims');
+  }
+
+  if (urlfixGoal) {
+    pushUnique(requiredTools, 'playwright');
+    pushUnique(requiredProof, 'URLFIX ownership and live runtime identity must be resolved before source mutation');
+    pushUnique(requiredProof, 'URLFIX repair proof must rerun the same failing browser path after the patch');
   }
 
   if (mutationRequested) {
