@@ -128,3 +128,12 @@ test('a fully verified historical snapshot is reconciled but never a release gra
   assert.equal(r.authorizesMerge, false);
   assert.equal(r.authorizesDeployment, false);
 });
+
+import { readFileSync } from 'node:fs';
+
+test('every REMEDIATED row in the checked-in ledger names its candidate correction SHA', () => {
+  const ledger = readFileSync(new URL('../docs/ci-historical-accountability.md', import.meta.url), 'utf8');
+  const remediated = parseLedger(ledger).filter((row) => row.status === 'REMEDIATED');
+  assert.ok(remediated.length > 0);
+  for (const row of remediated) assert.match(row.candidate ?? '', /^[0-9a-f]{40}$/, `${row.sha} run ${row.runId}`);
+});
