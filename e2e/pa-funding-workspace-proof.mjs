@@ -13,6 +13,7 @@ function asset(pathname) {
   return readFileSync(new URL(file, fsRoot), 'utf8');
 }
 
+const storedReviews = new Map();
 async function wire(page, signedIn, founderEmail = 'founder@example.com') {
   await page.route(ORIGIN + '/**', async route => {
     const url = new URL(route.request().url());
@@ -24,6 +25,22 @@ async function wire(page, signedIn, founderEmail = 'founder@example.com') {
           ? { success: true, data: { founder: { email: founderEmail } } }
           : { error: 'unauthorized' }),
       });
+    }
+    if (url.pathname === '/pa-funding/reviews' && route.request().method() === 'GET') {
+      const records=Array.from(storedReviews.entries()).filter(([key])=>key.startsWith(founderEmail+':'))
+        .map(([key,value])=>({id:key.slice(founderEmail.length+1),...value}));
+      return route.fulfill({status:signedIn?200:401,contentType:'application/json',
+        body:JSON.stringify({records,applicationAuthorized:false})});
+    }
+    if (url.pathname.startsWith('/pa-funding/reviews/') && route.request().method() === 'PUT') {
+      if(!signedIn)return route.fulfill({status:401,body:'unauthorized'});
+      const id=url.pathname.split('/').pop();
+      const body=route.request().postDataJSON();
+      if(body.stage==='APPLY')return route.fulfill({status:400,body:'APPLY locked'});
+      const record={stage:body.stage,checks:body.checks,evidenceNote:body.evidenceNote,updatedAt:'2026-11-11T00:00:00Z'};
+      storedReviews.set(founderEmail+':'+id,record);
+      return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({record:{id,...record},applicationAuthorized:false})});
     }
     const data = asset(url.pathname);
     if (data !== null) {
@@ -71,6 +88,8 @@ try {
   const officialLink = page.locator('#tab-content a.source-link');
   assert.match(await officialLink.getAttribute('href'), /^https:\/\/www\.pa\.gov\//,
     'evidence points to official PA source');
+  await page.locator('#evidence-note').fill('internal:eligibility-review-needed');
+  await page.locator('#save-evidence').click();
   await page.locator('button[data-tab="receipt"]').click();
   for (const label of ['REALITY', 'FIX', 'PROOF', 'RISK', 'ROLLBACK', 'NEXT GATE']) {
     assert.ok((await page.locator('#tab-content').innerText()).includes(label), label + ' receipt field');
@@ -86,7 +105,11 @@ try {
   assert.equal(await page.locator('input[data-check="0"]').isChecked(), true,
     'checklist persists within this browser tab session');
   assert.equal(await page.locator('button[data-stage="PREPARE"]').getAttribute('aria-pressed'), 'true',
-    'stage persists within tab session');
+    'stage persists through the authenticated private API');
+  await page.locator('button[data-tab="evidence"]').click();
+  assert.equal(await page.locator('#evidence-note').inputValue(),'internal:eligibility-review-needed',
+    'private evidence reference persists on reload');
+  await page.locator('button[data-tab="checklist"]').click();
 
   await page.locator('#lane-filter').selectOption('contracts');
   assert.equal(await page.locator('.op-card').count(), 2, 'contract lane filter works');
@@ -114,7 +137,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true,
     'mobile layout does not overflow horizontally');
   assert.deepEqual(errors, [], 'no browser page errors');
-  assert.deepEqual(mutationRequests, [], 'workspace never issues outbound mutation requests');
+  assert.ok(mutationRequests.length>=2,'private checklist and evidence updates were sent');
+  assert.ok(mutationRequests.every(url=>new URL(url).pathname.startsWith('/pa-funding/reviews/')),
+    'the workspace only mutates its own private review endpoint, never external funding systems');
   console.log('PA funding workspace Playwright checks passed: auth, sourcing, filtering, evidence, checklist, APPLY lock, mobile.');
   await context.close();
 } finally {

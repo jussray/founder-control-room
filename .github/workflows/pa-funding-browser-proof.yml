@@ -13,6 +13,9 @@ on:
       - 'public/control-room/pa-funding.*'
       - 'e2e/pa-funding-workspace-proof.mjs'
       - 'scripts/build-pages.mjs'
+      - 'src/http/routes/paFundingReviews.ts'
+      - 'src/http/server.ts'
+      - 'supabase/migrations/*founder_pa_funding_reviews.sql'
   workflow_dispatch:
 
 permissions:
@@ -53,6 +56,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Typecheck guarded private review route
+        run: npm run typecheck
 
       - name: Check focused syntax
         run: |

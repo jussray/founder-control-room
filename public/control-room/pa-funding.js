@@ -144,7 +144,13 @@ let activeTab='checklist';
 let selectionFilter='all';
 let searchValue='';
 let sessionData={};
-let sessionKey=null;
+let storageAvailable=false;
+let saveQueue=Promise.resolve();
+let storageMessage='Loading private reviews…';
+function updateStorageMessage(){
+ const element=document.getElementById('save-status');
+ if(element)element.textContent=storageMessage;
+}
 const root=document.getElementById('workspace');
 const access=document.getElementById('access');
 const list=document.getElementById('list');
@@ -152,15 +158,49 @@ const details=document.getElementById('details');
 function esc(value){return String(value==null?'':value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
 function getProgram(){return PROGRAMS.find(function(x){return x.id===selected;})||PROGRAMS[0];}
 function state(id){return sessionData[id]||{checks:{},stage:'REVIEW'};}
-function save(){
-  try{if(sessionKey)sessionStorage.setItem(sessionKey,JSON.stringify(sessionData));}
-  catch(_error){/* Read-only browsing remains available when storage is disabled. */}
-}
-function load(){
+async function load(){
   try{
-    const saved=JSON.parse(sessionKey?sessionStorage.getItem(sessionKey)||'{}':'{}');
-    if(saved&&typeof saved==='object'&&!Array.isArray(saved)){sessionData=saved;}
-  }catch(_error){sessionData={};}
+    const response=await fetch('/pa-funding/reviews',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+    if(!response.ok)throw Error('Storage unavailable');
+    const payload=await response.json();
+    if(!Array.isArray(payload.records))throw Error('Malformed stored state');
+    sessionData={};
+    for(const record of payload.records){
+      if(PROGRAMS.some(function(p){return p.id===record.id;})&&stageOrder.includes(record.stage)){
+        sessionData[record.id]={stage:record.stage,checks:record.checks||{},evidenceNote:record.evidenceNote||''};
+      }
+    }
+    storageAvailable=true;
+    storageMessage='Private review store connected · founder-only';
+  }catch(_error){
+    storageAvailable=false;
+    sessionData={};
+    storageMessage='Private review store unavailable · read-only; no notes saved';
+  }
+  updateStorageMessage();
+}
+function save(){
+  if(!storageAvailable)return;
+  const opportunityId=selected;
+  const snapshot=Object.assign({stage:'REVIEW',checks:{},evidenceNote:''},state(opportunityId));
+  storageMessage='Saving private review…';
+  updateStorageMessage();
+  saveQueue=saveQueue.catch(function(){}).then(async function(){
+    const response=await fetch('/pa-funding/reviews/'+encodeURIComponent(opportunityId),{
+      method:'PUT',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(snapshot)
+    });
+    if(!response.ok)throw Error('Write rejected');
+    const reply=await response.json();
+    if(!reply.record)throw Error('Persistence receipt missing');
+    storageMessage='Saved privately · applicant eligibility stays UNKNOWN';
+    updateStorageMessage();
+  }).catch(function(){
+    storageAvailable=false;
+    storageMessage='Private save failed · editing disabled until you reload';
+    updateStorageMessage();
+    renderDetail();
+  });
 }
 function headline(){
   document.getElementById('total-count').textContent=String(PROGRAMS.length);
@@ -192,13 +232,13 @@ function renderDetail(){
   }).join('');
   let body='';
   if(activeTab==='checklist'){
-    body='<p class="step-hint">Private review flags only · '+complete+'/'+p.materials.length+' prepared · session-only, not saved to FCR records.</p>'+
+    body='<p class="step-hint">Private review flags only · '+complete+'/'+p.materials.length+' prepared · '+(storageAvailable?'saved in FCR':'storage unavailable, read-only')+'.</p>'+
       p.materials.map(function(m,i){
         const id='check-'+esc(p.id)+'-'+i;
-        return '<div class="checkrow"><input type="checkbox" id="'+id+'" data-check="'+i+'" '+(known[i]?'checked':'')+'><label for="'+id+'"><span>'+esc(m)+'</span><small>A check mark means reviewed/prepared, not verified eligibility.</small></label></div>';
+        return '<div class="checkrow"><input type="checkbox" id="'+id+'" data-check="'+i+'" '+(known[i]?'checked':'')+' '+(storageAvailable?'':'disabled')+'><label for="'+id+'"><span>'+esc(m)+'</span><small>A check mark means reviewed/prepared, not verified eligibility.</small></label></div>';
       }).join('')+
       '<div class="eyebrow" style="margin-top:20px">REVIEW → VERIFY → PREPARE → APPLY</div>'+
-      '<div class="stage-flow">'+stageOrder.map(function(v){return '<button type="button" class="stage '+(v===stage?'active':'')+'" data-stage="'+v+'" aria-pressed="'+String(v===stage)+'">'+v+'</button>';}).join('')+
+      '<div class="stage-flow">'+stageOrder.map(function(v){return '<button type="button" class="stage '+(v===stage?'active':'')+'" data-stage="'+v+'" '+(storageAvailable?'':'disabled')+' aria-pressed="'+String(v===stage)+'">'+v+'</button>';}).join('')+
       '<button type="button" class="stage locked" disabled title="Applications require separate authorization">APPLY 🔒</button></div>'+
       '<p class="step-hint">'+esc(stageNotes[stage])+'</p>';
   }else if(activeTab==='evidence'){
@@ -207,14 +247,17 @@ function renderDetail(){
       '<div class="eyebrow" style="margin-top:14px">SOURCE PROVENANCE</div>'+
       '<p class="summary">'+esc(p.proof)+'</p>'+
       '<a class="source-link" href="'+esc(p.source)+'" target="_blank" rel="noopener noreferrer">Open official evidence ↗</a>'+
-      '<p class="step-hint">Estimated award or eligibility: none. Recheck before any decision. Source changes and deadlines can invalidate this review.</p>';
+      '<p class="step-hint">Estimated award or eligibility: none. Recheck before any decision. Source changes and deadlines can invalidate this review.</p>'+
+      '<label for="evidence-note" class="step-hint">Private evidence reference (reference IDs or short notes only; do not paste credentials or applicant documents)</label>'+
+      '<textarea id="evidence-note" maxlength="1500" rows="4" '+(storageAvailable?'':'disabled')+'>'+esc(s.evidenceNote||'')+'</textarea>'+
+      '<button type="button" id="save-evidence" '+(storageAvailable?'':'disabled')+'>Save private evidence reference</button>';
   }else{
     const receipt={
       REALITY:p.open?'Program application window confirmed at review time; applicant eligibility UNKNOWN.':'Official program or discovery route confirmed; current intake and applicant eligibility UNKNOWN.',
       FIX:'Investigate the exact gate, rather than marking this company eligible without proof.',
       PROOF:p.proof,
       RISK:p.risk,
-      ROLLBACK:'Undo session-only checklist or stage flags. No external state, filing, money or commitment was changed.',
+      ROLLBACK:'Correct the founder-only review record. No external filing, money or commitment was changed.',
       'NEXT GATE':p.next
     };
     body='<p class="step-hint">Local review receipt · state '+esc(stage)+' · no execution authority.</p><div class="receipt">'+
@@ -245,12 +288,11 @@ async function start(){
     try{const payload=await response.json();const data=payload&&payload.success===true?payload.data:payload;identity=data&&data.founder&&typeof data.founder.email==='string'&&data.founder.email.trim()?data.founder.email.trim():null;}catch(_error){identity=null;}
   }
   if(!identity){
-    try{sessionStorage.removeItem('juss-pa-funding-2026-session');}catch(_error){}
+    // No private funding records are written to browser storage.
     access.innerHTML='<div class="access-denied"><p class="eyebrow">FOUNDER-ONLY WORKSPACE</p><h2>Founder session required.</h2><p>Funding preparation records stay behind the existing Founder Control Room session. No program list or private checklist is displayed until sign-in.</p><a href="/control-room/">Return to Founder Control Room ↗</a></div>';
     root.hidden=true;return;
   }
-  sessionKey='juss-pa-funding-2026-session:'+encodeURIComponent(identity.toLowerCase());
-  load();
+  await load();
   access.hidden=true;root.hidden=false;
   refresh();
   const query=document.getElementById('query');
@@ -262,25 +304,34 @@ async function start(){
     if(window.matchMedia('(max-width: 950px)').matches)details.scrollIntoView({behavior:'smooth',block:'start'});
   });
   details.addEventListener('click',function(e){
+    if(e.target.closest('#save-evidence')){
+      if(!storageAvailable)return;
+      const note=details.querySelector('#evidence-note');
+      if(!note)return;
+      const current=state(selected);
+      sessionData[selected]={checks:current.checks||{},stage:stageOrder.includes(current.stage)?current.stage:'REVIEW',evidenceNote:note.value.slice(0,1500)};
+      save();renderDetail();return;
+    }
     const tab=e.target.closest('button[data-tab]');
     if(tab){activeTab=tab.getAttribute('data-tab');renderDetail();return;}
     const stageBtn=e.target.closest('button[data-stage]');
     if(stageBtn){
+      if(!storageAvailable)return;
       const stage=stageBtn.getAttribute('data-stage');
       if(!stageOrder.includes(stage))return;
       const current=state(selected);
-      sessionData[selected]={checks:current.checks||{},stage:stage};
+      sessionData[selected]={checks:current.checks||{},stage:stage,evidenceNote:current.evidenceNote||''};
       save();refresh();
     }
   });
   details.addEventListener('change',function(e){
-    if(!e.target.matches('input[type=checkbox][data-check]'))return;
+    if(!storageAvailable||!e.target.matches('input[type=checkbox][data-check]'))return;
     const i=Number(e.target.getAttribute('data-check'));
     if(!Number.isInteger(i)||i<0||i>=getProgram().materials.length)return;
     const current=state(selected);
     const checks=Object.assign({},current.checks||{});
     checks[i]=e.target.checked;
-    sessionData[selected]={checks:checks,stage:stageOrder.includes(current.stage)?current.stage:'REVIEW'};
+    sessionData[selected]={checks:checks,stage:stageOrder.includes(current.stage)?current.stage:'REVIEW',evidenceNote:current.evidenceNote||''};
     save();renderDetail();renderList();
   });
 }

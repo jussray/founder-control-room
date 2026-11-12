@@ -32,3 +32,8 @@ footer{border-top:1px solid var(--stroke);padding:24px 0 10px;display:flex;justi
 
 /* HTML hidden attribute must override styled access screen. */
 #access[hidden],#workspace[hidden]{display:none!important}
+
+.storage-status{max-width:1450px;margin:0 auto;padding:.4rem 1.5rem;color:#f6cc80;font-size:.8rem}
+#evidence-note{display:block;width:100%;margin:8px 0 12px;padding:12px;border:1px solid rgba(185,201,231,.3);border-radius:9px;background:#0b0d18;color:#f5f6ff;font:inherit;resize:vertical}
+#save-evidence{border-radius:10px;border:1px solid #a78bfa;padding:.6rem 1rem;background:#28203e;color:#fff}
+#save-evidence:disabled{opacity:.45;cursor:not-allowed}
