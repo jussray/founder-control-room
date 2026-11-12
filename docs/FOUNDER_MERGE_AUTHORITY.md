@@ -204,6 +204,11 @@ A required test contributes to merge readiness only when the exact-head workflow
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
 
 
+## November 2, 2026 — merge-time external peer freshness (source candidate)
+
+At the authorized FCR merge execution sink, `src/http/routes/approvals.ts` must fail closed if the exact candidate's pinned StoryEngine SHA is not the currently registered canonical `refs/heads/main` SHA. The candidate must not control an alternate peer ref; the server must resolve the registered project through its configured repository provider, compare full immutable SHAs, then re-read the FCR mutable branch after the external lookup before any `provider.integrate(...)` call. Independent exact-head deterministic review and separate authenticated Founder Final remain required; native GitHub `required_approving_review_count: 0` is the intentional founder-only review setting, not permission to merge without the systematic review membrane. Stale-peer and raced-head tests prove only source behavior until executed on the exact head; they do not prove production provider or branch protection state.
+
+
 ## CI lockfile determinism — current exact-head source contract
 
 Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.

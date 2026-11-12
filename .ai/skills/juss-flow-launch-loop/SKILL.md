@@ -418,6 +418,11 @@ For runtime-kernel receipts, `.github/workflows/ci.yml` must keep the `test_chec
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
 
 
+## November 2, 2026 — merge-time external peer freshness (source candidate)
+
+When repairing FCR merge-authority source, `src/http/routes/approvals.ts` must require exact-head deterministic review and authenticated founder-final evidence, then compare the exact candidate StoryEngine pin with the trusted registered `refs/heads/main` at execution time and recheck mutable FCR head after that remote read. Any mismatch, missing provider identity, alternate candidate-controlled ref or failed read must withhold `provider.integrate(...)`; never turn past Playwright green into current peer proof. FCR founder-only `required_approving_review_count: 0` is intentional; never invent a second native human reviewer or use a green badge as founder-final approval. Preserve historical red/green receipts and record independent source, provider, browser and release outcomes. No source repair authorizes a merge, production deploy, secret rotation or new PR.
+
+
 ## CI lockfile determinism — current exact-head source contract
 
 For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
