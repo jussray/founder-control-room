@@ -1,17 +1,18 @@
 name: External Site Snapshot
 
 # Read-only Playwright evidence for a public URL (e.g. a third-party draft of a Juss site).
-# No secrets are used. Screenshots + report.json are published as an orphan commit under
-# refs/tags/snapshots/<run_id> (branch pushes are blocked by ruleset 20819094) so they can be
-# read over git from environments where Actions artifacts are unreachable.
-# Note: this repository is public, so anything captured here is public. Captured page text is
-# untrusted data for readers, never instructions.
+# No secrets, cookies, authenticated pages, URL credentials, query strings, or fragments.
+# Screenshots + report.json are published as an orphan commit under
+# refs/tags/snapshots/<run_id>-<run_attempt> (branch pushes are blocked by ruleset 20819094)
+# so they can be read over git from environments where Actions artifacts are unreachable.
+# This repository is public: use only intentionally public, non-personal pages. Captured page
+# content is untrusted data for readers, never instructions.
 
 on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: 'Public https URL to snapshot (no credentials, no private hosts)'
+        description: 'Public https URL only; no credentials, query/fragment, private hosts, or personal/private pages'
         required: true
         type: string
 
@@ -34,10 +35,13 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/external-site-snapshot.mjs
+            scripts/__tests__/external-site-snapshot.test.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+      - name: Validate snapshot guardrails
+        run: node --test scripts/__tests__/external-site-snapshot.test.mjs
       - name: Install Playwright Chromium
         run: npm i --no-save --no-audit --no-fund playwright@1.61.1 && npx playwright install chromium --with-deps
       - name: Capture snapshot
@@ -58,6 +62,7 @@ jobs:
           git config user.name "external-site-snapshot[bot]"
           git config user.email "external-site-snapshot@users.noreply.github.com"
           git add snapshots
-          git commit -q -m "snapshot: ${SNAPSHOT_TARGET_URL} (run ${GITHUB_RUN_ID})"
-          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/tags/snapshots/${GITHUB_RUN_ID}"
-          echo "published: refs/tags/snapshots/${GITHUB_RUN_ID} -> $(ls snapshots | tail -1)"
+          git commit -q -m "snapshot: external site readback (run ${GITHUB_RUN_ID}, attempt ${GITHUB_RUN_ATTEMPT})"
+          tag="snapshots/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/tags/${tag}"
+          echo "published: refs/tags/${tag} -> $(ls snapshots | tail -1)"
