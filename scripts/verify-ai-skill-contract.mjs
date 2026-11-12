@@ -10,6 +10,7 @@ const files = {
   typescriptTests: await readFile(new URL('../skills/typescript-behavior-tests/SKILL.md', import.meta.url), 'utf8'),
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
+  assetContinuity: await readFile(new URL('../skills/asset-continuity/SKILL.md', import.meta.url), 'utf8'),
   zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
   zapierGitHubMetadata: await readFile(new URL('../docs/founder-signal-engine/zapier-github-metadata-contract.md', import.meta.url), 'utf8'),
   chatgptZapierBridge: await readFile(new URL('../.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md', import.meta.url), 'utf8'),
@@ -89,7 +90,8 @@ for (const [label, source, metadata] of [
   ['typescript-minimal-patch', files.typescriptPatch, ['name: typescript-minimal-patch', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-behavior-tests', files.typescriptTests, ['name: typescript-behavior-tests', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-strict-review', files.typescriptReview, ['name: typescript-strict-review', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
-  ['product-design-gate', files.productDesign, ['name: product-design-gate', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['product-design-gate', files.productDesign, ['name: product-design-gate', 'version: 1.1.0', 'status: active', 'scope: founder-control-room']],
+  ['asset-continuity', files.assetContinuity, ['name: asset-continuity', 'version: 1.0.0', 'status: active-candidate', 'scope: portfolio']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
@@ -139,7 +141,18 @@ for (const phrase of [
   'No screenshot evidence means no completed audit',
   'Supabase Auth, RLS, Storage, Realtime, Edge Functions',
   'design QA can pass while Supabase verification remains blocked',
+  '`asset-continuity` for any identity-bearing visual/graphic/media work',
+  'treat a matching palette as proof of graphic continuity',
 ]) requireText('product-design invariant', files.productDesign, phrase);
+for (const phrase of [
+  'Identity-bearing assets must survive at the asset layer',
+  'founder-approved visual source artifacts as evidence',
+  'generic gradient replacing hero art',
+  'random SVG/icon replacing a canonical host/mascot',
+  'GRAPHIC_CONTINUITY_REGRESSION',
+  'CROSS_PROJECT_COLLAPSE',
+  'Automated checks cannot self-certify artistic fidelity',
+]) requireText('asset-continuity invariant', files.assetContinuity, phrase);
 for (const phrase of [
   'Credential plane',
   'Control plane',
