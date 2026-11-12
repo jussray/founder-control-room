@@ -262,7 +262,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-test-results-${{ env.EXPECTED_HEAD_SHA }}
-          path: test-results/
+          path: |
+            test-results/
+            evidence/exact-head-fixture/
           if-no-files-found: ignore
           retention-days: 30
 
