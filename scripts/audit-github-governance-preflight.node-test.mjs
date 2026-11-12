@@ -60,7 +60,7 @@ function canonicalRuleset(overrides = {}) {
 function futureTeamRuleset(overrides = {}) {
   const value = canonicalRuleset();
   value.rules[0].parameters.required_approving_review_count = 2;
-  value.rules[0].parameters.require_code_owner_review = true;
+  value.rules[0].parameters.require_code_owner_review = false;
   value.rules[0].parameters.require_last_push_approval = true;
   return { ...value, ...overrides };
 }
