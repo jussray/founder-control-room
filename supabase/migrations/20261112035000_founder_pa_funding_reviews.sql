@@ -11,3 +11,5 @@ create table if not exists public.founder_pa_funding_reviews (
 comment on table public.founder_pa_funding_reviews is 'Private review checkmarks and references; not applicant proof or a funding application.';
 alter table public.founder_pa_funding_reviews enable row level security;
 revoke all on public.founder_pa_funding_reviews from public, anon, authenticated;
+-- Explicit grant is required when project defaults do not auto-grant service_role.
+grant select, insert, update on public.founder_pa_funding_reviews to service_role;
