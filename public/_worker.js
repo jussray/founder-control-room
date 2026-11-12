@@ -357,6 +357,16 @@ export default {
       return relaySyncControl(request, env);
     }
 
+    // The canonical FCR domain is a private product entrypoint, not a public
+    // marketing surface. Keep the URL stable while serving the single
+    // invitation-only sign-in door; authenticated routing remains owned by
+    // the existing FCR session flow.
+    if (requestUrl.pathname === '/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
     // The Pages asset layer canonicalizes /work.html -> /work with a 308,
     // and /work is a public page, not an API route. Ask ASSETS for the
     // canonical /work URL itself: fetching the /work.html filename returns
