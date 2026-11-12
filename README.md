@@ -1,5 +1,13 @@
 # Founder Control Room
 
+## November 12, 2026: Pennsylvania funding workspace and independent review candidate
+
+PR [#1094](https://github.com/jussray/founder-control-room/pull/1094) adds the founder-only Pennsylvania funding review workspace to the existing Control Room. The application list and Creative Entrepreneur Accelerator/KIZ eligibility gates distinguish official-source evidence from estimates and unknowns. `src/http/routes/paFundingReviews.ts` requires the founder-authenticated HTTP boundary, and `supabase/migrations/20261112043814_founder_pa_funding_reviews.sql` keeps the private review table service-role-only. The APPLY stage remains locked. Playwright source-level proof does not establish authenticated live production persistence.
+
+The proposed provider policy in `src/providers/providerFactory.ts` requires exactly **one independent GitHub approving review** for FCR `main`. `src/providers/GitHubProvider.ts` must reject mismatched review-count readback, require stale-review dismissal and last-push approval, and keep Code Owner gating disabled until a legitimate `CODEOWNERS` file and eligible owner exist. The existing GitHub Auto-merge click is the founder's per-PR queue instruction, not the independent review, an FCR founder-final receipt, or deployment authority. `scripts/audit-github-governance-preflight.mjs` must fail closed when an eligible non-owner reviewer is absent or provider protection differs. The current live GitHub ruleset still reports zero required approvals and always-on bypass actors, so this candidate **must not** be marked merge-ready or deployed.
+
+Release evidence is separate: PR-specific `Required Gate`, Documentation Truth, Migration lint, Neon preview, independent review, exact-head Playwright, and production browser/API/Supabase readback must all be assessed without suppressing failed signals. The Neon project is at its ten-branch capacity with nine active-PR previews; do not delete any preview without a separately identified and authorized target.
+
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
