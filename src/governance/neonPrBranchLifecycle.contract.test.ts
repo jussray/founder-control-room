@@ -1,11 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const workflow = readFileSync('.github/workflows/neon-pr-branches.yml', 'utf8');
+const createWorkflow = readFileSync('.github/workflows/neon-pr-branches.yml', 'utf8');
+const deleteWorkflow = readFileSync('.github/workflows/neon-pr-close-cleanup.yml', 'utf8');
+// The lifecycle contract covers both event-specific workflows without making
+// cleanup eligible during an open PR.
+const workflow = `${createWorkflow}\n${deleteWorkflow}`;
 
 describe('Neon pull-request branch lifecycle contract', () => {
   it('uses a stable PR-scoped branch identity and pinned Neon actions', () => {
-    expect(workflow).toContain('types: [opened, reopened, synchronize, closed]');
+    expect(createWorkflow).toContain('types: [opened, reopened, synchronize]');
+    expect(deleteWorkflow).toContain('types: [closed]');
+    expect(createWorkflow).not.toContain('  delete_neon_branch:');
+    expect(deleteWorkflow).not.toContain('  create_neon_branch:');
     expect(workflow).toContain('group: neon-pr-${{ github.event.pull_request.number }}');
     expect(workflow).toContain('branch_name: preview/pr-${{ github.event.number }}');
     expect(workflow).toContain('branch: preview/pr-${{ github.event.number }}');
