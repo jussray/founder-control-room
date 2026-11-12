@@ -11,6 +11,7 @@ import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
   FOUNDER_OS_LAB_COMMANDS,
   FOUNDER_OS_LAB_PROVIDERS,
+  FOUNDER_OS_LAB_SKILLS,
   founderOsLabCommand,
   founderOsLabProvider,
 } from '../registry.js';
@@ -91,6 +92,25 @@ describe('portable Founder OS registry', () => {
     expect(founderOsLabCommand('futureyou').class).toBe('founder');
     expect(founderOsLabCommand('elonmusk').role).toMatch(/first-principles/i);
     expect(founderOsLabCommand('elonmusk').role).toMatch(/without simulating a person/i);
+  });
+
+  it('registers URLFIX as a founder-native non-executing skill', () => {
+    expect(FOUNDER_OS_LAB_SKILLS).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'urlfix',
+        mayExecute: false,
+      }),
+    ]));
+  });
+
+
+  it('registers the Attack/Godmode companion as founder-native and non-executing', () => {
+    expect(FOUNDER_OS_LAB_SKILLS).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'ultrathink-attack-godmode',
+        mayExecute: false,
+      }),
+    ]));
   });
 
   it('contains the complete provider registry as preview-only, side-effect-free descriptors', () => {
