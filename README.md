@@ -693,3 +693,7 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 ## X user-context publisher — source candidate
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
+
+## Founder OS lab adapter provenance (November 5, 2026)
+
+The read-only Chief AI project adapter in `src/founder-os-lab/projectAdapters.ts` records the reviewed Chief main `b1b9e0faa159d20973ee1eda293a4bf7de963ea9` and five exact contract blobs, including non-authorizing execution-continuity markers and a merge-intent check that blocks draft PRs targeting main. Provenance eligibility never grants permission to merge, deploy, publish, or mutate providers. Source movement or a changed required contract blob requires a new semantic review and new exact-head CI evidence.
