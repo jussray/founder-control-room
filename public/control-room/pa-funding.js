@@ -185,7 +185,9 @@ function save(){
   const snapshot=Object.assign({stage:'REVIEW',checks:{},evidenceNote:''},state(opportunityId));
   storageMessage='Saving private review…';
   updateStorageMessage();
-  saveQueue=saveQueue.catch(function(){}).then(async function(){
+  saveQueue=saveQueue.then(async function(){
+    // A previous write failure disables storage; never execute already-queued saves.
+    if(!storageAvailable)return;
     const response=await fetch('/pa-funding/reviews/'+encodeURIComponent(opportunityId),{
       method:'PUT',credentials:'same-origin',cache:'no-store',
       headers:{'Content-Type':'application/json'},body:JSON.stringify(snapshot)

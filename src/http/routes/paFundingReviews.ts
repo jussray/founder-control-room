@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 // Private preparation records only. Never grants eligibility, funds, or application authority.
 export const paFundingReviewsRouter = Router();
-paFundingReviewsRouter.use(requireFounder);
+// Rate-limit private review access independently of the upstream general limiter.
+paFundingReviewsRouter.use(rateLimit({windowMs:60_000,limit:60,standardHeaders:'draft-7',legacyHeaders:false}),requireFounder);
 const PROGRAM_IDS = new Set(['cea-growth','cea-impact','kiz','contracts','apex','alphalab','bftp','ssbci','creative-loan']);
 const VALID_STAGES = new Set(['REVIEW','VERIFY','PREPARE']);
 

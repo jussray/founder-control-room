@@ -132,6 +132,39 @@ try {
   assert.equal(await page.locator('input[data-check="0"]').isChecked(), false,
     'another authenticated founder cannot inherit prior account checklist state');
 
+
+  // Two edits queued while the first PUT fails must not hide unsaved work behind a later success.
+  const failing=await context.newPage();
+  await wire(failing,true,'failed-save-probe@example.com');
+  const attemptedWrites=[];
+  let reportFirstWrite;
+  const firstWriteSeen=new Promise(resolve=>{reportFirstWrite=resolve;});
+  let releaseFirstWrite;
+  const firstWriteHeld=new Promise(resolve=>{releaseFirstWrite=resolve;});
+  await failing.route(ORIGIN + '/pa-funding/reviews/*',async route=>{
+    if(route.request().method()!=='PUT')return route.fallback();
+    attemptedWrites.push(new URL(route.request().url()).pathname);
+    if(attemptedWrites.length===1){
+      reportFirstWrite();
+      await firstWriteHeld;
+      return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'storage unavailable'})});
+    }
+    // Any later accepted write would mask the first failed save.
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({record:{id:'kiz'}})});
+  });
+  await failing.goto(ORIGIN + '/control-room/pa-funding.html',{waitUntil:'networkidle'});
+  await failing.locator('input[data-check="0"]').check();
+  await firstWriteSeen;
+  await failing.locator('button[data-id="kiz"]').click();
+  await failing.locator('button[data-stage="VERIFY"]').click();
+  releaseFirstWrite();
+  await failing.waitForFunction(()=>document.getElementById('save-status')?.textContent?.includes('Private save failed'));
+  await failing.waitForTimeout(150);
+  assert.equal(attemptedWrites.length,1,'failed first write prevents a later queued PUT from masking unsaved changes');
+  assert.match(await failing.locator('#save-status').innerText(),/Private save failed/,'error banner persists');
+  assert.equal(await failing.locator('button[data-stage="PREPARE"]').isDisabled(),true,'editing stops after failure');
+  await failing.close();
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: proofDir + '/mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true,
@@ -140,7 +173,7 @@ try {
   assert.ok(mutationRequests.length>=2,'private checklist and evidence updates were sent');
   assert.ok(mutationRequests.every(url=>new URL(url).pathname.startsWith('/pa-funding/reviews/')),
     'the workspace only mutates its own private review endpoint, never external funding systems');
-  console.log('PA funding workspace Playwright checks passed: auth, sourcing, filtering, evidence, checklist, APPLY lock, mobile.');
+  console.log('PA funding workspace Playwright checks passed: auth, sourcing, filtering, evidence, checklist, APPLY lock, queued-save failure, mobile.');
   await context.close();
 } finally {
   await browser.close();
