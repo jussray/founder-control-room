@@ -1,5 +1,13 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## October 23, 2026: Separate moving-main federation proof from fixed portfolio release proof
+
+FCR Playwright at candidate `8ed0916d31bbbc516b8f2ed589f7722737c26d60` failed the live StoryEngine peer-identity guard: the exact expected `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` did not equal the independently observed `refs/heads/main` head `be4fe1a006fcecdad077d5c3878cd76443274c65`. The application/browser steps preceding the guard did not certify the FCR-to-StoryEngine federation. This is a verified **stale federation proof subject**, not a reason to disable freshness or erase the failed receipt.
+
+The focused repair refreshes only the FCR browser federation pin to the observed StoryEngine main head and preserves the exact-live-main guard. Independent StoryEngine commit history confirmed the previous pin is ten commits behind the observed main at inspection. A fresh exact-head FCR Playwright run, peer runtime SHA readback, and directive/receipt/browser loop must succeed before a present-tense integration claim. A later StoryEngine main movement expires the moving-main witness and must be reconciled explicitly.
+
+Separately, `releases/portfolio-v0.1.0.json` selects the fixed StoryEngine SHA `cd0b9be794d7b1a1b682e1c457aa632f27a2112a`. Its frozen selection is correct for candidate-testing semantics even when main advances. The live federation check and the fixed release manifest are separate evidence planes; neither can replace the other's check. Candidate-level release promotion is still blocked by declared peer-version conflicts and the unwired behavioral three-product runtime integration suite. The historical October 16 observations below are preserved without renewing them.
+
 ## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
 
 The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
