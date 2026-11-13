@@ -40,7 +40,11 @@ afterEach(() => {
 describe('Cloudflare Pages edge proxy', () => {
   it('serves the invitation-only welcome door at the canonical root without exposing public content', async () => {
     const handler = await loadHandler();
-    const assets = vi.fn(async () => new Response('private welcome', { status: 200 }));
+    let requestedAsset: Request | undefined;
+    const assets = vi.fn(async (request: Request) => {
+      requestedAsset = request;
+      return new Response('private welcome', { status: 200 });
+    });
     const api = vi.fn(async () => identifiedResponse('wrong API'));
 
     const response = await handler.fetch(
@@ -51,7 +55,8 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('private welcome');
     expect(api).not.toHaveBeenCalled();
-    expect(new URL(assets.mock.calls[0]?.[0].url).pathname).toBe('/welcome');
+    expect(requestedAsset).toBeInstanceOf(Request);
+    expect(new URL(requestedAsset!.url).pathname).toBe('/welcome');
   });
 
   it('serves an existing browser asset without calling the API Worker', async () => {
