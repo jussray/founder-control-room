@@ -126,7 +126,8 @@ jobs:
       - name: Record Neon non-applicability only after canonical proof
         if: steps.neon_scope.outputs.needs_supabase == 'true' && steps.neon_scope.outputs.needs_neon == 'false'
         shell: bash
-        run: echo 'Neon provider preview NOT_APPLICABLE: no Neon-specific preview contract; canonical Supabase proof passed.'
+        run: |
+          echo 'Neon provider preview NOT_APPLICABLE: no Neon-specific preview contract; canonical Supabase proof passed.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
