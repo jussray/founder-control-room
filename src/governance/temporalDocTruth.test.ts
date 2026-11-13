@@ -147,6 +147,37 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
+  it('registers mandatory ULTRATHINK companions for documentation truth without overriding canonical Goalfix', () => {
+    expect(documentationVerifier).toContain('ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger');
+    expect(documentationVerifier).toContain('ultrathink-suite');
+    expect(documentationVerifier).toContain("file.startsWith('skills/')");
+    const companion = read('skills/ultrathink-attack-godmode/SKILL.md');
+    const activation = companion.split('## Activation')[1]?.split(String.fromCharCode(10))[1] ?? '';
+    expect(activation).toContain('/godmode');
+    expect(activation).not.toContain('/goalfix');
+    expect(activation).not.toContain('/repair-to-proof');
+    expect(activation).not.toContain('/ultrathink');
+    expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.claude/skills/ultrathink/SKILL.md`');
+    expect(activation).not.toMatch(/(^|[,\s])repair-to-proof([,\s]|$)/);
+    expect(companion).toContain('The `/repair-to-proof` activation belongs exclusively');
+    expect(companion).toContain('The canonical `/goalfix`');
+    expect(read('skills/ultrathink-suite/README.md')).toContain('canonical `.ai/skills/goalfix/SKILL.md` first');
+  });
+
+  it('keeps structured documentation-truth receipt claims within the verifier limit', () => {
+    const receipt = JSON.parse(read('docs/DOCUMENTATION_TRUTH_RECEIPT.json')) as {
+      changes: Array<{ path: string; claims: string[] }>;
+    };
+    for (const change of receipt.changes) {
+      expect(change.path.length).toBeGreaterThan(0);
+      expect(change.claims.length).toBeGreaterThan(0);
+      for (const claim of change.claims) {
+        expect(claim.length).toBeGreaterThan(0);
+        expect(claim.length).toBeLessThanOrEqual(600);
+      }
+    }
+  });
+
   it('rejects contradictory required-deployment semantics across the executable receipt guard', () => {
     const fullValidClaim = 'src/providers/GitHubProvider.ts must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge required_deployments because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.';
 

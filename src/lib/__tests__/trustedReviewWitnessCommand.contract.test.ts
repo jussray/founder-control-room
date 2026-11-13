@@ -216,6 +216,8 @@ describe('trusted review witness command contract', () => {
 
     expect(governanceJob).toContain('let providerMutationAttempted = false;');
     expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('INDEPENDENT_REVIEWER_UNAVAILABLE');
+    expect(governanceJob.indexOf('beforeTopology.independentReviewerReady')).toBeLessThan(governanceJob.indexOf('providerMutationAttempted = true;'));
     expect(governanceJob).toContain('} catch (error) {');
     expect(governanceJob).toContain('} finally {');
     expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
@@ -229,7 +231,7 @@ describe('trusted review witness command contract', () => {
     expect(receiptUpload).toContain('if: always()');
   });
 
-  it('emits a sanitized founder-phase provider receipt without widening authority', () => {
+  it('emits a sanitized independent-review provider receipt without widening authority', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
@@ -238,7 +240,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded',
+      'Human review phase: founder-plus-independent; one native approval and eligible non-owner human reviewer required',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',

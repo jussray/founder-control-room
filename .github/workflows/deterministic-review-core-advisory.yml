@@ -382,6 +382,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs/promises';
           import { createGitHubAppJwt } from './dist/providers/githubAppAuth.js';
+          import { FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS } from './dist/providers/providerFactory.js';
 
           const appId = String(process.env.GITHUB_APP_ID ?? '').trim();
           const privateKey = String(process.env.GITHUB_PRIVATE_KEY ?? '').trim();
@@ -406,7 +407,7 @@ jobs:
                 generatedAt: new Date().toISOString(),
                 providerMutationAttempted: false,
                 providerMutationState: 'NOT_ATTEMPTED',
-                requiredNativeApprovals: 0,
+                requiredNativeApprovals: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
                 result: null,
                 topology: null,
                 failure: {
@@ -479,6 +480,27 @@ jobs:
               throw new Error('Canonical repository provider does not expose applyBranchRuleset');
             }
 
+            // Verify an eligible non-author human can approve before activating
+            // a rule that would otherwise lock out every future PR.
+            const installationToken = await getGitHubInstallationToken(
+              appId,
+              privateKey,
+              PROJECT.repo_identifier,
+            );
+            const beforeTopology = await collectGovernancePreflight({
+              token: installationToken,
+              repository: PROJECT.repo_identifier,
+              targetRef: 'main',
+              trustedGitHubAppId: appId,
+            });
+            if (!beforeTopology.observationComplete || !beforeTopology.independentReviewerReady) {
+              throw new Error('INDEPENDENT_REVIEWER_UNAVAILABLE: governance is not safe to mutate until a non-owner human with write access is verified');
+            }
+            const mainBeforeMutation = await provider.resolveRef(PROJECT_ID, 'main');
+            if (mainBeforeMutation.toLowerCase() !== expectedMainSha) {
+              throw new Error('main moved during reviewer readiness preflight');
+            }
+
             providerMutationAttempted = true;
             result = await provider.applyBranchRuleset(PROJECT_ID, {
               name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
@@ -497,11 +519,6 @@ jobs:
               throw new Error(`main moved during governance reconciliation: expected ${expectedMainSha}, observed ${afterMain}`);
             }
 
-            const installationToken = await getGitHubInstallationToken(
-              appId,
-              privateKey,
-              PROJECT.repo_identifier,
-            );
             topology = await collectGovernancePreflight({
               token: installationToken,
               repository: PROJECT.repo_identifier,
@@ -587,7 +604,7 @@ jobs:
             echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
             echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
             echo '- Full provider topology preflight: `READY` required before this completion summary can run'
-            echo '- Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded'
+            echo '- Human review phase: founder-plus-independent; one native approval and eligible non-owner human reviewer required'
             echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
             echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"
