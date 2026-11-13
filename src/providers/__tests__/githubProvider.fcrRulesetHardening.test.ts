@@ -65,7 +65,7 @@ function reviewReadback(request: TestConfig = config, preserved: TestRule[] = []
       parameters: {
         required_approving_review_count: request.requiredApprovingReviewCount,
         dismiss_stale_reviews_on_push: true,
-        require_code_owner_review: requireNativeHumanReview,
+        require_code_owner_review: false,
         require_last_push_approval: requireNativeHumanReview,
         required_review_thread_resolution: true,
       },
@@ -221,7 +221,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
   });
 
-  it("restores Code Owner and last-push review automatically in a future-team phase", async () => {
+  it("requires independent review and last-push review without a nonexistent CODEOWNERS file", async () => {
     const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
     installStrongProviderMocks(futureConfig);
 
@@ -235,7 +235,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
       .toMatchObject({
         required_approving_review_count: 1,
-        require_code_owner_review: true,
+        require_code_owner_review: false,
         require_last_push_approval: true,
       });
   });
@@ -346,19 +346,19 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
   });
 
-  it("fails closed when future-team readback drops Code Owner review", async () => {
+  it("fails closed when independent-review readback disables last-push approval", async () => {
     const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
     const weakened = reviewReadback(futureConfig);
     const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
     if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
-    pullRequestRule.parameters.require_code_owner_review = false;
+    pullRequestRule.parameters.require_last_push_approval = false;
     mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
       data: ruleset_id === 2 ? freshnessReadback(futureConfig) : weakened,
     }));
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", futureConfig))
-      .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
+      .rejects.toThrow("last-push approval requirement does not match the requested native-review phase");
   });
 
   it("fails closed when review readback drops the CodeQL floor", async () => {

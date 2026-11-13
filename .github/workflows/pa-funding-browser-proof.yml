@@ -1,0 +1,89 @@
+name: PA Funding Browser Proof
+
+on:
+  # Always replay proof on this isolated work branch, including when a
+  # reconciliation brings new main changes without touching funding files.
+  push:
+    branches:
+      - work/pa-funding-workspace-20261111
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/pa-funding-browser-proof.yml'
+      - 'public/control-room/pa-funding.*'
+      - 'e2e/pa-funding-workspace-proof.mjs'
+      - 'scripts/build-pages.mjs'
+      - 'src/http/routes/paFundingReviews.ts'
+      - 'src/http/server.ts'
+      - 'supabase/migrations/*founder_pa_funding_reviews.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa-funding-browser-proof-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: PA Funding Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          echo "PA funding browser proof exact head: $EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck guarded private review route
+        run: npm run typecheck
+
+      - name: Check focused syntax
+        run: |
+          node --check public/control-room/pa-funding.js
+          node --check e2e/pa-funding-workspace-proof.mjs
+
+      - name: Verify independent human-review governance contracts
+        run: |
+          node --test scripts/audit-github-governance-preflight.node-test.mjs
+          npx vitest run src/providers/__tests__/providerFactory.rulesetGovernance.test.ts src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts src/lib/__tests__/trustedReviewWitnessCommand.contract.test.ts
+
+      - name: Verify public Pages bundle
+        run: npm run build:pages
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Verify founder session, evidence and no-apply paths in Playwright
+        run: node e2e/pa-funding-workspace-proof.mjs
+
+      - name: Upload browser proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pa-funding-browser-${{ env.EXPECTED_HEAD_SHA }}
+          path: test-results/pa-funding/
+          if-no-files-found: warn
+          retention-days: 7

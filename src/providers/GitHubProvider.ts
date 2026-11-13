@@ -522,7 +522,7 @@ export class GitHubProvider implements RepositoryProvider {
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
-          require_code_owner_review: requireNativeHumanReview,
+          require_code_owner_review: false, // FCR has no CODEOWNERS file; preserve the independent review count.
           require_last_push_approval: requireNativeHumanReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
@@ -862,7 +862,7 @@ function fcrMainReviewRulesetReadbackErrors(
     errors.push("approving review count does not match requested policy");
   }
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
-  if (pullParameters.require_code_owner_review !== requireNativeHumanReview) {
+  if (pullParameters.require_code_owner_review !== false) {
     errors.push("Code Owner review requirement does not match the requested native-review phase");
   }
   if (pullParameters.require_last_push_approval !== requireNativeHumanReview) {

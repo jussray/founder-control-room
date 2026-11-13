@@ -28,8 +28,8 @@ const canonicalConfig: RulesetConfig = {
 };
 
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts the current founder-only FCR main constitutional floor", () => {
-    expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(0);
+  it("accepts the current one-independent-review FCR main constitutional floor", () => {
+    expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(1);
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
   });
 
@@ -61,14 +61,14 @@ describe("Founder Control Room ruleset governance", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS + 1,
-    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
+    })).toThrow(/requires exactly 1 native approving reviews for the checked-in phase/);
   });
 
   it("fails closed when FCR main requests a negative approving-review count", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: -1,
-    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
+    })).toThrow(/requires exactly 1 native approving reviews for the checked-in phase/);
   });
 
   it("fails closed when FCR main disables pull-request enforcement", () => {
@@ -82,7 +82,7 @@ describe("Founder Control Room ruleset governance", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: Number.NaN,
-    })).toThrow(/requires exactly 0 native approving reviews for the checked-in phase/);
+    })).toThrow(/requires exactly 1 native approving reviews for the checked-in phase/);
   });
 
   it("fails closed when FCR main drops the Required Gate status check", () => {
