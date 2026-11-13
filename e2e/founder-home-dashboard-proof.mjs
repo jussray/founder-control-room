@@ -253,6 +253,8 @@ console.log('\n[1] Signed-in founder lands on the Home dashboard (desktop 1280×
     assert((await page.locator('.home-tiles .tile').count()) === 8, 'eight section tiles render');
 
     await noOverflow(page, 'desktop');
+    assert((await page.locator('.chief-kicker .fcr-online[data-truth="unknown"]').innerText()).trim() === 'Availability not checked', 'AI Council availability is marked unknown rather than an invented online count');
+    assert((await page.locator('[data-fcr-nav-search]').getAttribute('placeholder')) === 'Find a page…', 'topbar search accurately describes navigation-only filtering');
     await page.screenshot({ path: join(OUT_DIR, 'founder-home-desktop.png'), fullPage: true });
 
     await page.click('#project-list .card >> nth=0');
