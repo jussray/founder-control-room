@@ -1,6 +1,14 @@
 name: FCR live visual witness
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'audit/fcr-live-visual-witness-20261009'
+    paths:
+      - 'public/index.html'
+      - 'e2e/founder-experience-shell-proof.mjs'
+      - 'e2e/fcr-live-visual-witness.mjs'
+      - '.github/workflows/fcr-live-visual-witness.yml'
   pull_request:
     paths:
       - 'public/index.html'
