@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
+import { canonBootstrapRouter } from './routes/canonBootstrap.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
@@ -323,6 +324,7 @@ export function createServer(options: CreateServerOptions = {}) {
   });
 
   app.use(rateLimitGeneral);
+  app.use('/api/canon', canonBootstrapRouter);
 
   app.post(
     '/review/deterministic-witness/:pullRequestNumber',
