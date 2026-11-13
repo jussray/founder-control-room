@@ -25,6 +25,20 @@ try {
       const response = await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
       record.httpStatus = response?.status() ?? null;
       await page.locator('body').waitFor({ state: 'visible', timeout: 10000 });
+      // DOM readiness alone can capture blank background-image cards. Wait for load
+      // and verify the four public artwork assets before writing visual evidence.
+      await page.waitForLoadState('load', { timeout: 15000 });
+      const artworkReady = await page.locator('.card-photo').evaluateAll(async (cards) =>
+        Promise.all(cards.map(async (card) => {
+          const match = getComputedStyle(card).backgroundImage.match(/url\\(["']?([^"')]+)["']?\\)/);
+          if (!match) return false;
+          const image = new Image();
+          image.src = match[1];
+          try { await image.decode(); return image.naturalWidth > 0; } catch { return false; }
+        })),
+      );
+      record.artworkCount = artworkReady.length;
+      record.artworkReadyCount = artworkReady.filter(Boolean).length;
       await page.screenshot({ path: path.join(output, name + '.png'), fullPage: true, animations: 'disabled' });
       record.title = await page.title();
       record.finalUrl = page.url();
@@ -38,7 +52,7 @@ try {
       record.status = record.accessChallenge ? 'ACCESS_BLOCKED' : record.httpStatus >= 200 && record.httpStatus < 400 &&
         new URL(record.finalUrl).origin === target.origin &&
         record.dimensions.scrollWidth <= record.dimensions.clientWidth &&
-        errors.length === 0 ? 'CAPTURED' : 'REVIEW_REQUIRED';
+        errors.length === 0 && record.artworkCount === 4 && record.artworkReadyCount === 4 ? 'CAPTURED' : 'REVIEW_REQUIRED';
     } catch (error) {
       record.error = String(error);
     } finally {
