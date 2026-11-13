@@ -1,5 +1,19 @@
 # Founder Control Room
 
+## Chat ↔ Work continuity (source contract, not a live mode switch)
+
+`src/lib/operatorContinuity.ts` now defines a mode-neutral continuation packet
+that carries references to existing task intent, authorized history, verified
+completed steps, unfinished steps, pending decisions, and next action. It
+reuses the v2 exact-state continuity receipt and does not treat Chat as
+read-only. Stale evidence requires reacquisition, not a conversation restart.
+Unit coverage lives in `src/lib/__tests__/operatorExecutionContinuation.test.ts`.
+This is a source-level contract only: no native ChatGPT mode-switch integration,
+conversation-store synchronization, provider deployment, or live runtime
+verification is established by this change. See
+`docs/CHATGPT_OPERATOR_WORKFLOW.md` for the integration boundary.
+
+
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
