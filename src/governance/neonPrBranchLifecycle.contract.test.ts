@@ -30,14 +30,37 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT');
   });
 
-  it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {
+  it('requires a full isolated Supabase replay for every canonical schema change', () => {
+    expect(workflow).toContain('NEEDS_SUPABASE=false');
+    expect(workflow).toContain('NEEDS_NEON=false');
+    expect(workflow).toContain('supabase/*)');
+    expect(workflow).toContain('NEEDS_SUPABASE=true');
+    expect(workflow).toContain('needs_supabase=${NEEDS_SUPABASE}');
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'true'");
+    expect(workflow).toContain('version: 2.101.0');
+    expect(workflow).toContain('test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"');
+    expect(workflow).toContain('supabase start');
+    expect(workflow).toContain('supabase db lint --local --fail-on error');
+    expect(workflow).toContain('Neon provider preview NOT_APPLICABLE: no Neon-specific preview contract; canonical Supabase proof passed.');
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'false'");
+  });
+
+  it('retains mandatory isolated Neon proof for a changed explicit preview contract', () => {
     expect(workflow).toContain('name: Create Neon Branch');
     expect(workflow).toContain('pull-requests: read');
     expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
-    expect(workflow).toContain('supabase/*)');
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
-    expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
+    expect(workflow).toContain('supabase/preview-contracts/*.sql|supabase/preview-postconditions/*.sql');
+    expect(workflow).toContain('preview_contract="supabase/preview-contracts/${path##*/}"');
+    expect(workflow).toContain('preview_postcondition="supabase/preview-postconditions/${path##*/}"');
+    expect(workflow).toContain('if [ -f "$preview_contract" ] || [ -f "$preview_postcondition" ]; then');
+    expect(workflow).toContain('NEEDS_NEON=true');
+    expect(workflow).toContain('needs_neon=${NEEDS_NEON}');
+    expect(workflow.match(/if: steps\\.neon_scope\\.outputs\\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(workflow).toContain('Check Neon preview branch budget');
+    expect(workflow).toContain('Neon branch budget exhausted');
+    expect(workflow).toContain('Create Neon Branch');
+    expect(workflow).toContain('Execute added migrations on Neon preview');
+    expect(workflow).toContain('No supabase/ change detected against live base; no database proof required.');
     expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
