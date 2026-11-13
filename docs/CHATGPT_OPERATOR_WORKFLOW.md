@@ -106,3 +106,35 @@ The operator workflow must stop or reacquire evidence when:
 - a provider/connector asks for broader authority than the current task needs.
 
 A fresh observation creates a new fingerprint. It does not renew an old approval.
+
+
+## Chat ↔ Work task continuation (repository contract only)
+
+The existing `juss-v10/operator-continuity@v2` receipt recognizes both `chatgpt` and
+`work` sources. Its state fingerprint deliberately excludes the observing
+surface so the same project evidence can be checked across modes. The additive
+`juss-v10/operator-execution-continuation@v1` contract in
+`src/lib/operatorContinuity.ts` links that receipt to an active task:
+
+- `taskId` and `intentRef` identify the ongoing goal without embedding raw chat;
+- `contextRefs` point to previously authorized, access-controlled conversation
+  history and artifacts;
+- `completedSteps` require evidence references, while `remainingStepIds`,
+  `nextActionRef`, and `pendingDecisionRefs` retain the unfinished execution path;
+- the packet fingerprint is mode-independent and does not grant action,
+  approval, cookie, merge, or deployment authority;
+- a fresh matching observation yields `CURRENT`, while moved or expired
+  evidence yields `REVALIDATE` without erasing the conversational context;
+- Chat is **not** treated as read-only. Tools are determined by the actual
+  current surface, connection, and separate action authority, not by mode name.
+
+The source references must resolve in an existing authorized persistence
+service. This module does **not** itself store conversations, listen for mode
+changes, fetch private history, or modify ChatGPT's native mode switch. Those
+capabilities require a separately verified integration with both surfaces and
+the FCR access-controlled store. Do not claim automatic cross-mode syncing or
+production activation from passing unit tests of this contract alone.
+
+Execution, provider writes, CI, Playwright, approval and release still pass
+through their ordinary independent gates. An expired snapshot can preserve
+discussion momentum but cannot resurrect an expired approval or green check.
