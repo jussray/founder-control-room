@@ -20,8 +20,8 @@ function addTopbarSearch() {
   const input = document.createElement('input');
   input.className = 'fcr-nav-search';
   input.type = 'search';
-  input.placeholder = 'Search this Control Room…';
-  input.setAttribute('aria-label', 'Filter Control Room navigation');
+  input.placeholder = 'Find a page…';
+  input.setAttribute('aria-label', 'Find a Control Room page');
   input.dataset.fcrNavSearch = '';
   input.addEventListener('input', () => {
     const q = input.value.trim().toLowerCase();
@@ -64,7 +64,7 @@ function decorateCouncil(chief) {
   if (!(chief instanceof HTMLElement)) return;
   chief.classList.add('fcr-council');
   const kicker = chief.querySelector('.chief-kicker');
-  if (kicker) kicker.innerHTML = 'AI COUNCIL <span class="fcr-online">3 online</span>';
+  if (kicker) kicker.innerHTML = 'AI COUNCIL <span class="fcr-online" data-truth="unknown">Availability not checked</span>';
   const heading = chief.querySelector('h2');
   if (heading) heading.textContent = 'Strategy · Build · Intelligence · Automation';
   const prompt = chief.querySelector('.chief-prompt');
