@@ -23,6 +23,7 @@ canonBootstrapRouter.get('/bootstrap', async (req, res) => {
       .eq('project', project).eq('claim_key', key)
       .order('sequence', { ascending: true }).limit(500);
     if (result.error) return res.status(503).json({ error: 'canon_store_unavailable' });
+    if ((result.data ?? []).length === 500) return res.status(409).json({ error: 'canon_history_exceeds_read_limit' });
     const events = (result.data ?? []).map((row) => ({
       project: row.project, key: row.claim_key, sequence: row.sequence,
       contract: row.contract, digest: row.digest, observedAt: new Date(row.observed_at).toISOString(),
@@ -32,7 +33,7 @@ canonBootstrapRouter.get('/bootstrap', async (req, res) => {
     })) as CanonEvent[];
     const summary = readCanonKnowledge(events, { project, key });
     return res.json({ ...summary, events, scope: 'historical_only', executionAuthorized: false,
-      truncated: events.length === 500 });
+      truncated: false });
   } catch {
     return res.status(503).json({ error: 'canon_integrity_or_provider_failure' });
   }
