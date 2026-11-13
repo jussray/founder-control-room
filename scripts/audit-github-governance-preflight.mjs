@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
-export const CANONICAL_NATIVE_APPROVAL_COUNT = 0;
+export const CANONICAL_NATIVE_APPROVAL_COUNT = 1;
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
   'required_linear_history',
@@ -223,6 +223,8 @@ export function buildReport({
   const canonical = canonicalMatches[0] ?? null;
   const freshness = freshnessMatches[0] ?? null;
   const eligibleReviewers = collaborators.filter((collaborator) => collaboratorCanReview(collaborator, owner));
+  const independentReviewerReady = eligibleReviewers.length > 0;
+  const needsIndependentReviewer = CANONICAL_NATIVE_APPROVAL_COUNT > 0 && !independentReviewerReady;
   const bypassObservationComplete = canonical?.bypassObservationComplete === true;
   const freshnessBypassObservationComplete = freshness?.bypassObservationComplete === true;
   const observationComplete = expectedBypassActors !== null
@@ -234,7 +236,7 @@ export function buildReport({
       ? 'review_bypass_observation_unavailable'
       : freshness !== null && !freshnessBypassObservationComplete
         ? 'freshness_bypass_observation_unavailable'
-        : null;
+        : needsIndependentReviewer ? 'independent_reviewer_unavailable' : null;
   const canonicalFloor = canonicalFloorSatisfied(canonical, expectedBypassActors);
   const freshnessFloor = freshnessFloorSatisfied(freshness, freshnessName);
   const reviewBypassSatisfied = canonical === null ? false : bypassPolicyMatches(canonical, expectedBypassActors);
@@ -269,7 +271,7 @@ export function buildReport({
     trustedBypassPolicyAvailable: expectedBypassActors !== null,
     bypassPolicySatisfied: reviewBypassSatisfied,
     freshnessBypassPolicySatisfied: freshnessBypassSatisfied,
-    independentReviewerReady: eligibleReviewers.length > 0,
+    independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: eligibleReviewers.length,
     observedBranchRulesets: snapshots,
     status: !observationComplete
@@ -279,6 +281,7 @@ export function buildReport({
         && activeTargetingRef.length === 2
         && canonicalFloor
         && freshnessFloor
+        && !needsIndependentReviewer
           ? 'READY'
           : 'NOT_READY',
   };
