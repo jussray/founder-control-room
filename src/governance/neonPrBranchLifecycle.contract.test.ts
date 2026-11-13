@@ -55,7 +55,7 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('if [ -f "$preview_contract" ] || [ -f "$preview_postcondition" ]; then');
     expect(workflow).toContain('NEEDS_NEON=true');
     expect(workflow).toContain('needs_neon=${NEEDS_NEON}');
-    expect(workflow.match(/if: steps\\.neon_scope\\.outputs\\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(workflow.split("if: steps.neon_scope.outputs.needs_neon == 'true'").length - 1).toBeGreaterThanOrEqual(5);
     expect(workflow).toContain('Check Neon preview branch budget');
     expect(workflow).toContain('Neon branch budget exhausted');
     expect(workflow).toContain('Create Neon Branch');
