@@ -282,3 +282,22 @@ describe('repository documentation truth control', () => {
     expect(truthDecay).toContain('**Analytics remains observation-only.**');
   });
 });
+
+describe('exact-head CI queue consolidation', () => {
+  it('keeps main PR authority in CI and extended coverage on staging only', () => {
+    const requiredCi = read('.github/workflows/ci.yml');
+    const stagingQuality = read('.github/workflows/quality-gate.yml');
+    const evidence = read('.github/workflows/fcr-search-evidence-gate.yml');
+    expect(requiredCi).toContain('name: Required Gate');
+    expect(requiredCi).toContain('name: Verify guarded terminal and AI skill contracts (required)');
+    for (const command of ['verify:terminal-contract', 'verify:juss-flow', 'verify:production-authority', 'verify:ai-skills']) {
+      expect(requiredCi).toContain(`npm run ${command}`);
+    }
+    expect(requiredCi).toContain('- test');
+    expect(stagingQuality).toMatch(/pull_request:\s*\n\s*branches:\s*\n\s*- staging/);
+    expect(stagingQuality).not.toMatch(/^\s*- main\s*$/m);
+    expect(evidence).toContain('branches: [main]');
+    expect(evidence).toContain('ref: ${{ env.EXPECTED_HEAD_SHA }}');
+    expect(evidence).toContain('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"');
+  });
+});

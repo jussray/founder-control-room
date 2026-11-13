@@ -14,6 +14,10 @@ owner: Juss
 
 When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
 
+## Queue economy and required proof
+
+For `main` pull requests, `.github/workflows/ci.yml` must own the load-bearing verification, including terminal and AI-skill contracts through the required `Test` job. `.github/workflows/quality-gate.yml` remains the extended `staging` proof lane rather than running duplicate main checks. The Search Console/evidence gate must check the exact PR head and avoid a second feature-branch push execution. Do not save runner minutes by dropping CodeQL, required test-ledger/CI gates, browser proof, independently reviewed candidate approval, or production provider readback. This source change is a candidate only until the successor exact head is verified.
+
 ## Goal
 
 Move the authoritative product toward a truthful full app launch without replacing Juss's intent with a smaller cosmetic task, creating fake-green evidence, deleting history, leaking private sauce, or scaling an unproven path.
@@ -421,5 +425,3 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
-
-For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.

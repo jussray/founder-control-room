@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+FCR member sign-in and workspace navigation are apex-cookie-bound: safe `GET`/`HEAD` visits from `www.foundercontrolroom.org` to `/welcome` or `/member/` must redirect to the apex Pages origin before browser authentication state is consumed. This change is separate from public SEO canonical URLs, cannot redirect mutating sign-in requests, cannot expose host-only cookies to `www`, and requires live browser/provider readback before a production-ready claim.
+
+
+## November 3, 2026 — separate member browser session candidate (PR #1060)
+
+The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.
+
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
 The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.
@@ -217,8 +224,6 @@ The Worker-only `.github/workflows/worker-reconcile.yml` authority gate must als
 
 The canonical Deploy workflow's authority gate performs the same Wrangler enumeration of provider-held secret names before its first mutation. Its receipt handling accounts for Wrangler writing human authentication notices to stdout ahead of the requested JSON: the gate extracts the JSON name list from the receipt text before parsing, and fails closed with a named receipt error when no JSON list is present. Only the parsing envelope is tolerant; the required-name comparison and the fail-closed posture are unchanged.
 
-The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.
-
 The Worker-only reconciliation runtime proof must check the `X-Founder-Control-Room-Service` header and exact approved `gitSha` in the **direct API `/version`** response, and then independently check that the **public Pages `/version`** proxy returns the same required header and exact SHA. Successful `/health` alone, a JSON `/version` body without its header, a Pages preview deployment, or the existence of `FCR_API` service binding is not sufficient. The redacted Pages-proxy proof receipt is produced only after live readback; a green source contract test never substitutes for that receipt.
 
 FCR's `public-web-observation-v1` contract does not require a dedicated provider-held Worker secret. Public-web adapter selection occurs behind FCR's governed read-only research hub, so changing or losing an adapter cannot silently change product authority or become proof of an observed outcome.
@@ -286,3 +291,5 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.

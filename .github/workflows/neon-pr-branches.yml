@@ -182,6 +182,12 @@ jobs:
               -c "SELECT sha256 FROM ci_preview.migration_receipts WHERE filename = '$migration';")"
 
             PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
+            PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"
+            PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"
+            if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then
+              echo "::error title=Ambiguous migration preview::Cannot mix an isolated fixture with a substitution contract: $migration"
+              exit 1
+            fi
             if [ -n "$EXISTING" ]; then
               if [ "$EXISTING" = "$CHECKSUM" ]; then
                 echo "Preview migration already applied with matching checksum: $migration"
@@ -189,17 +195,30 @@ jobs:
                   echo "Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT"
                   psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
                 fi
+                if [ -f "$PREVIEW_ASSERT" ]; then
+                  echo "Re-running isolated preview postconditions: $PREVIEW_ASSERT"
+                  psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_ASSERT"
+                fi
                 continue
               fi
               echo "::error title=Applied migration changed::$migration was already executed on this preview with a different checksum. Add a new migration instead of rewriting history."
               exit 1
             fi
-            if [ -f "$PREVIEW_CONTRACT" ]; then
+            if [ -f "$PREVIEW_FIXTURE" ]; then
+              # Run compatibility fixture and original migration atomically.
+              # This acts only on the ephemeral Neon branch, never on Supabase.
+              echo "Applying original SQL with isolated Neon-only fixture: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$PREVIEW_FIXTURE" -f "$migration"
+            elif [ -f "$PREVIEW_CONTRACT" ]; then
               echo "Running migration preview contract: $PREVIEW_CONTRACT"
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
             else
               echo "Applying preview migration atomically: $migration"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+            fi
+            if [ -f "$PREVIEW_ASSERT" ]; then
+              echo "Verifying isolated preview postconditions: $PREVIEW_ASSERT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_ASSERT"
             fi
             psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 \
               -c "INSERT INTO ci_preview.migration_receipts(filename, sha256) VALUES ('$migration', '$CHECKSUM');"

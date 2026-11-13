@@ -38,6 +38,27 @@ afterEach(() => {
 });
 
 describe('Cloudflare Pages edge proxy', () => {
+  it('serves the invitation-only welcome door at the canonical root without exposing public content', async () => {
+    const handler = await loadHandler();
+    let requestedAsset: Request | undefined;
+    const assets = vi.fn(async (request: Request) => {
+      requestedAsset = request;
+      return new Response('private welcome', { status: 200 });
+    });
+    const api = vi.fn(async () => identifiedResponse('wrong API'));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('private welcome');
+    expect(api).not.toHaveBeenCalled();
+    expect(requestedAsset).toBeInstanceOf(Request);
+    expect(new URL(requestedAsset!.url).pathname).toBe('/welcome');
+  });
+
   it('serves an existing browser asset without calling the API Worker', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('asset', { status: 200 }));
@@ -99,6 +120,40 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
     expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
     expect(await forwarded?.text()).toBe(JSON.stringify({ action: 'approve' }));
+  });
+
+  it('normalizes www welcome and member navigation to the apex browser-session origin', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('asset'));
+    const api = vi.fn(async () => identifiedResponse('API'));
+    const cases: Array<[string, string]> = [
+      ['/welcome', '/welcome'],
+      ['/welcome/?ref=home', '/welcome?ref=home'],
+      ['/member', '/member/'],
+      ['/member/?ref=welcome', '/member/?ref=welcome'],
+    ];
+    for (const [requestPath, expectedPath] of cases) {
+      const response = await handler.fetch(
+        new Request('https://www.foundercontrolroom.org' + requestPath),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('https://foundercontrolroom.org' + expectedPath);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+      expect(response.headers.get('set-cookie')).toBeNull();
+    }
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+
+    const apex = await handler.fetch(
+      new Request('https://foundercontrolroom.org/member/'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(apex.status).toBe(200);
+    expect(assets).toHaveBeenCalledOnce();
+    expect(api).not.toHaveBeenCalled();
   });
 
   it('normalizes www consent navigation to the apex founder session origin', async () => {

@@ -25,8 +25,8 @@ function publicAssets(): FetchBinding {
   return {
     fetch: async (request: Request) => {
       const pathname = new URL(request.url).pathname;
-      const source = pathname === '/'
-        ? 'public/index.html'
+      const source = pathname === '/welcome'
+        ? 'public/welcome.html'
         : pathname === '/work.html'
           ? 'public/work.html'
           : pathname === '/juss-rayy/' || pathname === '/juss-rayy'
@@ -41,7 +41,7 @@ function publicAssets(): FetchBinding {
   };
 }
 
-test('public front door visibly links people to Juss Rayy and the public work directory', async ({ page }) => {
+test('canonical root serves the private invitation-only welcome door', async ({ page }) => {
   const handler = await loadHandler();
   let apiCalls = 0;
   const fcrApi = {
@@ -60,20 +60,21 @@ test('public front door visibly links people to Juss Rayy and the public work di
   expect(apiCalls).toBe(0);
   await page.setContent(await response.text());
 
-  await expect(page.getByRole('link', { name: 'Explore public work' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Explore public work' })).toHaveAttribute('href', '/work.html');
-  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveAttribute('href', '/juss-rayy/');
+  await expect(page).toHaveTitle('Welcome | Founder Control Room');
+  await expect(page.getByRole('heading', { name: /Welcome to Founder Control Room/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Founder sign-in' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Explore public work' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveCount(0);
 
   mkdirSync(outputDir, { recursive: true });
-  await page.screenshot({ path: resolve(outputDir, 'desktop-front-door-founder-work.png'), fullPage: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-private-welcome-door.png'), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(hasHorizontalOverflow).toBe(false);
-  await page.screenshot({ path: resolve(outputDir, 'mobile-front-door-founder-work.png'), fullPage: true });
+  await page.screenshot({ path: resolve(outputDir, 'mobile-private-welcome-door.png'), fullPage: true });
 });
 
 test('serves the public work directory from Pages and keeps live/source states distinct', async ({ page }) => {
