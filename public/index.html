@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Founder Control Room: back founders, build a brighter tomorrow. Public user view and founder view, with proof boundaries stated plainly." />
+  <meta name="description" content="Explore live Juss & Co. public sites, founder-led projects, and inspectable source. Founder Control Room keeps private operations behind founder sign-in." />
   <meta name="robots" content="index,follow" />
   <link rel="canonical" href="https://www.foundercontrolroom.org/" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.foundercontrolroom.org/" />
   <meta property="og:title" content="Founder Control Room | Public work and verifiable projects" />
-  <meta property="og:description" content="Explore founder work, inspect public evidence, and distinguish shipped features from planned systems." />
+  <meta property="og:description" content="Open public products, discover the founder behind them, and inspect source evidence. Private founder controls stay protected." />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="Founder Control Room | Public work and verifiable projects" />
   <meta name="twitter:description" content="Public founder work, sources and verification boundaries." />
@@ -130,6 +130,16 @@
       font-size: 1.15rem; color: #e8e4ff;
     }
 
+    /* Working public links are visible before the four cinematic story cards. */
+    .live-proof { display: grid; grid-template-columns: minmax(200px, .8fr) minmax(0, 2.2fr); gap: 1rem; align-items: center; margin: 0 1.2rem 1.2rem; padding: 1rem 1.1rem; border: 1px solid rgba(91, 188, 255, .34); border-radius: 1.15rem; background: linear-gradient(110deg, rgba(15, 28, 65, .94), rgba(21, 16, 58, .93)); }
+    .live-proof-label { display: inline-flex; align-items: center; gap: .45rem; color: #a7eeff; font-size: .7rem; font-weight: 800; letter-spacing: .14em; }
+    .live-proof-label::before { content: ''; width: .5rem; height: .5rem; border-radius: 50%; background: #51dcba; box-shadow: 0 0 12px rgba(81, 220, 186, .5); }
+    .live-proof-intro p { margin: .45rem 0 0; color: #e0e8ff; font-size: .85rem; line-height: 1.4; }
+    .live-proof-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; }
+    .live-proof-links a { min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 4.35rem; padding: .75rem .85rem; border: 1px solid rgba(160, 164, 255, .3); border-radius: .8rem; background: rgba(5, 11, 34, .65); color: #f3f7ff; font-weight: 750; font-size: .89rem; line-height: 1.3; }
+    .live-proof-links a span { margin-top: .3rem; color: #a9c7eb; font-weight: 550; font-size: .72rem; overflow-wrap: anywhere; }
+    .live-proof-links a:hover, .live-proof-links a:focus-visible { background: rgba(55, 51, 127, .58); border-color: rgba(138, 205, 255, .72); }
+
     /* User view: four cards */
     .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; padding: 0 1.2rem 1.2rem; }
     .card {
@@ -239,6 +249,7 @@
     @media (max-width: 980px) {
       .hero { grid-template-columns: 1fr; padding: 2rem 1.8rem; min-height: 0; }
       .quote-serif { position: static; text-align: left; margin-top: 1.2rem; }
+      .live-proof { grid-template-columns: 1fr; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .fgrid, .fgrid.pair { grid-template-columns: 1fr; }
@@ -250,6 +261,9 @@
       .navlinks a { padding: .45rem .55rem; font-size: .85rem; }
       .hero { padding: 1.4rem 1.1rem; }
       .hero-art { min-height: 250px; }
+      .live-proof { margin: 0 .6rem .9rem; padding: .9rem; }
+      .live-proof-links { grid-template-columns: 1fr; }
+      .live-proof-links a { min-height: 3.7rem; }
       .cards { grid-template-columns: 1fr; }
       .card { min-height: 280px; }
       .banner { margin: 0 .6rem .9rem; }
@@ -315,8 +329,8 @@
         <div class="hero-copy">
           <p class="eyebrow">People × Ideas × Impact</p>
           <h1 id="home-title">Back Founders.<br /><span class="grad">Build a Brighter</span><br />Tomorrow.</h1>
-          <p class="sub">Real people. Real progress. Real impact.</p>
-          <a class="btn" href="/work.html">Explore Founders →</a>
+          <p class="sub">Explore the public products. Inspect the source. See the work for yourself.</p>
+          <a class="btn" href="/work.html">See Products &amp; Proof →</a>
         </div>
         <figure class="hero-art">
           <img src="/assets/front-door/hero-peak.jpg" alt="" width="940" height="730" decoding="async" />
@@ -325,12 +339,24 @@
         <p class="quote-serif">“Bigger thinking.<br />Real outcomes.”</p>
       </div>
 
+      <section class="live-proof" aria-label="Open public products and evidence">
+        <div class="live-proof-intro">
+          <span class="live-proof-label">PUBLIC WORK · OPEN NOW</span>
+          <p>Real sites to explore. Real source to inspect.</p>
+        </div>
+        <div class="live-proof-links">
+          <a href="/work.html">Product directory<span>Browse live links &amp; source states ↗</span></a>
+          <a href="https://sekretbip.net/">Se’kret Bip<span>Visit the public product site ↗</span></a>
+          <a href="https://github.com/jussray/founder-control-room">FCR source<span>Inspect the repository &amp; history ↗</span></a>
+        </div>
+      </section>
+
       <div class="cards" id="learn">
         <a class="card" id="founders" href="/juss-rayy/" data-public-card-link="story">
           <span class="card-photo stories" aria-hidden="true"></span>
           <div class="card-body">
             <h3>Founder Stories</h3>
-            <p>Real founders. Real progress. Stories publish as they are verified.</p>
+            <p>Meet the founder and explore the ideas, decisions, and products behind the work.</p>
           </div>
           <span class="more" aria-hidden="true">→</span>
         </a>
@@ -338,7 +364,7 @@
           <span class="card-photo missions" aria-hidden="true"></span>
           <div class="card-body">
             <h3>Missions That Matter</h3>
-            <p>Purpose-driven projects, each with its current state shown.</p>
+            <p>Open public projects, working site links, and inspectable source evidence.</p>
           </div>
           <span class="more" aria-hidden="true">→</span>
         </a>
@@ -346,23 +372,23 @@
           <span class="card-photo learn" aria-hidden="true"></span>
           <div class="card-body">
             <h3>Learn &amp; Grow</h3>
-            <p>Practical resources from real builders.</p>
+            <p>Explore the tools and methods behind the builds.</p>
           </div>
           <span class="more" aria-hidden="true">→</span>
         </a>
         <article class="card" id="community">
           <span class="card-photo community" aria-hidden="true"></span>
           <div class="card-body">
-            <h3>Community Highlights</h3>
-            <p>Supporter highlights appear here once real supporters exist.</p>
+            <h3>People &amp; Progress</h3>
+            <p>People first, products in the open, and progress supported by real evidence.</p>
           </div>
         </article>
       </div>
 
       <div class="banner" id="support">
         <div>
-          <strong>A public front door for founders, supporters and builders.</strong>
-          <span class="line">Real people. Real projects. A brighter tomorrow.</span>
+          <strong>Built to be explored, not just described.</strong>
+          <span class="line">Open public product routes and inspect the work behind them.</span>
         </div>
         <span class="arrow-dot" aria-hidden="true">→</span>
       </div>
@@ -403,7 +429,7 @@
           </div>
           <div class="panel" id="proof">
             <div class="panel-head"><h3>Recent Proof</h3><small>Receipts only</small></div>
-            <p class="empty">Receipts are shown only after founder sign-in. Public proof is published separately, after verification.</p>
+            <p class="empty">Private receipts appear after founder sign-in. Public products and source evidence are available in the <a href="/work.html">Work &amp; Proof directory</a>.</p>
           </div>
         </div>
       </div>
