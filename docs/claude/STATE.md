@@ -1,5 +1,13 @@
 # Claude session state — Founder Control Room
 
+## 2026-11-13 — Lint fix implanted on #1092 (main's Johnstown commit)
+
+- REALITY: main `4461992e` (Johnstown 90-day pilot workflow) added `src/http/routes/johnstownAiPilot.ts` with an unused `EVIDENCE` constant. Lint fails on it (`@typescript-eslint/no-unused-vars`), so every PR merging this main inherits a red Lint check.
+- FIX (implant rule): branch `docs/state-969-merge-20261112`. Deleted the one unused line. POST always inserts `evidence_state: 'unknown'`, and the migration's CHECK constraint enforces the allowed values, so behavior is unchanged.
+- PROOF: `npx eslint src/http/routes/johnstownAiPilot.ts --quiet` clean; `tsc --noEmit` clean. Exact-head CI pending.
+- ROLLBACK: revert the commit. main still carries the error until #1092 or another fix lands.
+- NEXT GATE: Juss's SHA-bound merge line for #1092 at its new head.
+
 ## 2026-11-12 — PR #969 merged; production API degraded (pre-existing)
 
 - REALITY: #969 was squash-merged as `6d7e9b4636d913b96abb605ebab1fcc19ed6ae1e` from head `b16f857c` on base `023f94bc`. All 31 review threads were verified and resolved first. Merge approval was "1-3" (an item naming the exact SHAs), confirmed afterwards by Juss's literal SHA-bound line. Future merges wait for the literal line.
