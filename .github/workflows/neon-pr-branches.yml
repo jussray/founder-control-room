@@ -96,6 +96,41 @@ jobs:
         shell: bash
         run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
+      # Stop before an opaque Neon 422 when the included branch allowance is
+      # exhausted. Never delete another PR's preview or incur paid branch use.
+      - name: Check Neon preview branch budget
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          curl --fail --silent --show-error --retry 2 --header "Authorization: Bearer ${NEON_API_KEY}" --header "Accept: application/json" --output "$response" "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches?limit=100"
+          python3 - "$response" "$PR_NUMBER" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          branches = payload.get("branches")
+          if not isinstance(branches, list):
+              raise SystemExit("Neon branch readback invalid; preview remains BLOCKED")
+          name = f"preview/pr-{sys.argv[2]}"
+          if any(branch.get("name") == name for branch in branches):
+              raise SystemExit(f"Neon {name} already exists; create-only workflow must not overwrite it")
+          if len(branches) >= 10:
+              raise SystemExit(
+                  f"Neon branch budget exhausted ({len(branches)} branches); "
+                  f"cannot create {name}. Review existing previews or the plan; "
+                  "no branch was deleted and migration proof stays BLOCKED."
+              )
+          print(f"Neon capacity observed: {len(branches)} / 10; creation may proceed")
+          PY
+
       - name: Create Neon Branch
         if: steps.neon_scope.outputs.needs_neon == 'true'
         id: create_neon_branch
