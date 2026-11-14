@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Replace the StoryEngine live-ref equality gate with an ancestry gate so forward peer merges stop failing FCR CI while history rewrites still fail closed.",
+  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -246,7 +246,8 @@
         "README.md records the October 23 peer refresh to 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f, StoryEngine's exact-head 15/15 successful check state, PR #1004's failure at its old 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f pin, and the requirement that PR #1004 earn its own exact-head witness; no separate PR witness or production/deploy authority transfers.",
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
-        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail."
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
+        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary."
       ]
     },
     {
@@ -703,7 +704,8 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
+        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
+        "`src/providers/providerFactory.ts` must require exactly one native approving review for active canonical FCR main governance, reject a weaker caller-supplied review count, and preserve all exact-head status checks and other provider authority boundaries."
       ]
     },
     {
@@ -755,6 +757,21 @@
       ]
     },
     {
+      "path": "src/providers/githubGovernanceReconciliation.ts",
+      "claims": [
+        "`src/providers/githubGovernanceReconciliation.ts` must treat trusted Chief ruleset readback as evidence, preserve producer integration identity, strictness, bypass actors including provider-native null-id DeployKey entries, deployment requirements, and provider fingerprints, and plan the founder-approved producer-correct topology without authorizing provider mutation, merge, deploy, production proof, or execution.",
+        "The Chief reconciliation plan must require zero desired bypass actors and strict status freshness, place `Verify candidate ProofMode runtime with Playwright` on exact-head ruleset `20818149` with GitHub Actions integration `15368`, and narrow governance-boundary unconditional checks to `Typecheck` plus `Verify operational authority`.",
+        "The Chief reconciliation plan must remove production deployment environments from the pre-merge desired state while preserving `Cloudflare Production` plus `proofmode-access-admin` as post-merge/current-main proof obligations, preserve unmanaged security rules, and fail closed until a separately authorized drift-safe provider mutation is followed by fresh readback."
+      ]
+    },
+    {
+      "path": "src/providers/jusscoRulesetPreflight.ts",
+      "claims": [
+        "`src/providers/jusscoRulesetPreflight.ts` must accept read-only provider observations only for active `jussray/jussray` branch rulesets Governance `26857902` and Production `26428639`, require exactly one native human approval, reject unauthorized targets and stale full-readback fingerprints before any suggested remediation, and never mint merge, deployment, or provider-update authority.",
+        "The JussCo ruleset preflight must preserve observed required check producer identities, deployment counts and bypass counts in its advisory output, never silently replace unrelated protection, and return `BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE` for needed provider changes because a fingerprint alone is not an atomic update precondition; source tests do not prove a live GitHub administrative change."
+      ]
+    },
+    {
       "path": ".github/workflows/playwright.yml",
       "claims": [
         "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit."
@@ -776,6 +793,30 @@
       "path": "src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts",
       "claims": [
         "`src/lib/__tests__/storyEnginePeerAncestryGate.contract.test.ts` must verify the Playwright StoryEngine gate fails closed unless the pin is an ancestor of live main, binds fetched history to the live SHA, drops exact live equality, and still verifies the exact pinned checkout."
+      ]
+    },
+    {
+      "path": "scripts/audit-github-governance-preflight.mjs",
+      "claims": [
+        "`scripts/audit-github-governance-preflight.mjs` must treat one eligible non-owner human reviewer as a prerequisite for READY when canonical FCR native approvals equals one, and must never call owner-only or bot-only collaboration independent review proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        "`.github/workflows/deterministic-review-core-advisory.yml` must perform a trusted read-only non-owner reviewer availability check and re-read exact main before any GitHub ruleset provider mutation, preserving current-main founder command authorization and post-write provider proof."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
+      "claims": [
+        "`docs/FOUNDER_MERGE_AUTHORITY.md` must distinguish the approved one-review source phase from live provider enforcement and keep independent human GitHub approval separate from deterministic review and founder-final authority."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "`docs/PROVIDERS.md` must describe one native independent human approval, Code Owner and last-push requirements, and fail-closed reviewer eligibility before FCR ruleset mutation, without claiming that provider state has been changed."
       ]
     }
   ]
