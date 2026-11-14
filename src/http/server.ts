@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
+import { workspaceProjectsRouter } from './routes/workspaceProjects.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
@@ -171,6 +172,18 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
   app.use(requestAudit);
+
+  // The request-audit path enforces 120/minute per IP with a custom limiter.
+  // Keep it first so all denied requests are logged. This independently
+  // modeled Express limiter adds defense in depth without altering the
+  // existing RateLimit headers or allowing a different request quota.
+  app.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 120,
+    standardHeaders: false,
+    legacyHeaders: false,
+    message: { error: 'Rate limit exceeded.' },
+  }));
 
   if (options.serveStatic) {
     const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public');
@@ -384,6 +397,7 @@ export function createServer(options: CreateServerOptions = {}) {
   );
 
   app.use('/', onboardingRouter);
+  app.use('/workspace', workspaceProjectsRouter);
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);

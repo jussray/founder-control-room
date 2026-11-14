@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const securityPath = path.resolve(process.cwd(), 'src/http/middleware/security.ts');
+const serverPath = path.resolve(process.cwd(), 'src/http/server.ts');
 
 describe('HTTP rate-limit baseline contract', () => {
   it('applies the general limiter from the earliest shared request middleware', () => {
@@ -19,6 +20,25 @@ describe('HTTP rate-limit baseline contract', () => {
     expect(source).toMatch(/generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s);
     expect(source).toContain('export const rateLimitMagicLink = createRateLimiter(');
     expect(source).toContain('export const rateLimitFounderPermissions = rateLimit({');
+  });
+
+
+  it('keeps the recognized baseline between request audit and all signed ingress routes', () => {
+    const source = fs.readFileSync(serverPath, 'utf8');
+    const audit = source.indexOf('app.use(requestAudit);');
+    const recognizedLimiter = source.indexOf('app.use(rateLimit({', audit);
+    const githubWebhook = source.indexOf("'/webhooks/github'", recognizedLimiter);
+    const browserMutationGate = source.indexOf('app.use(requireSameOriginBrowserMutation);', recognizedLimiter);
+    const workspaceMount = source.indexOf("app.use('/workspace', workspaceProjectsRouter);", recognizedLimiter);
+
+    expect(audit).toBeGreaterThan(-1);
+    expect(recognizedLimiter).toBeGreaterThan(audit);
+    expect(githubWebhook).toBeGreaterThan(recognizedLimiter);
+    expect(browserMutationGate).toBeGreaterThan(recognizedLimiter);
+    expect(workspaceMount).toBeGreaterThan(browserMutationGate);
+    expect(source.slice(recognizedLimiter, githubWebhook)).toMatch(
+      /windowMs:\s*60 \* 1_000,\s*limit:\s*120,/,
+    );
   });
 
   it('counts each Express request at most once even when routes reuse the limiter', () => {
