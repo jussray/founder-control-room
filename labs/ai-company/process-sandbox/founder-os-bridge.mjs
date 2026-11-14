@@ -4,6 +4,24 @@ const BRIDGE_VERSION = 'founder-os-container-bridge-v1';
 const RECEIPT_VERSION = 'founder-os-container-control-receipt-v1';
 const WORKER_REQUEST_VERSION = 'synthetic-employee-request-v1';
 const ALLOWED_ACTIONS = new Set(['inspect', 'plan']);
+const EXPECTED_SPECIALIST_BY_ACTION = Object.freeze({
+  inspect: 'repo-truth',
+  plan: 'goalfix',
+});
+const EXPECTED_WORKER_CAPABILITIES = Object.freeze({
+  network: false,
+  providers: false,
+  database: false,
+  filesystemWrite: false,
+  childProcess: false,
+  workerThreads: false,
+  nativeAddons: false,
+  wasi: false,
+  inspector: false,
+  dynamicCode: false,
+  environment: false,
+});
+const FINGERPRINT8 = /^[0-9a-f]{8}$/;
 const HTTPS_URL = /^https:\/\/[^\s]+$/;
 const SHA40 = /^[0-9a-f]{40}$/i;
 
@@ -89,6 +107,15 @@ function assertFounderOsEligibility(request, plan) {
   }
   if (plan.route?.chiefSkill !== 'juss-chief-ai') {
     reject('chief_route_mismatch', 'container handoff must route through juss-chief-ai');
+  }
+  if (plan.route?.specialistSkill !== EXPECTED_SPECIALIST_BY_ACTION[request.action]) {
+    reject('specialist_route_mismatch', 'Founder OS specialist does not match the allowlisted action');
+  }
+  if (
+    plan.authority.approvalRequired !== false
+    || plan.authority.approvalObserved !== false
+  ) {
+    reject('approval_state_invalid', 'inspect and plan container tasks must not depend on approval state');
   }
   if (!Array.isArray(plan.truth?.blocked) || plan.truth.blocked.length !== 0) {
     reject('plan_blocked', 'blocked Founder OS plans may not enter the worker');
@@ -186,24 +213,43 @@ function boundaryMatches(boundary) {
 
 function validWorkerReceipt(workerRequest, worker) {
   if (!worker || typeof worker !== 'object' || Array.isArray(worker)) return false;
-  if (worker.status !== 'simulated' || worker.environmentCleared !== true) return false;
+  if (
+    worker.status !== 'simulated'
+    || worker.workerVersion !== 'ai-company-process-worker-v1'
+    || worker.environmentCleared !== true
+  ) return false;
   if (
     worker.authority?.level !== 'L0'
     || worker.authority?.mode !== 'simulation'
     || worker.authority?.executionAllowed !== false
   ) return false;
-  if (!worker.capabilities || Object.values(worker.capabilities).some((value) => value !== false)) {
+  if (!worker.capabilities || typeof worker.capabilities !== 'object' || Array.isArray(worker.capabilities)) {
     return false;
   }
-  if (typeof worker.inputFingerprint !== 'string' || typeof worker.outputFingerprint !== 'string') {
+  const capabilityKeys = Object.keys(EXPECTED_WORKER_CAPABILITIES);
+  if (
+    Object.keys(worker.capabilities).length !== capabilityKeys.length
+    || capabilityKeys.some((key) => worker.capabilities[key] !== false)
+  ) {
+    return false;
+  }
+  if (
+    typeof worker.inputFingerprint !== 'string'
+    || typeof worker.outputFingerprint !== 'string'
+    || !FINGERPRINT8.test(worker.inputFingerprint)
+    || !FINGERPRINT8.test(worker.outputFingerprint)
+  ) {
     return false;
   }
 
   const result = worker.result;
   if (!result || typeof result !== 'object' || Array.isArray(result)) return false;
+  if (result.version !== 'synthetic-employee-result-v1') return false;
   if (result.taskId !== workerRequest.taskId) return false;
   if (result.employee?.id !== 'synthetic-evidence-analyst') return false;
+  if (result.employee?.version !== 'synthetic-evidence-analyst-v1') return false;
   if (result.employee?.model?.provider !== 'deterministic-fixture') return false;
+  if (result.employee?.model?.id !== 'synthetic-model-v1') return false;
   if (result.employee?.model?.externalCalls !== false) return false;
   if (
     result.authority?.level !== 'L0'
@@ -211,6 +257,12 @@ function validWorkerReceipt(workerRequest, worker) {
     || result.authority?.executionAllowed !== false
   ) return false;
   if (result.decision !== 'ready_for_review') return false;
+  if (!Array.isArray(result.missingProof) || result.missingProof.length !== 0) return false;
+  if (
+    !Array.isArray(result.brief)
+    || result.brief.length === 0
+    || result.brief.some((line) => typeof line !== 'string')
+  ) return false;
   if (result.liveSideEffects !== false || result.publicUrl !== null) return false;
   return true;
 }
