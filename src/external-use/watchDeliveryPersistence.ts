@@ -22,13 +22,13 @@ export async function claimEligibleWatchDelivery(
   const localDate = easternDate(now);
   const lastWorldBriefLocalDate = record.lane === "world" && !record.urgent
     ? await store.lastWorldBriefDate() : undefined;
-  const alreadyDelivered = await store.hasDelivered(watchDeliveryId(record.id));
+  const claimId = watchDeliveryId(record.lane === "world" && !record.urgent\n    ? `world-brief:${localDate}` : record.id);\n  const alreadyDelivered = await store.hasDelivered(claimId);
   const state: WatchDeliveryState = {
     alertedIds: alreadyDelivered ? [record.id] : [],
     lastWorldBriefLocalDate,
   };
   if (!eligibleForDelivery(record, state, now)) return { claimed: false, reason: "ineligible_or_duplicate" };
-  const claimed = await store.claimDelivery(watchDeliveryId(record.id), record,
+  const claimed = await store.claimDelivery(claimId, record,
     record.lane === "world" && !record.urgent ? localDate : undefined);
   return { claimed, reason: claimed ? "claimed_for_review" : "concurrent_duplicate" };
 }
