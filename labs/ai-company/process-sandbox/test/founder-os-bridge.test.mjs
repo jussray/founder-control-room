@@ -247,6 +247,20 @@ test('requires an exact L0 ready-for-review Founder OS plan', () => {
     () => buildFounderOsWorkerRequest(request(), blocked),
     /blocked Founder OS plans/,
   );
+
+  const specialist = plan();
+  specialist.route.specialistSkill = 'goalfix';
+  assert.throws(
+    () => buildFounderOsWorkerRequest(request(), specialist),
+    /specialist does not match/,
+  );
+
+  const approvalState = plan();
+  approvalState.authority.approvalObserved = true;
+  assert.throws(
+    () => buildFounderOsWorkerRequest(request(), approvalState),
+    /must not depend on approval state/,
+  );
 });
 
 test('seals a verified container result into a Chief AI control-plane receipt', () => {
@@ -282,8 +296,15 @@ test('rejects forged boundary, authority, task, and model claims', () => {
   const forgeries = [
     (receipt) => { receipt.boundary.network = 'host'; },
     (receipt) => { receipt.worker.authority.executionAllowed = true; },
+    (receipt) => { receipt.worker.workerVersion = 'unexpected-worker-v2'; },
+    (receipt) => { receipt.worker.capabilities = {}; },
+    (receipt) => { receipt.worker.inputFingerprint = 'not-a-fingerprint'; },
+    (receipt) => { receipt.worker.result.version = 'unexpected-result-v2'; },
     (receipt) => { receipt.worker.result.taskId = 'different-task'; },
+    (receipt) => { receipt.worker.result.employee.version = 'unexpected-employee-v2'; },
+    (receipt) => { receipt.worker.result.employee.model.id = 'unexpected-model-v2'; },
     (receipt) => { receipt.worker.result.employee.model.externalCalls = true; },
+    (receipt) => { receipt.worker.result.missingProof = ['forged gap']; },
     (receipt) => { receipt.worker.result.decision = 'published'; },
     (receipt) => { receipt.worker.result.publicUrl = 'https://public.example.test/forged'; },
   ];
