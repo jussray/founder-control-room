@@ -22,7 +22,8 @@ function request(action = 'inspect') {
 }
 
 function plan(action = 'inspect') {
-  const specialistSkill = action === 'plan' ? 'goalfix' : 'repo-truth';
+  const commandId = action === 'plan' ? 'v10' : 'truthmode';
+  const providerId = action === 'plan' ? 'chatgpt' : 'github';
   return {
     version: 'founder-os-lab-v1',
     goal: request(action).goal,
@@ -41,10 +42,40 @@ function plan(action = 'inspect') {
       executionAllowed: false,
       approvalRequired: false,
       approvalObserved: false,
+      capabilityPlanBound: false,
     },
     route: {
       chiefSkill: 'juss-chief-ai',
-      specialistSkill,
+      command: {
+        id: commandId,
+        role: 'Synthetic command route.',
+        class: action === 'plan' ? 'founder' : 'truth',
+      },
+      provider: {
+        id: providerId,
+        mode: 'preview',
+        supported: true,
+        executionAllowed: false,
+        approvalRequired: false,
+        credentialBoundary: 'connector-owned',
+        evidenceRequired: [],
+        preflightEvidenceRequired: [],
+        preflightEvidenceObserved: [],
+        preflightEvidenceMissing: [],
+        rollback: 'Discard preview.',
+      },
+      project: null,
+      capabilityPlan: {
+        observed: false,
+        valid: false,
+        selectedBy: null,
+        planHash: null,
+        registryHash: null,
+        capabilityIds: [],
+        strategicLenses: [],
+        outcomeSignals: [],
+        errors: [],
+      },
       capabilities: ['founder-routing', 'proof-validation'],
       adapters: [],
     },
@@ -248,18 +279,25 @@ test('requires an exact L0 ready-for-review Founder OS plan', () => {
     /blocked Founder OS plans/,
   );
 
-  const specialist = plan();
-  specialist.route.specialistSkill = 'goalfix';
+  const provider = plan();
+  provider.route.provider.executionAllowed = true;
   assert.throws(
-    () => buildFounderOsWorkerRequest(request(), specialist),
-    /specialist does not match/,
+    () => buildFounderOsWorkerRequest(request(), provider),
+    /provider must remain a supported non-executing preview/,
+  );
+
+  const preflight = plan();
+  preflight.route.provider.preflightEvidenceMissing = ['commitSha'];
+  assert.throws(
+    () => buildFounderOsWorkerRequest(request(), preflight),
+    /preflight evidence must be complete/,
   );
 
   const approvalState = plan();
-  approvalState.authority.approvalObserved = true;
+  approvalState.authority.approvalRequired = true;
   assert.throws(
     () => buildFounderOsWorkerRequest(request(), approvalState),
-    /must not depend on approval state/,
+    /must never require approval/,
   );
 });
 
@@ -276,6 +314,8 @@ test('seals a verified container result into a Chief AI control-plane receipt', 
   assert.equal(first.status, 'simulated');
   assert.equal(first.controlPlane, 'juss-chief-ai');
   assert.equal(first.founderOs.action, 'inspect');
+  assert.equal(first.founderOs.commandId, 'truthmode');
+  assert.equal(first.founderOs.providerId, 'github');
   assert.equal(first.authority.level, 'L0');
   assert.equal(first.authority.executionAllowed, false);
   assert.equal(first.containerInvoked, true);
