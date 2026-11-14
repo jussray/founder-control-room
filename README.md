@@ -1,5 +1,10 @@
 # Founder Control Room
 
+## November 2, 2026: project-owned Monday founder orientation candidate
+
+Existing PR #894 is the carrier for FCR's Monday 08:00 America/New_York founder orientation. It reuses the single per-minute Cloudflare Worker scheduler and adds no ChatGPT automation slot or competing cron owner. Verification freshness is measured from the repository observation timestamp (scanned_at), not packet ingestion time, so delayed stale evidence cannot become current merely by arriving late; invalid and future observation times fail closed to UNKNOWN.
+
+This remains source-candidate truth only until exact-head CI and Playwright pass, the protected migration is applied through the normal release path, the current Worker is deployed with its project-scoped email binding, and a real scheduled receipt is observed. It grants no automatic merge, deploy, publication, provider mutation, or cross-project authority.
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
