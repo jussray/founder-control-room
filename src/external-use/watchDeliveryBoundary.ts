@@ -24,9 +24,11 @@ export interface WatchDeliveryState {
   lastWorldBriefLocalDate?: string;
 }
 export function easternDate(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(now);
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 export function easternHour(now: Date): number {
   return Number(new Intl.DateTimeFormat("en-US", {
