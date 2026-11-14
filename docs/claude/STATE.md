@@ -5,8 +5,8 @@
 - REALITY: main `4461992e` (Johnstown 90-day pilot workflow) added `src/http/routes/johnstownAiPilot.ts` with an unused `EVIDENCE` constant. Lint fails on it (`@typescript-eslint/no-unused-vars`), so every PR merging this main inherits a red Lint check.
 - FIX (implant rule): branch `docs/state-969-merge-20261112`. Deleted the one unused line. POST always inserts `evidence_state: 'unknown'`, and the migration's CHECK constraint enforces the allowed values, so behavior is unchanged.
 - PROOF: `npx eslint src/http/routes/johnstownAiPilot.ts --quiet` clean; `tsc --noEmit` clean. Exact-head CI pending.
-- ROLLBACK: revert the commit. main still carries the error until #1092 or another fix lands.
-- NEXT GATE: Juss's SHA-bound merge line for #1092 at its new head.
+- ROLLBACK: revert the commit.
+- SUPERSEDED (2026-11-14): main `cc9707d3` (#1096) removed the same constant, so after merging main the PR no longer changes `johnstownAiPilot.ts`. Ledger re-bound to `cc9707d3`. Juss enabled auto-merge (squash) on #1092.
 
 ## 2026-11-12 — PR #969 merged; production API degraded (pre-existing)
 
