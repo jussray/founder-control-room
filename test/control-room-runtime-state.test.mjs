@@ -18,6 +18,18 @@ function fixture() {
 }
 function env(overrides = {}) { return { GITHUB_EVENT_NAME: 'push', GITHUB_RUN_ATTEMPT: '1', GITHUB_REPOSITORY: 'jussray/example', EXPECTED_HEAD_SHA: SHA, CONTROL_ROOM_RUNTIME_STATE_PATH: 'artifacts/control-room-runtime-state.json', ...overrides }; }
 
+test('written runtime-state receipt is parseable JSON with a real trailing newline', () => {
+  const root = fixture();
+  const outputPath = path.join(root, 'artifacts', 'runtime-state.json');
+  const receipt = writeRuntimeStateReceipt(
+    env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }),
+    root,
+  );
+  const written = fs.readFileSync(outputPath, 'utf8');
+  assert.ok(written.endsWith('\n'), 'runtime-state JSON must end with a real newline');
+  assert.deepEqual(JSON.parse(written), receipt);
+});
+
 test('tracked configuration movement changes the receipt fingerprint', () => {
   const root = fixture(); const before = trackedConfigFingerprint(root);
   fs.appendFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'on: push\\n', 'utf8');
