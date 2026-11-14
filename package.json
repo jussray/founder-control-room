@@ -48,7 +48,7 @@
     "verify:founder-review-email": "node scripts/verify-founder-review-email-ingress.mjs && vitest run --config vitest.founder-review-email.config.ts src/founderSignalEmailIngress/email.test.ts src/founderSignalEmailIngress/reviewExecution.test.ts src/founderSignalEmailIngress/reviewAuthorization.test.ts src/worker/founderSignalReviewEmail.test.ts src/http/routes/__tests__/founderSignalReviewContexts.integration.test.ts src/http/routes/__tests__/founderSignalReviewEmailIngress.integration.test.ts && npm run cf:dry-run:email",
     "verify:ai-company-parity": "node scripts/verify-founder-os-lab-isolation.mjs && npm --prefix labs/ai-company run verify && vitest run --config vitest.ai-company-parity.config.ts",
     "verify:ai-company-adversarial": "node scripts/verify-founder-os-lab-isolation.mjs && npm --prefix labs/ai-company run verify && vitest run --config vitest.ai-company-adversarial.config.ts",
-    "verify:ai-company-container:unit": "node labs/ai-company/process-sandbox/verify.mjs && node --test labs/ai-company/process-sandbox/test/*.test.mjs",
+    "verify:ai-company-container:unit": "node labs/ai-company/process-sandbox/verify.mjs && node --test labs/ai-company/process-sandbox/test/*.test.mjs && vitest run --config vitest.founder-os-container-bridge.config.ts",
     "verify:ai-company-container": "npm run verify:ai-company-container:unit && node labs/ai-company/process-sandbox/container-proof.mjs",
     "verify:founder-chief-pair": "node scripts/verify-founder-chief-pair.mjs",
     "verify:cookies": "node scripts/verify-cookie-contract.mjs",
