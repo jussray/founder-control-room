@@ -37,6 +37,7 @@ describe("Supabase watch event store", () => {
     const calls: string[] = [];
     const query = {
       eq: (_field: string, _value: string) => { calls.push("eq"); return query; },
+      filter: () => query,
       not: (field: string, operator: string, value: null) => {
         expect([field, operator, value]).toEqual(["payload->>local_date", "is", null]);
         calls.push("not"); return query;
