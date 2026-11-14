@@ -22,7 +22,9 @@ export async function claimEligibleWatchDelivery(
   const localDate = easternDate(now);
   const lastWorldBriefLocalDate = record.lane === "world" && !record.urgent
     ? await store.lastWorldBriefDate() : undefined;
-  const claimId = watchDeliveryId(record.lane === "world" && !record.urgent\n    ? `world-brief:${localDate}` : record.id);\n  const alreadyDelivered = await store.hasDelivered(claimId);
+  const claimId = watchDeliveryId(record.lane === "world" && !record.urgent
+    ? `world-brief:${localDate}` : record.id);
+  const alreadyDelivered = await store.hasDelivered(claimId);
   const state: WatchDeliveryState = {
     alertedIds: alreadyDelivered ? [record.id] : [],
     lastWorldBriefLocalDate,
