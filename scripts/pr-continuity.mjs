@@ -155,6 +155,23 @@ export function collectRolloverOrder(pulls, rootRef = 'main') {
   return order;
 }
 
+// Rollover only spends CI on pull requests that can merge soon. Drafts and PRs
+// labelled `stale` (see scripts/pr-hygiene.mjs) are recorded as deferred instead
+// of having main merged into them; every gate still requires current-base
+// ancestry, so a deferred PR cannot merge until it is rolled forward.
+export const ROLLOVER_DEFER_LABEL = 'stale';
+export const DEFERRED_PROOF_STATE = 'REVERIFY_OR_ROLLOVER_REQUIRED';
+
+export function rolloverDeferral(pr) {
+  if (pr?.draft === true) return 'DEFERRED_DRAFT';
+  if ((pr?.labels ?? []).some((label) => label?.name === ROLLOVER_DEFER_LABEL)) return 'DEFERRED_STALE';
+  return null;
+}
+
+export function deferralAlreadyRecorded(body, state) {
+  return String(body || '').includes(`- continuity: **${state}**`);
+}
+
 export const sameRepositoryPull = (pr, repository) =>
   pr?.head?.repo?.full_name === repository && pr?.base?.repo?.full_name === repository;
 
@@ -246,6 +263,22 @@ const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
     proofState: proof,
     autoMergeIntent: observedAutoMerge(pr),
   });
+
+async function deferOnePull(repository, pr, rootRef, state) {
+  if (deferralAlreadyRecorded(pr.body, state)) {
+    return { number: pr.number, state, headRef: pr.head?.ref, headSha: pr.head?.sha, metadata: { updated: false, blocked: false } };
+  }
+  const rootSha = await branchSha(repository, rootRef);
+  const baseSha = await liveBaseSha(repository, pr);
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, DEFERRED_PROOF_STATE));
+  return {
+    number: pr.number,
+    state: metadata.blocked ? 'BLOCKED_METADATA' : state,
+    headRef: pr.head?.ref,
+    headSha: pr.head?.sha,
+    metadata,
+  };
+}
 
 async function updateOnePull(repository, number, rootRef) {
   let pr = await getPull(repository, number);
@@ -392,9 +425,17 @@ export async function rolloverMode() {
   const rootRef = env('ROOT_BASE_REF', 'main');
   if (!repository) throw new Error('GITHUB_REPOSITORY_REQUIRED');
 
-  const order = collectRolloverOrder(await listOpenPulls(repository), rootRef);
+  const pulls = await listOpenPulls(repository);
+  const order = collectRolloverOrder(pulls, rootRef);
+  const byNumber = new Map(pulls.map((pull) => [pull.number, pull]));
   const results = [];
-  for (const number of order) results.push(await updateOnePull(repository, number, rootRef));
+  for (const number of order) {
+    const deferral = rolloverDeferral(byNumber.get(number));
+    results.push(deferral
+      ? await deferOnePull(repository, byNumber.get(number), rootRef, deferral)
+      : await updateOnePull(repository, number, rootRef));
+  }
+  const deferred = results.filter((item) => item.state.startsWith('DEFERRED'));
   const blocked = results.filter((item) => item.state.startsWith('BLOCKED'));
   const blockedByState = blocked.reduce((counts, item) => {
     counts[item.state] = (counts[item.state] || 0) + 1;
@@ -413,6 +454,8 @@ export async function rolloverMode() {
     rootBaseSha: await branchSha(repository, rootRef),
     order,
     results,
+    deferredCount: deferred.length,
+    deferredPullRequests: deferred.map((item) => ({ pullRequest: item.number, state: item.state })),
     blockedCount: blocked.length,
     blockedByState,
     failureReceiptCount: failureReceipts.length,
