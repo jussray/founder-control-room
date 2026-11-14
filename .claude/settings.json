@@ -1,9 +1,46 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push origin main)",
       "Bash(gh issue close:*)"
     ],
-    "deny": []
+    "deny": [
+      "Bash(git push origin main)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin HEAD:refs/heads/main*)",
+      "Bash(git push origin production*)",
+      "Bash(git push origin HEAD:production*)",
+      "Bash(git push origin HEAD:refs/heads/production*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git push origin +*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-remote-writes.sh",
+            "timeout": 10,
+            "statusMessage": "Checking for GitHub remote writes"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-repo-skills.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
