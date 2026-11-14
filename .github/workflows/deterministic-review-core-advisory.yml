@@ -412,12 +412,14 @@ jobs:
                 topology: null,
                 failure: {
                   name: 'CredentialShapeError',
-                  message: 'APP_PRIVATE_KEY_SHAPE_INVALID: replace the production APP_PRIVATE_KEY secret with the complete matching GitHub App RSA private-key PEM or a documented supported transport encoding',
+                  message: 'APP_PRIVATE_KEY_SHAPE_INVALID: effective APP_PRIVATE_KEY value failed local RSA parsing; secret scope and origin remain unverified, so do not infer the original GitHub App key is invalid or needs replacement',
+                  secretReference: 'APP_PRIVATE_KEY',
+                  secretScopeVerified: false,
                 },
               }, null, 2)}\n`,
               'utf8',
             );
-            console.error('::error title=GitHub App credential shape invalid::APP_PRIVATE_KEY_SHAPE_INVALID: production APP_PRIVATE_KEY is not a complete supported GitHub App RSA private-key transport. Provider authentication and provider mutation were not attempted.');
+            console.error('::error title=GitHub App effective credential parsing failed::APP_PRIVATE_KEY_SHAPE_INVALID: the value supplied through secrets.APP_PRIVATE_KEY was not parseable as an RSA private key. Its actual scope, source, and original key validity were not verified. Check binding provenance before proposing any credential replacement. Provider authentication and provider mutation were not attempted.');
             process.exit(1);
           }
           NODE

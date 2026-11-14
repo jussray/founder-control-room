@@ -579,6 +579,12 @@
       ]
     },
     {
+      "path": "src/providers/GitHubChangeGenealogyReader.ts",
+      "claims": [
+        "`src/providers/GitHubChangeGenealogyReader.ts` must redact the complete opaque GitHub installation token, including JWT-format ghs_ values with dot-delimited segments and URL-safe final characters, before comment/review excerpts are truncated or returned; redaction source tests do not establish live credential validity, provider identity, production deployment, or merge authority."
+      ]
+    },
+    {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
         "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
@@ -593,7 +599,8 @@
     {
       "path": ".github/workflows/github-app-secret-shape-diagnostic.yml",
       "claims": [
-        ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+        ".github/workflows/github-app-secret-shape-diagnostic.yml must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof.",
+        ".github/workflows/github-app-secret-shape-diagnostic.yml must classify the existing production environment APP_PRIVATE_KEY input in a founder-gated exact-main read-only job, retaining only bounded shape booleans and never exposing key material or substituting local RSA parsing for the App issuer and installation proof."
       ]
     },
     {
@@ -687,6 +694,13 @@
       "path": "src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts",
       "claims": [
         "`src/lib/__tests__/firstPartyContentTruthUi.contract.test.ts` must verify the exact-head Playwright checkout, PR-scoped cancellation that preserves non-PR witnesses, and pinned browser evidence artifacts; a source equality assertion must not require canceling main runs."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        ".github/workflows/deterministic-review-core-advisory.yml must bind its trusted witness publisher's GitHub App private key to the existing production environment secret APP_PRIVATE_KEY while preserving APP_ID issuer identity, protected environment approval, exact current-main verification, fail-closed RSA parsing, independent provider readback, and separately authorized merge and deployment gates.",
+        ".github/workflows/deterministic-review-core-advisory.yml must retain fail-closed RSA parsing while labeling secrets.APP_PRIVATE_KEY as the effective runtime input with unverified origin/scope, never claiming the original key is defective or demanding replacement based solely on a failed local parse; the failed preflight itself must not attempt GitHub App authentication, governance mutation, merge, or deployment, and grants no authority to those separate paths."
       ]
     },
     {

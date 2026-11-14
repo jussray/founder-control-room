@@ -196,6 +196,30 @@ describe("shared GitHub App wrapper transports", () => {
     }
   });
 
+  it("signs identically from diagnostic-accepted DER and collapsed PEM transports", () => {
+    const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString().trim();
+    const now = Date.parse("2026-11-03T12:00:00Z");
+    const expected = createGitHubAppJwt("99", pem, now);
+    const transports = [
+      privateKey.export({ type: "pkcs8", format: "der" }).toString("base64"),
+      privateKey.export({ type: "pkcs1", format: "der" }).toString("base64url"),
+      pem.split("\n").slice(1, -1).join("\n"),
+      pem.replace(/\n/g, " "),
+    ];
+    for (const transport of transports) {
+      expect(createGitHubAppJwt("99", transport, now)).toBe(expected);
+    }
+  });
+
+  it("rejects malformed base64 DER without echoing key material", () => {
+    const malformed = Buffer.from("not a DER private key").toString("base64");
+    let error: unknown;
+    try { createGitHubAppJwt("99", malformed); } catch (caught) { error = caught; }
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toContain(malformed);
+  });
+
   it("rejects ambiguous objects and malformed wrappers without echoing values", () => {
     const pem = generatePrivatePem();
     for (const value of [

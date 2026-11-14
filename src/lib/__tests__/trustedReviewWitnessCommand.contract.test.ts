@@ -159,6 +159,11 @@ describe('trusted review witness command contract', () => {
     expect(credentialPreflight).toContain('providerMutationAttempted: false');
     expect(credentialPreflight).toContain("providerMutationState: 'NOT_ATTEMPTED'");
     expect(credentialPreflight).toContain("name: 'CredentialShapeError'");
+    expect(credentialPreflight).toContain("secretReference: 'APP_PRIVATE_KEY'");
+    expect(credentialPreflight).toContain('secretScopeVerified: false');
+    expect(credentialPreflight).toContain('effective APP_PRIVATE_KEY value failed local RSA parsing');
+    expect(credentialPreflight).toContain('Check binding provenance before proposing any credential replacement');
+    expect(credentialPreflight).not.toContain('replace the production APP_PRIVATE_KEY secret with');
     expect(credentialPreflight).toContain(
       'Provider authentication and provider mutation were not attempted.',
     );
