@@ -33,6 +33,21 @@ describe("Supabase watch event store", () => {
     expect(captured?.processed).toBe(true);
     expect((captured?.payload as {status:string}).status).toBe("CLAIMED_NOT_DELIVERED");
   });
+  it("ignores urgent world claims without a daily briefing date", async () => {
+    const calls: string[] = [];
+    const query = {
+      eq: (_field: string, _value: string) => { calls.push("eq"); return query; },
+      not: (field: string, operator: string, value: null) => {
+        expect([field, operator, value]).toEqual(["payload->>local_date", "is", null]);
+        calls.push("not"); return query;
+      },
+      order: () => query,
+      limit: async () => ({data: [{payload: {local_date: "2026-11-14"}}], error: null}),
+    };
+    const client = {from: () => ({select: () => query})} as unknown as Pick<SupabaseClient, "from">;
+    expect(await supabaseWatchEventStore(client).lastWorldBriefDate()).toBe("2026-11-14");
+    expect(calls).toContain("not");
+  });
   it("fails closed on Supabase errors", async () => {
     const client = {from: () => ({upsert: () => ({select: async () => ({
       data: null, error: {code: "42501"}
