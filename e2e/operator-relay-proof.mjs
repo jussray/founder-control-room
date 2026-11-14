@@ -41,7 +41,9 @@ console.log(JSON.stringify({
   contract: 'fcr/operator-relay-playwright-preflight@v1',
   peerOperators: relayOperators,
   instructorLane: instructorOnly,
+  canonicalPath: '/mcp',
+  standaloneHttpRoute: 'UNMOUNTED_TEST_SCAFFOLD',
   authorityEscalation: false,
-  status: 'CONTRACT_ONLY',
-  nextGate: 'authenticated endpoint + real provider dispatch + browser round-trip',
+  status: 'SOURCE_WIRED_LIVE_UNPROVEN',
+  nextGate: 'same-head deployed runtime + OAuth-bound operator client + real provider evidence + founder-visible Playwright round-trip',
 }, null, 2));

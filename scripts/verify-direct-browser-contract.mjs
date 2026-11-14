@@ -10,6 +10,8 @@ const ultrathinkPluginProofUrl = new URL('../e2e/plugin-center-ultrathink-proof.
 const ultrathinkPluginProof = fs.readFileSync(ultrathinkPluginProofUrl, 'utf8');
 const composerProofUrl = new URL('../e2e/control-room-composer-proof.mjs', import.meta.url);
 const composerProof = fs.readFileSync(composerProofUrl, 'utf8');
+const operatorRelayProofUrl = new URL('../e2e/operator-relay-proof.mjs', import.meta.url);
+const operatorRelayProof = fs.readFileSync(operatorRelayProofUrl, 'utf8');
 const fiveScreenProofUrl = new URL('../e2e/five-screen-shell-proof.mjs', import.meta.url);
 const fiveScreenProof = fs.readFileSync(fiveScreenProofUrl, 'utf8');
 const localFirstFounderProofUrl = new URL('../e2e/founder-local-first-proof.mjs', import.meta.url);
@@ -53,6 +55,9 @@ assert.match(composerProof, /composer-desktop/);
 assert.match(composerProof, /composer-mobile/);
 assert.match(composerProof, /submittedPayload\.controlRoom/);
 assert.match(composerProof, /test-results\/control-room-composer/);
+assert.match(operatorRelayProof, /SOURCE_WIRED_LIVE_UNPROVEN/);
+assert.match(operatorRelayProof, /canonicalPath: '\/mcp'/);
+assert.match(operatorRelayProof, /standaloneHttpRoute: 'UNMOUNTED_TEST_SCAFFOLD'/);
 assert.match(fiveScreenProof, /from 'playwright'/);
 assert.match(fiveScreenProof, /\['Home', 'Control', 'Chief', 'PromptOS', 'Proof'\]/);
 assert.match(fiveScreenProof, /fcr_founder_context/);
@@ -153,6 +158,10 @@ execFileSync(process.execPath, [fileURLToPath(composerProofUrl)], {
   env: process.env,
 });
 
+execFileSync(process.execPath, [fileURLToPath(operatorRelayProofUrl)], {
+  stdio: 'inherit',
+  env: process.env,
+});
 execFileSync(process.execPath, [fileURLToPath(fiveScreenProofUrl)], {
   stdio: 'inherit',
   env: process.env,
@@ -162,4 +171,4 @@ execFileSync(process.execPath, [fileURLToPath(visualParityProofUrl)], {
   env: process.env,
 });
 
-console.log('direct browser contract verified: safe-read recovery, local proof, ULTRATHINK, Composer, five-screen navigation, offline state, OS topology, visual parity, Truth Console contract');
+console.log('direct browser contract verified: safe-read recovery, local proof, ULTRATHINK, Composer, five-screen navigation, offline state, OS topology, visual parity, operator relay, Truth Console contract');
