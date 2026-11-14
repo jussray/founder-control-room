@@ -1,5 +1,14 @@
 # Claude session state — Founder Control Room
 
+## 2026-11-14 — Production deploy blocked: Cloudflare API token invalid
+
+- REALITY: #1092 merged as `0e85256d`. Juss approved `deploy.yml` on main `0e85256d` (approval ID `juss-2026-11-14-api-redeploy`). Run 43551157647 failed in the "Production Authority and Exact-Head Gate" job: Cloudflare returned `Invalid access token [code: 9109]` for the `CLOUDFLARE_API_TOKEN` secret in the GitHub "production" environment. The gate reported no secret value read or printed and no provider mutation. Supabase migrations, Worker deploy and Pages release never started.
+- ROOT CAUSE of the live 503: the bot-dispatched deploy run 43319795155 (2026-11-12, main `aedd5650`) failed the same way. With an invalid token no deploy can reach the API Worker `founder-control-room`, which is why it has not changed since 2026-10-20 and the Pages proxy still returns 503 `API_SERVICE_IDENTITY_MISMATCH`.
+- PROOF: live check 2026-11-14 ~03:10Z — `/` 200; `/version`, `/health`, `/api/health` 503 `API_SERVICE_IDENTITY_MISMATCH`. Main CI on `0e85256d`: 14 workflows completed, all success.
+- PENDING MIGRATION: `20261113193000_johnstown_ai_pilot_workflow.sql` (additive: one new RLS-enabled table, service_role select/insert/update only). The deploy's `supabase db push --include-all` dry run will list any older unapplied migrations.
+- UPDATE (2026-11-14 ~06:10Z): main moved to `a7c66b41`, so the `0e85256d` deploy approval has expired. Main `53edf4f7` makes `deploy.yml` verify the Cloudflare token (status active) before any Wrangler call and adds a read-only credential diagnostic.
+- NEXT GATE: Juss rotates `CLOUDFLARE_API_TOKEN` (Workers scripts edit + Pages edit on the account) in the GitHub "production" environment, and optionally re-stores `APP_PRIVATE_KEY` as a full PEM. Then rerun `deploy.yml` — the existing approval covers main `0e85256d` only; any main movement needs a fresh SHA-bound line.
+
 ## 2026-11-13 — Lint fix implanted on #1092 (main's Johnstown commit)
 
 - REALITY: main `4461992e` (Johnstown 90-day pilot workflow) added `src/http/routes/johnstownAiPilot.ts` with an unused `EVIDENCE` constant. Lint fails on it (`@typescript-eslint/no-unused-vars`), so every PR merging this main inherits a red Lint check.
