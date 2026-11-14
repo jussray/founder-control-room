@@ -1,5 +1,24 @@
 # Claude session state — Founder Control Room
 
+## 2026-11-13 — Lint fix implanted on #1092 (main's Johnstown commit)
+
+- REALITY: main `4461992e` (Johnstown 90-day pilot workflow) added `src/http/routes/johnstownAiPilot.ts` with an unused `EVIDENCE` constant. Lint fails on it (`@typescript-eslint/no-unused-vars`), so every PR merging this main inherits a red Lint check.
+- FIX (implant rule): branch `docs/state-969-merge-20261112`. Deleted the one unused line. POST always inserts `evidence_state: 'unknown'`, and the migration's CHECK constraint enforces the allowed values, so behavior is unchanged.
+- PROOF: `npx eslint src/http/routes/johnstownAiPilot.ts --quiet` clean; `tsc --noEmit` clean. Exact-head CI pending.
+- ROLLBACK: revert the commit.
+- SUPERSEDED (2026-11-14): main `cc9707d3` (#1096) removed the same constant, so after merging main the PR no longer changes `johnstownAiPilot.ts`. Ledger re-bound to `cc9707d3`. Juss enabled auto-merge (squash) on #1092.
+
+## 2026-11-12 — PR #969 merged; production API degraded (pre-existing)
+
+- REALITY: #969 was squash-merged as `6d7e9b4636d913b96abb605ebab1fcc19ed6ae1e` from head `b16f857c` on base `023f94bc`. All 31 review threads were verified and resolved first. Merge approval was "1-3" (an item naming the exact SHAs), confirmed afterwards by Juss's literal SHA-bound line. Future merges wait for the literal line.
+- PROOF: CI on `6d7e9b46` shows 39 passed, 15 skipped, 2 failed. Cloudflare Pages reports "Deployed successfully" and Workers Builds reports success.
+- RISK (pre-existing, not #969):
+  - "Juss & Co portfolio evidence sync" fails on every main run since at least `aa1199d1` (2026-11-08) with `APP_PRIVATE_KEY_SHAPE_INVALID`: the secret has no BEGIN/END lines. Its GitHub environment is named "production", so it shows as a failed "production" deployment.
+  - `verify-pair-contract` stays red until Chief `main` restores the pair contract. Chief is still `99d3b7c3`.
+  - Live API is degraded: `foundercontrolroom.org` `/version`, `/health` and `/api/health` return 503 with `API_SERVICE_IDENTITY_MISMATCH`. The Pages proxy (`public/_worker.js`) requires `x-founder-control-room-service: founder-control-room`, and the upstream does not send it. Cloudflare deployment history shows the API Worker `founder-control-room` was last deployed 2026-10-20, so neither #969 nor its branch builds changed it. The home page returns 200.
+- STATE: MERGED_UNVERIFIED. The live API cannot be verified while the identity check fails. Production Playwright Exact-SHA Witness was skipped.
+- NEXT GATE: Juss decides on an API Worker redeploy (`deploy.yml`) or a binding fix, re-stores `APP_PRIVATE_KEY` as a full PEM, and lands the Chief restore.
+
 ## Standing founder rule (2026-11-11): implant needed fixes, document, Sauce Guard
 
 Juss: "Implant the needed fixes always … even if the work branch isn't yours, just document accordingly. Use Sauce Guard when doing so."
