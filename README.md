@@ -129,6 +129,10 @@ Founder Control Room is the provider-independent founder operating plane for gov
 
 GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, Shopify, and other providers may supply execution or evidence. None of them becomes the product constitution.
 
+## ACTUAL-FLOW V5.2 — read-only verification candidate
+
+A source-only, offline FCR signed-evidence verifier and negative tests are proposed at `scripts/actual-flow-fcr-verify.mjs` and `test/actual-flow-fcr-verify.test.mjs`. The contract is documented in [`docs/ACTUAL_FLOW_FCR_READONLY_INTEGRATION.md`](docs/ACTUAL_FLOW_FCR_READONLY_INTEGRATION.md). This is **not** an active FCR route, a configured key, an integrated autonomous agent, a Cloudflare deployment, or live runtime proof. No signing keys or private evidence are bundled. Founder-controlled approval remains a separate gate.
+
 ## October 22, 2026 StoryEngine peer-pin recovery for Council PR #996
 
 PR #996's Council-scoped tests completed, but the broader Playwright workflow stopped at the stale peer-ref guard. Independently observed StoryEngine `main` moved forward from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9` in three commits changing 24 files. All 15 StoryEngine commit checks passed at observation; that evidence is *not* an FCR browser-integration proof. The reviewed pin refresh retains the live-ref-equality guard, immutable checkout and complete FCR-to-StoryEngine Playwright witness. Only the exact successor FCR commit and peer pair may earn new federation evidence. Council cost controls and authenticated founder mission creation remain unchanged; no new live Council verdict is established by CI.
