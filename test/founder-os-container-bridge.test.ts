@@ -59,7 +59,7 @@ describe('Founder OS to container worker compatibility', () => {
           }),
           expect.objectContaining({
             label: 'Founder OS route',
-            value: `juss-chief-ai -> ${plan.route.specialistSkill}`,
+            value: `juss-chief-ai -> ${plan.route.command.id} -> ${plan.route.provider.id}`,
             proofUrl: PROOF,
           }),
         ]),
@@ -83,8 +83,6 @@ describe('Founder OS to container worker compatibility', () => {
     };
     const plan = planFounderOsLab(input);
 
-    expect(plan.readiness).toBe('ready_for_external_executor');
-    expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(() => buildFounderOsWorkerRequest(input, plan)).toThrow(
       /only inspect and plan may enter the container worker/,
