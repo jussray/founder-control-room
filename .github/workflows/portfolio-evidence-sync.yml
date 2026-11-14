@@ -27,7 +27,7 @@ env:
 
 jobs:
   sync:
-    name: Observe, publish, and prove portfolio evidence
+    name: Observe and propose portfolio evidence (read-only)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -50,6 +50,7 @@ jobs:
         run: node scripts/sync-jussco-portfolio-evidence.mjs --self-test
 
       - name: Normalize key and mint portfolio GitHub App token
+        id: mint
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
@@ -57,7 +58,7 @@ jobs:
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
         run: node scripts/mint-portfolio-github-app-token.mjs
 
-      - name: Observe canonical repositories and publish evidence atomically
+      - name: Observe canonical repositories and propose bounded evidence (no publication)
         id: sync
         env:
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
@@ -86,10 +87,12 @@ jobs:
             echo "- Worlds refreshed: \`$(jq -r '.changedWorlds | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
             echo "- Systems refreshed: \`$(jq -r '.changedSystems | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
             echo "- Unavailable repositories: \`$(jq -r '.unavailableRepositories | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
-            echo '- Mutation boundary: evidence fields + registry generatedAt only'
+            echo '- Mutation boundary: reviewable local evidence proposals only; no GitHub writes'
+          echo '- Source readback is not production release or founder authorization'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install Chromium for deployed proof
+        if: ${{ steps.sync.outputs.state == 'PUBLISHED' }}
         env:
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
         shell: bash
@@ -99,6 +102,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Prove deployed evidence in real browsers
+        if: ${{ steps.sync.outputs.state == 'PUBLISHED' }}
         env:
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
           EXPECTED_WORLDS_GENERATED_AT: ${{ steps.sync.outputs.worlds_generated_at }}
@@ -106,10 +110,11 @@ jobs:
           JUSSCO_URLS: https://jussco.company,https://www.jussco.company
         run: node scripts/sync-jussco-portfolio-evidence.mjs --live-proof
 
-      - name: Record blocked authentication evidence
+      - name: Record blocked workflow-stage evidence without asserting credential revocation
         if: ${{ failure() }}
         env:
           FAILED_JOB_STATUS: ${{ job.status }}
+          MINT_STEP_OUTCOME: ${{ steps.mint.outcome }}
           FCR_RUN_ID: ${{ github.run_id }}
           FCR_HEAD_SHA: ${{ github.sha }}
         shell: bash
@@ -124,7 +129,8 @@ jobs:
             --arg run "$FCR_RUN_ID" \
             --arg sha "$FCR_HEAD_SHA" \
             --arg status "$FAILED_JOB_STATUS" \
-            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,sourceVerified:false,liveVerified:false}' \
+            --arg mint "$MINT_STEP_OUTCOME" \
+            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,mintStepOutcome:$mint,bindingOrigin:"UNKNOWN_FROM_WORKFLOW",providerCredentialValidity:"NOT_EVALUATED_BY_THIS_RECEIPT",sourceVerified:false,liveVerified:false}' \
             > "$PORTFOLIO_SYNC_RECEIPT"
 
       - name: Upload bounded evidence receipt and browser proof
@@ -134,6 +140,7 @@ jobs:
           name: portfolio-evidence-sync-${{ github.run_id }}
           path: |
             artifacts/portfolio-evidence-sync/receipt.json
+            artifacts/portfolio-evidence-sync/proposed/
             proof/portfolio-evidence-sync/
           if-no-files-found: warn
           retention-days: 30

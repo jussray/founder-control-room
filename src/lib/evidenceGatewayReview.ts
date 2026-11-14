@@ -69,7 +69,8 @@ export async function reviewEvidence(input:unknown,options:{
  try{
    const url='https://gateway.ai.cloudflare.com/v1/'+accountId+'/'+gatewayId+'/openai/chat/completions';
    const headers:Record<string,string>={Accept:'application/json',
-     'Content-Type':'application/json',Authorization:'Bearer '+providerToken};
+     'Content-Type':'application/json',Authorization:'Bearer '+providerToken,
+     'cf-aig-collect-log':'false','cf-aig-skip-cache':'true','Cache-Control':'no-store'};
    if(gatewayToken)headers['cf-aig-authorization']='Bearer '+gatewayToken;
    const r=await fetchFn(url,{method:'POST',redirect:'error',signal:ac.signal,headers,
      body:JSON.stringify({model,temperature:0,max_tokens:1100,stream:false,

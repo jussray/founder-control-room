@@ -8,7 +8,6 @@ const DEFAULT_TARGET = 'jussray/jussray';
 const DEFAULT_BRANCH = 'main';
 const MAX_STABLE_AGE_MS = 24 * 60 * 60 * 1000;
 const HARD_FAILURES = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure']);
-const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
 
 class GitHubHttpError extends Error {
   constructor(status, path, body) {
@@ -63,28 +62,32 @@ function evidenceIsFresh(evidence, nowMs) {
   return Number.isFinite(observed) && nowMs - observed < MAX_STABLE_AGE_MS;
 }
 
-function summarizeChecks(checkRuns) {
-  const runs = Array.isArray(checkRuns) ? checkRuns : [];
-  if (!runs.length) {
-    return { state: 'unknown', total: 0, completed: 0, passing: 0, failing: 0, pending: 0, ci: 'UNKNOWN · no exact-head checks observed' };
-  }
-  let completed = 0;
-  let passing = 0;
-  let failing = 0;
-  let pending = 0;
+// A successful subset of GitHub check-runs is not proof that all checks passed.
+// Skipped/neutral jobs are not green, and truncated or incomplete API reads are
+// UNKNOWN rather than a fabricated PASS.
+function summarizeChecks(checkRuns, providerTotal = Array.isArray(checkRuns) ? checkRuns.length : null) {
+  const runs=Array.isArray(checkRuns) ? checkRuns : [];
+  if (!Number.isSafeInteger(providerTotal) || providerTotal<0 || providerTotal!==runs.length)
+    return { state:'unknown',total:providerTotal,observed:runs.length,completed:0,passing:0,failing:0,pending:0,
+      ci:'UNKNOWN · incomplete exact-head check inventory' };
+  if (!runs.length)
+    return { state:'unknown',total:0,completed:0,passing:0,failing:0,pending:0,ci:'UNKNOWN · no exact-head checks observed' };
+  let completed=0,passing=0,failing=0,pending=0,indeterminate=0;
   for (const run of runs) {
-    if (run?.status !== 'completed') {
-      pending += 1;
-      continue;
-    }
-    completed += 1;
-    if (HARD_FAILURES.has(run?.conclusion)) failing += 1;
-    else if (PASSING_CONCLUSIONS.has(run?.conclusion)) passing += 1;
+    if (run?.status!=='completed') {pending++;continue;}
+    completed++;
+    if (HARD_FAILURES.has(run?.conclusion)) failing++;
+    else if (run?.conclusion==='success') passing++;
+    else indeterminate++;
   }
-  if (failing > 0) return { state: 'failed', total: runs.length, completed, passing, failing, pending, ci: `FAIL · ${failing}/${runs.length} exact-head checks` };
-  if (pending > 0) return { state: 'pending', total: runs.length, completed, passing, failing, pending, ci: `PENDING · ${pending}/${runs.length} exact-head checks` };
-  if (passing === runs.length) return { state: 'passed', total: runs.length, completed, passing, failing, pending, ci: `PASS · ${runs.length} exact-head checks` };
-  return { state: 'unknown', total: runs.length, completed, passing, failing, pending, ci: 'UNKNOWN · exact-head check conclusions incomplete' };
+  if (failing>0) return {state:'failed',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`FAIL · ${failing}/${runs.length} exact-head checks`};
+  if (pending>0) return {state:'pending',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`PENDING · ${pending}/${runs.length} exact-head checks`};
+  if (indeterminate>0) return {state:'unknown',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`UNKNOWN · ${indeterminate}/${runs.length} skipped, neutral or unrecognized conclusions`};
+  return {state:'passed',total:runs.length,completed,passing,failing,pending,indeterminate,
+    ci:`PASS · ${runs.length} observed exact-head checks (not a complete release gate)`};
 }
 
 function repositoryEvidence(observation, observedAt) {
@@ -97,6 +100,17 @@ function repositoryEvidence(observation, observedAt) {
       status: 'unknown',
       repository: observation?.repository || null,
       reason: observation?.reason || 'PROVIDER_READ_UNAVAILABLE',
+    };
+  }
+  if (observation.visibility !== 'public') {
+    return {
+      contract: CONTRACT,
+      observedAt,
+      authority: 'observation-only',
+      source: 'founder-control-room',
+      status: 'restricted',
+      visibility: observation.visibility,
+      reason: 'NON_PUBLIC_REPOSITORY_EVIDENCE_REDACTED',
     };
   }
   const evidence = {
@@ -186,17 +200,16 @@ export function applyEvidence({ worldsRegistry, systemsRegistry, observations, n
   return { worlds, systems, changedWorlds, changedSystems, observedAt };
 }
 
-async function githubRequest(token, path, { method = 'GET', body } = {}) {
+// Read-only transport; this scheduled observer cannot create commits or update refs.
+async function githubRequest(token, path) {
   const response = await fetch(`https://api.github.com${path}`, {
-    method,
+    method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'founder-control-room-portfolio-evidence-sync',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
   let parsed = null;
@@ -245,7 +258,7 @@ async function observeRepository(token, repository) {
 
   const checksResponse = await optionalProviderRead(() => githubRequest(token, `${root}/commits/${encodeURIComponent(headSha)}/check-runs?per_page=100`));
   const checks = checksResponse
-    ? summarizeChecks(checksResponse.check_runs)
+    ? summarizeChecks(checksResponse.check_runs, checksResponse.total_count ?? null)
     : { state: 'unavailable', total: 0, completed: 0, passing: 0, failing: 0, pending: 0, ci: 'UNKNOWN · exact-head check read unavailable' };
 
   return {
@@ -298,43 +311,6 @@ async function readTargetState(token, targetRepository, branch) {
   };
 }
 
-async function publishAtomicRegistryCommit(token, target, branch, beforeHead, baseTreeSha, worlds, systems) {
-  const currentRef = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (currentRef.object.sha !== beforeHead) throw new Error(`STALE_TARGET_HEAD:${beforeHead}:${currentRef.object.sha}`);
-
-  const [worldBlob, systemBlob] = await Promise.all([
-    githubRequest(token, `${target.root}/git/blobs`, { method: 'POST', body: { content: `${JSON.stringify(worlds, null, 2)}\n`, encoding: 'utf-8' } }),
-    githubRequest(token, `${target.root}/git/blobs`, { method: 'POST', body: { content: `${JSON.stringify(systems, null, 2)}\n`, encoding: 'utf-8' } }),
-  ]);
-  const tree = await githubRequest(token, `${target.root}/git/trees`, {
-    method: 'POST',
-    body: {
-      base_tree: baseTreeSha,
-      tree: [
-        { path: 'site/data/worlds.json', mode: '100644', type: 'blob', sha: worldBlob.sha },
-        { path: 'site/data/systems.json', mode: '100644', type: 'blob', sha: systemBlob.sha },
-      ],
-    },
-  });
-  const commit = await githubRequest(token, `${target.root}/git/commits`, {
-    method: 'POST',
-    body: {
-      message: 'chore(site): refresh FCR portfolio evidence',
-      tree: tree.sha,
-      parents: [beforeHead],
-    },
-  });
-
-  const refReadback = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (refReadback.object.sha !== beforeHead) throw new Error(`STALE_TARGET_HEAD_BEFORE_REF_UPDATE:${beforeHead}:${refReadback.object.sha}`);
-  await githubRequest(token, `${target.root}/git/refs/heads/${encodeURIComponent(branch)}`, {
-    method: 'PATCH',
-    body: { sha: commit.sha, force: false },
-  });
-  const finalRef = await githubRequest(token, `${target.root}/git/ref/heads/${encodeURIComponent(branch)}`);
-  if (finalRef.object.sha !== commit.sha) throw new Error(`TARGET_REF_READBACK_MISMATCH:${commit.sha}:${finalRef.object.sha}`);
-  return commit.sha;
-}
 
 async function writeReceipt(path, receipt) {
   await mkdir(dirname(path), { recursive: true });
@@ -363,24 +339,37 @@ async function runSync() {
   const now = new Date();
   const result = applyEvidence({ worldsRegistry: target.worlds, systemsRegistry: target.systems, observations, now });
   const changed = result.changedWorlds.length + result.changedSystems.length > 0;
-  const targetCommit = changed
-    ? await publishAtomicRegistryCommit(token, target, branch, target.headSha, target.treeSha, result.worlds, result.systems)
-    : target.headSha;
+  const proposals = changed ? {
+    worlds: 'artifacts/portfolio-evidence-sync/proposed/worlds.json',
+    systems: 'artifacts/portfolio-evidence-sync/proposed/systems.json',
+  } : {};
+  // No GitHub mutation authority: save reviewable local artifacts. A separate
+  // authenticated, exact-head founder release gate must authorize publication.
+  if (changed) {
+    await Promise.all([
+      writeReceipt(proposals.worlds, result.worlds),
+      writeReceipt(proposals.systems, result.systems),
+    ]);
+  }
   const unavailableRepositories = observed.filter(([, value]) => value.status === 'unavailable').map(([repository, value]) => ({ repository, reason: value.reason }));
   const receipt = {
     contract: CONTRACT,
-    state: changed ? 'PUBLISHED' : 'NO_CHANGE',
+    state: changed ? 'PROPOSED_UNPUBLISHED' : 'NO_CHANGE',
     targetRepository,
     branch,
     previousTargetHead: target.headSha,
-    targetCommit,
+    targetCommit: target.headSha,
+    publicationAuthorized: false,
+    published: false,
+    liveVerified: false,
+    proposals,
     worldsGeneratedAt: result.worlds.generatedAt,
     systemsGeneratedAt: result.systems.generatedAt,
     observedRepositoryCount: repoList.length,
     unavailableRepositories,
     changedWorlds: result.changedWorlds,
     changedSystems: result.changedSystems,
-    mutationBoundary: 'evidence fields + registry generatedAt only',
+    mutationBoundary: 'local reviewable evidence proposal; no GitHub mutation',
   };
   await writeReceipt(receiptPath, receipt);
   console.log(JSON.stringify(receipt));
@@ -402,8 +391,24 @@ async function runSelfTest() {
       { name: 'Internal', kind: 'standalone_internal_os', public: false, builder: { provider: 'Base44', appId: 'internal-1' } },
     ],
   };
+  // A pass requires a complete inventory of successful observations, not a
+  // subset of green jobs. These assertions run before any token is minted.
+  const onlySuccess=[{status:'completed',conclusion:'success'}];
+  assert.equal(summarizeChecks(onlySuccess,1).state,'passed');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:'skipped'}],1).state,'unknown');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:'neutral'}],1).state,'unknown');
+  assert.equal(summarizeChecks([{status:'completed',conclusion:null}],1).state,'unknown');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'completed',conclusion:'skipped'}],2).state,'unknown');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'in_progress',conclusion:null}],2).state,'pending');
+  assert.equal(summarizeChecks([...onlySuccess,{status:'completed',conclusion:'failure'}],2).state,'failed');
+  assert.equal(summarizeChecks(onlySuccess,2).state,'unknown');
+  assert.equal(summarizeChecks(onlySuccess,null).state,'unknown');
+  assert.equal(summarizeChecks(onlySuccess,0).state,'unknown');
+  assert.equal(summarizeChecks([],0).state,'unknown');
+  assert.equal(summarizeChecks(Array.from({length:100},()=>onlySuccess[0]),101).state,'unknown');
+  assert.equal(summarizeChecks([{status:'queued',conclusion:null}],1).state,'pending');
   const observation = (repository, sha) => ({
-    status: 'observed', repository, visibility: 'private', archived: false, defaultBranch: 'main', headSha: sha,
+    status: 'observed', repository, visibility: 'public', archived: false, defaultBranch: 'main', headSha: sha,
     headDate: '2026-10-01T11:55:00Z', latestMergedPr: { number: 7, title: 'Focused fix', mergedAt: '2026-10-01T11:50:00Z', mergeCommitSha: sha },
     checks: summarizeChecks([{ status: 'completed', conclusion: 'success' }]),
   });
@@ -424,6 +429,14 @@ async function runSelfTest() {
   assert.equal(first.systems.systems[2].evidence, undefined);
   assert.deepEqual(stripMutableEvidence(first.worlds), stripMutableEvidence(baseWorlds));
   assert.deepEqual(stripMutableEvidence(first.systems), stripMutableEvidence(baseSystems));
+
+  const privateEvidence=repositoryEvidence({...observation('jussray/private-repo','c'.repeat(40)),visibility:'private'},now.toISOString());
+  assert.equal(privateEvidence.status,'restricted');
+  assert.equal(privateEvidence.reason,'NON_PUBLIC_REPOSITORY_EVIDENCE_REDACTED');
+  assert.equal(privateEvidence.headSha,undefined);
+  assert.equal(privateEvidence.mainSha,undefined);
+  assert.equal(privateEvidence.latestMergedPr,undefined);
+  assert.equal(privateEvidence.repository,undefined);
 
   const second = applyEvidence({ worldsRegistry: first.worlds, systemsRegistry: first.systems, observations, now: new Date(now.getTime() + 60 * 60 * 1000) });
   assert.deepEqual(second.changedWorlds, []);
