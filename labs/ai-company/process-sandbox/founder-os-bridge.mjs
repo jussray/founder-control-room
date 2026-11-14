@@ -4,10 +4,6 @@ const BRIDGE_VERSION = 'founder-os-container-bridge-v1';
 const RECEIPT_VERSION = 'founder-os-container-control-receipt-v1';
 const WORKER_REQUEST_VERSION = 'synthetic-employee-request-v1';
 const ALLOWED_ACTIONS = new Set(['inspect', 'plan']);
-const EXPECTED_SPECIALIST_BY_ACTION = Object.freeze({
-  inspect: 'repo-truth',
-  plan: 'goalfix',
-});
 const EXPECTED_WORKER_CAPABILITIES = Object.freeze({
   network: false,
   providers: false,
@@ -108,14 +104,29 @@ function assertFounderOsEligibility(request, plan) {
   if (plan.route?.chiefSkill !== 'juss-chief-ai') {
     reject('chief_route_mismatch', 'container handoff must route through juss-chief-ai');
   }
-  if (plan.route?.specialistSkill !== EXPECTED_SPECIALIST_BY_ACTION[request.action]) {
-    reject('specialist_route_mismatch', 'Founder OS specialist does not match the allowlisted action');
+  if (
+    typeof plan.route?.command?.id !== 'string'
+    || !plan.route.command.id.trim()
+    || typeof plan.route?.provider?.id !== 'string'
+    || !plan.route.provider.id.trim()
+  ) {
+    reject('route_contract_invalid', 'Founder OS command and provider route are required');
   }
   if (
-    plan.authority.approvalRequired !== false
-    || plan.authority.approvalObserved !== false
+    plan.route.provider.mode !== 'preview'
+    || plan.route.provider.supported !== true
+    || plan.route.provider.executionAllowed !== false
   ) {
-    reject('approval_state_invalid', 'inspect and plan container tasks must not depend on approval state');
+    reject('provider_route_not_preview', 'Founder OS provider must remain a supported non-executing preview');
+  }
+  if (
+    !Array.isArray(plan.route.provider.preflightEvidenceMissing)
+    || plan.route.provider.preflightEvidenceMissing.length !== 0
+  ) {
+    reject('provider_preflight_incomplete', 'Founder OS provider preflight evidence must be complete');
+  }
+  if (plan.authority.approvalRequired !== false) {
+    reject('approval_state_invalid', 'inspect and plan container tasks must never require approval');
   }
   if (!Array.isArray(plan.truth?.blocked) || plan.truth.blocked.length !== 0) {
     reject('plan_blocked', 'blocked Founder OS plans may not enter the worker');
@@ -162,7 +173,7 @@ export function buildFounderOsWorkerRequest(request, plan) {
     },
     {
       label: 'Founder OS route',
-      value: `juss-chief-ai -> ${plan.route.specialistSkill}`,
+      value: `juss-chief-ai -> ${plan.route.command.id} -> ${plan.route.provider.id}`,
       proofUrl: primaryProof,
     },
     {
@@ -184,7 +195,8 @@ export function buildFounderOsWorkerRequest(request, plan) {
     repository: request.evidence.repository.trim(),
     commitSha: request.evidence.commitSha.toLowerCase(),
     proofUrls,
-    specialistSkill: plan.route.specialistSkill,
+    commandId: plan.route.command.id,
+    providerId: plan.route.provider.id,
   };
 
   return deepFreeze({
@@ -317,7 +329,8 @@ export function sealFounderOsContainerReceipt(workerRequest, plan, containerRece
       version: plan.version,
       action: plan.action,
       readiness: plan.readiness,
-      specialistSkill: plan.route.specialistSkill,
+      commandId: plan.route.command.id,
+      providerId: plan.route.provider.id,
     },
     authority: {
       level: 'L0',
