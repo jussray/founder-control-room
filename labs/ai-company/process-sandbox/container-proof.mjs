@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import {
+  executeFounderOsContainerTask,
+} from './founder-os-bridge.mjs';
+import {
   DEFAULT_SANDBOX_IMAGE,
   buildContainerImage,
   runDeadlineProbe,
@@ -38,7 +41,105 @@ function request() {
   };
 }
 
+function founderOsRequest() {
+  return {
+    goal: 'Prepare one synthetic Founder OS evidence brief.',
+    action: 'inspect',
+    evidence: {
+      repository: 'jussray/founder-control-room',
+      commitSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      proofUrls: ['https://proof.example.test/founder-os-container-bridge'],
+    },
+  };
+}
+
+function founderOsPlan() {
+  return {
+    version: 'founder-os-lab-v1',
+    goal: founderOsRequest().goal,
+    action: 'inspect',
+    readiness: 'ready_for_review',
+    isolation: {
+      externalCalls: false,
+      providerCalls: false,
+      databaseWrites: false,
+      filesystemWrites: false,
+      environmentReads: false,
+    },
+    authority: {
+      level: 'L0',
+      mode: 'simulation',
+      executionAllowed: false,
+      approvalRequired: false,
+      approvalObserved: false,
+    },
+    route: {
+      chiefSkill: 'juss-chief-ai',
+      specialistSkill: 'repo-truth',
+      capabilities: ['founder-routing', 'repository-inspection', 'proof-validation'],
+      adapters: ['repository-preview'],
+    },
+    truth: {
+      verified: ['Synthetic container bridge proof.'],
+      inferred: [],
+      unknown: [],
+      blocked: [],
+    },
+    redteam: {
+      shouldExist: true,
+      premiseRisk: 'Synthetic fixture.',
+      failureModes: [],
+    },
+    l99: {
+      authority: 'L0 simulation only.',
+      state: 'ready_for_review',
+      evidence: 'Synthetic fixture.',
+      rollback: 'Revert.',
+      compoundingValue: 'Deterministic bridge proof.',
+    },
+    ooda: {
+      observe: [],
+      orient: [],
+      decide: [],
+      act: [],
+      verify: [],
+      loop: [],
+    },
+    nextGate: 'Review.',
+  };
+}
+
 await buildContainerImage(DEFAULT_SANDBOX_IMAGE);
+
+const founderBridgeFirst = await executeFounderOsContainerTask(
+  founderOsRequest(),
+  founderOsPlan(),
+  {
+    image: DEFAULT_SANDBOX_IMAGE,
+    hostEnvironment: { SYNTHETIC_HOST_SECRET: 'must-not-enter-container' },
+  },
+);
+const founderBridgeSecond = await executeFounderOsContainerTask(
+  founderOsRequest(),
+  founderOsPlan(),
+  {
+    image: DEFAULT_SANDBOX_IMAGE,
+    hostEnvironment: { SYNTHETIC_HOST_SECRET: 'must-not-enter-container' },
+  },
+);
+
+assert.equal(founderBridgeFirst.status, 'simulated');
+assert.equal(founderBridgeFirst.controlPlane, 'juss-chief-ai');
+assert.equal(founderBridgeFirst.authority.level, 'L0');
+assert.equal(founderBridgeFirst.authority.executionAllowed, false);
+assert.equal(founderBridgeFirst.containerInvoked, true);
+assert.equal(founderBridgeFirst.container.boundary.network, 'none');
+assert.equal(founderBridgeFirst.employee.id, 'synthetic-evidence-analyst');
+assert.equal(founderBridgeFirst.employee.decision, 'ready_for_review');
+assert.equal(founderBridgeFirst.liveSideEffects, false);
+assert.equal(founderBridgeFirst.publicUrl, null);
+assert.equal(founderBridgeFirst.receiptFingerprint, founderBridgeSecond.receiptFingerprint);
+assert.deepEqual(founderBridgeFirst.employee.brief, founderBridgeSecond.employee.brief);
 
 const first = await runSyntheticEmployeeContainer(request(), {
   image: DEFAULT_SANDBOX_IMAGE,
@@ -108,4 +209,9 @@ console.log(JSON.stringify({
   deterministicWorker: true,
   runtimeIsolation: probe,
   hardDeadline: deadline,
+  founderOsBridge: {
+    status: founderBridgeFirst.status,
+    controlPlane: founderBridgeFirst.controlPlane,
+    receiptFingerprint: founderBridgeFirst.receiptFingerprint,
+  },
 }));
