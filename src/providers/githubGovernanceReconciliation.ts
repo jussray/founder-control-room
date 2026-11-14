@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 export const GITHUB_GOVERNANCE_RECONCILIATION_CONTRACT =
   "fcr/github-governance-reconciliation@v1" as const;
 
+const GITHUB_ACTIONS_APP_ID = "15368" as const;
+
 export const CHIEF_GOVERNANCE = Object.freeze({
   repository: "jussray/chief-ai-machine",
   protectedBranch: "main",
@@ -11,15 +13,21 @@ export const CHIEF_GOVERNANCE = Object.freeze({
   governanceBoundaryRulesetId: "21261587",
   governanceBoundaryRulesetName: "governance boundary",
   candidateContext: "Verify candidate ProofMode runtime with Playwright",
-  candidateIntegrationId: null,
-  candidateProducerTrust: "external-github-app-check-required",
-  requiredExactHeadDeploymentEnvironments: [
+  candidateIntegrationId: GITHUB_ACTIONS_APP_ID,
+  candidateProducerTrust: "github-actions-integration-bound",
+  governanceBoundaryStableContexts: [
+    "Typecheck",
+    "Verify operational authority",
+  ],
+  postMergeProductionProofEnvironments: [
     "Cloudflare Production",
     "proofmode-access-admin",
   ],
 } as const);
 
-export type GithubRulesetMutationDisposition = "NO_CHANGE_REQUIRED";
+export type GithubRulesetMutationDisposition =
+  | "NO_CHANGE_REQUIRED"
+  | "MUTATION_REQUIRED";
 
 export interface GithubRequiredStatusCheck {
   context: string;
@@ -28,7 +36,7 @@ export interface GithubRequiredStatusCheck {
 
 export interface GithubBypassActorObservation {
   actorType: string;
-  actorId: string;
+  actorId: string | null;
   bypassMode: string;
 }
 
@@ -42,6 +50,7 @@ export interface TrustedGithubRulesetObservation {
   includedRefs: string[];
   excludedRefs: string[];
   requiredStatusChecks: GithubRequiredStatusCheck[];
+  requiredStatusChecksStrict: boolean;
   requiredDeploymentEnvironments: string[];
   bypassActors: GithubBypassActorObservation[];
   providerFingerprint: string;
@@ -55,6 +64,36 @@ export interface TrustedGithubRulesetObservation {
     providerMutationAuthority: false;
     mergeAuthority: false;
     deployAuthority: false;
+  };
+}
+
+export interface ChiefRulesetDesiredState {
+  rulesetId: string;
+  rulesetName: string;
+  expectedProviderFingerprint: string;
+  desiredRequiredStatusChecks: GithubRequiredStatusCheck[];
+  desiredRequiredDeploymentEnvironments: string[];
+  desiredBypassActors: GithubBypassActorObservation[];
+  requireStrictStatusFreshness: true;
+  preserveUnmanagedRules: true;
+  changes: {
+    statusChecks: {
+      added: GithubRequiredStatusCheck[];
+      removed: GithubRequiredStatusCheck[];
+      retained: GithubRequiredStatusCheck[];
+    };
+    requiredDeploymentEnvironments: {
+      added: string[];
+      removed: string[];
+      retained: string[];
+    };
+    bypassActors: {
+      removed: GithubBypassActorObservation[];
+    };
+    strictStatusFreshness: {
+      from: boolean;
+      to: true;
+    };
   };
 }
 
@@ -73,15 +112,26 @@ export interface ChiefProofModeRulesetVerification {
     governanceBoundary: string[];
     exactHeadGate: string[];
   };
-  changesRequired: false;
+  changesRequired: boolean;
   disposition: GithubRulesetMutationDisposition;
-  mutationRequired: false;
-  mutation: null;
+  mutationRequired: boolean;
+  mutation: null | {
+    governanceBoundary: ChiefRulesetDesiredState;
+    exactHeadGate: ChiefRulesetDesiredState;
+    executionAuthorized: false;
+    requiresFreshProviderReadback: true;
+  };
   candidateProducer: {
     context: typeof CHIEF_GOVERNANCE.candidateContext;
-    integrationId: null;
+    integrationId: typeof CHIEF_GOVERNANCE.candidateIntegrationId;
     trust: typeof CHIEF_GOVERNANCE.candidateProducerTrust;
-    requiredByRuleset: false;
+    requiredByRuleset: true;
+    carrierRulesetId: typeof CHIEF_GOVERNANCE.exactHeadRulesetId;
+  };
+  postMergeProductionProof: {
+    requiredDeploymentEnvironments: string[];
+    preMergeRequired: false;
+    truthPlane: "post-merge-current-main";
   };
   authority: {
     observationOnly: true;
@@ -91,7 +141,6 @@ export interface ChiefProofModeRulesetVerification {
   };
 }
 
-/** @deprecated Compatibility alias. Chief ruleset #20818149 is verified as-is; no migration is planned. */
 export type ChiefProofModeRulesetMigrationPlan = ChiefProofModeRulesetVerification;
 
 type JsonObject = Record<string, unknown>;
@@ -130,7 +179,7 @@ function requireArray(value: unknown, label: string): unknown[] {
   return value;
 }
 
-function requiredStatusChecks(readback: JsonObject): GithubRequiredStatusCheck[] {
+function requiredStatusRule(readback: JsonObject): JsonObject | null {
   const rules = requireArray(readback.rules, "ruleset rules");
   const statusRules = rules.filter(
     (rule) => isObject(rule) && cleanText(rule.type) === "required_status_checks",
@@ -138,10 +187,14 @@ function requiredStatusChecks(readback: JsonObject): GithubRequiredStatusCheck[]
   if (statusRules.length > 1) {
     throw new Error("ruleset must not contain duplicate required_status_checks rules");
   }
-  if (statusRules.length === 0) return [];
+  return statusRules.length === 0 ? null : statusRules[0] as JsonObject;
+}
 
-  const parameters = isObject((statusRules[0] as JsonObject).parameters)
-    ? ((statusRules[0] as JsonObject).parameters as JsonObject)
+function requiredStatusChecks(readback: JsonObject): GithubRequiredStatusCheck[] {
+  const statusRule = requiredStatusRule(readback);
+  if (!statusRule) return [];
+  const parameters = isObject(statusRule.parameters)
+    ? statusRule.parameters as JsonObject
     : {};
   const entries = requireArray(parameters.required_status_checks, "required status checks");
   const seen = new Set<string>();
@@ -159,6 +212,15 @@ function requiredStatusChecks(readback: JsonObject): GithubRequiredStatusCheck[]
   });
 }
 
+function requiredStatusChecksStrict(readback: JsonObject): boolean {
+  const statusRule = requiredStatusRule(readback);
+  if (!statusRule) return false;
+  const parameters = isObject(statusRule.parameters)
+    ? statusRule.parameters as JsonObject
+    : {};
+  return parameters.strict_required_status_checks_policy === true;
+}
+
 function requiredDeploymentEnvironments(readback: JsonObject): string[] {
   const rules = requireArray(readback.rules, "ruleset rules");
   const deploymentRules = rules.filter(
@@ -170,7 +232,7 @@ function requiredDeploymentEnvironments(readback: JsonObject): string[] {
   if (deploymentRules.length === 0) return [];
 
   const parameters = isObject((deploymentRules[0] as JsonObject).parameters)
-    ? ((deploymentRules[0] as JsonObject).parameters as JsonObject)
+    ? (deploymentRules[0] as JsonObject).parameters as JsonObject
     : {};
   const environments = requireArray(
     parameters.required_deployment_environments,
@@ -184,9 +246,10 @@ function bypassActors(readback: JsonObject): GithubBypassActorObservation[] {
   return actors.map((actor) => {
     if (!isObject(actor)) throw new Error("ruleset bypass actor entries must be objects");
     const actorType = cleanText(actor.actor_type);
-    const actorId = cleanId(actor.actor_id);
+    const rawActorId = actor.actor_id;
+    const actorId = rawActorId == null ? null : cleanId(rawActorId);
     const bypassMode = cleanText(actor.bypass_mode);
-    if (!actorType || !actorId || !bypassMode) {
+    if (!actorType || (rawActorId != null && !actorId) || !bypassMode) {
       throw new Error("ruleset bypass actor identity must be complete");
     }
     return { actorType, actorId, bypassMode };
@@ -242,6 +305,7 @@ export function createTrustedGithubRulesetObservation(input: {
     includedRefs: refs(input.readback, "include"),
     excludedRefs: refs(input.readback, "exclude"),
     requiredStatusChecks: requiredStatusChecks(input.readback),
+    requiredStatusChecksStrict: requiredStatusChecksStrict(input.readback),
     requiredDeploymentEnvironments: requiredDeploymentEnvironments(input.readback),
     bypassActors: bypassActors(input.readback),
     providerFingerprint: sha256(input.readback),
@@ -254,10 +318,6 @@ export function createTrustedGithubRulesetObservation(input: {
       deployAuthority: false,
     },
   };
-}
-
-function sameStrings(left: readonly string[], right: readonly string[]): boolean {
-  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
 function requireChiefRuleset(
@@ -279,16 +339,128 @@ function requireChiefRuleset(
   }
 }
 
+function checkKey(check: GithubRequiredStatusCheck): string {
+  return `${check.context}\u0000${check.integrationId ?? ""}`;
+}
+
+function sameChecks(left: readonly GithubRequiredStatusCheck[], right: readonly GithubRequiredStatusCheck[]): boolean {
+  return JSON.stringify([...left].map(checkKey).sort()) === JSON.stringify([...right].map(checkKey).sort());
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function sameActors(left: readonly GithubBypassActorObservation[], right: readonly GithubBypassActorObservation[]): boolean {
+  return stableJson(left) === stableJson(right);
+}
+
+function statusCheckDelta(
+  observed: readonly GithubRequiredStatusCheck[],
+  desired: readonly GithubRequiredStatusCheck[],
+): ChiefRulesetDesiredState["changes"]["statusChecks"] {
+  const observedKeys = new Set(observed.map(checkKey));
+  const desiredKeys = new Set(desired.map(checkKey));
+  return {
+    added: desired.filter((check) => !observedKeys.has(checkKey(check))).map((check) => ({ ...check })),
+    removed: observed.filter((check) => !desiredKeys.has(checkKey(check))).map((check) => ({ ...check })),
+    retained: desired.filter((check) => observedKeys.has(checkKey(check))).map((check) => ({ ...check })),
+  };
+}
+
+function stringDelta(observed: readonly string[], desired: readonly string[]) {
+  const observedSet = new Set(observed);
+  const desiredSet = new Set(desired);
+  return {
+    added: desired.filter((value) => !observedSet.has(value)),
+    removed: observed.filter((value) => !desiredSet.has(value)),
+    retained: desired.filter((value) => observedSet.has(value)),
+  };
+}
+
+function desiredGovernanceBoundaryChecks(): GithubRequiredStatusCheck[] {
+  return CHIEF_GOVERNANCE.governanceBoundaryStableContexts.map((context) => ({
+    context,
+    integrationId: GITHUB_ACTIONS_APP_ID,
+  }));
+}
+
+function desiredExactHeadChecks(
+  observed: readonly GithubRequiredStatusCheck[],
+): GithubRequiredStatusCheck[] {
+  const preserved = observed.filter((check) => (
+    check.context !== CHIEF_GOVERNANCE.candidateContext
+    && check.context !== "Verify production ProofMode MCP with Playwright"
+  ));
+  return [
+    ...preserved.map((check) => ({ ...check })),
+    {
+      context: CHIEF_GOVERNANCE.candidateContext,
+      integrationId: CHIEF_GOVERNANCE.candidateIntegrationId,
+    },
+  ];
+}
+
+function desiredState(
+  observation: TrustedGithubRulesetObservation,
+  desiredRequiredStatusChecks: GithubRequiredStatusCheck[],
+): ChiefRulesetDesiredState {
+  const desiredRequiredDeploymentEnvironments: string[] = [];
+  const desiredBypassActors: GithubBypassActorObservation[] = [];
+  return {
+    rulesetId: observation.rulesetId,
+    rulesetName: observation.rulesetName,
+    expectedProviderFingerprint: observation.providerFingerprint,
+    desiredRequiredStatusChecks: desiredRequiredStatusChecks.map((check) => ({ ...check })),
+    desiredRequiredDeploymentEnvironments,
+    desiredBypassActors,
+    requireStrictStatusFreshness: true,
+    preserveUnmanagedRules: true,
+    changes: {
+      statusChecks: statusCheckDelta(observation.requiredStatusChecks, desiredRequiredStatusChecks),
+      requiredDeploymentEnvironments: stringDelta(
+        observation.requiredDeploymentEnvironments,
+        desiredRequiredDeploymentEnvironments,
+      ),
+      bypassActors: {
+        removed: observation.bypassActors.map((actor) => ({ ...actor })),
+      },
+      strictStatusFreshness: {
+        from: observation.requiredStatusChecksStrict,
+        to: true,
+      },
+    },
+  };
+}
+
+function stateMatchesObservation(
+  observation: TrustedGithubRulesetObservation,
+  desired: ChiefRulesetDesiredState,
+): boolean {
+  return observation.requiredStatusChecksStrict
+    && sameChecks(observation.requiredStatusChecks, desired.desiredRequiredStatusChecks)
+    && sameStrings(
+      observation.requiredDeploymentEnvironments,
+      desired.desiredRequiredDeploymentEnvironments,
+    )
+    && sameActors(observation.bypassActors, desired.desiredBypassActors);
+}
+
 /**
- * Verifies the founder-approved Chief governance topology without constructing
- * any desired-state mutation. Ruleset #20818149 is the desired state as
- * observed: zero bypass actors, both existing deployment requirements intact,
- * and the reserved external candidate context still unbound.
+ * Plans the founder-approved producer-correct Chief governance topology from
+ * complete trusted provider observations. This is evidence and desired-state
+ * planning only: it never executes a ruleset mutation or grants merge/deploy
+ * authority.
+ *
+ * Candidate-head proof belongs on the no-bypass exact-head carrier and is
+ * bound to GitHub Actions integration 15368. Production deployment evidence is
+ * removed from the pre-merge membrane but remains an explicit post-merge truth
+ * obligation.
  */
-export function verifyChiefProofModeRulesetsAsIs(input: {
+export function planChiefProofModeRulesetMigration(input: {
   governanceBoundary: TrustedGithubRulesetObservation;
   exactHeadGate: TrustedGithubRulesetObservation;
-}): ChiefProofModeRulesetVerification {
+}): ChiefProofModeRulesetMigrationPlan {
   const { governanceBoundary, exactHeadGate } = input;
   requireChiefRuleset(
     governanceBoundary,
@@ -303,22 +475,21 @@ export function verifyChiefProofModeRulesetsAsIs(input: {
   if (governanceBoundary.observer.appId !== exactHeadGate.observer.appId) {
     throw new Error("Chief governance observations must come from the same trusted GitHub App observer");
   }
-  if (exactHeadGate.bypassActors.length !== 0) {
-    throw new Error("Chief exact-head ruleset must preserve zero bypass actors");
-  }
-  if (exactHeadGate.requiredStatusChecks.some(
-    (check) => check.context === CHIEF_GOVERNANCE.candidateContext,
-  )) {
-    throw new Error("Chief reserved candidate runtime context must remain unbound in the founder-approved ruleset");
-  }
-  if (!sameStrings(
-    exactHeadGate.requiredDeploymentEnvironments,
-    CHIEF_GOVERNANCE.requiredExactHeadDeploymentEnvironments,
-  )) {
-    throw new Error(
-      `Chief exact-head required deployments drifted: expected ${CHIEF_GOVERNANCE.requiredExactHeadDeploymentEnvironments.join(", ")}`,
-    );
-  }
+
+  const governanceBoundaryDesired = desiredState(
+    governanceBoundary,
+    desiredGovernanceBoundaryChecks(),
+  );
+  const exactHeadDesired = desiredState(
+    exactHeadGate,
+    desiredExactHeadChecks(exactHeadGate.requiredStatusChecks),
+  );
+  const governanceMatches = stateMatchesObservation(
+    governanceBoundary,
+    governanceBoundaryDesired,
+  );
+  const exactHeadMatches = stateMatchesObservation(exactHeadGate, exactHeadDesired);
+  const changesRequired = !governanceMatches || !exactHeadMatches;
 
   return {
     contract: GITHUB_GOVERNANCE_RECONCILIATION_CONTRACT,
@@ -335,15 +506,26 @@ export function verifyChiefProofModeRulesetsAsIs(input: {
       governanceBoundary: [...governanceBoundary.requiredDeploymentEnvironments],
       exactHeadGate: [...exactHeadGate.requiredDeploymentEnvironments],
     },
-    changesRequired: false,
-    disposition: "NO_CHANGE_REQUIRED",
-    mutationRequired: false,
-    mutation: null,
+    changesRequired,
+    disposition: changesRequired ? "MUTATION_REQUIRED" : "NO_CHANGE_REQUIRED",
+    mutationRequired: changesRequired,
+    mutation: changesRequired ? {
+      governanceBoundary: governanceBoundaryDesired,
+      exactHeadGate: exactHeadDesired,
+      executionAuthorized: false,
+      requiresFreshProviderReadback: true,
+    } : null,
     candidateProducer: {
       context: CHIEF_GOVERNANCE.candidateContext,
-      integrationId: null,
+      integrationId: CHIEF_GOVERNANCE.candidateIntegrationId,
       trust: CHIEF_GOVERNANCE.candidateProducerTrust,
-      requiredByRuleset: false,
+      requiredByRuleset: true,
+      carrierRulesetId: CHIEF_GOVERNANCE.exactHeadRulesetId,
+    },
+    postMergeProductionProof: {
+      requiredDeploymentEnvironments: [...CHIEF_GOVERNANCE.postMergeProductionProofEnvironments],
+      preMergeRequired: false,
+      truthPlane: "post-merge-current-main",
     },
     authority: {
       observationOnly: true,
@@ -355,12 +537,13 @@ export function verifyChiefProofModeRulesetsAsIs(input: {
 }
 
 /**
- * @deprecated Compatibility wrapper. The founder-approved ruleset is verified
- * as-is; this function never plans or authorizes a ruleset mutation.
+ * @deprecated Compatibility name retained for callers. The September 13
+ * founder decision superseded the former as-is topology; this now returns the
+ * same non-authorizing reconciliation plan as planChiefProofModeRulesetMigration.
  */
-export function planChiefProofModeRulesetMigration(input: {
+export function verifyChiefProofModeRulesetsAsIs(input: {
   governanceBoundary: TrustedGithubRulesetObservation;
   exactHeadGate: TrustedGithubRulesetObservation;
-}): ChiefProofModeRulesetMigrationPlan {
-  return verifyChiefProofModeRulesetsAsIs(input);
+}): ChiefProofModeRulesetVerification {
+  return planChiefProofModeRulesetMigration(input);
 }
