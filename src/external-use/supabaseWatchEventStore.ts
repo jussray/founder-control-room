@@ -20,6 +20,7 @@ export function supabaseWatchEventStore(client: Pick<SupabaseClient, "from">): W
       const { data, error } = await client.from("events").select("payload")
         .eq("source", SOURCE).eq("event_type", TYPE)
         .filter("payload->>lane", "eq", "world")
+        .not("payload->>local_date", "is", null)
         .order("observed_at", { ascending: false }).limit(1);
       if (error) throw new Error(`watch_world_claim_lookup_failed:${error.code ?? "unknown"}`);
       const date = (data?.[0]?.payload as { local_date?: unknown } | undefined)?.local_date;
