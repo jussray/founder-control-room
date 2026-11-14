@@ -57,28 +57,77 @@ jobs:
             git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"
           )
 
+          # FCR's canonical database is Supabase. A plain Neon PostgreSQL
+          # preview cannot replay auth/storage roles or the full production
+          # schema unless an explicit Neon preview contract provides fixtures.
+          NEEDS_SUPABASE=false
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
             case "$path" in
               supabase/*)
+                NEEDS_SUPABASE=true
+                ;;
+            esac
+            case "$path" in
+              supabase/preview-contracts/*.sql|supabase/preview-postconditions/*.sql)
                 NEEDS_NEON=true
-                break
+                ;;
+              supabase/migrations/*.sql)
+                preview_contract="supabase/preview-contracts/${path##*/}"
+                preview_postcondition="supabase/preview-postconditions/${path##*/}"
+                if [ -f "$preview_contract" ] || [ -f "$preview_postcondition" ]; then
+                  NEEDS_NEON=true
+                fi
                 ;;
             esac
           done
 
           echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "needs_supabase=${NEEDS_SUPABASE}" >> "$GITHUB_OUTPUT"
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
-          if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected against live base; Neon preview branch is required.'
+          if [ "$NEEDS_SUPABASE" = "true" ]; then
+            echo 'Canonical Supabase changes detected: exact-head full local migration replay and schema lint are required.'
           else
-            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
+            echo 'No supabase/ change detected against live base.'
+          fi
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Neon-specific preview contract found: isolated Neon branch verification remains mandatory.'
+          else
+            echo 'No Neon-specific preview contract in exact-head diff: Neon provider preview is NOT_APPLICABLE.'
           fi
 
       - name: Record non-database no-op
-        if: steps.neon_scope.outputs.needs_neon == 'false'
+        if: steps.neon_scope.outputs.needs_supabase == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/ against live base.'
+        run: echo 'No supabase/ change detected against live base; no database proof required.'
+
+      # Unlike plain Neon Postgres, this runs ALL FCR migrations against the
+      # canonical Supabase local stack. It is mandatory for Supabase changes,
+      # uses no production credentials and cannot turn a failed replay green.
+      - name: Set up Supabase CLI for canonical schema scope
+        if: steps.neon_scope.outputs.needs_supabase == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+
+      - name: Verify canonical Supabase schema on exact candidate
+        if: steps.neon_scope.outputs.needs_supabase == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          supabase start
+          supabase db lint --local --fail-on error
+          echo 'Canonical Supabase full migration replay + schema lint PASSED on exact PR head.'
+
+      - name: Record Neon non-applicability only after canonical proof
+        if: steps.neon_scope.outputs.needs_supabase == 'true' && steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: |
+          echo 'Neon provider preview NOT_APPLICABLE: no Neon-specific preview contract; canonical Supabase proof passed.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -95,6 +144,41 @@ jobs:
         if: steps.neon_scope.outputs.needs_neon == 'true'
         shell: bash
         run: echo "EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
+      # Stop before an opaque Neon 422 when the included branch allowance is
+      # exhausted. Never delete another PR's preview or incur paid branch use.
+      - name: Check Neon preview branch budget
+        if: steps.neon_scope.outputs.needs_neon == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          curl --fail --silent --show-error --retry 2 --header "Authorization: Bearer ${NEON_API_KEY}" --header "Accept: application/json" --output "$response" "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches?limit=100"
+          python3 - "$response" "$PR_NUMBER" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          branches = payload.get("branches")
+          if not isinstance(branches, list):
+              raise SystemExit("Neon branch readback invalid; preview remains BLOCKED")
+          name = f"preview/pr-{sys.argv[2]}"
+          if any(branch.get("name") == name for branch in branches):
+              raise SystemExit(f"Neon {name} already exists; create-only workflow must not overwrite it")
+          if len(branches) >= 10:
+              raise SystemExit(
+                  f"Neon branch budget exhausted ({len(branches)} branches); "
+                  f"cannot create {name}. Review existing previews or the plan; "
+                  "no branch was deleted and migration proof stays BLOCKED."
+              )
+          print(f"Neon capacity observed: {len(branches)} / 10; creation may proceed")
+          PY
 
       - name: Create Neon Branch
         if: steps.neon_scope.outputs.needs_neon == 'true'

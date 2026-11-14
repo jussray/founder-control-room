@@ -5,6 +5,14 @@ Authority: founder-approved direct-main contract implant
 Mutation scope: `jussray/founder-control-room` only  
 Cross-repository audit scope: read-only
 
+## Current supersession note — 2026-09-10
+
+This document preserves the September 8 pre-wiring baseline. Its statements that the revised deterministic first slice was not yet wired and that live first-slice wiring remained gated are **HISTORICAL / SUPERSEDED AS SOURCE-STATE CLAIMS** by the bounded Friend Intake candidate in PR #774.
+
+The current source candidate mounts a separate `/friend-intake` path while leaving the existing `/mirror/run` implementation untouched. The Friend Intake path is deterministic and model-free, uses the shared `project_events` timeline boundary, and has a founder-facing desktop/mobile surface. The feature remains fail-closed unless `FCR_FRIEND_INTAKE_ENABLED=true`; intake-content persistence has a separate fail-closed `FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED=true` requirement. Saved content requires interactive founder authority, and sensitive saves require a session-bound exact-payload review capability with one-review/one-save database identity.
+
+That source state does **not** prove either flag is enabled in production, that the migration is applied, that a provider/runtime serves the candidate, or that production browser behavior matches the candidate. Those remain separate configuration, database, deployment, runtime, and browser proof planes.
+
 ## Header
 
 ```text
@@ -31,6 +39,8 @@ STOP CONDITION:
 
 ## VERIFIED — Founder Control Room
 
+The bullets in this section are the September 8 observation set unless the supersession note above says otherwise.
+
 - Repository is `jussray/founder-control-room`; default branch is `main`.
 - Audited starting `main` is `34ffe99e77455f278b437f4cfc67c76e3df59a25`.
 - The base master file labels itself v1.2.
@@ -42,7 +52,7 @@ STOP CONDITION:
 - The current Mirror route is founder-gated and writes sanitized audit metadata into `project_events`.
 - The current Mirror route calls the OpenAI Mirror provider by default.
 - The current Mirror input accepts `relatedMemories`.
-- Therefore the revised deterministic first slice (no model call, no memory retrieval) is **not yet the live Mirror implementation**.
+- **HISTORICAL:** at the September 8 observation point, the revised deterministic first slice was not yet the live Mirror implementation. PR #774 later introduced a separate default-off `/friend-intake` source candidate instead of rewriting `/mirror/run`.
 - `project_events` is already used as the shared founder-visible operational activity/audit feed. New first-slice timeline work should prefer reuse over a parallel timeline table.
 - Playwright is configured under `e2e/`, non-parallel by default, with retained failure video/screenshot/trace behavior.
 - The repository already has V10 privileged approval middleware and tests. The new generic ApprovalBinding must not replace that live authority path without a separate migration proof.
@@ -89,22 +99,24 @@ main: ee3a85a3c1f4904f07206fe2204b036e235ec7e9
 
 ## INFERRED
 
-- The revised first slice can likely reuse `project_events` for the founder-visible timeline/audit entry, but the final record shape must be verified against current migrations and route consumers before a persistence patch.
-- Existing Mirror types can likely be adapted instead of replaced, but the current `MirrorModelProvenance` is OpenAI-specific and the revised deterministic slice needs a provider-neutral/stub-safe provenance seam.
-- Existing founder auth is sufficient for a first founder-only slice; role expansion should be additive and must not weaken the current founder boundary.
+The following are preserved as September 8 hypotheses. Where PR #774 now supplies source evidence, the supersession note above controls present-tense interpretation.
+
+- The revised first slice could likely reuse `project_events` for the founder-visible timeline/audit entry, but the final record shape had to be verified against current migrations and route consumers before a persistence patch.
+- Existing Mirror types could likely be adapted instead of replaced, but the current `MirrorModelProvenance` is OpenAI-specific and the revised deterministic slice needed a provider-neutral/stub-safe provenance seam.
+- Existing founder auth was sufficient for a first founder-only slice; role expansion should be additive and must not weaken the current founder boundary.
 
 ## UNKNOWN / NOT YET PROVEN
 
 - Exact production Supabase schema parity for every logical first-slice record.
-- Whether a current feature-flag store already covers all six generic mutable-module kill switches.
-- Whether the current public/control-room UI already has a reusable provenance drawer for this exact slice.
-- Whether the current CI on the post-implant exact head will run the relevant full Playwright lane automatically.
-- Production runtime behavior is not proven by this source audit.
+- Whether either Friend Intake source flag is enabled in a production runtime.
+- Whether the Friend Intake migration has been applied to production Supabase.
+- Whether the public production route serves the exact PR candidate.
+- Production runtime behavior is not proven by this source audit or by source-only review.
 
 ## BLOCKED
 
-- None for the additive contract implant.
-- Live first-slice wiring remains gated on a separately scoped touched-file plan and browser proof.
+- None for the historical September 8 additive contract implant.
+- **SUPERSEDED:** the old statement that source wiring itself remained gated no longer describes PR #774's source candidate. Production activation remains separately gated by exact-head review/CI, explicit configuration, database migration authority, deployment authority, and runtime/browser proof.
 
 ## FIRST VERTICAL SLICE
 
@@ -132,7 +144,7 @@ Friend Intake
 
 ## NEXT IMPLEMENTATION GATE
 
-Produce one focused live-slice plan that reconciles:
+The September 8 planning gate below is historical. PR #774 subsequently implemented the bounded source candidate it described.
 
 1. current `src/http/routes/mirror.ts`;
 2. `src/mirror/types.ts`;
@@ -141,4 +153,4 @@ Produce one focused live-slice plan that reconciles:
 5. founder-facing UI surface;
 6. desktop/mobile Playwright path.
 
-Do not call the revised Friend slice implemented until that exact path is wired and browser-proven.
+Present-tense acceptance now requires exact-head proof for the PR candidate and separate proof for any later production configuration, migration, deployment, or runtime claim. Do not infer production activation from source implementation.

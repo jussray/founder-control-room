@@ -125,6 +125,14 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 async function waitForFounderProjects(label) {
   try {
     await page.locator('#root .shell').waitFor({ state: 'visible', timeout: 10_000 });
+    // The five-screen shell opens on Home. Exercise its real navigation to
+    // Control → Overview before requiring the Projects list to be visible.
+    const controlNav = page.getByRole('navigation', { name: 'Founder Control Room screens' });
+    const controlButton = controlNav.getByRole('button', { name: 'Control', exact: true });
+    await controlButton.waitFor({ state: 'visible', timeout: 10_000 });
+    if (new URL(page.url()).searchParams.get('screen') !== 'control') {
+      await controlButton.click();
+    }
     await page.locator('#project-list').waitFor({ state: 'visible', timeout: 10_000 });
   } catch (error) {
     const diagnostic = await page.evaluate(() => ({

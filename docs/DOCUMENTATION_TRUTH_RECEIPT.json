@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility. Preserve the existing evidence-authority, Cloudflare Access recovery, Founder Capital Decision, ATTACK-20, and governed Founder Content invariants while binding the Friend Intake first-slice source candidate to current privacy and authority documentation. This receipt keeps source intent, provider configuration, runtime identity, database application, publication outcome, merge authority, and deploy authority as separate proof planes and does not claim that Friend Intake flags, production Supabase migrations, provider runtime, or browser production behavior are live merely because the source candidate exists.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -11,7 +11,8 @@
     "workflow-authority",
     "truth-governance",
     "capability-authority",
-    "founder-permission-authority"
+    "founder-permission-authority",
+    "privacy"
   ],
   "changes": [
     {
@@ -817,6 +818,87 @@
       "path": "docs/PROVIDERS.md",
       "claims": [
         "`docs/PROVIDERS.md` must describe one native independent human approval, Code Owner and last-push requirements, and fail-closed reviewer eligibility before FCR ruleset mutation, without claiming that provider state has been changed."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must describe `public-web-observation-v1` as an FCR-owned provider-neutral contract whose read-only research adapter is selected behind the governed MCP Hub; adapter availability, returned evidence, source truth, and downstream outcomes remain separate proof planes and no provider-specific observer secret is required by the capability itself.",
+        "`README.md` must keep FCR Shopify runtime-secret name verification separate from webhook registration, deployed callback identity, production database migration, and collected-revenue outcome proof.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
+        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
+        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority.",
+        "`README.md` must describe Postiz as bounded server-authenticated account/status readback only, keep Postiz scheduling/publication writes outside that adapter, and refuse to translate provider-reported PUBLISHED state without terminal artifact evidence into publication truth.",
+        "`README.md` must describe Componecat as read-only architecture/catalog context whose discovery grants no project ownership, repository mutation, merge, deploy, provider-write, or publication authority.",
+        "`README.md` must describe the proof-weighted model capability market as task-specific advisory routing where public benchmarks remain bounded priors, local receipts govern promotion, stale proof expires, false-green and authority violations are penalized, and routing never grants execution authority.",
+        "`README.md` must keep exact predecessor/successor StoryEngine SHAs in audit/receipt provenance rather than durable current-state prose; a peer refresh selects a new evidence subject only and never carries predecessor green forward.",
+        "`README.md` must describe Cowork as a governed Claude work surface grounded in the exact current GitHub repository/branch/head, keep Claude-side GitHub connector configuration separate from repository source, and explicitly state that FCR-native Cowork receipt binding is not wired until separately implemented and proven.",
+        "`README.md` must describe the Founder Council as dual-resident in the founder assistant and project Control Room without centralizing execution authority, and must keep Muse source implementation separate from configured Worker secret presence, deployed runtime identity, and a live provider response receipt.",
+        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim any required Worker secret absent when the provider-held target set was never observed.",
+        "`README.md` must keep the GitHub Actions and Cloudflare Worker copies of `OPENAI_API_KEY` as separate CI/runtime authority planes and state that the all-secret proof derives names from the canonical Worker registry without reading values.",
+        "`README.md` must treat a successful successor StoryEngine Playwright witness as current only for the exact FCR/StoryEngine evidence pair recorded by the run and expire that proof when either repository moves.",
+        "`README.md` must record that the StoryEngine peer refresh discovered during URLFix PR #914 merge review is a focused recovery transition handled by PR #896, not URLFix failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "`README.md` must record that the StoryEngine peer refresh after the agent-contract v1 rollout is a focused recovery transition, not a #913 failure, and that pin alignment alone cannot promote the successor federation state beyond UNKNOWN.",
+        "README.md records the October 23 peer refresh to 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f, StoryEngine's exact-head 15/15 successful check state, PR #1004's failure at its old 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f pin, and the requirement that PR #1004 earn its own exact-head witness; no separate PR witness or production/deploy authority transfers.",
+        "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
+        "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
+        "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
+        "README.md must describe Friend Intake as a bounded default-off FCR capability with separate feature and persistence gates, interactive authority for retention, model-free deterministic processing, and explicit separation between source implementation and production activation proof."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify `src/founder-os-lab/projectAdapters.ts` as evidence-authority truth-sensitive so a Chief exact-head pin movement cannot pass Documentation Truth without substantive README, truth-decay audit, and structured receipt updates that name the changed path.",
+        "`scripts/verify-documentation-truth.mjs` must classify `tools/zapier/founder-content-outcome-contract.cjs` as evidence-authority truth-sensitive so account-provenance changes cannot pass Documentation Truth without substantive README, truth-decay audit, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
+        "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
+        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntake.ts",
+      "claims": [
+        "src/http/routes/friendIntake.ts must keep process_without_saving available behind normal founder authentication while requiring the interactive opaque founder-session boundary for every saved intake, enforce the independent persistence kill switch before any saved content is derived or written, and report retained summary-plus-derived-label state truthfully without granting model, merge, deploy, migration, or provider authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntakeReviewReceipt.ts",
+      "claims": [
+        "src/http/routes/friendIntakeReviewReceipt.ts must issue only short-lived HttpOnly sensitive-save capabilities bound to the current opaque browser-session identity and every persisted reviewed field, use a fresh nonce and engine-version binding, and derive one deterministic intake/timeline identity pair per receipt so concurrent replay cannot create multiple sensitive saves."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260909031700_friend_intake_v1.sql",
+      "claims": [
+        "supabase/migrations/20260909031700_friend_intake_v1.sql must keep intake content service-role-only, prevent auth-user deletion from cascading into saved intake history, preserve behavior-only timeline metadata, enforce reviewed sensitive saves at the database boundary, and append usefulness corrections with idempotent exact-event retries rather than overwrite prior feedback history."
+      ]
+    },
+    {
+      "path": "public/control-room/friend-intake.js",
+      "claims": [
+        "public/control-room/friend-intake.js must freeze the submitted input/privacy controls while a request owns that snapshot, revoke a sensitive review capability before discarding or changing its privacy state, display every reviewed retained label, and describe saved retention as redacted summary plus derived labels rather than summary-only."
+      ]
+    },
+    {
+      "path": "src/chief/firstSliceEngine.ts",
+      "claims": [
+        "src/chief/firstSliceEngine.ts must preserve the protected human-support lane for high-consequence health language while disambiguating established technical uses of age-related terms so routine build work is not incorrectly classified as teen context."
+      ]
+    },
+    {
+      "path": "docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md",
+      "claims": [
+        "docs/PHASE_0_SELF_ATTACK_TRUTH_MAP_2026-09-08.md must preserve its September 8 baseline as historical evidence while marking the old not-yet-wired first-slice source claim superseded by PR #774, without converting source implementation into production configuration, migration, deployment, runtime, or browser proof."
       ]
     }
   ]
