@@ -24,7 +24,7 @@ function resolveReadmePath(value, root) {
 
 export function findMissingLocalPaths(markdown, repoRoot = defaultRoot) {
   const root = resolve(repoRoot);
-  const text = markdown.replace(/^``[^\n]*\n[\s\S]*?^``[^\n]*(?:\n|$)/gm, '\n');
+  const text = markdown.replace(/^```[^\n]*\n[\s\S]*?^```[^\n]*(?:\n|$)/gm, '\n');
   const references = [];
 
   // Local Markdown links: skip fragments, URLs and email addresses.
