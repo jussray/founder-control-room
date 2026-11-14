@@ -2,6 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseWranglerSecretRegistry } from './wrangler-secret-registry.mjs';
 
 const root = process.cwd();
 const REMOTE_ENDPOINT = 'POST https://api.foundercontrolroom.org/mcp/read';
@@ -22,6 +23,7 @@ function slugsFromConst(source, constName) {
 
 const envExample = read('.env.example');
 const wrangler = read('wrangler.worker.toml');
+const workerSecretRegistry = parseWranglerSecretRegistry(wrangler);
 const docs = read('docs/MCP_STACK.md');
 const remoteRoute = read('src/http/routes/remoteReadMcp.ts');
 const mcpRouter = read('src/http/routes/mcp.ts');
@@ -46,8 +48,12 @@ assert(
 );
 
 assert(
-  /required\s*=\s*\[[\s\S]*?"FCR_REMOTE_MCP_READ_TOKEN"[\s\S]*?\]/m.test(wrangler),
-  'Worker required secrets must include FCR_REMOTE_MCP_READ_TOKEN',
+  workerSecretRegistry.optional.includes('FCR_REMOTE_MCP_READ_TOKEN'),
+  'Worker optional secrets must include legacy FCR_REMOTE_MCP_READ_TOKEN compatibility authority',
+);
+assert(
+  !workerSecretRegistry.required.includes('FCR_REMOTE_MCP_READ_TOKEN'),
+  'FCR_REMOTE_MCP_READ_TOKEN must remain optional while canonical /mcp OAuth is independently available',
 );
 assert(
   !/FCR_REMOTE_MCP_READ_TOKEN\s*=\s*"[^"\s]+"/.test(wrangler),
