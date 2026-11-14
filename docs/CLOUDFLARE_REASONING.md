@@ -331,3 +331,8 @@ For an external connector's authorization request, the Pages edge redirects only
 ## Production Deploy parser recovery and authority boundary (2026-11-04 candidate)
 
 `deploy.yml` includes a Python gate that compares the provider-observed Cloudflare Worker secret names with `wrangler.worker.toml`'s required-name registry without reading credential values. The parser must stay correctly indented within the GitHub Actions script; otherwise GitHub rejects the workflow itself and production dispatch can fail with HTTP 422 before the authority gate executes. PR #1067 repairs that syntax error and documents the distinction between candidate source and observed release. Production readiness still requires the accepted exact-commit workflow, a separate founder authorization receipt, successful gated dispatch, and direct Worker plus Pages `/version` identity readback. A successful Pages deployment or a present secret binding name cannot substitute for those observations.
+
+
+## November 14, 2026 — production credential observation boundary
+
+The production Cloudflare credential diagnostic is founder-dispatched only. It checks out the supplied full main SHA with persisted checkout credentials disabled, refetches live main, and stops unless both identities match. It prints only presence, non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it never prints a credential, deploys, rotates a secret, or changes a provider resource. Pull-request code must never receive the production deployment credential. A successful diagnostic proves only what the production environment resolved at that exact main identity, not release or runtime health.
