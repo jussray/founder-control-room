@@ -125,6 +125,15 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify Cloudflare accepts the deploy credential (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
+          bash scripts/verify-cloudflare-token.sh "$ACCOUNT_ID"
+
       - name: Verify provider-held Worker secret names before reconciliation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -174,17 +183,27 @@ jobs:
 
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
               receipt_text = handle.read()
-          # Wrangler can prefix the JSON list with authentication notices.
-          # Parse only the list, never log the provider response or secret values.
-          array_start = receipt_text.find('[')
-          array_end = receipt_text.rfind(']')
-          if array_start < 0 or array_end <= array_start:
-              print('::error title=Invalid Cloudflare secret receipt::No JSON list returned.')
-              sys.exit(1)
-          try:
-              observed = json.loads(receipt_text[array_start:array_end + 1])
-          except (ValueError, TypeError):
-              print('::error title=Invalid Cloudflare secret receipt::Malformed JSON list.')
+          # Wrangler can surround the JSON list with notices that themselves
+          # contain brackets ("▲ [WARNING] ...", "[wrangler] done"). Decode at
+          # each '[' and keep the first list made only of objects; never log the
+          # provider response or secret values.
+          decoder = json.JSONDecoder()
+          observed = None
+          position = receipt_text.find('[')
+          while position >= 0:
+              try:
+                  candidate, _ = decoder.raw_decode(receipt_text, position)
+              except ValueError:
+                  candidate = None
+              if (
+                  isinstance(candidate, list) and candidate and
+                  all(isinstance(entry, dict) for entry in candidate)
+              ):
+                  observed = candidate
+                  break
+              position = receipt_text.find('[', position + 1)
+          if observed is None:
+              print('::error title=Invalid Cloudflare secret receipt::No JSON list of provider entries returned.')
               sys.exit(1)
           if not isinstance(observed, list) or any(
               not isinstance(entry, dict) or

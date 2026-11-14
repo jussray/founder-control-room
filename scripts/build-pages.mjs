@@ -15,6 +15,9 @@ const requiredAssets = [
   'index.html',
   '_headers',
   '_worker.js',
+  // Browsers request /favicon.ico on every page; a missing icon is a console
+  // 404 on every FCR surface and fails the Founder Home browser proof.
+  'favicon.ico',
   'robots.txt',
   'sitemap.xml',
   'llms.txt',
