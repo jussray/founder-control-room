@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Record the exact approved commit on every production Worker deploy from .github/workflows/deploy.yml: wrangler deploy now passes --tag <expected_head_sha> and short run provenance via --message, and a fail-closed post-deploy readback (wrangler deployments list/versions view, names/ids/annotations only) fails the deploy job unless the newest deployment routes 100% to one version whose workers/tag equals that exact SHA. Candidate source only; no deploy run.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -31,7 +31,9 @@
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
         "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
-        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts."
+        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
+        "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
+        "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy."
       ]
     },
     {
@@ -824,6 +826,12 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": "scripts/worker-deployment-version-tag.mjs",
+      "claims": [
+        "`evaluateWorkerVersionTag` is a pure function: it passes only when the newest deployment (by `created_on`, independent of list order) routes 100% to a single version, the viewed version id equals that active id, and its `workers/tag` equals a lowercase 40-character expected SHA; missing, prefix, different, split-traffic, empty, or malformed input fails closed. Its unit tests prove this comparison logic only, not wrangler JSON shape stability or Cloudflare behaviour."
       ]
     }
   ]

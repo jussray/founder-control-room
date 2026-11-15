@@ -1,5 +1,9 @@
 # Cloudflare Reasoning Contract
 
+## November 15, 2026 — exact-commit Worker version tag readback (candidate)
+
+Reasoning about which commit the production Worker runs must not rely on the `/version` `gitSha` runtime marker alone. Candidate `.github/workflows/deploy.yml` tags each production Worker version with the exact approved SHA (`--tag`) and fails the deploy job unless provider readback shows the newest deployment routing 100% to one version whose `workers/tag` equals it (`scripts/worker-deployment-version-tag.mjs`). A matching tag shows only the commit recorded on the provider version. It does not show runtime behaviour, the Pages binding, or secret state. No deploy was run for this change. A read-only audit on November 15, 2026 observed that no existing version carries a tag, message or commit SHA.
+
 ## November 7, 2026 — candidate Gmail AI Inbox read boundary
 
 PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
