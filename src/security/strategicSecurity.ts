@@ -251,6 +251,13 @@ export function auditPortfolioStrategicSecurity(
 
 export function validateLanternPolicy(policy: LanternPolicy): string[] {
   const errors: string[] = [];
+  // Each safeguard must be explicit; omitted and truthy/falsy substitutes
+  // cannot establish an isolated, non-authorizing sandbox.
+  for (const [key, expected] of Object.entries(DEFAULT_LANTERN_POLICY)) {
+    if (policy[key as keyof LanternPolicy] !== expected) {
+      errors.push(`Lantern safeguard ${key} must explicitly equal ${expected}.`);
+    }
+  }
   if (!policy.isolated) errors.push('Lantern must remain isolated.');
   if (policy.realDataAllowed) errors.push('Lantern cannot contain real user or production data.');
   if (policy.realSecretsAllowed) errors.push('Lantern cannot contain real secrets.');

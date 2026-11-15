@@ -15,15 +15,25 @@ const requiredAssets = [
   'index.html',
   '_headers',
   '_worker.js',
+  // Browsers request /favicon.ico on every page; a missing icon is a console
+  // 404 on every FCR surface and fails the Founder Home browser proof.
+  'favicon.ico',
   'robots.txt',
   'sitemap.xml',
   'llms.txt',
   'crawlers.json',
   'work.html',
+  '.well-known/security.txt',
   '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
+  // These four files are load-bearing for the five-screen cockpit/runtime seam.
+  // Packaging must fail closed if merge reconciliation ever drops one of them.
+  'control-room/opaque-session-bootstrap.js',
+  'control-room/safe-rate-limit-fetch.js',
+  'control-room/five-screen-shell.js',
+  'control-room/os-topology.js',
   'control-room/founder-shell.html',
   'control-room/founder-shell.css',
   'control-room/capabilities.html',

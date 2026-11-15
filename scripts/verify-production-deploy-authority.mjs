@@ -35,6 +35,16 @@ assert.match(
   /^on:\n  workflow_dispatch:/m,
   'production deployment must be manually dispatched',
 );
+assert.match(
+  workflow,
+  /^ {10}receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m,
+  'Cloudflare secret receipt parser must remain inside the YAML run block',
+);
+assert.doesNotMatch(
+  workflow,
+  /^ {8}receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m,
+  'dedented receipt parser invalidates the production Actions workflow',
+);
 assert.doesNotMatch(
   workflow,
   /^  push:/m,

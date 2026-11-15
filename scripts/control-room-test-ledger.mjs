@@ -54,9 +54,16 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
 
     const key = checkKey(run);
     const current = selected.get(key);
-    const currentTime = timestamp(current?.completed_at ?? current?.started_at);
-    const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    // Check-run IDs are allocated at creation; completion timestamps can make an
+    // older completed attempt look newer than a just-queued replacement.
+    const currentId = /^\d+$/.test(String(current?.id ?? '')) ? BigInt(current.id) : null;
+    const candidateId = /^\d+$/.test(String(run.id ?? '')) ? BigInt(run.id) : null;
+    const currentTime = timestamp(current?.started_at ?? current?.completed_at);
+    const candidateTime = timestamp(run.started_at ?? run.completed_at);
+    const newer = currentId !== null && candidateId !== null
+      ? candidateId > currentId || (candidateId === currentId && candidateTime >= currentTime)
+      : candidateTime >= currentTime;
+    if (!current || newer) selected.set(key, run);
   }
 
   return [...selected.values()]
@@ -148,20 +155,35 @@ async function githubJson(url, token) {
   return response.json();
 }
 
-async function fetchAllCheckRuns({repository, sha, token}) {
+export async function fetchAllCheckRuns({repository, sha, token, getJson = githubJson}) {
   const [owner, repo] = clean(repository).split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must use owner/repo format.');
 
   const runs = [];
+  let providerTotal = null;
   for (let page = 1; page <= 10; page += 1) {
     const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`);
     url.searchParams.set('filter', 'all');
     url.searchParams.set('per_page', '100');
     url.searchParams.set('page', String(page));
-    const payload = await githubJson(url, token);
-    const pageRuns = Array.isArray(payload?.check_runs) ? payload.check_runs : [];
+    const payload = await getJson(url, token);
+    if (!Array.isArray(payload?.check_runs) || !Number.isSafeInteger(payload.total_count) || payload.total_count < 0) {
+      throw new Error('GitHub check-run page has an invalid or incomplete shape.');
+    }
+    const pageRuns = payload.check_runs;
+    providerTotal = payload.total_count;
     runs.push(...pageRuns);
+    if (page === 10 && pageRuns.length === 100) {
+      throw new Error('GitHub check-run enumeration reached the 1000-record limit; refusing partial ledger.');
+    }
     if (pageRuns.length < 100) break;
+  }
+  const ids = runs.map((run) => String(run?.id ?? ''));
+  if (ids.some((id) => !/^\d+$/.test(id)) || new Set(ids).size !== runs.length) {
+    throw new Error('GitHub check-run pagination returned missing or duplicate IDs; refusing partial ledger.');
+  }
+  if (providerTotal !== runs.length) {
+    throw new Error(`GitHub check-run enumeration incomplete: fetched ${runs.length} of ${providerTotal}; refusing partial ledger.`);
   }
   return runs;
 }

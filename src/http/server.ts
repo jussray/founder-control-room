@@ -52,11 +52,13 @@ import {
   handleProofOfShipReceiptLookup,
 } from './routes/proofOfShipReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
+import { exactHeadCockpitRouter } from './routes/exactHeadCockpit.js';
 import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
+import { johnstownAiPilotRouter } from './routes/johnstownAiPilot.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
@@ -385,6 +387,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/integration-cockpit', exactHeadCockpitRouter);
   app.use('/switchboard', switchboardRouter);
   app.use('/security-posture', securityPostureRouter);
   app.use('/projects', repositoryVerificationRouter);
@@ -428,6 +431,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mcp', mcpRouter);
   app.use('/external-use', externalUseRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
+  app.use('/johnstown-ai-pilot', johnstownAiPilotRouter);
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
