@@ -140,7 +140,9 @@ async function waitForFounderProjects(label) {
 try {
   mkdirSync(RESULTS_ROOT, { recursive: true });
 
-  await page.goto(`${BASE_URL}/control-room/`, {
+  // Since the five-screen shell (#832) the Control Room opens on Home; the
+  // Projects list lives on Control > Overview, so the proof navigates there.
+  await page.goto(`${BASE_URL}/control-room/?screen=control&view=overview`, {
     waitUntil: 'commit',
     timeout: 10_000,
   });

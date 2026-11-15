@@ -335,3 +335,8 @@ For an external connector's authorization request, the Pages edge redirects only
 ## Post-deploy reconciliation tolerance (2026-11-05 candidate)
 
 The Post-Deploy Reconciliation job is an inspection step. It runs after `smoke-test`, after the production Worker has been promoted. It is neither an authority gate nor a mutation step, and no job depends on it. Its `timeout-minutes: 15` bound keeps a hung inspection from holding the run open. Its `continue-on-error: true` setting means a reconciliation failure does not turn a completed release into a failed Deploy run. The founder selected that tolerance deliberately for PR #1069. Its cost is that the failure is visible only on the reconcile job, so a green Deploy run does not prove reconciliation passed. The repository already records a case where a `continue-on-error` step hid a failing database check (the migration-lint entry in `docs/TRUTH_DECAY_AUDIT.md`), so this job must not be cited as validation evidence. A reconciliation result requires its job log or a separate readback.
+
+
+## November 14, 2026 — production credential observation boundary
+
+The production Cloudflare credential diagnostic is founder-dispatched only. It checks out the supplied full main SHA with persisted checkout credentials disabled, refetches live main, and stops unless both identities match. It prints only presence, non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it never prints a credential, deploys, rotates a secret, or changes a provider resource. Pull-request code must never receive the production deployment credential. A successful diagnostic proves only what the production environment resolved at that exact main identity, not release or runtime health.
