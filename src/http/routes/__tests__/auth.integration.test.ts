@@ -22,7 +22,7 @@ const FOUNDER_EMAIL = 'founder@example.com';
 const FOUNDER_USER_ID = '11111111-1111-4111-8111-111111111111';
 const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 const VALID_OPAQUE_COOKIE = `v1.${'A'.repeat(43)}`;
-const VERIFIED_USER = { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL };
+const VERIFIED_USER = { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' };
 const SESSION = {
   access_token: 'supabase-access-token-value',
   refresh_token: 'supabase-refresh-token-value',
@@ -31,7 +31,22 @@ const SESSION = {
 
 type ResponseWithHeaders = { headers: Record<string, string | string[] | undefined> };
 function buildApp() { const app = express(); app.use(express.json()); app.use('/auth', authRouter); return app; }
-function founderUsersRow(match: boolean) { return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: match ? { email: FOUNDER_EMAIL } : null, error: null }) }) }) }; }
+function founderUsersRow(match: boolean) {
+  let requestedUserId = '';
+  const query: any = {
+    eq: (field: string, value: unknown) => {
+      if (field === 'user_id') requestedUserId = String(value);
+      return query;
+    },
+    not: () => query,
+    maybeSingle: () => Promise.resolve({
+      data: match && (!requestedUserId || requestedUserId === FOUNDER_USER_ID)
+        ? { email: FOUNDER_EMAIL, user_id: FOUNDER_USER_ID } : null,
+      error: null,
+    }),
+  };
+  return { select: () => query };
+}
 function browserSessionTable() {
   return {
     insert: () => Promise.resolve({ data: null, error: null }),
@@ -62,7 +77,7 @@ beforeEach(() => {
 describe('POST /auth/magic-link', () => {
   it('requires an email with the standard error envelope', async () => { const res = await request(buildApp()).post('/auth/magic-link').send({}); expect(res.status).toBe(400); expect(res.body).toEqual({ success: false, error: { code: 'BAD_REQUEST', message: 'A valid email is required.', details: [] } }); });
   it('sends the same generic response for a non-allowlisted email without sending an OTP', async () => { setAllowlist(false); const res = await request(buildApp()).post('/auth/magic-link').send({ email: 'stranger@example.com' }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).not.toHaveBeenCalled(); });
-  it('sends an OTP for an allowlisted email with the same generic response', async () => { setAllowlist(true); const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: FOUNDER_EMAIL, options: expect.objectContaining({ shouldCreateUser: true }) })); });
+  it('sends an OTP for an allowlisted email with the same generic response', async () => { setAllowlist(true); const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL }); expect(res.status).toBe(202); expect(res.body.success).toBe(true); expect(mockSignInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: FOUNDER_EMAIL, options: expect.objectContaining({ shouldCreateUser: false }) })); });
 });
 
 describe('GET /auth/callback', () => {
