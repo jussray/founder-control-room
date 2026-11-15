@@ -203,6 +203,10 @@ A required test contributes to merge readiness only when the exact-head workflow
 
 For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a green specialized Pages workflow alone cannot satisfy merge-required browser proof or authorize integration.
 
+## Sauce Guard egress proof before merge
+
+A contributor or agent changing public product communications must apply `.agents/skills/sauce-guard/SKILL.md` and preserve Current You's exact-copy publication approval, FCR revalidation, and provider readback. Proposed code changes cannot confer communication authority. For newly introduced logging calls, the existing PR/push CI lane must execute the fail-closed `scripts/verify-sauce-guard-egress.mjs` audit and contract suite; a failed, skipped, or stale-head log check is not permission to bypass, suppress, or merge. Scanner success is changed-line evidence only, not a complete privacy audit, proof of safe historical logs, or a substitute for founder-final merge approval.
+
 
 ## CI lockfile determinism — current exact-head source contract
 
