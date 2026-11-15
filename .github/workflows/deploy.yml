@@ -100,6 +100,15 @@ jobs:
 
           echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
 
+      - name: Verify Cloudflare accepts the deploy credential (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
+          bash scripts/verify-cloudflare-token.sh "$ACCOUNT_ID"
+
       - name: Verify provider-held Worker secret names before mutation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

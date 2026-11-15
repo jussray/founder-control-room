@@ -147,3 +147,21 @@ Material work ends in one of:
 - `INCOMPLETE`
 
 Never manufacture `VERIFIED` from confidence or effort.
+
+
+## FCR GPT Skills Export and Scoped Execution
+
+The existing FCR GPT must use the current founder frameworks, including the approved Juss Flow launch loop, V10 FutureYOU/Me, Goalfix, Red Team I/II, Lindy, L99, OODA, Product Design and proof-led release. Read `docs/FCR_GPT_SKILLS_EXPORT_AND_EXECUTION.md` and the current exact-head repository contracts. Do not create a duplicate GPT, control plane, permission broker, PR, or skills registry just to display this framework.
+
+The personal portfolio skill export already exists under `systems/EXPORT-INDEX.md`. For additional skills, use the owning repository's current `SKILL.md` and any verified exported Knowledge index. Preserve source repo/path/revision/content digest and keep distinct same-name variants. Private/personal skills stay held for owner-only review; a public/shared Knowledge bundle must not leak them or unreviewed reference files.
+
+**Execution permissions are capability-specific, not all-off and not all-on:**
+
+- Advisory reasoning skills (FutureYOU, ULTRATHINK, Truth Mode, Council, Red Team, Lindy, L99, OODA) may inspect, propose and challenge. Their text cannot authorize an action.
+- Verification-capable skills may use genuinely connected, scoped read/test/browser tools, including focused tests and Playwright when those tools and target permission are present.
+- Goalfix/repair-to-proof may make a smallest reversible branch patch only within explicitly authorized repository, branch and file scope. MakeVideo may create reviewed original assets; distribution is a separate permission.
+- Merge, deploy, database migration, auth/security changes, external publication/sending, spending, secrets, deletion and provider writes require the precise current target, valid executor, separate relevant founder authority, fresh evidence and provider outcome readback.
+
+Knowledge metadata may mark an action as **eligible**, but must never claim it is **authorized**. Do not flip advisory `mayExecute:false` flags to bypass the trusted runtime. Tool exposure alone does not grant access; equally, an advisory registry does not prevent a *separately approved* scoped executor. Current safety, privacy, repository rules and external platform constraints remain binding even after founder approval.
+
+Before asserting the GPT is upgraded, confirm the **actual existing GPT editor** has been updated, the sanitized Knowledge is attached, actions/plugins are connected with appropriate scope, and a real founder-vs-nonfounder privacy test plus one bounded tool action is verified. Repository prompt updates alone are only source changes, never evidence of a live GPT installation.

@@ -2,6 +2,10 @@
 
 This record is append-only in meaning: a successor's green checks do not rewrite a predecessor's failed or cancelled checks. Entries distinguish observed CI from claimed remediation. Never mark a historical failure resolved solely because a later head is green.
 
+Base-bound: `0e85256dfe1434eb81eeafadec950b564e0da7de`
+
+Rows below were reconciled against this main SHA. When main moves, the binding becomes stale and the audit fails closed until rows are re-verified.
+
 ## Evidence ledger
 
 | Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
@@ -357,30 +361,38 @@ The following GitHub Actions runs were independently read by run ID, commit SHA,
 | `ee8d8de3614b9cc2651a59d8c8e7664a23217f75` | Historical CI Accountability (run 42389462627) | failure | Observed ledger verifier reported missing failed Repo Reality Evidence run 42389462544 | Append the exact failed run to this historical ledger; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42389462627); failed job/step and log inspected, successor pass unverified | OPEN |
 | `4dc8110f66a1323733fed456d4575a391ef9f5b5` | Repo Reality Evidence (run 42391915297) | failure | Observed CI gate rejected missing ### Scope, Verification, Evidence, Limits and Rollback PR sections (at run event time) | PR #1072 description now includes ### evidence sections; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42391915297); failed job/step and log inspected, successor pass unverified | OPEN |
 | `4dc8110f66a1323733fed456d4575a391ef9f5b5` | Historical CI Accountability (run 42391915243) | failure | Observed ledger verifier reported missing historical failed runs 42389462544 and 42389462627 on predecessor SHA | Append the missing historical failed runs to this ledger; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42391915243); failed job/step and log inspected, successor pass unverified | OPEN |
+| `5d5dae60c0eeecc9a62c3a7bfa55f5899937f43a` | CI (run 42156674960) | failure | Playwright screenshot protocol error (`Page.captureScreenshot`) at `e2e/plugin-center-ultrathink-proof.mjs:168`; the branch changes no `e2e/` file | `aaf1745189b58156afce0eda975186c065a869ce` | CI run 42439322334 succeeded on `aaf1745`, including Playwright e2e and Playwright E2E | REMEDIATED |
 
 ## 2026-11-07 — independent historical-CI audit observations (source-only, unresolved)
 
 These 85 distinct failure/cancellation records were extracted from the existing GitHub Actions Historical CI Accountability auditor logs for PRs #1073, #1075, #1076 and #1077. The existing auditor queried GitHub workflow history by commit SHA. Seven representative run identities were additionally fetched from GitHub API and matched to their exact SHA, name, and conclusion. Individual root causes and remediation for the remaining entries are not asserted here. Every outcome stays OPEN; adding a row does not convert a failure into success or prove any release readiness.
+
 ## PR #463 historical run observations (November 7, 2026)
 
 These records preserve observed GitHub outcomes from the exact predecessor commits of PR #463. A successor's green check does not rewrite a cancellation or establish unrelated remediation.
 
-| `2ca8c7eccad49f94107abf429d8911099de5d882` | Repo Reality Evidence (run 42346031869) | failure | Repo Reality rejected PR #463 body missing Scope, Verification, Evidence, Limits and Rollback sections | Existing PR description updated with five substantive sections | [Failed run](https://github.com/jussray/founder-control-room/actions/runs/42346031869); [successor Repo Reality success](https://github.com/jussray/founder-control-room/actions/runs/42346215197) at e86a6f1a9a2fb252f8d4de67c3d3341615f5606c | REMEDIATED |
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `2ca8c7eccad49f94107abf429d8911099de5d882` | Repo Reality Evidence (run 42346031869) | failure | Repo Reality rejected PR #463 body missing Scope, Verification, Evidence, Limits and Rollback sections | `e86a6f1a9a2fb252f8d4de67c3d3341615f5606c`: Existing PR description updated with five substantive sections | [Failed run](https://github.com/jussray/founder-control-room/actions/runs/42346031869); [successor Repo Reality success](https://github.com/jussray/founder-control-room/actions/runs/42346215197) at e86a6f1a9a2fb252f8d4de67c3d3341615f5606c | REMEDIATED |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Control Room Test Ledger (run 42346031905) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346031905); result observed, no remediation proof | OPEN |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Founder Repo Cycle (run 42346031982) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346031982); result observed, no remediation proof | OPEN |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Playwright E2E (run 42346031983) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346031983); result observed, no remediation proof | OPEN |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | CI (run 42346031985) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346031985); result observed, no remediation proof | OPEN |
-| `2ca8c7eccad49f94107abf429d8911099de5d882` | Documentation Truth (run 42346031989) | failure | Documentation Truth required README refresh and a current structured truth receipt | README and existing Documentation Truth receipt updated on successor | [Failed run](https://github.com/jussray/founder-control-room/actions/runs/42346031989); [successor Documentation Truth success](https://github.com/jussray/founder-control-room/actions/runs/42346215104) at e86a6f1a9a2fb252f8d4de67c3d3341615f5606c | REMEDIATED |
+| `2ca8c7eccad49f94107abf429d8911099de5d882` | Documentation Truth (run 42346031989) | failure | Documentation Truth required README refresh and a current structured truth receipt | `e86a6f1a9a2fb252f8d4de67c3d3341615f5606c`: README and existing Documentation Truth receipt updated on successor | [Failed run](https://github.com/jussray/founder-control-room/actions/runs/42346031989); [successor Documentation Truth success](https://github.com/jussray/founder-control-room/actions/runs/42346215104) at e86a6f1a9a2fb252f8d4de67c3d3341615f5606c | REMEDIATED |
 | `2ca8c7eccad49f94107abf429d8911099de5d882` | Quality Gate (run 42346032096) | cancelled | UNKNOWN: run conclusion observed; precise cause not independently established | UNKNOWN: correction not yet established | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42346032096); result observed, no remediation proof | OPEN |
 | `e86a6f1a9a2fb252f8d4de67c3d3341615f5606c` | Historical CI Accountability (run 42346215140) | failure | Seven failed or cancelled predecessor workflow runs were unrecorded for PR #463 | Ledger backfill proposed in successor commit, not independently verified yet | [Failed historical auditor](https://github.com/jussray/founder-control-room/actions/runs/42346215140); no successor success yet | OPEN |
 
 ## PR #463 predecessor head verified outcomes
 
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
 | `743bb87e0e429636b11fa29c384e210c2c782e0f` | PR Continuity (run 42395990252) | cancelled | UNKNOWN: result observed, root cause not verified | UNKNOWN: no verified correction yet | [Exact GitHub run](https://github.com/jussray/founder-control-room/actions/runs/42395990252); no remediation proven | OPEN |
 
 ## PR #463 November 8, 2026 exact-head audit observations
 These are independently read GitHub Actions run conclusions on predecessor commits. They remain visible after later tests pass; do not reclassify as remediated without a matched cause and corrective exact-head evidence.
 
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
 | `44b9ddd06b284acd514b0b0f8f85c85548e49b56` | Historical CI Accountability (run 42441645142) | failure | UNKNOWN: underlying job cause not independently established for this ledger entry | UNKNOWN: not asserted fixed | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42441645142); outcome observed, remediation not established | OPEN |
 | `44b9ddd06b284acd514b0b0f8f85c85548e49b56` | Founder Repo Cycle (run 42441645161) | cancelled | UNKNOWN: underlying job cause not independently established for this ledger entry | UNKNOWN: not asserted fixed | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42441645161); outcome observed, remediation not established | OPEN |
 | `44b9ddd06b284acd514b0b0f8f85c85548e49b56` | Quality Gate (run 42441645165) | cancelled | UNKNOWN: underlying job cause not independently established for this ledger entry | UNKNOWN: not asserted fixed | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42441645165); outcome observed, remediation not established | OPEN |
@@ -408,6 +420,8 @@ These are independently read GitHub Actions run conclusions on predecessor commi
 
 The entries below are failures or cancellations observed in the exact GitHub Actions audit run [42400448844](https://github.com/jussray/founder-control-room/actions/runs/42400448844), mapped to the pull request's 34 commit SHAs. This evidence records outcomes only; it does not claim root cause, repair, provider delivery, or production success. Each entry remains OPEN pending specific verification. Historical events are retained, not overwritten.
 
+| Failed/cancelled SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
 | `3be827ca3f6474781c70c718ac51bcc3c74349f8` | Repo Reality Evidence (run 40589515208) | failure | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/40589515208); outcome only | OPEN |
 | `3be827ca3f6474781c70c718ac51bcc3c74349f8` | Playwright E2E (run 40589479355) | failure | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/40589479355); outcome only | OPEN |
 | `3be827ca3f6474781c70c718ac51bcc3c74349f8` | Repo Reality Evidence (run 40589479556) | failure | UNKNOWN — logs not individually diagnosed | UNKNOWN — remediation not evidenced | [Observed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/40589479556); outcome only | OPEN |
@@ -698,6 +712,8 @@ The entries below are failures or cancellations observed in the exact GitHub Act
 
 The following Historical CI Accountability runs failed because earlier historical outcomes had not yet been recorded. This adds observed failure evidence without converting any prior red result to green. Live status remains dependent on subsequent exact-head CI.
 
+| Failed/cancelled SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
 | `add8f562585d6beaaedcbfbd950575c17ab9ffd6` | Historical CI Accountability (run 42400448844) | failure | Earlier historical failure evidence absent from ledger | Append the observed missing evidence; do not suppress audit | [Failed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42400448844) | OPEN |
 | `9401e61c12d35d6dfeb15a3c4e2b73e5919f6147` | Historical CI Accountability (run 42404310293) | failure | Earlier historical failure evidence absent from ledger | Append the observed missing evidence; do not suppress audit | [Failed GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42404310293) | OPEN |
 
