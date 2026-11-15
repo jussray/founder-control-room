@@ -27,12 +27,18 @@ These are different capability classes:
 - Model-provider availability does not grant operator, truth, mutation, spend, render, or publish authority.
 - A Gemini provider response is provider evidence only. It is not itself a valid `GeminiMediaProductionCommand`; production commands must satisfy the checked-in command contract and `/LEEVIZE` policy evaluation before execution.
 
-The current Friend Intake slice remains model-free:
+### Friend runtime supersession
+
+The former model-free-only Friend rule is superseded for current runtime behavior by `docs/FRIEND_INTAKE_V1.md` and `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md`.
+
+Friend now supports two bounded runtime classes:
 
 ```text
 Founder auth
 -> privacy choice
--> deterministic Mirror
+-> sensitive check
+-> deterministic OR explicitly allowlisted live provider
+-> Mirror
 -> editable tags
 -> exactly one Move
 -> provenance
@@ -40,7 +46,9 @@ Founder auth
 -> usefulness feedback
 ```
 
-For that slice, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
+`deterministic` remains the local, no-model path. OpenAI, Anthropic, and Perplexity may be used only when the Friend runtime feature flag is on, the provider is explicitly allowlisted, the required server credential is present, the input is not classified sensitive, and the request is backed by an interactive founder session. DeepSeek is not part of the Friend runtime provider set.
+
+Live inference does not grant provider mutation, memory retrieval, publication, deployment, merge, scheduling, spending authority beyond the bounded inference request, or any other external action authority.
 
 ## Enabled operator capabilities
 
@@ -85,9 +93,9 @@ All enabled operators must preserve:
 4. No Chief privileged-write expansion while its current semantic/security gate is unresolved.
 5. No weakening of Se'kret Bip teen/family/privacy/RLS rules.
 6. No raw founder input in `project_events`.
-7. `process_without_saving` means zero raw persistence, raw embedding, raw timeline content, or raw provenance payload.
+7. `process_without_saving` means zero founder-content persistence inside FCR, including raw input, raw embedding, raw timeline/provenance payload, and content-derived semantic classifications. A live provider still receives a founder-approved non-sensitive request under that provider's own retention policy.
 8. Exactly one Move per intake.
-9. Sensitive input may produce only `protective_move` or `clarifying_question`.
+9. Sensitive Friend input may produce only `protective_move` or `clarifying_question` and must stay off the live-provider path.
 10. Green founder-facing truth requires compatible, fresh evidence.
 11. A cross-project lesson is only a hypothesis until the target project is independently inspected against its current exact head.
 12. Raw model output may propose a plan or instruction packet, but cannot itself become a repository/provider/tool execution command. A media command becomes executable only after deterministic contract validation and `/LEEVIZE` policy acceptance.

@@ -35,16 +35,28 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('pull-requests: read');
     expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
     expect(workflow).toContain('supabase/*)');
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_neon == 'false'");
     expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
     expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
+  });
+
+  it('treats synchronize as an idempotent reuse of an existing Supabase PR branch', () => {
+    expect(workflow).toContain('name: Detect existing Neon branch');
+    expect(workflow).toContain('NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}');
+    expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
+    expect(workflow).toContain('first(.branches[]? | select(.name == $name) | .id) // ""');
+    expect(workflow).toContain("steps.neon_branch.outputs.exists != 'true'");
+    expect(workflow).toContain('NEON_EXISTING_BRANCH_ID: ${{ steps.neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain('NEON_EXISTING_BRANCH_STATE: ${{ steps.neon_branch.outputs.branch_state }}');
+    expect(workflow).toContain('NEON_CREATED_BRANCH_ID: ${{ steps.create_neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain("test \"$NEON_EXISTING_BRANCH_STATE\" = 'ready'");
   });
 
   it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url_pooled');
     expect(workflow).not.toContain('db_url_with_pooler');
+    expect(workflow).not.toContain('set -x');
     expect(workflow).toContain("echo 'NEON_API_KEY is not configured' >&2");
     expect(workflow).toContain('NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}');
     expect(workflow).toContain("echo 'Neon branch identity and private database URL output are present. URL value was not printed.'");
