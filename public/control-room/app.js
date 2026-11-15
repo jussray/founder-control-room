@@ -38,6 +38,7 @@ const state = {
     projectSlug: null,
     missionId: null,
     messages: [],
+    error: null,
     sending: false,
   },
   banner: null, // { kind: 'error'|'notice', text }
@@ -481,6 +482,7 @@ function founderChatMarkup() {
           ${state.founderChat.sending ? 'Thinking…' : 'Send'}
         </button>
       </form>
+      ${state.founderChat.error ? `<p class="error founder-chat-error" data-founder-chat-feedback>${escapeHtml(state.founderChat.error)}</p>` : ''}
       <p class="founder-chat-boundary" data-founder-chat-boundary>
         First send opens one proposed mission for this thread. Council may reason and propose; chat never grants merge, deploy, provider-write, spend, publish, or other execution authority.
       </p>
@@ -507,6 +509,7 @@ async function sendFounderChatTurn(rawMessage) {
   if (!projectSlug) throw new Error('Register a project before starting Founder Chat.');
 
   chat.messages.push({ role: 'founder', text: message });
+  chat.error = null;
   chat.sending = true;
   render();
 
@@ -554,6 +557,11 @@ async function sendFounderChatTurn(rawMessage) {
     if (state.founderChat === chat) {
       chat.messages.push({ role: 'council', text: founderChatReply(result) });
     }
+  } catch (error) {
+    if (state.founderChat === chat) {
+      chat.error = error instanceof Error ? error.message : String(error);
+    }
+    throw error;
   } finally {
     chat.sending = false;
   }
@@ -566,6 +574,7 @@ function bindFounderChat(mount) {
       projectSlug: projectSelect.value,
       missionId: null,
       messages: [],
+      error: null,
       sending: false,
     };
     render();
@@ -576,6 +585,7 @@ function bindFounderChat(mount) {
       projectSlug: founderChatProjectSlug(),
       missionId: null,
       messages: [],
+      error: null,
       sending: false,
     };
     render();
