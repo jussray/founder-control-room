@@ -93,6 +93,38 @@ describe('POST /auth/session', () => {
   it('binds the separately verified user into an opaque founder browser capability', async () => { mockSetSession.mockResolvedValue({ data: { session: SESSION, user: VERIFIED_USER }, error: null }); setAllowlist(true); const res = await request(buildApp()).post('/auth/session').send({ access_token: SESSION.access_token, refresh_token: SESSION.refresh_token }); expect(res.status).toBe(201); expect(res.body).toEqual({ success: true, data: { founder: { email: FOUNDER_EMAIL } }, meta: {} }); expectSessionCookie(res); });
 });
 
+describe('founder authorization identity boundary', () => {
+  it('rejects a confirmed same-email account with a different Supabase user ID', async () => {
+    setAllowlist(true);
+    mockSetSession.mockResolvedValue({
+      data: {
+        session: SESSION,
+        user: { ...VERIFIED_USER, id: '22222222-2222-4222-8222-222222222222' },
+      },
+      error: null,
+    });
+    const res = await request(buildApp()).post('/auth/session').send({
+      access_token: SESSION.access_token,
+      refresh_token: SESSION.refresh_token,
+    });
+    expect(res.status).toBe(403);
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('rejects an unconfirmed same-email founder account', async () => {
+    setAllowlist(true);
+    mockSetSession.mockResolvedValue({
+      data: { session: SESSION, user: { ...VERIFIED_USER, email_confirmed_at: null } },
+      error: null,
+    });
+    const res = await request(buildApp()).post('/auth/session').send({
+      access_token: SESSION.access_token,
+      refresh_token: SESSION.refresh_token,
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('POST /auth/logout', () => {
   it('preserves the browser capability when server-side revocation fails so logout can be retried', async () => {
     setAllowlist(true);
