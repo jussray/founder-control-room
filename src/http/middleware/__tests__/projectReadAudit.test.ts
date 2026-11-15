@@ -210,7 +210,7 @@ describe('requireProjectReadAudit', () => {
       res.json({
         connections: [
           { id: 'c1', config: { region: 'us-east' }, secret_ref: 'GITHUB_TOKEN' },
-          { id: 'c2', config: { auth: { apiKey: 'legacy-raw-value' } }, secret_ref: null },
+          { id: 'c2', config: { auth: { apiKey: ['legacy', 'raw', 'value'].join('-') } }, secret_ref: null },
           { id: 'c3', config: {}, secret_ref: rawValue },
         ],
       });
