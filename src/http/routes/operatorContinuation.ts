@@ -30,6 +30,7 @@ function requestRecord(value: unknown): OperatorExecutionContinuation | null {
 function failure(error: unknown): { status: number; code: string } {
   if (error instanceof OperatorContinuationStoreError) {
     if (error.code === 'invalid_continuation') return { status: 400, code: error.code };
+    if (error.code === 'stale_continuation') return { status: 409, code: error.code };
     if (error.code === 'project_not_found') return { status: 404, code: error.code };
   }
   return { status: 503, code: 'continuation_store_unavailable' };
