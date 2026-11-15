@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## November 2, 2026: Search Console and evidence challenge source candidate
+
+The existing PR #1055 branch includes a source-only Founder Control Room owner-insights screen at `/control-room/owner-insights.html` and founder-authenticated API endpoints `GET /owner-insights/search-console` and `POST /owner-insights/challenge`. The former makes read-only Google Search Console sitemap and *sampled* URL Inspection requests for `sc-domain:jussco.company`; absent or rejected service-account authority must remain a blocked/unknown state rather than a zero-indexing statistic. It requires an independent, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret and read access to that exact Search Console property. The latter sends only consented, bounded claim/evidence text to the configured Cloudflare Workers AI binding routed through AI Gateway; model gaps, adversarial questions, and manual gate suggestions are unverified recommendations, not founder authorization.
+
+The two features are **not production-verified**, and neither grants deployment, merge, customer-account access, or indexing. The first slice remains founder-only; general project owners require separate project-scoped authentication, RLS, billing and privacy verification. Keep Google credentials off public Pages and source control, and do not turn a green source check into a production claim. See `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.

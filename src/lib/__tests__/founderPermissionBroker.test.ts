@@ -207,6 +207,61 @@ describe('Founder Permission Broker', () => {
     expect(resolution.independentReviewSatisfied).toBeNull();
   });
 
+  it('binds learning cross-domain approval to the exact later outcome, head and reason', () => {
+    const learningProposal = {
+      ...proposal, actionType: 'apply_learning_cross_domain',
+      proposalId: 'learning-approval-1',
+    };
+    const learningTarget = {
+      type: 'learning_application' as const,
+      learningId: '11111111-1111-4111-8111-111111111111',
+      targetMissionId: '22222222-2222-4222-8222-222222222222',
+      targetOutcomeId: '33333333-3333-4333-8333-333333333333',
+      targetHeadSha: 'b'.repeat(40), targetDomain: 'auth',
+      crossDomainReason: 'A shared verification race was observed in this domain.',
+    };
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:learning-cross-domain',
+      requestedBySurface: 'chatgpt', proposal: learningProposal,
+      actionTarget: learningTarget,
+    });
+    expect(request.actionTarget).toMatchObject(learningTarget);
+    const approved = resolveFounderPermissionRequest({request, decision: 'approved'});
+    expect(approved.decision.executionAuthorized).toBe(false);
+    expect(() => resolveFounderPermissionRequest({
+      request: {...request, actionTarget: {...learningTarget, targetOutcomeId: '44444444-4444-4444-8444-444444444444'}},
+      decision: 'approved',
+    })).toThrow(/request hash/);
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:learning-wrong-head',
+      requestedBySurface: 'chatgpt',proposal:learningProposal,
+      actionTarget: {...learningTarget,targetHeadSha:'c'.repeat(40)},
+    })).toThrow(/must pin lesson/);
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:learning-no-reason',
+      requestedBySurface: 'chatgpt',proposal:learningProposal,
+      actionTarget: {...learningTarget,crossDomainReason:'no'},
+    })).toThrow(/must pin lesson/);
+  });
+
+  it('binds retirement approval to the exact lesson and original head', () => {
+    const retireProposal = {...proposal, actionType: 'retire_learning', proposalId: 'learning-retire-1'};
+    const retireTarget = {
+      type: 'learning_retirement' as const,
+      learningId: '11111111-1111-4111-8111-111111111111',
+      originHeadSha: 'b'.repeat(40),
+    };
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:learning-retirement',
+      requestedBySurface: 'chatgpt', proposal: retireProposal,actionTarget:retireTarget,
+    });
+    expect(request.actionTarget).toEqual(retireTarget);
+    expect(() => resolveFounderPermissionRequest({
+      request: {...request, actionTarget: {...retireTarget,learningId:'22222222-2222-4222-8222-222222222222'}},
+      decision:'approved',
+    })).toThrow(/request hash/);
+  });
+
   it('rejects a tampered request target before recording a decision', () => {
     const request = createFounderPermissionRequest({
       requestId: 'permission:tamper-123',

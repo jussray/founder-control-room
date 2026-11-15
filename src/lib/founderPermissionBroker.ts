@@ -33,6 +33,22 @@ export interface FounderPermissionMergeTarget {
   headSha: string;
 }
 
+export interface FounderPermissionLearningApplicationTarget {
+  type: 'learning_application';
+  learningId: string;
+  targetMissionId: string;
+  targetOutcomeId: string;
+  targetHeadSha: string;
+  targetDomain: string;
+  crossDomainReason: string;
+}
+
+export interface FounderPermissionLearningRetirementTarget {
+  type: 'learning_retirement';
+  learningId: string;
+  originHeadSha: string;
+}
+
 export interface FounderPermissionPromptOSWorkflowRegistryTarget {
   type: typeof PROMPTOS_WORKFLOW_REGISTRY_ACTION;
   repo: string;
@@ -51,6 +67,8 @@ export interface FounderPermissionPromptOSWorkflowRegistryTarget {
 
 export type FounderPermissionActionTarget =
   | FounderPermissionMergeTarget
+  | FounderPermissionLearningApplicationTarget
+  | FounderPermissionLearningRetirementTarget
   | FounderPermissionPromptOSWorkflowRegistryTarget
   | null;
 
@@ -92,6 +110,8 @@ const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{5,199}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LEARNING_DOMAIN = /^[a-z][a-z0-9_-]{1,63}$/;
 const WORKFLOW_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const WORKFLOW_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
@@ -199,6 +219,38 @@ function normalizedActionTarget(
   proposal: FounderControlProposalBinding,
   input: FounderPermissionActionTarget | undefined,
 ): FounderPermissionActionTarget {
+  if (proposal.actionType === 'apply_learning_cross_domain') {
+    if (!input || input.type !== 'learning_application') {
+      throw new Error('learning application requires an exact learning_application actionTarget');
+    }
+    const learningId = text(input.learningId).toLowerCase();
+    const targetMissionId = text(input.targetMissionId).toLowerCase();
+    const targetOutcomeId = text(input.targetOutcomeId).toLowerCase();
+    const targetHeadSha = text(input.targetHeadSha).toLowerCase();
+    const targetDomain = text(input.targetDomain).toLowerCase();
+    const crossDomainReason = text(input.crossDomainReason);
+    if (![learningId, targetMissionId, targetOutcomeId].every((value) => UUID.test(value))
+      || !FULL_SHA.test(targetHeadSha) || !LEARNING_DOMAIN.test(targetDomain)
+      || crossDomainReason.length < 12 || crossDomainReason.length > 600
+      || proposal.expectedHeadSha !== targetHeadSha) {
+      throw new Error('learning application target must pin lesson, downstream outcome/mission/head, domain, and reason');
+    }
+    return { type: 'learning_application', learningId, targetMissionId, targetOutcomeId, targetHeadSha, targetDomain, crossDomainReason };
+  }
+
+  if (proposal.actionType === 'retire_learning') {
+    if (!input || input.type !== 'learning_retirement') {
+      throw new Error('retirement requires an exact learning_retirement actionTarget');
+    }
+    const learningId = text(input.learningId).toLowerCase();
+    const originHeadSha = text(input.originHeadSha).toLowerCase();
+    if (!UUID.test(learningId) || !FULL_SHA.test(originHeadSha)
+      || proposal.expectedHeadSha !== originHeadSha) {
+      throw new Error('learning retirement must pin the lesson and its source head');
+    }
+    return { type: 'learning_retirement', learningId, originHeadSha };
+  }
+
   if (proposal.actionType === PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
     if (!input || input.type !== PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
       throw new Error('PromptOS workflow registry promotion requires an exact actionTarget');
@@ -208,7 +260,7 @@ function normalizedActionTarget(
 
   if (proposal.actionType !== 'merge') {
     if (input) {
-      throw new Error('actionTarget is only supported for merge and PromptOS workflow registry promotion requests in this broker version');
+      throw new Error('actionTarget is only supported for merge, PromptOS workflow registry promotion, and learning application/retirement requests in this broker version');
     }
     return null;
   }

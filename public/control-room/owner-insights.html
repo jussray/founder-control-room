@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Site Discovery &amp; Evidence Challenge · Founder Control Room</title>
+<link rel="stylesheet" href="/control-room/styles.css">
+<style>
+:root{color-scheme:dark}body{margin:0;background:#070b14;color:#eff6ff;font:16px/1.5 system-ui,sans-serif}
+main{max-width:1080px;padding:clamp(1rem,4vw,2.5rem);margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+a{color:#a5f3fc}.muted{color:#a9b9cf}.layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
+article{background:#111c2e;border:1px solid #34425a;border-radius:16px;padding:1.25rem;min-width:0}h1{font-size:clamp(1.6rem,4vw,2.4rem);margin:.6rem 0}
+h2{margin:0 0 .5rem;font-size:1.25rem}p{overflow-wrap:anywhere}label{display:grid;gap:.4rem;margin-bottom:.85rem;font-weight:650}
+input,textarea{box-sizing:border-box;width:100%;background:#091324;color:#f8fafc;border:1px solid #60728e;border-radius:8px;padding:.7rem;font:inherit}
+textarea{min-height:100px;resize:vertical}.consent{display:flex;align-items:flex-start;gap:.6rem;font-weight:450}.consent input{width:1.2rem;height:1.2rem;flex:none}
+button{border:0;border-radius:9px;background:#a5f3fc;color:#08111e;padding:.75rem 1rem;font:750 1rem system-ui;cursor:pointer}
+button:disabled{opacity:.55;cursor:progress}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #fde68a;outline-offset:2px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{text-align:left;vertical-align:top;padding:.6rem;border-bottom:1px solid #39475c;overflow-wrap:anywhere}th{color:#c7d2fe}
+.scroll{overflow-x:auto}.state{padding:.7rem;border:1px solid #475569;border-radius:8px;min-height:2.2rem;overflow-wrap:anywhere}
+ul{padding-left:1.3rem}.subhead{font-size:.95rem;margin-top:1.1rem}.wide{grid-column:1/-1}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><a href="/control-room/">← Founder Control Room</a><span class="muted">Founder-only · Read/propose · No deployments</span></div>
+<h1>Site discovery &amp; evidence challenge</h1>
+<p class="muted">Monitor Google Search Console for jussco.company. Separately challenge claims using AI Gateway; model output never verifies a claim or authorizes execution.</p>
+<div class="layout">
+<article>
+<h2>Google Search Console</h2>
+<p class="muted">Read-only provider snapshot. URL inspection covers six declared pages, not the entire Google index. A sitemap is not proof of indexing.</p>
+<button type="button" id="gsc-refresh">Refresh provider status</button>
+<p role="status" aria-live="polite" id="gsc-status" class="state">Not fetched.</p>
+<h3 class="subhead">Submitted sitemaps</h3>
+<div class="scroll"><table><thead><tr><th>Sitemap</th><th>Processing</th><th>Last downloaded</th><th>Errors</th></tr></thead><tbody id="sitemap-rows"><tr><td colspan="4">No provider data loaded.</td></tr></tbody></table></div>
+<h3 class="subhead">Individual page indexing</h3>
+<div class="scroll"><table><thead><tr><th>URL</th><th>Index verdict</th><th>Coverage</th><th>Last crawl</th></tr></thead><tbody id="index-rows"><tr><td colspan="4">No provider data loaded.</td></tr></tbody></table></div>
+</article>
+<article>
+<h2>Challenge a claim</h2>
+<p class="muted">You control what evidence is sent to Cloudflare AI Gateway. Do not include secrets or private customer records.</p>
+<form id="challenge-form">
+<label>Project identifier<input name="projectSlug" value="jussray" required maxlength="80" pattern="[a-z0-9-]+" autocomplete="off"></label>
+<label>Claim<textarea name="claim" required minlength="10" maxlength="2000" placeholder="What is asserted as true?"></textarea></label>
+<label>Supporting evidence, one fact or cited source per line (up to 8)<textarea name="evidence" required placeholder="Evidence 1: Search Console inspection on [date]…"></textarea></label>
+<label class="consent"><input type="checkbox" name="consentToModel" required><span>I authorize sending this claim and this evidence to the configured AI model for a proposal-only review. No verification or publication is performed.</span></label>
+<button type="submit" id="challenge-submit">Find evidence gaps</button>
+</form>
+<p role="status" aria-live="polite" class="state" id="challenge-status">Nothing submitted.</p>
+<section id="challenge-result" aria-live="polite" hidden>
+<h3>Evidence gaps</h3><ul id="challenge-gaps"></ul>
+<h3>Attack questions</h3><ul id="challenge-questions"></ul>
+<h3>Recommended next gate</h3><p id="challenge-gate"></p>
+<h3>Reasoning</h3><p id="challenge-rationale"></p>
+<p class="muted">Model-generated, unverified, no authority effect. The founder must independently validate any evidence or decision.</p>
+</section>
+</article>
+</div>
+</main>
+<script type="module" src="/control-room/owner-insights.js"></script>
+</body>
+</html>

@@ -1,5 +1,11 @@
 # Cloudflare Deployment Targets
 
+## November 2, 2026: Owner Insights optional bindings — source only
+
+The existing `founder-control-room` Worker remains the single FCR API target. This branch declares an optional Workers AI `AI` binding and an optional, provider-held `GSC_SERVICE_ACCOUNT_JSON` secret. The AI binding permits only the authenticated, proposal-only evidence challenge route `/owner-insights/challenge`; the Google secret permits only the read-only `/owner-insights/search-console` lookup after the exact Search Console property grants access. Missing Google authorization must return a blocked state. Neither binding allows payments, production mutation, deploys, or an unauthenticated public dashboard, and no credential value belongs in Wrangler source, GitHub Actions output, or Pages assets.
+
+The presence of `[ai]` and an optional-secret name is **configuration intent, not proof** of Worker runtime bindings, live AI Gateway inference, Google index measurements, or tenant/project-owner entitlements. Protect the founder session, same-origin CSRF barrier, existing service boundaries, and existing exact-head deploy guard. Verify the full test suite, CodeQL, provider readback, founder-only browser behavior and an approved Cloudflare deployment before claiming activation. Source details: `docs/OWNER_INSIGHTS_SOURCE_CANDIDATE.md`.
+
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
 The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.

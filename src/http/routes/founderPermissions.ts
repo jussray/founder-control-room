@@ -109,6 +109,20 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
       consequence: text(value.consequence) as 'CONSEQUENTIAL_WRITE',
     };
   }
+  if (type === 'learning_application') {
+    return {
+      type,
+      learningId: text(value.learningId),
+      targetMissionId: text(value.targetMissionId),
+      targetOutcomeId: text(value.targetOutcomeId),
+      targetHeadSha: text(value.targetHeadSha),
+      targetDomain: text(value.targetDomain),
+      crossDomainReason: text(value.crossDomainReason),
+    };
+  }
+  if (type === 'learning_retirement') {
+    return { type, learningId: text(value.learningId), originHeadSha: text(value.originHeadSha) };
+  }
   return null;
 }
 function errorCode(value: unknown): string {

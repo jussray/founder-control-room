@@ -187,6 +187,15 @@ A repository merge may proceed only when:
 
 Evidence is the lock. Exact founder approval turns the key. The approved conversational console is only a command surface.
 
+## Learning application and retirement targets
+
+The founder-permission broker accepts two learning-loop action targets beside `merge` and the PromptOS workflow-registry promotion:
+
+- `apply_learning_cross_domain` requires a `learning_application` target that pins the lesson, the downstream mission and outcome, the exact target head SHA (equal to the proposal's expected head), a bounded target domain, and a 12-600 character cross-domain reason.
+- `retire_learning` requires a `learning_retirement` target that pins the lesson and the exact source head SHA it was learned from.
+
+Any other shape fails closed. A validated learning target is a precondition, not authority: founder approval, receipt binding, expiry and one-time consumption still apply exactly as for every other portable approval, and validation never grants merge, deploy or execution.
+
 ## Command Bridge integration
 
 Command Bridge should store these additional references when a portable packet is used:
