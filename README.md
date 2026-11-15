@@ -1,15 +1,5 @@
 # Founder Control Room
 
-## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
-
-`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
-
-## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
-
-The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
-
-Rollover deferral does not cancel or skip any check on a pull request that is rolled forward. Separately, `e2e/control-room-read-truth-proof.mjs` now opens `/control-room/?screen=control&view=overview`: since the five-screen shell the Control Room boots to Home, where the Projects list is hidden, so this proof had failed on every run regardless of the change under test. Its assertions (UNKNOWN on a failed read, verified empty state on a successful empty read, no browser-readable tokens) are unchanged. Runner throughput after merge is not proven by this source change; read actual queue times on GitHub.
-
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
@@ -21,8 +11,6 @@ Rollover deferral does not cancel or skip any check on a pull request that is ro
 The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list from surrounding human notices, including bracketed lines such as `▲ [WARNING] …` before it or `[wrangler] …` after it (it decodes at each `[` and keeps the first list made only of objects; a follow-up to the original first-`[`/last-`]` slice, which rejected those shapes), validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
 
 The existing exact-current-main founder approval requirement, bounded removal of the stale undeclared `CF_API_TOKEN` plaintext binding, strict post-deployment binding-type check, and direct API + public Pages identity proofs remain mandatory. No value migration or secret rotation is authorized by this candidate; the canonical Worker Reconcile workflow is the only approved execution path for legacy-binding removal.
-
-Before the first Cloudflare API call, both the production Deploy and the canonical Worker Reconcile authority gates now run `scripts/verify-cloudflare-token.sh`, which asks Cloudflare to verify the resolved `CLOUDFLARE_API_TOKEN` (user-token endpoint, then the account-token endpoint for the `wrangler.worker.toml` account) and fails closed unless the response has `success: true` and `result.status == "active"`. The token travels via curl stdin config, never argv or logs. Both jobs run in the `production` environment, so a production environment secret named `CLOUDFLARE_API_TOKEN` overrides the repository secret. This is a source-level gate; it does **not** prove that the currently stored credential is valid.
 
 ## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
 
@@ -744,16 +732,3 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 ## X user-context publisher — source candidate
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
-
-## Chat ↔ Work continuation (candidate only)
-
-Founder-authenticated task checkpoints are implemented as reference-only
-records within FCR's existing Supabase continuity ledger. The candidate
-orders saves by observation time, rejects stale and future-dated checkpoints,
-and cannot renew approval or release authority. Chromium checks use the
-complete local FCR server's CORS, CSRF, and founder-auth boundary.
-
-These changes are **not deployed**. They require independent review,
-required GitHub checks, an approved database migration, authenticated
-production persistence proof, and a separate ChatGPT mode integration.
-See `docs/CHATGPT_OPERATOR_WORKFLOW.md` for exact details.
