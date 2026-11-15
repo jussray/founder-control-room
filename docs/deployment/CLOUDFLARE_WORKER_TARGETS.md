@@ -283,6 +283,12 @@ Current executable source and authoritative provider readback outrank an older v
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
 
+
+### Whop commerce ingress
+
+The canonical `founder-control-room` API Worker is the only intended runtime target for the Whop commerce witness route `POST /webhooks/whop/fcr/payments-succeeded`. The provider signing value is held as the Worker secret `FCR_WHOP_WEBHOOK_SECRET`; it is not a Pages variable, browser secret, GitHub Actions substitute, or product-wide credential.
+
+Repository declaration, route mounting, and exact-head CI are source/configuration evidence only. Production activation additionally requires provider-side Whop webhook registration, observed Worker secret-name presence, the additive external-commerce migration, at least one valid signed delivery/readback, and separate browser/runtime evidence for any checkout-return claim. No Whop provider state may be inferred from source configuration alone.
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
