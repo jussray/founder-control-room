@@ -313,6 +313,7 @@ truthConsoleRouter.get('/continuity', async (_req: FounderRequest, res) => {
   const { data, error } = await supabase
     .from('continuity_records')
     .select('id, project_id, mission_id, subject_fingerprint, proof_cookie, truth_snapshot_id, authority_fingerprint, runtime_fingerprint, evidence_fingerprint, valid_until, invalidated_at, invalidation_reason, created_at')
+    .is('task_id', null) // Task resume pointers are not verified Truth Console proof.
     .order('created_at', { ascending: false })
     .limit(CONTINUITY_LIMIT);
   if (error) return res.status(500).json({ error: 'Continuity unavailable' });
