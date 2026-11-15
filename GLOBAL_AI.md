@@ -290,3 +290,7 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
+## Asset Continuity gate — candidate (November 15, 2026)
+
+For identity-bearing visual, graphic, or media work, agents load `skills/asset-continuity/SKILL.md` (status `active-candidate`, proposed in draft PR #906) and its contract `docs/ASSET_CONTINUITY_GLOBAL_V1.md`. A matching palette or layout is not proof of graphic continuity; founder-approved visual source artifacts are evidence, not inspiration to swap for generic substitutes. `npm run verify:asset-continuity`, now run in the Quality Gate AI-skill job, checks registry and contract structure only. Automated checks cannot self-certify artistic fidelity, and none of this grants deterministic review, founder-final, deployment, or publication authority.
