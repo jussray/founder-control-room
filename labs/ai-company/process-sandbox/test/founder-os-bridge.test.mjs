@@ -5,6 +5,7 @@ import {
   executeFounderOsContainerTask,
   sealFounderOsContainerReceipt,
   stageFounderOsWorkspaceChange,
+  buildFounderOsMissionPatchHandoff,
 } from '../founder-os-bridge.mjs';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -477,5 +478,59 @@ test('virtual editing blocks mismatched exact head and unapproved action classes
   assert.throws(
     () => stageFounderOsWorkspaceChange(request('inspect'), plan('inspect'), workspace),
     /virtual editing requires a Founder OS plan/,
+  );
+});
+
+test('exports a real repository-source edit as a request for the authenticated mission route only', () => {
+  const input = request('plan');
+  const candidate = plan('plan');
+  const workspace = {
+    dataClassification: 'repository-source',
+    repository: input.evidence.repository,
+    sourceSha: input.evidence.commitSha,
+    branch: 'mission/example',
+    files: [{ path: 'src/example.ts', content: 'export const ready = false;\n' }],
+    edits: [{ path: 'src/example.ts', find: 'false', replace: 'true' }],
+  };
+  const details = {
+    missionId: 'mission-uuid-001',
+    message: 'Apply reviewed simulator edit',
+    idempotencyKey: 'mission-patch-1234',
+  };
+  const handoff = buildFounderOsMissionPatchHandoff(input, candidate, workspace, details);
+  assert.equal(handoff.status, 'ready_for_founder_route');
+  assert.equal(handoff.route, '/approvals/mission-uuid-001/patch');
+  assert.equal(handoff.method, 'POST');
+  assert.equal(handoff.requiresFounderSession, true);
+  assert.equal(handoff.requestSent, false);
+  assert.equal(handoff.authority.executionAllowed, false);
+  assert.equal(handoff.body.changes[0].content, 'export const ready = true;\n');
+  assert.equal(handoff.body.stagedWorkspaceReceipt.sourceClassification, 'repository-source');
+  assert.equal(handoff.body.stagedWorkspaceReceipt.sourceSha, input.evidence.commitSha);
+  assert.equal(handoff.body.idempotencyKey, details.idempotencyKey);
+  assert.ok(!JSON.stringify(handoff.body.stagedWorkspaceReceipt).includes('export const'));
+  assert.equal(workspace.files[0].content, 'export const ready = false;\n');
+});
+
+test('refuses to offer live handoff for synthetic-only fixtures or missing idempotency', () => {
+  const input = request('plan');
+  const candidate = plan('plan');
+  const workspace = {
+    dataClassification: 'synthetic',
+    repository: input.evidence.repository,
+    sourceSha: input.evidence.commitSha,
+    branch: 'mission/example',
+    files: [{ path: 'src/example.ts', content: 'before' }],
+    edits: [{ path: 'src/example.ts', find: 'before', replace: 'after' }],
+  };
+  const details = { missionId: 'mission-uuid-001', message: 'Edit', idempotencyKey: 'replay-key-01' };
+  assert.throws(
+    () => buildFounderOsMissionPatchHandoff(input, candidate, workspace, details),
+    /explicitly labeled repository-source/,
+  );
+  workspace.dataClassification = 'repository-source';
+  assert.throws(
+    () => buildFounderOsMissionPatchHandoff(input, candidate, workspace, { ...details, idempotencyKey: '' }),
+    /idempotency key/,
   );
 });
