@@ -115,7 +115,7 @@ export async function storeOperatorExecutionContinuation(
       authority_fingerprint: record.observation.authorityFingerprint,
       runtime_fingerprint: record.observation.runtimeFingerprint,
       evidence_fingerprint: record.observation.proofFingerprint,
-      valid_until: record.observation.expiresAt,
+      valid_until: null, // Unverified handoff never extends the canonical truth lease.
     })
     .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,invalidated_at,created_at')
     .single();
