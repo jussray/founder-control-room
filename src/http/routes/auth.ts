@@ -34,7 +34,7 @@ function normalizePassword(value: unknown): string { return typeof value === 'st
 async function isAllowlisted(email: string): Promise<boolean> {
   // Send founder links only for pre-provisioned accounts; never provision from a login request.
   const { data, error } = await supabase.from('founder_users')
-    .select('user_id').eq('email', email).not('user_id', 'is', null).maybeSingle();
+    .select('user_id').eq('email', email).maybeSingle();
   if (error) throw new Error('Founder allowlist check failed');
   return Boolean(data?.user_id);
 }
