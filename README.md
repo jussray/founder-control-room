@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — Federated relay v3 public-key immutability trigger (candidate, not provider proof)
+
+Migration `20261115194101_guard_federated_relay_v3_public_key_immutability.sql` adds a before-update trigger on `public.federated_relay_public_keys`. A key row's identity and material (`member`, `key_id`, `algorithm`, `public_key_jwk`, `valid_from`, `created_at`) cannot change in place; rotation creates a new row. Lifecycle transitions stay possible but monotonic: revocation is terminal, a retired key cannot reactivate, `revoked_at` and a set `valid_until` are fixed, and `revoked_at`/`updated_at` are database-owned. Table grants and RLS are unchanged. Behavior was checked against a scratch local Postgres only; this is not proof that the migration is applied to any provider database.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
