@@ -17,7 +17,7 @@ function section(source: string, start: string, end: string): string {
 
 describe('proof-of-ship publication authority', () => {
   it('activates the scheduled proof lane while preserving the founder-review rollback path', () => {
-    expect(deployWorkflow).toMatch(/^\s+PUBLISH_ALLOWED: 'true'$/m);
+    expect(deployWorkflow).toMatch(/^\s+PUBLISH_ALLOWED: 'false'$/m);
 
     const reviewHold = section(
       deployWorkflow,
@@ -33,6 +33,8 @@ describe('proof-of-ship publication authority', () => {
     expect(reviewHold).toContain('.buffer_method = "none"');
     expect(reviewHold).toContain('.buffer_terminal_action = "hold"');
     expect(reviewHold).not.toContain('ZAPIER_CATCH_HOOK_URL');
+    expect(deployWorkflow).not.toMatch(/^\s+ZAPIER_CATCH_HOOK_URL:/m);
+    expect(deployWorkflow).not.toMatch(/^\s+PROOF_OF_SHIP_STEERING_GRANT_ID:/m);
     expect(reviewHold).not.toMatch(/\bcurl\b/);
   });
 

@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, manual read-only production identity verification, and the separation of deployment from publication authority: source wiring, configured bindings, live provider invocation, deployment state, publication state, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -31,7 +31,8 @@
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
         "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
-        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts."
+        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
+        "`.github/workflows/deploy.yml` must keep deployment and publication as separate authority classes: canonical Deploy may verify and retain exact-release Proof-of-Ship evidence, but it must keep `PUBLISH_ALLOWED=false`, inject no Zapier catch-hook or Proof-of-Ship publication-grant secret into that job, and must not schedule or publish; any later publication requires separate exact reviewed-content authority plus provider/outcome proof."
       ]
     },
     {
@@ -61,7 +62,9 @@
       "claims": [
         "`.github/workflows/openai-runtime-secret-proof.yml` must derive the complete provider-held Worker secret-name set from canonical `wrangler.worker.toml [secrets].required`, compare names against Cloudflare, fingerprint the required-name registry, and never read or print secret values.",
         "The workflow must fail early when `CLOUDFLARE_API_TOKEN` is empty, contains whitespace, or contains non-ASCII characters that cannot safely enter an HTTP Authorization header, without printing the credential.",
-        "If the Cloudflare credential needed to execute `wrangler secret list` is malformed, rejected, or otherwise unusable before the provider list is observed, target-secret presence remains UNKNOWN/BLOCKED rather than missing; transport failure is not negative provider evidence."
+        "If the Cloudflare credential needed to execute `wrangler secret list` is malformed, rejected, or otherwise unusable before the provider list is observed, target-secret presence remains UNKNOWN/BLOCKED rather than missing; transport failure is not negative provider evidence.",
+        "`.github/workflows/openai-runtime-secret-proof.yml` must prove only provider-held Worker secret-name presence for both `OPENAI_API_KEY` and Muse `MODEL_API_KEY`; it must never read or print either secret value and must not convert a failed Cloudflare observation prerequisite into a claim that an unobserved target secret is absent.",
+        "If the Cloudflare credential needed to execute `wrangler secret list` is malformed, rejected, or otherwise unusable before the provider list is observed, `MODEL_API_KEY` presence remains UNKNOWN/BLOCKED rather than missing; transport failure is not negative provider evidence."
       ]
     },
     {
@@ -137,7 +140,8 @@
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
         "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
-        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release."
+        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release.",
+        "`wrangler.worker.toml` must also declare `FCR_CLOUDFLARE_MCP_READ_TOKEN` and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping `FCR_RELAY_MUSE_MODEL` and the official Cloudflare MCP endpoint public-safe configuration; declaration proves required-name policy only, not provider presence or successful Muse/Cloudflare runtime use."
       ]
     },
     {
@@ -247,7 +251,12 @@
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
         "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
-        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary."
+        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary.",
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must keep a refreshed StoryEngine peer pin in UNKNOWN federation state until the exact successor FCR head completes the full runtime/directive/receipt/Playwright witness.",
+        "`README.md` must classify a Cloudflare proof-credential failure that prevents secret enumeration as an observation blocker; it cannot be used to claim `MODEL_API_KEY` absent when the provider-held target secret was never observed.",
+        "`README.md` must describe the standalone manual exact-SHA production witness as read-only observation of an already-deployed current-main release and must not imply that running the witness grants deploy, publication, provider-mutation, secret, billing, or merge authority.",
+        "`README.md` must describe canonical Deploy as deployment/release-verification authority only, keep Proof-of-Ship publication separate, and must not imply that deployment approval authorizes scheduling or publication."
       ]
     },
     {
@@ -276,7 +285,8 @@
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
-        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false.",
+        "`docs/CLOUDFLARE_REASONING.md` must require both FCR Shopify provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of Shopify callback registration, production migration, or revenue outcome."
       ]
     },
     {
@@ -293,7 +303,10 @@
         "The audit records PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failing at stale StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f, while live StoryEngine main was independently observed at 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f with 15/15 successful peer checks. Rebinding does not prove PR #1004 federation or transfer another PR's exact-head evidence.",
         "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer.",
         "`docs/TRUTH_DECAY_AUDIT.md` must preserve PR #1044's prior local Playwright success and failed StoryEngine peer equality as separate historical facts: FCR expected `4601cc3a8297875c97e54717f2aeb47db44d0595`, observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, and cannot claim the successor pair VERIFIED until the new exact FCR head passes the full independent federation and browser witness.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must separate observation transport failure from target-secret truth: failure before Cloudflare secret enumeration leaves provider-held Muse secret presence UNKNOWN/BLOCKED and cannot be relabeled as evidence of absence.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must distinguish the manual read-only production witness from deployment authority: the witness may compare an already-deployed Worker, public proxy, and browser to trusted current-main identity, but it cannot deploy, publish, mutate providers, read secrets, bill, or mint merge approval."
       ]
     },
     {
@@ -301,13 +314,15 @@
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` as required canonical Worker secrets while keeping provider subscription, runtime delivery, production database state, and paid-order outcome as separate activation proof."
       ]
     },
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts."
+        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts.",
+        "`docs/SECRETS.md` must keep the FCR Shopify signing secret and commerce hash salt in the Cloudflare Worker secret plane and never recast either provider-held value as a public proof artifact."
       ]
     },
     {
@@ -824,6 +839,13 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/exact-sha-production-witness.yml",
+      "claims": [
+        "`.github/workflows/exact-sha-production-witness.yml` must remain a manually dispatched, contents-read-only verifier that executes trusted current-main witness source, requires the requested exact release SHA to equal that trusted current-main SHA, and reuses `e2e/production-release-sha.spec.ts` without acquiring deploy, publication, provider-write, secret, billing, or merge authority.",
+        "A successful manual witness may prove that the already-deployed Worker, public proxy, and browser surface share the requested current-main release identity; it cannot deploy that SHA, publish content, mutate Postiz or another provider, manufacture provider state, or authorize a merge."
       ]
     }
   ]
