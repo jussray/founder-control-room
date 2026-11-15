@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — independent outcome verifier for capability proof (candidate, not provider proof)
+
+`src/lib/capabilityOutcomeVerification.ts` adds the producer for the capability observation fold's `verifiedResponseHashes`. A relay response hash is counted as proven only when a verification receipt issued in this process re-read provider evidence for the exact repository and full commit SHA the relay request was bound to, with every required check passed at that head by its declared producer identity (and a passed browser signal when Playwright is required). Copied or deserialized receipts, mismatched operators or task classes, unresolved work, tampered hashes, and responses completed outside the request window never produce proof. Council transcripts now persist the hash-relevant response fields, and `recoverPersistedRelayResponses` returns only hash-verifiable responses; older projections are ignored, not upgraded. Verification receipts grant no routing or execution authority. Nothing here wires a live route, store, deployment, or provider readback; only `repository-repair` has a verifier.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
