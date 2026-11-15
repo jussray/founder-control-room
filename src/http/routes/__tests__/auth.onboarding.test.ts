@@ -295,7 +295,7 @@ describe('founder browser onboarding', () => {
     expect(invited.body.data.status).toBe('invited_pending_email_verification');
     expect(invited.headers['cache-control']).toBe('private, no-store');
     expect(mockInviteFounder).toHaveBeenCalledWith(ALIAS, {
-      redirectTo: expect.stringMatching(/\\/auth\\/callback$/),
+      redirectTo: expect.stringContaining('/auth/callback'),
     });
     expect(founderState.aliasUserId).toBe(ALIAS_USER_ID);
 
