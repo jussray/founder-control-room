@@ -41,6 +41,32 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
+  it('pre-provisions Neon previews without an unsupported suspend override before pinned validation', () => {
+    const preflightStart = workflow.indexOf('- name: Provision PR preview with Neon default suspend settings');
+    const pinnedActionStart = workflow.indexOf('- name: Create Neon Branch');
+    expect(preflightStart).toBeGreaterThan(0);
+    expect(pinnedActionStart).toBeGreaterThan(preflightStart);
+    const preflight = workflow.slice(preflightStart, pinnedActionStart);
+    expect(preflight).toContain('endpoints: [{type: "read_write"}]');
+    expect(preflight).not.toContain('suspend_timeout_seconds: 0');
+    expect(preflight).toContain('default_id=');
+    expect(preflight).toContain('parent_id');
+    expect(preflight).toContain('exit 1');
+    expect(workflow).toContain('Verify branch creation result');
+    expect(workflow).toContain('Execute added migrations on Neon preview');
+    expect(workflow).not.toContain('continue-on-error: true');
+  });
+
+  it('retains red failure when Neon create returns 422 and permits only redacted readback', () => {
+    expect(workflow).toContain("steps.create_neon_branch.outcome == 'failure'");
+    expect(workflow).toContain('if: failure() && steps.neon_scope.outputs.needs_neon');
+    expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
+    expect(workflow).toContain("preview/pr-${PR_NUMBER}");
+    expect(workflow).toContain('exit 1');
+    expect(workflow).not.toContain('continue-on-error: true');
+    expect(workflow).not.toContain('cat "$response_file"');
+  });
+
   it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url_pooled');

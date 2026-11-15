@@ -125,6 +125,37 @@ export const corsMiddleware: RequestHandler = (req, res, next): void => {
     return;
   }
 
+  // A separately hosted Site must not inherit the founder dashboard's
+  // cross-origin cookie privileges. Its one endpoint is bearer-only and GET.
+  const siteOriginRaw = process.env.FCR_COMMAND_CENTER_SITE_ORIGIN?.trim() ?? '';
+  if (siteOriginRaw && origin === siteOriginRaw) {
+    let siteOriginValid = false;
+    try {
+      const url = new URL(siteOriginRaw);
+      siteOriginValid = url.protocol === 'https:' && url.origin === siteOriginRaw
+        && url.username === '' && url.password === '';
+    } catch { /* invalid configuration fails closed */ }
+    const siteRequest = req.path === '/site/command-center/bootstrap'
+      && (req.method === 'GET' || req.method === 'OPTIONS')
+      && (req.method !== 'OPTIONS' || !req.get('Access-Control-Request-Method')
+        || req.get('Access-Control-Request-Method') === 'GET');
+    if (process.env.FCR_COMMAND_CENTER_SITE_ENABLED !== 'true' || !siteOriginValid || !siteRequest) {
+      next(new Error(`CORS: origin not allowed: ${origin}`));
+      return;
+    }
+    appendVary(res, 'Origin');
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization');
+    // Deliberately never set Access-Control-Allow-Credentials for Site calls.
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+    return;
+  }
+
   if (!ALLOWED_ORIGINS.includes(origin)) {
     next(new Error(`CORS: origin not allowed: ${origin}`));
     return;
