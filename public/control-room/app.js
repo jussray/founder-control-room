@@ -1066,8 +1066,13 @@ async function selectMission(id) {
 function renderMissionDetail(mount) {
   const panel = mount.querySelector('#mission-detail');
   const mission = state.missions.find((m) => m.id === state.selectedMissionId);
-  if (!mission) { panel.style.display = 'none'; return; }
+  if (!mission) {
+    panel.style.display = 'none';
+    delete panel.dataset.missionId;
+    return;
+  }
   panel.style.display = 'block';
+  panel.dataset.missionId = mission.id;
 
   const editable = mission.status === 'sandboxed' || mission.status === 'in_review';
   // create_branch is proof-gated too (PROOF_GATED_ACTIONS in approvals.ts)

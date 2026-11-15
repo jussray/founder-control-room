@@ -422,14 +422,24 @@ console.log('\n[6] Founder Chat routes intent into one proposed mission and boun
     assert(missionWrites().length===1,'second chat turn reuses the same mission instead of creating a duplicate');
     assert(councilWrites().length===2,'second chat turn continues reasoning through the same mission Council route');
 
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Control$/}).click();
+    await page.locator('[data-control-view=work]').click();
+    await page.locator('#mission-lanes .card[data-id="m-1"]').click();
+    await page.waitForFunction(()=>document.querySelector('#mission-detail')?.dataset?.missionId==='m-1');
+    assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'),
+      'a different mission can already be selected before returning to Founder Chat');
+
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Home$/}).click();
+    await page.waitForSelector('[data-founder-chat]',{state:'visible'});
     await page.click('[data-founder-chat-mission]');
     await page.waitForFunction(()=> {
       const url=new URL(window.location.href);
-      return url.searchParams.get('screen')==='control' && url.searchParams.get('view')==='work';
+      return url.searchParams.get('screen')==='control'
+        && url.searchParams.get('view')==='work'
+        && document.querySelector('#mission-detail')?.dataset?.missionId==='chat-mission-1';
     });
-    await page.waitForSelector('#mission-detail',{state:'visible'});
     assert((await page.locator('#mission-detail').innerText()).includes('Founder chat fixture'),
-      'Open thread mission routes through five-screen Control / Work and restores the chat mission detail');
+      'Open thread mission replaces a stale mission selection with the exact chat mission in Control / Work');
     await noOverflow(page,'Founder Chat desktop');
   });
   assert(pageErrors.length===0,'Founder Chat has no JS exceptions: '+JSON.stringify(pageErrors));

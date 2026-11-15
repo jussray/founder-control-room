@@ -449,7 +449,8 @@ function maybeRestoreContext() {
     if (restoreAttempts.has(key)) return;
     const card = [...document.querySelectorAll('#mission-lanes .card[data-id]')]
       .find((candidate) => candidate.dataset.id === context.missionId);
-    if (card instanceof HTMLElement && !document.querySelector('#mission-detail h2')) {
+    const displayedMissionId = document.querySelector('#mission-detail')?.dataset?.missionId ?? null;
+    if (card instanceof HTMLElement && displayedMissionId !== context.missionId) {
       restoreAttempts.add(key);
       card.click();
     }
