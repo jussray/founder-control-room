@@ -77,3 +77,35 @@ test('preserves repository-source identity while editing only in memory', () => 
   assert.equal(result.artifacts[0].content, 'export const state = "verified";\n');
   assert.equal(input.files[0].content, source);
 });
+
+
+test('stages replacement tokens literally without JavaScript substitution', () => {
+  const tokens = ['$&', '$$', "$'", '$' + String.fromCharCode(96)];
+  for (const replacement of [...tokens, tokens.join(' / ')]) {
+    const input = candidate();
+    input.files[0].content = 'start old end';
+    input.edits[0] = { path: 'src/example.ts', find: 'old', replace: replacement };
+    const staged = stageVirtualWorkspaceEdit(input);
+    assert.equal(staged.artifacts[0].content, 'start ' + replacement + ' end');
+    assert.notEqual(staged.receipt.changes[0].beforeSha256, staged.receipt.changes[0].afterSha256);
+    assert.equal(input.files[0].content, 'start old end');
+  }
+});
+
+test('preserves indentation and trailing newline in exact search text', () => {
+  const input = candidate();
+  input.files[0].content = 'head\n  old\nfooter\n';
+  input.edits[0] = { path: 'src/example.ts', find: '  old\n', replace: '  new\n' };
+  const staged = stageVirtualWorkspaceEdit(input);
+  assert.equal(staged.artifacts[0].content, 'head\n  new\nfooter\n');
+  assert.equal(input.files[0].content, 'head\n  old\nfooter\n');
+});
+
+test('rejects blank exact-match search text without changing the source', () => {
+  for (const find of ['', ' ', '\n']) {
+    const input = candidate();
+    input.edits[0] = { path: 'src/example.ts', find, replace: 'new' };
+    assert.throws(() => stageVirtualWorkspaceEdit(input), /edit.find is required/);
+    assert.equal(input.files[0].content, source);
+  }
+});
