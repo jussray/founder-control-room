@@ -1,5 +1,9 @@
 # Cloudflare Deployment Targets
 
+## November 15, 2026 — `[vars]`/secret name-collision preflight (candidate, not deployed)
+
+`scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. A name must live in exactly one place: a plain `[vars]` binding or a provider-held secret. The November 15, 2026 read-only audit (historical; re-observe before use) saw `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` on both sides, so the next gated deploy fails closed until a founder-authorized cleanup removes one side. No secret, var, deployment or provider resource is changed by this source change.
+
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
 The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.
