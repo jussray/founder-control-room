@@ -34,6 +34,12 @@ const state = {
   costs: null,
   agents: [],
   authorityLevels: [],
+  founderChat: {
+    projectSlug: null,
+    missionId: null,
+    messages: [],
+    sending: false,
+  },
   banner: null, // { kind: 'error'|'notice', text }
   // Per-read truth for the Home KPIs: 'pending' until a load settles, then
   // 'ok' or 'failed'. An empty array is only "0" once its read succeeded.
@@ -424,6 +430,170 @@ function routeMarkup(label, sub, kind, target, className) {
     : `<a class="${className}" href="${escapeHtml(target)}">${inner}</a>`;
 }
 
+function founderChatProjectSlug() {
+  const current = state.founderChat.projectSlug;
+  if (current && state.projects.some((project) => project.slug === current)) return current;
+  const selected = state.selectedProjectSlug && state.projects.some((project) => project.slug === state.selectedProjectSlug)
+    ? state.selectedProjectSlug
+    : null;
+  const fallback = selected
+    ?? state.projects.find((project) => project.status === 'active')?.slug
+    ?? state.projects[0]?.slug
+    ?? null;
+  state.founderChat.projectSlug = fallback;
+  return fallback;
+}
+
+function founderChatMarkup() {
+  const projectSlug = founderChatProjectSlug();
+  const projectOptions = state.projects.map((project) => `
+    <option value="${escapeHtml(project.slug)}" ${project.slug === projectSlug ? 'selected' : ''}>
+      ${escapeHtml(project.name)} · ${escapeHtml(project.status)}
+    </option>
+  `).join('');
+  const messages = state.founderChat.messages.map((message) => `
+    <div class="founder-chat-message" data-founder-chat-message data-role="${escapeHtml(message.role)}">
+      <span>${message.role === 'founder' ? 'You' : message.role === 'council' ? 'Council' : 'System'}</span>
+      <p>${escapeHtml(message.text)}</p>
+    </div>
+  `).join('');
+
+  return `
+    <div class="founder-chat" data-founder-chat>
+      <div class="founder-chat-toolbar">
+        <label>
+          <span>Project</span>
+          <select data-founder-chat-project ${state.projects.length === 0 ? 'disabled' : ''}>
+            ${projectOptions || '<option selected disabled>No projects registered</option>'}
+          </select>
+        </label>
+        <button type="button" class="link-button" data-founder-chat-new ${state.founderChat.missionId || state.founderChat.messages.length ? '' : 'disabled'}>
+          New thread
+        </button>
+      </div>
+      <div class="founder-chat-thread" data-founder-chat-thread aria-live="polite">
+        ${messages || '<p class="founder-chat-empty">Say what you want to move forward. FCR keeps the cockpit around the conversation instead of replacing it.</p>'}
+        ${state.founderChat.sending ? '<div class="founder-chat-message" data-role="council"><span>Council</span><p>Thinking across the existing Council lane…</p></div>' : ''}
+      </div>
+      <form id="founder-chat-form" class="founder-chat-form">
+        <textarea name="message" data-founder-chat-input rows="3" maxlength="3000" placeholder="Tell FCR what you want to build, fix, decide, verify, or understand…" required ${projectSlug && !state.founderChat.sending ? '' : 'disabled'}></textarea>
+        <button type="submit" class="primary" data-founder-chat-send ${projectSlug && !state.founderChat.sending ? '' : 'disabled'}>
+          ${state.founderChat.sending ? 'Thinking…' : 'Send'}
+        </button>
+      </form>
+      <p class="founder-chat-boundary" data-founder-chat-boundary>
+        First send opens one proposed mission for this thread. Council may reason and propose; chat never grants merge, deploy, provider-write, spend, publish, or other execution authority.
+      </p>
+      ${state.founderChat.missionId ? `<button type="button" class="founder-chat-mission" data-founder-chat-mission="${escapeHtml(state.founderChat.missionId)}">Open thread mission →</button>` : ''}
+    </div>
+  `;
+}
+
+function founderChatReply(result) {
+  const outcome = result?.conversation?.outcome;
+  if (typeof outcome === 'string' && outcome.trim()) return outcome.trim();
+  const hops = result?.relay?.transcript?.hops;
+  const lastAnswer = Array.isArray(hops) ? hops[hops.length - 1]?.answer : null;
+  if (typeof lastAnswer === 'string' && lastAnswer.trim()) return lastAnswer.trim();
+  throw new Error('Council completed without a readable response.');
+}
+
+async function sendFounderChatTurn(rawMessage) {
+  const message = String(rawMessage ?? '').trim();
+  if (!message || state.founderChat.sending) return;
+
+  const projectSlug = founderChatProjectSlug();
+  if (!projectSlug) throw new Error('Register a project before starting Founder Chat.');
+
+  state.founderChat.messages.push({ role: 'founder', text: message });
+  state.founderChat.sending = true;
+  render();
+
+  try {
+    let missionId = state.founderChat.missionId;
+    if (!missionId) {
+      const project = state.projects.find((item) => item.slug === projectSlug);
+      const condensed = message.replace(/\s+/g, ' ');
+      const title = `Founder chat · ${condensed.slice(0, 70)}${condensed.length > 70 ? '…' : ''}`;
+      const created = await api(`/projects/${encodeURIComponent(projectSlug)}/missions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          description: `Founder Chat intent:\n${message}`,
+          riskLevel: project?.risk_level ?? 'medium',
+          requiredChecks: [],
+        }),
+      });
+      const mission = created?.mission ?? null;
+      missionId = mission?.id ?? null;
+      if (!missionId) throw new Error('Founder Chat mission creation returned no mission id.');
+      state.founderChat.missionId = missionId;
+      if (!state.missions.some((item) => item.id === missionId)) {
+        state.missions = [{ ...mission, project: { slug: projectSlug } }, ...state.missions];
+      }
+    }
+
+    const seed = state.founderChat.messages
+      .slice(-8)
+      .map((item) => `${item.role === 'founder' ? 'Founder' : 'Council'}: ${item.text}`)
+      .join('\n\n')
+      .slice(-12_000);
+
+    const result = await api(`/missions/${encodeURIComponent(missionId)}/council/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        goal: message,
+        seed,
+        capability: 'propose',
+        sensitivity: 'internal',
+        sourceRef: `control-room:founder-chat:${missionId}`,
+      }),
+    });
+
+    state.founderChat.messages.push({ role: 'council', text: founderChatReply(result) });
+  } finally {
+    state.founderChat.sending = false;
+  }
+}
+
+function bindFounderChat(mount) {
+  const projectSelect = mount.querySelector('[data-founder-chat-project]');
+  projectSelect?.addEventListener('change', () => {
+    state.founderChat = {
+      projectSlug: projectSelect.value,
+      missionId: null,
+      messages: [],
+      sending: false,
+    };
+    render();
+  });
+
+  mount.querySelector('[data-founder-chat-new]')?.addEventListener('click', () => {
+    state.founderChat = {
+      projectSlug: founderChatProjectSlug(),
+      missionId: null,
+      messages: [],
+      sending: false,
+    };
+    render();
+  });
+
+  mount.querySelector('[data-founder-chat-mission]')?.addEventListener('click', (event) => {
+    const missionId = event.currentTarget.dataset.founderChatMission;
+    if (!missionId) return;
+    state.tab = 'missions';
+    guarded(() => selectMission(missionId));
+  });
+
+  mount.querySelector('#founder-chat-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = formValues(event.currentTarget);
+    const message = typeof values.message === 'string' ? values.message.trim() : '';
+    if (!message) return;
+    guarded(() => sendFounderChatTurn(message));
+  });
+}
+
 function renderHomeTab(mount) {
   const metrics = homeMetrics();
   const focus = state.missions.filter((m) => IN_FLIGHT_LANES.has(m.status)).slice(0, 6);
@@ -446,6 +616,7 @@ function renderHomeTab(mount) {
           <p class="chief-kicker">Chief</p>
           <h2 id="chief-heading">Your intelligence partner</h2>
           <p class="chief-prompt">What are you trying to move forward?</p>
+          ${founderChatMarkup()}
           <div class="chief-routes">
             ${CHIEF_ROUTES.map(([label, sub, kind, target]) => routeMarkup(label, sub, kind, target, 'chief-route')).join('')}
           </div>
@@ -514,6 +685,8 @@ function renderHomeTab(mount) {
       guarded(() => selectMission(node.dataset.focusMission));
     });
   });
+
+  bindFounderChat(mount);
 
   const projectsMount = mount.querySelector('[data-home-projects]');
   renderProjectsTab(projectsMount);
