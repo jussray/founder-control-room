@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — production Worker deploys record and read back the exact commit (candidate, not deploy proof)
+
+`.github/workflows/deploy.yml` now passes `--tag <expected_head_sha>` and a short run-provenance `--message` to `wrangler deploy` for the canonical `founder-control-room` Worker, and a new fail-closed step in the same job reads back `wrangler deployments list --json` and `wrangler versions view --json` (names, ids and annotations only). The job fails unless the newest deployment sends 100% of traffic to one version whose `workers/tag` equals that exact SHA. The comparison lives in the pure, unit-tested `scripts/worker-deployment-version-tag.mjs`. This is source only: no deploy was run, and no Cloudflare call was made. A read-only provider audit on November 15, 2026 found that no Worker version yet has a tag, message or commit SHA, and no recent `Deploy` run has succeeded, so this check has not yet passed against the real provider.
+
 ## November 15, 2026 — n8n provider-native readback witness (candidate, not provider proof)
 
 `src/lib/n8nFounderContentProviderReadback.ts` adds a strict, sanitized witness contract: an n8n `scheduled` founder-content receipt stays `provider_schedule_receipt_pending_readback` until an independent provider-native observation matches the exact orchestration, provider item/request identity, source repository/SHA, platform/channel and requested schedule. Mismatches, unsupported provider payload fields and any `published:true` claim fail closed, and a verified schedule is still not publication. Rebuilt on current main from #730, whose branch no longer shares history with main. No production adapter calls the witness yet; no provider call, Buffer scheduling, publication, deployment, database or secret change is made, and #299 (live native readback) remains open.
