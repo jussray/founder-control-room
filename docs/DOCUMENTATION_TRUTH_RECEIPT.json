@@ -18,7 +18,7 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution.",
-        "`.github/workflows/ci.yml`: The Cloudflare bridge authority contract job must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state."
+        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state."
       ]
     },
     {
@@ -35,7 +35,7 @@
         "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
         "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
         "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy.",
-        "`.github/workflows/deploy.yml`: The production Deploy authority gate must run the var/secret collision verifier on the same name-only secret receipt it already reads, after that readback and before the Supabase, Worker and Pages mutation jobs, so a [vars] name that already exists as a Worker secret stops the run. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
+        "The production Deploy authority gate in `.github/workflows/deploy.yml` must run the var/secret collision verifier on the same name-only secret receipt it already reads, after that readback and before the Supabase, Worker and Pages mutation jobs, so a [vars] name that already exists as a Worker secret stops the run. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
       ]
     },
     {
