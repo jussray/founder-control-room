@@ -118,7 +118,7 @@ function startServer(mode) {
     if (mode === 'signed-out' && path.startsWith('/auth/')) return json(res, 401, { error: 'unauthenticated' });
 
     if (req.method === 'POST' && /^\/projects\/[^/]+\/missions$/.test(path)) {
-      return json(res, 201, {
+      return setTimeout(() => json(res, 201, {
         mission: {
           id: 'chat-mission-1',
           title: 'Founder chat fixture',
@@ -126,7 +126,7 @@ function startServer(mode) {
           status: 'proposed',
           risk_level: 'high',
         },
-      });
+      }), 250);
     }
     if (req.method === 'POST' && path === '/missions/chat-mission-1/council/run') {
       return json(res, 201, {
@@ -389,6 +389,11 @@ console.log('\n[6] Founder Chat routes intent into one proposed mission and boun
     await page.selectOption('[data-founder-chat-project]','sekret-bip');
     await page.fill('[data-founder-chat-input]','Repair signup without widening authority');
     await page.click('[data-founder-chat-send]');
+    await page.waitForFunction(()=>document.querySelector('[data-founder-chat-send]')?.disabled===true);
+    assert(await page.locator('[data-founder-chat-project]').isDisabled(),
+      'project selector locks while a chat turn is pending');
+    assert(await page.locator('[data-founder-chat-new]').isDisabled(),
+      'new-thread control locks while a chat turn is pending');
     await page.waitForFunction(()=>document.querySelectorAll('[data-founder-chat-message][data-role="council"]').length===1);
 
     const thread=await page.locator('[data-founder-chat-thread]').innerText();

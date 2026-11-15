@@ -463,11 +463,11 @@ function founderChatMarkup() {
       <div class="founder-chat-toolbar">
         <label>
           <span>Project</span>
-          <select data-founder-chat-project ${state.projects.length === 0 ? 'disabled' : ''}>
+          <select data-founder-chat-project ${state.projects.length === 0 || state.founderChat.sending ? 'disabled' : ''}>
             ${projectOptions || '<option selected disabled>No projects registered</option>'}
           </select>
         </label>
-        <button type="button" class="link-button" data-founder-chat-new ${state.founderChat.missionId || state.founderChat.messages.length ? '' : 'disabled'}>
+        <button type="button" class="link-button" data-founder-chat-new ${state.founderChat.sending || (!state.founderChat.missionId && state.founderChat.messages.length === 0) ? 'disabled' : ''}>
           New thread
         </button>
       </div>
@@ -500,17 +500,18 @@ function founderChatReply(result) {
 
 async function sendFounderChatTurn(rawMessage) {
   const message = String(rawMessage ?? '').trim();
-  if (!message || state.founderChat.sending) return;
+  const chat = state.founderChat;
+  if (!message || chat.sending) return;
 
   const projectSlug = founderChatProjectSlug();
   if (!projectSlug) throw new Error('Register a project before starting Founder Chat.');
 
-  state.founderChat.messages.push({ role: 'founder', text: message });
-  state.founderChat.sending = true;
+  chat.messages.push({ role: 'founder', text: message });
+  chat.sending = true;
   render();
 
   try {
-    let missionId = state.founderChat.missionId;
+    let missionId = chat.missionId;
     if (!missionId) {
       const project = state.projects.find((item) => item.slug === projectSlug);
       const condensed = message.replace(/\s+/g, ' ');
@@ -527,13 +528,13 @@ async function sendFounderChatTurn(rawMessage) {
       const mission = created?.mission ?? null;
       missionId = mission?.id ?? null;
       if (!missionId) throw new Error('Founder Chat mission creation returned no mission id.');
-      state.founderChat.missionId = missionId;
+      chat.missionId = missionId;
       if (!state.missions.some((item) => item.id === missionId)) {
         state.missions = [{ ...mission, project: { slug: projectSlug } }, ...state.missions];
       }
     }
 
-    const seed = state.founderChat.messages
+    const seed = chat.messages
       .slice(-8)
       .map((item) => `${item.role === 'founder' ? 'Founder' : 'Council'}: ${item.text}`)
       .join('\n\n')
@@ -550,9 +551,11 @@ async function sendFounderChatTurn(rawMessage) {
       }),
     });
 
-    state.founderChat.messages.push({ role: 'council', text: founderChatReply(result) });
+    if (state.founderChat === chat) {
+      chat.messages.push({ role: 'council', text: founderChatReply(result) });
+    }
   } finally {
-    state.founderChat.sending = false;
+    chat.sending = false;
   }
 }
 
