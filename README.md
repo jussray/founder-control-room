@@ -1,5 +1,13 @@
 # Founder Control Room
 
+## November 15, 2026 — production Worker deploys record and read back the exact commit (candidate, not deploy proof)
+
+`.github/workflows/deploy.yml` now passes `--tag <expected_head_sha>` and a short run-provenance `--message` to `wrangler deploy` for the canonical `founder-control-room` Worker, and a new fail-closed step in the same job reads back `wrangler deployments list --json` and `wrangler versions view --json` (names, ids and annotations only). The job fails unless the newest deployment sends 100% of traffic to one version whose `workers/tag` equals that exact SHA. The comparison lives in the pure, unit-tested `scripts/worker-deployment-version-tag.mjs`. This is source only: no deploy was run, and no Cloudflare call was made. A read-only provider audit on November 15, 2026 found that no Worker version yet has a tag, message or commit SHA, and no recent `Deploy` run has succeeded, so this check has not yet passed against the real provider.
+
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
 ## November 15, 2026 — Worker [vars]/secret name-collision deploy gate (candidate, not deployed)
 
 `scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. CI runs the unit tests and the offline check in the `Cloudflare bridge authority contract` job.
