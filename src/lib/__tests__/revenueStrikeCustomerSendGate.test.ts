@@ -228,4 +228,30 @@ describe('Revenue Strike customer send authority membrane', () => {
     expect(sql).toContain('to service_role;');
     expect(sql).toContain('from authenticated;');
   });
+
+  it('replaces the finalize function with alias-qualified UPDATE columns so its claim_id OUT column is not ambiguous', () => {
+    const fix = readFileSync(
+      new URL(
+        '../../../supabase/migrations/20261115211500_fix_revenue_strike_finalize_claim_id_ambiguity.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+    const body = fix.slice(fix.indexOf('as $function$'), fix.indexOf('$function$;'));
+    const update = body.slice(body.indexOf('update public.revenue_strike_customer_send_leases'), body.indexOf('return query'));
+
+    expect(fix).toContain('create or replace function public.finalize_revenue_strike_customer_send_lease(');
+    expect(update).toContain('update public.revenue_strike_customer_send_leases as l');
+    expect(update).toContain('where l.claim_id = lease_row.claim_id');
+    expect(update).toContain("and l.provider_outcome = 'claimed'");
+    expect(update).toContain('and l.finalized_at is null');
+    expect(update).toContain('returning l.* into lease_row');
+    expect(update).not.toMatch(/where\s+claim_id\b/);
+    expect(update).not.toMatch(/\n\s+and\s+(provider_outcome|finalized_at)\b/);
+    expect(fix).toContain('security definer');
+    expect(fix).toContain('set search_path = pg_catalog');
+    expect(fix).toContain('grant execute on function public.finalize_revenue_strike_customer_send_lease');
+    expect(fix).toContain('to service_role;');
+    expect(fix).toContain('from authenticated;');
+  });
 });
