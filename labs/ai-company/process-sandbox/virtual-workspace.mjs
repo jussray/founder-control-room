@@ -74,13 +74,51 @@ export function stageVirtualWorkspaceEdit(input) {
       throw new TypeError('edit path must be unique and reference an allowed source snapshot');
     }
     const before = originals.get(edit.path);
+    // Preserve exact search bytes, including indentation and trailing newlines.
+    const find = bounded(edit.find, 'edit.find');
+    if (!find.trim()) throw new TypeError('edit.find is required');
+    const replacement = bounded(edit.replace, 'edit.replace');
+    if (find === replacement || !before.includes(find)
+      || before.indexOf(find) !== before.lastIndexOf(find)) {
+      throw new TypeError('edit requires exactly one current exact-text match and a non-noop replacement');
+    }
+    // Callback replacement keeps     const before = originals.get(edit.path);
     const find = required(edit.find, 'edit.find');
     const replacement = bounded(edit.replace, 'edit.replace');
     if (find === replacement || !before.includes(find)
       || before.indexOf(find) !== before.lastIndexOf(find)) {
       throw new TypeError('edit requires exactly one current exact-text match and a non-noop replacement');
     }
-    const after = bounded(before.replace(find, replacement), 'updated content');
+    const after = bounded(before.replace(find, replacement), 'updated content');, $, 
+    const beforeSha256 = hash(before);
+    const afterSha256 = hash(after);
+    touched.add(edit.path);
+    artifacts.push(Object.freeze({ path: edit.path, content: after, expectedBeforeSha256: beforeSha256 }));
+    changes.push(Object.freeze({ path: edit.path, beforeSha256, afterSha256 }));
+  }
+  return Object.freeze({
+    receipt: Object.freeze({
+      version: VIRTUAL_WORKSPACE_EDIT_VERSION,
+      status: 'staged',
+      mode: 'in-memory-only',
+      sourceClassification: input.dataClassification,
+      repository, sourceSha, branch,
+      changes: Object.freeze(changes),
+      providerCalls: false,
+      filesystemWrites: false,
+      sourceBranchWrites: false,
+      externalExecutionAllowed: false,
+      nextGate: 'Reread exact live branch and file content; apply artifacts only through a separately authorized governed branch writer. Merge and deploy require separate proof.',
+    }),
+    // Private source artifacts are NEVER part of the sanitized receipt.
+    artifacts: Object.freeze(artifacts),
+  });
+}
+ and $\` literal.
+    const after = bounded(before.replace(find, () => replacement), 'updated content');
+    if (after === before) {
+      throw new TypeError('edit must change source content');
+    }
     const beforeSha256 = hash(before);
     const afterSha256 = hash(after);
     touched.add(edit.path);
