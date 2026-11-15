@@ -1,4 +1,6 @@
 import {
+  createOperatorContinuityReceiptV2,
+  createOperatorExecutionContinuation,
   validateOperatorExecutionContinuation,
   type OperatorExecutionContinuation,
 } from './operatorContinuity.js';
@@ -98,9 +100,15 @@ export async function storeOperatorExecutionContinuation(
   if (validateOperatorExecutionContinuation(record).length > 0) {
     throw new OperatorContinuationStoreError('invalid_continuation');
   }
-  const projectId = await projectFor(record.observation.projectSlug, record.observation.repositoryFullName);
-  const existing = await latestFor(projectId, record.taskId);
-  if (existing?.record.fingerprint === record.fingerprint) {
+  // Reconstruct the known schema before persistence; never retain arbitrary
+  // caller-supplied extra fields (including hidden transcript/secret payloads).
+  const safeRecord = createOperatorExecutionContinuation({
+    ...record,
+    observation: createOperatorContinuityReceiptV2(record.observation),
+  });
+  const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
+  const existing = await latestFor(projectId, safeRecord.taskId);
+  if (existing?.safeRecord.fingerprint === safeRecord.fingerprint) {
     return { disposition: 'duplicate', stored: existing };
   }
 
@@ -108,13 +116,13 @@ export async function storeOperatorExecutionContinuation(
   const { data, error } = await supabase.from('continuity_records')
     .insert({
       project_id: projectId,
-      task_id: record.taskId,
-      execution_state: record,
-      subject_fingerprint: record.observation.fingerprint,
-      proof_cookie: record.fingerprint,
-      authority_fingerprint: record.observation.authorityFingerprint,
-      runtime_fingerprint: record.observation.runtimeFingerprint,
-      evidence_fingerprint: record.observation.proofFingerprint,
+      task_id: safeRecord.taskId,
+      execution_state: safeRecord,
+      subject_fingerprint: safeRecord.observation.fingerprint,
+      proof_cookie: safeRecord.fingerprint,
+      authority_fingerprint: safeRecord.observation.authorityFingerprint,
+      runtime_fingerprint: safeRecord.observation.runtimeFingerprint,
+      evidence_fingerprint: safeRecord.observation.proofFingerprint,
       valid_until: null, // Unverified handoff never extends the canonical truth lease.
     })
     .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,invalidated_at,created_at')
