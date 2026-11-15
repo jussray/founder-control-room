@@ -1,5 +1,11 @@
 # Cloudflare Deployment Targets
 
+## November 15, 2026 — exact-commit version tag on production Worker deploys (candidate)
+
+Candidate `.github/workflows/deploy.yml` passes `--tag ${{ inputs.expected_head_sha }}` and a short space-free `--message` (`fcr-deploy-run-<run_id>.<attempt>`) to `wrangler deploy --config wrangler.worker.toml`, keeping the existing `--var GIT_SHA` marker. The next step in the same job reads back `wrangler deployments list --json` and `wrangler versions view <active-version> --json` and runs `scripts/worker-deployment-version-tag.mjs verify`. It fails closed unless the newest deployment routes 100% to exactly one version whose `workers/tag` equals the exact SHA. This step reads names, ids and annotations only.
+
+Provider observation (read-only audit, November 15, 2026; historical once read, re-observe before relying on it): none of the 19 versions of `founder-control-room` carries a tag, message or commit SHA. The active version is a dashboard-uploaded stub, not a wrangler upload from `wrangler.worker.toml`, and none of the last 100 `Deploy` runs succeeded. The Workers Builds and plaintext `CF_API_TOKEN` corrections are recorded once, in the dated readback section below and on the build-lane and November 2 lines. This change runs no deploy, so the readback has not yet passed against the real provider.
+
 ## November 15, 2026 — Workers Builds and active Worker observation (dated read-only readback, not deploy proof)
 
 Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API reads; no provider state was changed. This is a dated observation, not current truth at any later read.
