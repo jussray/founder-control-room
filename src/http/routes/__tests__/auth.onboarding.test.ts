@@ -303,6 +303,10 @@ describe('founder browser onboarding', () => {
       .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
       .send({ email: 'stranger@example.com' });
     expect(unapproved.status).toBe(403);
+    const malformed = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .send({ email: 'ali as@example.com' });
+    expect(malformed.status).toBe(400);
     expect(mockInviteFounder).toHaveBeenCalledTimes(1);
 
     const foreignOrigin = await request(app()).post('/auth/founder/invite')
