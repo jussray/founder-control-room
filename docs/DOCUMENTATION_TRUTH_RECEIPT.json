@@ -828,6 +828,13 @@
       ]
     },
     {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+      ]
+    },
+    {
       "path": "scripts/documentation-truth-claim-fingerprint.mjs",
       "claims": [
         "`scripts/documentation-truth-claim-fingerprint.mjs` must fingerprint receipt claims by discarding only non-semantic HTML comments, Markdown link destinations, HTML wrappers, casing, and punctuation while keeping logical and comparison operators as distinct tokens, so inherited wording cannot be repackaged as a fresh invariant. A fingerprint proves textual identity only, never claim truth or authority."
