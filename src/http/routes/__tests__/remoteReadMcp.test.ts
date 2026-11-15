@@ -190,6 +190,24 @@ describe('Supabase OAuth token verifier', () => {
     });
   });
 
+  it('denies the same founder email bound to a different user ID', async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'founder-user-1', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce({
+      select: () => {
+        const query = {
+          eq: () => query,
+          maybeSingle: async () => ({ data: { user_id: 'different-founder-id' }, error: null }),
+        };
+        return query;
+      },
+    });
+    await expect(verifyRemoteMcpOauthToken(jwt(validClaims()), oauthEnv()))
+      .rejects.toThrow('not on the founder allowlist');
+  });
+
   it.each([
     ['issuer', { iss: 'https://attacker.example/auth/v1' }, 'issuer'],
     ['audience', { aud: 'https://attacker.example/mcp' }, 'audience'],
