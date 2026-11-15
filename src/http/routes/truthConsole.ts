@@ -114,7 +114,7 @@ truthConsoleRouter.get('/overview', async (_req: FounderRequest, res) => {
     supabase.from('evidence').select('id, status, created_at').order('created_at', { ascending: false }).limit(EVIDENCE_LIMIT),
     supabase.from('reconciliation_runs').select('id, controller, resource_id, status, message, started_at, completed_at').eq('controller', 'TruthConsole').order('started_at', { ascending: false }).limit(RECEIPT_LIMIT),
     supabase.from('truth_attacks').select('id, status, severity, created_at').order('created_at', { ascending: false }).limit(ATTACK_LIMIT),
-    supabase.from('continuity_records').select('id, proof_cookie, invalidated_at, valid_until, created_at').order('created_at', { ascending: false }).limit(CONTINUITY_LIMIT),
+    supabase.from('continuity_records').select('id, proof_cookie, invalidated_at, valid_until, created_at').is('task_id', null).order('created_at', { ascending: false }).limit(CONTINUITY_LIMIT),
   ]);
   const error = claimsResult.error ?? evidenceResult.error ?? runsResult.error ?? attacksResult.error ?? continuityResult.error;
   if (error) return res.status(500).json({ error: 'Truth console overview unavailable' });
