@@ -277,6 +277,12 @@ function validWorkerReceipt(workerRequest, worker) {
     || result.brief.some((line) => typeof line !== 'string')
   ) return false;
   if (result.liveSideEffects !== false || result.publicUrl !== null) return false;
+  // The worker and host share the canonical stable-JSON FNV fingerprint.
+  // Hex-shaped values alone are not evidence that this request or result ran.
+  if (
+    worker.inputFingerprint !== fingerprint(workerRequest)
+    || worker.outputFingerprint !== fingerprint(result)
+  ) return false;
   return true;
 }
 
