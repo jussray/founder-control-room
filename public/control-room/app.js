@@ -619,12 +619,22 @@ function renderHomeTab(mount) {
           <p class="chief-kicker">Chief</p>
           <h2 id="chief-heading">Your intelligence partner</h2>
           <p class="chief-prompt">What are you trying to move forward?</p>
-          ${founderChatMarkup()}
           <div class="chief-routes">
             ${CHIEF_ROUTES.map(([label, sub, kind, target]) => routeMarkup(label, sub, kind, target, 'chief-route')).join('')}
           </div>
         </aside>
       </div>
+
+      <section class="panel home-founder-chat" data-home-founder-chat aria-labelledby="founder-chat-heading">
+        <div class="panel-head">
+          <div>
+            <p class="chief-kicker">Founder Chat</p>
+            <h2 id="founder-chat-heading">Talk to the Control Room</h2>
+          </div>
+          <span class="muted">Intent → Council → mission</span>
+        </div>
+        ${founderChatMarkup()}
+      </section>
 
       <div class="kpi-strip" data-home-kpis>
         ${metrics.map((m) => `
