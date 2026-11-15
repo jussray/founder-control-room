@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -150,7 +150,8 @@
       "path": "src/http/routes/approvals.ts",
       "claims": [
         "`src/http/routes/approvals.ts` must require exact-head evidence plus provider-backed PR identity, deterministic independent review, and authenticated founder-final confirmation bound to the exact PR, base, and head before FCR integration, then must re-read the mutable branch head immediately before provider integration.",
-        "`src/http/routes/approvals.ts` must re-resolve the live base ref immediately before FCR provider integration and must fail closed with `Base moved after verification` (HTTP 409) when it does not equal the pinned reviewed base SHA, so a merge never lands on a base nobody reviewed; source and mock-test proof never proves live GitHub ruleset enforcement."
+        "`src/http/routes/approvals.ts` must re-resolve the live base ref immediately before FCR provider integration and must fail closed with `Base moved after verification` (HTTP 409) when it does not equal the pinned reviewed base SHA, so a merge never lands on a base nobody reviewed; source and mock-test proof never proves live GitHub ruleset enforcement.",
+        "`src/http/routes/approvals.ts` must validate the exact FCR merge candidate's StoryEngine peer pin against the configured registered provider's canonical refs/heads/main immediately before provider integration, refuse candidate-controlled alternate refs and moved peer SHAs, re-read the mutable FCR branch after the peer lookup, and never treat old CI/deterministic witness or zero native human approvals as founder-final exact-candidate authorization."
       ]
     },
     {
@@ -510,7 +511,8 @@
       "claims": [
         "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
         "`src/providers/GitHubProvider.ts` must retain the live CodeQL `alerts_threshold: all` severity setting rather than downgrade it to `errors` while reconciling required-signatures and strict freshness; both source and independent governance preflight must enforce this, and successful source checks do not prove a live provider mutation.",
-        "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority."
+        "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority.",
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
       ]
     },
     {
