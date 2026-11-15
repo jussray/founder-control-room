@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
 ## Founder OS mission-patch simulation contract (candidate, not release proof)
 
 A simulator-generated `repository-source` edit must remain an in-memory artifact until the existing founder-authenticated `POST /approvals/:missionId/patch` route accepts it. The server must independently verify the live mission branch, pinned SHA, original file contents and proposed file hashes, then reserve an idempotent action before its GitHub provider commits. A staged receipt cannot grant merge, deployment, or production authority; independent human review, full exact-head CI and Playwright proof remain separate gates.

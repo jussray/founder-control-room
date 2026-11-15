@@ -1044,6 +1044,23 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     expect(mockCommitPatch).not.toHaveBeenCalled();
   });
 
+  it('rejects nonboolean staged delete flags before provider reads or commits', async () => {
+    wireStandardTables({ policy_snapshot: { expectedHeadSha: EXPECTED_SHA } });
+    for (const invalid of ['false', 0, 1, null, {}, []]) {
+      const res = await request(buildApp()).post(`/approvals/${MISSION_ID}/patch`)
+        .set('Authorization', BEARER).send({
+          message: 'Reject unsafe deletion flag',
+          idempotencyKey: 'reject-delete-flag-1',
+          changes: [{ path: 'src/example.ts', content: 'safe replacement', delete: invalid }],
+          stagedWorkspaceReceipt: {},
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('STAGED_WORKSPACE_UNSAFE_FILES');
+    }
+    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
   it('rejects unsafe staged file paths before source reads or branch commits', async () => {
     wireStandardTables({ policy_snapshot: { expectedHeadSha: EXPECTED_SHA } });
     const res = await request(buildApp()).post(`/approvals/${MISSION_ID}/patch`)

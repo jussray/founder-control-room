@@ -1198,7 +1198,7 @@ approvalsRouter.post(
     const stagedWorkspaceReceipt = (req.body as Record<string, unknown>)['stagedWorkspaceReceipt'];
     let stagedExpectedHeadSha: string | undefined;
     if (stagedWorkspaceReceipt !== undefined) {
-      if (changes.length > 3 || changes.some((change) => !isSafeFounderOsStagedPatchPath(change?.path) || change.delete === true)) {
+      if (changes.length > 3 || changes.some((change) => !isSafeFounderOsStagedPatchPath(change?.path) || (change.delete !== undefined && change.delete !== false))) {
         return res.status(400).json({
           ok: false,
           code: 'STAGED_WORKSPACE_UNSAFE_FILES',

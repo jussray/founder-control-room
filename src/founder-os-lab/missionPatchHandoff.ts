@@ -110,7 +110,7 @@ export function validateFounderOsStagedPatch(
       continue;
     }
     paths.add(entry.path);
-    if (change.delete === true || typeof change.content !== 'string'
+    if ((change.delete !== undefined && change.delete !== false) || typeof change.content !== 'string'
       || typeof before.content !== 'string'
       || Buffer.byteLength(change.content, 'utf8') > MAX_FILE_BYTES
       || Buffer.byteLength(before.content, 'utf8') > MAX_FILE_BYTES) {

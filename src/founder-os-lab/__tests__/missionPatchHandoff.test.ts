@@ -99,6 +99,13 @@ describe('Founder OS staged workspace handoff to existing FCR mission route', ()
     const removed = { ...context, changes: [{ path: 'src/example.ts', delete: true }] };
     expect(validateFounderOsStagedPatch(receipt, removed))
       .toContain('staged workspace only accepts bounded non-destructive text edits');
+    const explicitFalse = { ...context, changes: [{ ...context.changes[0], delete: false }] };
+    expect(validateFounderOsStagedPatch(receipt, explicitFalse)).toEqual([]);
+    for (const invalid of ['false', 0, 1, null, {}, []]) {
+      const malformed = { ...context, changes: [{ ...context.changes[0], delete: invalid as unknown as boolean }] };
+      expect(validateFounderOsStagedPatch(receipt, malformed))
+        .toContain('staged workspace only accepts bounded non-destructive text edits');
+    }
     for (const path of ['.env', 'src/.env.local', 'src/../secret.ts', 'src/token.pem', '/src/x.ts', '.github/workflows/ci.yml']) {
       expect(isSafeFounderOsStagedPatchPath(path)).toBe(false);
     }
