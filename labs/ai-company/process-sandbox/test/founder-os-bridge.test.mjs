@@ -4,6 +4,7 @@ import {
   buildFounderOsWorkerRequest,
   executeFounderOsContainerTask,
   sealFounderOsContainerReceipt,
+  stageFounderOsWorkspaceChange,
 } from '../founder-os-bridge.mjs';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -381,4 +382,54 @@ test('propagates blocked container state only as a blocked control receipt', () 
   assert.ok(sealed.violations.includes('container:hard_deadline_exceeded'));
   assert.equal(sealed.liveSideEffects, false);
   assert.equal(sealed.publicUrl, null);
+});
+
+
+test('Founder OS plan can actually edit synthetic source in memory and export governed receipt', () => {
+  const input = request('plan');
+  const candidate = plan('plan');
+  const original = 'export const ready = false;\\n';
+  const workspace = {
+    dataClassification: 'synthetic',
+    repository: input.evidence.repository,
+    sourceSha: input.evidence.commitSha,
+    branch: 'feat/founder-os-container-bridge',
+    files: [{ path: 'src/fixture.ts', content: original }],
+    edits: [{ path: 'src/fixture.ts', find: 'false', replace: 'true' }],
+  };
+  const result = stageFounderOsWorkspaceChange(input, candidate, workspace);
+  assert.equal(result.artifacts[0].content, 'export const ready = true;\\n');
+  assert.equal(workspace.files[0].content, original);
+  assert.equal(result.receipt.controlPlane, 'juss-chief-ai');
+  assert.equal(result.receipt.mode, 'in-memory-only');
+  assert.equal(result.receipt.sourceBranchWrites, false);
+  assert.equal(result.receipt.externalExecutionAllowed, false);
+  assert.match(result.receipt.changes[0].afterSha256, /^[0-9a-f]{64}$/);
+  assert.ok(!JSON.stringify(result.receipt).includes('export const'));
+});
+
+test('virtual editing blocks mismatched exact head and unapproved action classes', () => {
+  const input = request('plan');
+  const candidate = plan('plan');
+  const workspace = {
+    dataClassification: 'synthetic',
+    repository: input.evidence.repository,
+    sourceSha: 'b'.repeat(40),
+    branch: 'feat/founder-os-container-bridge',
+    files: [{ path: 'src/fixture.ts', content: 'old' }],
+    edits: [{ path: 'src/fixture.ts', find: 'old', replace: 'new' }],
+  };
+  assert.throws(
+    () => stageFounderOsWorkspaceChange(input, candidate, workspace),
+    /exact Founder OS source identity/,
+  );
+  workspace.sourceSha = input.evidence.commitSha;
+  assert.throws(
+    () => stageFounderOsWorkspaceChange(request('merge-code'), plan('merge-code'), workspace),
+    /only inspect and plan may enter the container worker/,
+  );
+  assert.throws(
+    () => stageFounderOsWorkspaceChange(request('inspect'), plan('inspect'), workspace),
+    /virtual editing requires a Founder OS plan/,
+  );
 });
