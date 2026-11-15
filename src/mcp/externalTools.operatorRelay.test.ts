@@ -177,69 +177,40 @@ describe('external FCR operator relay authority boundary', () => {
     }));
   });
 
-  it('routes DeepSeek as a peer while keeping DeepSeek Instructor out of the relay lane', async () => {
-    const relayOperator = vi.fn(async (input: RelayCall) => ({
-      request: input,
-      response: {
-        fromOperator: input.toOperator,
-        toOperator: input.fromOperator,
-        answer: 'DeepSeek bounded peer result',
-        evidenceRefs: ['provider:deepseek:resp_ds_1'],
-      },
-    }));
-    const recordEvidence = vi.fn(async (input: { toolName: string }) => (
-      receipt(input.toolName as 'fcr_relay_operator')
-    ));
+  it('rejects DeepSeek identities from the peer relay tool', async () => {
+    const relayOperator = vi.fn();
     const execute = externalTools.createExternalMcpToolExecutor({
       env: {
         FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ 'chatgpt-client': 'codex' }),
       },
       relayOperator,
-      recordEvidence,
+      recordEvidence: vi.fn(async (input: { toolName: string }) => (
+        receipt(input.toolName as 'fcr_relay_operator')
+      )),
     });
 
-    await execute({
-      name: 'fcr_relay_operator',
-      arguments: {
-        targetOperator: 'deepseek',
-        capability: 'research',
-        goal: 'Attack the bounded claim and return attributable evidence.',
-        contextSummary: 'Peer mode only. Instructor mode remains a separate operator identity.',
-        sensitivity: 'internal',
-      },
-      allowedProjects: new Set(['founder-control-room']),
-      identity: {
-        userId: 'founder-user-1',
-        email: 'founder@example.com',
-        clientId: 'chatgpt-client',
-        authMode: 'oauth',
-      },
-      requestId: 'relay-request-deepseek-1',
-    });
-
-    expect(relayOperator).toHaveBeenCalledWith(expect.objectContaining({
-      fromOperator: 'codex',
-      toOperator: 'deepseek',
+    const common = {
       capability: 'research',
-    }));
+      goal: 'Attack the bounded claim and return attributable evidence.',
+      contextSummary: 'DeepSeek is instructor-only and must not enter the peer relay lane.',
+      sensitivity: 'internal',
+    };
 
-    await expect(execute({
-      name: 'fcr_relay_operator',
-      arguments: {
-        targetOperator: 'deepseek-instructor',
-        capability: 'research',
-        goal: 'This should be rejected.',
-        contextSummary: 'Instructor identity is not a peer relay target.',
-        sensitivity: 'internal',
-      },
-      allowedProjects: new Set(['founder-control-room']),
-      identity: {
-        userId: 'founder-user-1',
-        email: 'founder@example.com',
-        clientId: 'chatgpt-client',
-        authMode: 'oauth',
-      },
-      requestId: 'relay-request-deepseek-instructor-1',
-    })).rejects.toThrow('targetOperator is not a peer relay operator');
+    for (const targetOperator of ['deepseek', 'deepseek-instructor']) {
+      await expect(execute({
+        name: 'fcr_relay_operator',
+        arguments: { ...common, targetOperator },
+        allowedProjects: new Set(['founder-control-room']),
+        identity: {
+          userId: 'founder-user-1',
+          email: 'founder@example.com',
+          clientId: 'chatgpt-client',
+          authMode: 'oauth',
+        },
+        requestId: `relay-request-${targetOperator}`,
+      })).rejects.toThrow('targetOperator is not a peer relay operator');
+    }
+
+    expect(relayOperator).not.toHaveBeenCalled();
   });
 });

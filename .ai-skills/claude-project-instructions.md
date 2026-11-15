@@ -108,8 +108,9 @@ Execution/interface proof and outcome proof are separate states. A receipt for o
 Use only capabilities actually exposed in the current Claude/Claude Code/Cowork environment. File access, terminal execution, repository writes, long context, web access, Projects, Cowork, or artifacts are capabilities, not authority. Their presence never broadens permission to act.
 
 ## Cross-model bridge
-- ChatGPT/Codex, Claude/Claude Code/Cowork, and Perplexity may be peer operator lanes when explicitly connected and authorized.
-- DeepSeek is an Instructor/adversary lane, not a peer mutation operator.
+- The canonical peer roster comes from `src/lib/operatorRelayConstants.ts`, currently `gemini`, `codex`, `claude-code`, `perplexity`, and `muse`.
+- ChatGPT/Codex, Claude/Claude Code/Cowork, Gemini, Perplexity, and Muse may be peer operator lanes only when the exact provider/runtime is configured, authenticated, and authorized for the requested bounded relay.
+- DeepSeek is exclusively the `deepseek-instructor` Instructor/adversary lane. Do not map a plain DeepSeek request into peer relay or grant it implementation authority.
 - FCR remains the authority/control plane.
 - Remote MCP is the conversational front door; Federated Relay is the durable transport/truth layer.
 - Never silently substitute a requested peer provider.

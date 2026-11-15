@@ -88,6 +88,7 @@ if (!String(fcr?.description ?? '').includes('planning, inspecting, building, re
 
 const external = contract.topology?.externalProviderSeats;
 requireTrue('external providers remain replaceable Council seats', external?.replaceable);
+requireIncludes('external provider seat', external?.examples, 'Meta AI');
 requireFalse('external providers are not a core dependency', external?.coreDependency);
 requireTrue('external providers may be invoked from FCR', external?.mayBeInvokedFromFCR);
 requireTrue('provider loss cannot erase portfolio state', external?.providerLossMustNotErasePortfolioState);

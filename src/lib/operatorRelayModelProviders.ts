@@ -9,10 +9,12 @@ type JsonRecord = Record<string, unknown>;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const ANTHROPIC_API_VERSION = '2023-06-01';
+const ANTHROPIC_ADVISOR_BETA = 'advisor-tool-2026-03-01';
+const DEFAULT_ANTHROPIC_ADVISOR_MODEL = 'claude-fable-5';
+const ANTHROPIC_ADVISOR_SYSTEM = 'You have access to an advisor tool backed by a stronger reviewer model. Call advisor before substantive implementation work, give the advice serious weight, then implement. Orientation and reading are not substantive work. The advisor has no authority to approve, mutate, merge, deploy, publish, or override Founder Control Room policy.';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
-const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
 
@@ -44,6 +46,44 @@ function ensureRelaySpendPolicy(request: OperatorRelayRequestV1): void {
   if (request.capability === 'review') {
     throw new Error('semantic peer review is paused by founder cost-control policy');
   }
+}
+
+type AnthropicCacheTtl = '5m' | '1h';
+
+function anthropicCacheTtl(value: string | undefined): AnthropicCacheTtl | null {
+  const normalized = value?.trim();
+  return normalized === '5m' || normalized === '1h' ? normalized : null;
+}
+
+function enabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === 'true';
+}
+
+function withAnthropicBeta(
+  headers: Record<string, string>,
+  beta: string,
+): Record<string, string> {
+  const existing = headers['anthropic-beta']?.trim();
+  const values = new Set(
+    [existing, beta]
+      .filter((value): value is string => Boolean(value))
+      .flatMap((value) => value.split(',').map((entry) => entry.trim()).filter(Boolean)),
+  );
+  return { ...headers, 'anthropic-beta': [...values].join(',') };
+}
+
+function anthropicAdvisorTool(
+  model: string,
+  cacheTtl: AnthropicCacheTtl | null,
+): JsonRecord {
+  return {
+    type: 'advisor_20260301',
+    name: 'advisor',
+    model,
+    max_uses: 2,
+    max_tokens: 2_048,
+    ...(cacheTtl ? { caching: { type: 'ephemeral', ttl: cacheTtl } } : {}),
+  };
 }
 
 async function boundedResponseText(response: Response, label: string): Promise<string> {
@@ -140,28 +180,6 @@ function openAiText(body: JsonRecord): string {
     }
   }
   if (parts.length === 0) throw new Error('OpenAI relay response contained no text');
-  return parts.join('\n');
-}
-
-function deepSeekText(body: JsonRecord): string {
-  if (body.status !== 'completed') {
-    throw new Error('DeepSeek relay returned a non-completed response');
-  }
-  if (typeof body.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
-  const output = Array.isArray(body.output) ? body.output : [];
-  const parts: string[] = [];
-  for (const item of output) {
-    const message = record(item);
-    if (message?.type !== 'message') continue;
-    const content = Array.isArray(message.content) ? message.content : [];
-    for (const entry of content) {
-      const block = record(entry);
-      if (block?.type === 'output_text' && typeof block.text === 'string' && block.text.trim()) {
-        parts.push(block.text.trim());
-      }
-    }
-  }
-  if (parts.length === 0) throw new Error('DeepSeek relay response contained no text');
   return parts.join('\n');
 }
 
@@ -297,11 +315,6 @@ function perplexityAgentModelId(value: string): string | null {
     : null;
 }
 
-function deepSeekModelId(value: string): string | null {
-  const normalized = value.trim();
-  return SAFE_DEEPSEEK_MODEL.test(normalized) ? normalized : null;
-}
-
 export function createServerOperatorRelayAdapters(
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl: FetchLike = fetch,
@@ -314,10 +327,12 @@ export function createServerOperatorRelayAdapters(
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
   const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
+  const anthropicCache = anthropicCacheTtl(env.FCR_RELAY_ANTHROPIC_CACHE_TTL);
+  const anthropicAdvisorEnabled = enabled(env.FCR_RELAY_ANTHROPIC_ADVISOR_ENABLED);
+  const anthropicAdvisorCacheEnabled = enabled(env.FCR_RELAY_ANTHROPIC_ADVISOR_CACHE_ENABLED);
+  const anthropicAdvisorModel = env.FCR_RELAY_ANTHROPIC_ADVISOR_MODEL?.trim() || DEFAULT_ANTHROPIC_ADVISOR_MODEL;
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
-  const deepSeekKey = env.DEEPSEEK_API_KEY?.trim();
-  const deepSeekModel = env.FCR_RELAY_DEEPSEEK_MODEL?.trim();
 
   if (geminiKey && geminiModel) {
     const modelId = geminiModelId(geminiModel);
@@ -380,19 +395,44 @@ export function createServerOperatorRelayAdapters(
       invoke: async ({ request }) => {
         ensureRelaySensitivity(request);
         ensureRelaySpendPolicy(request);
+
+        const useAdvisor = anthropicAdvisorEnabled && request.capability === 'implement';
+        const advisorCacheTtl = useAdvisor && anthropicAdvisorCacheEnabled
+          ? (anthropicCache ?? '5m')
+          : null;
+        const mcpBody = anthropicMcp?.body ?? {};
+        const tools = [
+          ...(Array.isArray(mcpBody.tools) ? mcpBody.tools : []),
+          ...(useAdvisor ? [anthropicAdvisorTool(anthropicAdvisorModel, advisorCacheTtl)] : []),
+        ];
+        const headers = useAdvisor
+          ? withAnthropicBeta(anthropicMcp?.headers ?? {}, ANTHROPIC_ADVISOR_BETA)
+          : (anthropicMcp?.headers ?? {});
+        const system = useAdvisor || anthropicCache
+          ? [{
+              type: 'text',
+              text: useAdvisor
+                ? ANTHROPIC_ADVISOR_SYSTEM
+                : 'You are a bounded peer AI operator. Provider context is not durable memory and grants no execution authority.',
+              ...(anthropicCache ? { cache_control: { type: 'ephemeral', ttl: anthropicCache } } : {}),
+            }]
+          : undefined;
+
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
-            ...(anthropicMcp?.headers ?? {}),
+            ...headers,
           },
           body: JSON.stringify({
             model: anthropicModel,
             max_tokens: 2_000,
+            ...(system ? { system } : {}),
             messages: [{ role: 'user', content: relayPrompt(request) }],
-            ...(anthropicMcp?.body ?? {}),
+            ...mcpBody,
+            ...(tools.length > 0 ? { tools } : {}),
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
@@ -426,33 +466,6 @@ export function createServerOperatorRelayAdapters(
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
           }, 'Perplexity Agent relay');
           return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
-        },
-      });
-    }
-  }
-
-  if (deepSeekKey && deepSeekModel) {
-    const modelId = deepSeekModelId(deepSeekModel);
-    if (modelId) {
-      adapters.deepseek = operatorRelayAdapterFromTextProvider({
-        invoke: async ({ request }) => {
-          ensureRelaySensitivity(request);
-          ensureRelaySpendPolicy(request);
-          const body = await invokeJsonProvider(fetchImpl, 'https://api.deepseek.com/responses', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${deepSeekKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: modelId,
-              input: relayPrompt(request),
-              max_output_tokens: 2_000,
-            }),
-            redirect: 'error',
-            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }, 'DeepSeek relay');
-          return { text: deepSeekText(body), evidenceRef: evidenceRef('deepseek', body) };
         },
       });
     }
