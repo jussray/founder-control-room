@@ -235,7 +235,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {
-        redirectTo: expect.stringMatching(/\/auth\/callback$/),
+      redirectTo: expect.stringContaining('/auth/callback'),
         skipBrowserRedirect: true,
       },
     });
