@@ -129,11 +129,25 @@ surface so the same project evidence can be checked across modes. The additive
   current surface, connection, and separate action authority, not by mode name.
 
 The source references must resolve in an existing authorized persistence
-service. This module does **not** itself store conversations, listen for mode
-changes, fetch private history, or modify ChatGPT's native mode switch. Those
-capabilities require a separately verified integration with both surfaces and
-the FCR access-controlled store. Do not claim automatic cross-mode syncing or
-production activation from passing unit tests of this contract alone.
+service. The candidate founder-authenticated API provides:
+
+- `POST /operator/continuity` with `{ "continuation": <validated packet> }`;
+- `GET /operator/continuity/:taskId?projectSlug=...&repositoryFullName=...`;
+- server-only storage in existing `public.continuity_records`, using a
+  reviewed additive migration for `task_id` and `execution_state`;
+- responses explicitly marked `PERSISTED_NOT_REVALIDATED` and
+  `currentEvidenceVerified: false`; no replayed approval or execution permit;
+- strict founder authentication, existing same-origin browser CSRF rules,
+  project/repository binding, reference-only canonicalization, and readback.
+
+Task checkpoints are excluded from the legacy project-shell and Truth Console
+proof views. The unverified checkpoint does not extend `valid_until`.
+
+The integration still does **not** listen for native ChatGPT mode changes, fetch
+private ChatGPT/Work transcripts, or make unapproved provider actions. Clients
+must explicitly send and retrieve authorized task-reference packets through the
+API. An approved storage migration, review, deployment and live authentication
+readback are required before any production claim.
 
 Execution, provider writes, CI, Playwright, approval and release still pass
 through their ordinary independent gates. An expired snapshot can preserve
