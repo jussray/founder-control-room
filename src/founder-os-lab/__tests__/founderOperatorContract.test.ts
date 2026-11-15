@@ -330,6 +330,11 @@ describe('founder FAST and GUARDED lane routing', () => {
       'src/security/access.ts',
       'supabase/migrations/20261115_auth.sql',
       '.github/workflows/deploy.yml',
+      '.github/workflows/ci.yml',
+      '.github/CODEOWNERS',
+      'public/control-room/login.js',
+      'docs/FOUNDER_MERGE_AUTHORITY.md',
+      'src/providers/GitHubProvider.ts',
       'src/founder-os-lab/founderOperatorContract.ts',
     ]) {
       expect(classifyExecutionLane(task, { ...narrow, files: [filename] }, { surface: 'ui' }).lane).toBe('GUARDED');

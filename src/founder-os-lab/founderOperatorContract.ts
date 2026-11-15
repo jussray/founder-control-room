@@ -225,7 +225,7 @@ function canonicalFile(file: string): boolean {
     !/^[A-Za-z]:/.test(file);
 }
 
-const GUARDED_FILE_PATH = /(?:^|\/)(?:auth(?:entication)?|security|secrets?|payments?|billing|checkout|privacy|permissions?|credentials?|access|identity|tokens?)(?:\/|[._-])/i;
+const GUARDED_FILE_PATH = /(?:^|\/)(?:auth(?:entication)?|security|secrets?|payments?|billing|checkout|privacy|permissions?|credentials?|access|identity|tokens?|login|logout|signup|signin|register)(?:\/|[._-])/i;
 const GUARDED_CONTROL_PATH = /(?:founderOperatorContract|executionWorkflow|standingFounderPolicy|verify-independent-review|founder-authority|pr-continuity)/i;
 
 export function classifyExecutionLane(
@@ -241,7 +241,10 @@ export function classifyExecutionLane(
   if (proposal.files.some(file =>
     GUARDED_FILE_PATH.test(file) || GUARDED_CONTROL_PATH.test(file) ||
     /^supabase\/migrations\//i.test(file) ||
-    /^\.github\/workflows\/(?:deploy|release|prod|security|merge)/i.test(file)
+    /^\.github\/workflows\//i.test(file) ||
+    /^\.github\/CODEOWNERS$/i.test(file) ||
+    /^src\/providers\//i.test(file) ||
+    /^docs\/(?:FOUNDER_MERGE_AUTHORITY|GOALFIX_EXECUTION_WORKFLOW)/i.test(file)
   )) {
     reasons.push('sensitive or release-control source path');
   }
