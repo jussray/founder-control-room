@@ -7,6 +7,7 @@ import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFo
 import { clearMemberSession, revokeMemberSession } from '../../auth/memberSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
+import { requireSameOriginBrowserMutation } from '../middleware/csrf.js';
 import { authenticatedIdentity, founderAllowlisted, requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
 import { oauthConsentRouter } from './oauthConsent.js';
@@ -97,7 +98,14 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
 // Only an already authenticated founder may enroll a preapproved, unbound address.
 // This endpoint sends an invite only when explicitly invoked. A new account receives
 // no founder authority until its Supabase email is confirmed and its UUID is bound.
-authRouter.post('/founder/invite', rateLimitFounderInvite, requireInteractiveFounder, async (req: FounderRequest, res) => {
+authRouter.post('/founder/invite', rateLimitFounderInvite, (req, res, next) => {
+  // Never let an Authorization header opt a founder-only browser mutation out
+  // of its strict origin check, even if an attacker also supplies cookies.
+  if (req.get('Authorization')) {
+    return respondError(res, 400, 'BAD_REQUEST', 'Use the interactive founder browser session.');
+  }
+  next();
+}, requireSameOriginBrowserMutation, requireInteractiveFounder, async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const email = normalizeEmail(req.body?.email);
   if (!email || email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
