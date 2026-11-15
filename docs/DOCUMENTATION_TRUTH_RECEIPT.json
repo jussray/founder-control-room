@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -113,7 +113,8 @@
         "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority.",
         "`.github/workflows/playwright.yml` must run FCR's exact-head welcome/login/logout `auth-lifecycle` Chromium scenario before the separately required guarded-terminal journey, verify real browser same-origin opaque-session identity and server-revoked logout through `e2e/run.mjs`, preserve both client-side and server-side V10 planless-action denial, and never treat an isolated passing test as deployed Site or production proof.",
         "`.github/workflows/playwright.yml` must install lockfile-bound dependencies and use Playwright's source-level browser discovery without mutating e2e/run.mjs at test time; after the first exact-head build it must run the complete prepared E2E harness without silently omitting browser, peer, authorization, or security proofs.",
-        "`.github/workflows/playwright.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries."
+        "`.github/workflows/playwright.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
+        "The October 15, 2026 FCR PR #979 StoryEngine peer repair updates `.github/workflows/playwright.yml` from stale `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to independently observed `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` after the previous browser harness passed but the required live peer-ref check failed; the workflow must reverify exact current StoryEngine ref equality, immutable peer checkout, runtime identity and the full FCR directive/receipt browser loop on the successor head before current federation proof or any consequential authority can be claimed."
       ]
     },
     {
