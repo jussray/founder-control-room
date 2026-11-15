@@ -740,3 +740,7 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 ## X user-context publisher — source candidate
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
+
+## Asset Continuity gate (candidate, 2026-11-15)
+
+Draft PR #906 adds a portfolio Asset Continuity skill (`skills/asset-continuity/SKILL.md`, status `active-candidate`), its contract (`docs/ASSET_CONTINUITY_GLOBAL_V1.md`), a portfolio registry and manifest template under `config/`, and `scripts/verify-asset-continuity.mjs`. The Quality Gate `Guarded Terminal and AI Skill Contracts` job now also runs `npm run verify:asset-continuity` on the exact PR head. The verifier checks structure only: every governed and external-coverage repository has a classification, visual projects are not left optional, and the contract, skill, and template keep their required invariants. It does not judge artistic fidelity, does not prove that any project manifest or runtime asset exists, and changes no review, merge, deployment, or provider authority.

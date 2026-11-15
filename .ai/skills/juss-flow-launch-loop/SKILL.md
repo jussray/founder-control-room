@@ -423,3 +423,7 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
 
 For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.
+
+## Asset Continuity check in the launch loop (candidate, November 15, 2026)
+
+When a loop changes identity-bearing visuals, carry the `skills/asset-continuity/SKILL.md` output fields (Source authority, Manifest, Graphic continuity result, Rollback, Next gate) into Proof. Draft PR #906 adds `npm run verify:asset-continuity` to the Quality Gate `Guarded Terminal and AI Skill Contracts` job. Report a pass as structural exact-head evidence only: it does not prove visual fidelity, runtime assets, deployment, or merge readiness, and it never replaces deterministic exact-head review or founder-final approval.
