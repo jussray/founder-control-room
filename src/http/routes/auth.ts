@@ -108,7 +108,7 @@ authRouter.post('/founder/invite', (req, res, next) => {
 }, requireSameOriginBrowserMutation, requireInteractiveFounder, rateLimitFounderInvite, async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const email = normalizeEmail(req.body?.email);
-  if (!email || email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
   }
   try {
