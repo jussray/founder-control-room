@@ -66,3 +66,14 @@ test('blocks oversized source and duplicated source paths', () => {
   duplicate.files.push({ ...duplicate.files[0] });
   assert.throws(() => stageVirtualWorkspaceEdit(duplicate), /duplicated/);
 });
+
+
+test('preserves repository-source identity while editing only in memory', () => {
+  const input = { ...candidate(), dataClassification: 'repository-source' };
+  const result = stageVirtualWorkspaceEdit(input);
+  assert.equal(result.receipt.sourceClassification, 'repository-source');
+  assert.equal(result.receipt.sourceBranchWrites, false);
+  assert.equal(result.receipt.externalExecutionAllowed, false);
+  assert.equal(result.artifacts[0].content, 'export const state = "verified";\\n');
+  assert.equal(input.files[0].content, source);
+});
