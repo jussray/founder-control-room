@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
@@ -741,6 +745,15 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
 
-## Chat ↔ Work reference continuation (candidate)
+## Chat ↔ Work continuation (candidate only)
 
-Founder-authenticated, reference-only task persistence in the existing FCR continuity ledger is implemented on the isolated candidate branch. Release still requires the additive reviewed migration, exact-head verification, founder approval and deployed readback. See `docs/CHATGPT_OPERATOR_WORKFLOW.md` for limits.
+Founder-authenticated task checkpoints are implemented as reference-only
+records within FCR's existing Supabase continuity ledger. The candidate
+orders saves by observation time, rejects stale and future-dated checkpoints,
+and cannot renew approval or release authority. Chromium checks use the
+complete local FCR server's CORS, CSRF, and founder-auth boundary.
+
+These changes are **not deployed**. They require independent review,
+required GitHub checks, an approved database migration, authenticated
+production persistence proof, and a separate ChatGPT mode integration.
+See `docs/CHATGPT_OPERATOR_WORKFLOW.md` for exact details.
