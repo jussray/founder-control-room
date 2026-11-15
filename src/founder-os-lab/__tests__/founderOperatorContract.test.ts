@@ -294,7 +294,7 @@ describe('adversarial operator execution gates', () => {
           revision: 'rev-1' },
       ],
     });
-    expect((await runGoal(task, h.tools, approval)).status).toBe('BLOCKED');
+    expect((await runGoal(task, h.tools, { ...approval, approvedLane: 'GUARDED' })).status).toBe('BLOCKED');
   });
 
   it('excludes stale, unrelated evidence from verified receipts', async () => {
