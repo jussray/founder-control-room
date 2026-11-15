@@ -286,3 +286,8 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+
+## Production credential diagnostic boundary
+
+The diagnostic workflow may inspect the production deployment credential only after a founder dispatch supplies an exact current main SHA. It checks out and re-observes that SHA before invoking the checked-in read-only diagnostic. Pull-request code is excluded from the credential path. Its fingerprint/verdict receipt distinguishes the value GitHub resolves from remembered rotation history without revealing a secret or authorizing deploy, secret mutation, Pages publication, Worker promotion, or production acceptance.
