@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — n8n provider-native readback witness (candidate, not provider proof)
+
+`src/lib/n8nFounderContentProviderReadback.ts` adds a strict, sanitized witness contract: an n8n `scheduled` founder-content receipt stays `provider_schedule_receipt_pending_readback` until an independent provider-native observation matches the exact orchestration, provider item/request identity, source repository/SHA, platform/channel and requested schedule. Mismatches, unsupported provider payload fields and any `published:true` claim fail closed, and a verified schedule is still not publication. Rebuilt on current main from #730, whose branch no longer shares history with main. No production adapter calls the witness yet; no provider call, Buffer scheduling, publication, deployment, database or secret change is made, and #299 (live native readback) remains open.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
