@@ -125,6 +125,15 @@ jobs:
           echo "Cloudflare Worker deploy token is present and header-safe."
           echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
+      - name: Verify Cloudflare accepts the deploy credential (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
+          bash scripts/verify-cloudflare-token.sh "$ACCOUNT_ID"
+
       - name: Verify provider-held Worker secret names before reconciliation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
