@@ -300,14 +300,6 @@
       ]
     },
     {
-      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
-      "claims": [
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
-      ]
-    },
-    {
       "path": "docs/SECRETS.md",
       "claims": [
         "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts."
@@ -827,6 +819,14 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
       ]
     }
   ]
