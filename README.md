@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## Founder OS mission-patch simulation contract (candidate, not release proof)
+
+A simulator-generated `repository-source` edit must remain an in-memory artifact until the existing founder-authenticated `POST /approvals/:missionId/patch` route accepts it. The server must independently verify the live mission branch, pinned SHA, original file contents and proposed file hashes, then reserve an idempotent action before its GitHub provider commits. A staged receipt cannot grant merge, deployment, or production authority; independent human review, full exact-head CI and Playwright proof remain separate gates.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.

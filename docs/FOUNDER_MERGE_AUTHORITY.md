@@ -1,5 +1,9 @@
 # Founder Merge Authority
 
+## Simulator-staged edits are not merge approvals
+
+The existing `POST /approvals/:missionId/patch` may write a bounded simulator-staged `repository-source` edit only after authenticated mission checks, current provider branch identity, pinned policy SHA, live source hashes and idempotent reservation. The GitHub provider must reject moved heads before its non-forced mission-branch commit. A staged artifact or successful sandbox branch patch is not a deterministic independent review, founder-final approval, exact-head merge authorization, Playwright production witness, or deployment authority.
+
 Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
 
 ## Current founder decision
