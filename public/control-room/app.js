@@ -261,6 +261,7 @@ const SURFACE_LINKS = [
   ['Security', '/control-room/security.html'],
   ['QuickScan', '/control-room/quickscan.html'],
   ['Evidence trust', '/control-room/evidence-trust.html'],
+  ['Johnstown pilot', '/control-room/johnstown-ai-pilot.html'],
 ];
 
 function renderShell() {
