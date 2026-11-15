@@ -15,11 +15,12 @@ export const operatorContinuationRouter = Router();
 
 // The continuity store is internal to the founder, not a public user workspace.
 // All mutations also inherit server-wide CSRF and rate-limit middleware.
-operatorContinuationRouter.use(requireFounder);
+// Every response, including unauthenticated denials, must be non-cacheable.
 operatorContinuationRouter.use((_req, res, next) => {
   res.set('Cache-Control', 'private, no-store');
   next();
 });
+operatorContinuationRouter.use(requireFounder);
 
 function requestRecord(value: unknown): OperatorExecutionContinuation | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
