@@ -601,6 +601,12 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   }
   const observationErrors = validateOperatorContinuityReceiptV2(input.observation);
   if (observationErrors.length) throw new Error('observation invalid: ' + observationErrors.join('; '));
+  // A receipt's historical evidenceRefs can be arbitrary strings, but a
+  // persisted continuation must contain opaque, bounded source pointers only.
+  // Validate in place: reordering would invalidate the observation fingerprint.
+  for (const ref of input.observation.evidenceRefs) {
+    continuationRef(ref, 'observation evidence');
+  }
   if (!Array.isArray(input.completedSteps) || input.completedSteps.length > 40) {
     throw new Error('completedSteps must be an array of at most 40 steps');
   }
