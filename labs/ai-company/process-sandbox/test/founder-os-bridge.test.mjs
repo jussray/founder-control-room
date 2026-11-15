@@ -126,8 +126,29 @@ function boundary() {
   };
 }
 
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function workerFingerprint(value) {
+  const input = stableStringify(value);
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 function containerReceipt(workerRequest) {
-  return {
+  const receipt = {
     version: 'container-execution-receipt-v1',
     status: 'simulated',
     boundary: boundary(),
@@ -184,6 +205,9 @@ function containerReceipt(workerRequest) {
       },
     },
   };
+  receipt.worker.inputFingerprint = workerFingerprint(workerRequest);
+  receipt.worker.outputFingerprint = workerFingerprint(receipt.worker.result);
+  return receipt;
 }
 
 test('builds deterministic worker requests only for inspect and plan', () => {
@@ -358,6 +382,28 @@ test('rejects forged boundary, authority, task, and model claims', () => {
     assert.equal(sealed.status, 'blocked');
     assert.equal(sealed.authority.executionAllowed, false);
     assert.ok(sealed.violations.length > 0);
+    assert.equal(sealed.receiptFingerprint, null);
+    assert.equal(sealed.employee, null);
+  }
+});
+
+
+test('rejects plausible hex fingerprints if they do not bind to the actual request and result', () => {
+  const input = request();
+  const candidate = plan();
+  const workerRequest = buildFounderOsWorkerRequest(input, candidate);
+  const badReceipts = [
+    (raw) => { raw.worker.inputFingerprint = '00000000'; },
+    (raw) => { raw.worker.outputFingerprint = '00000000'; },
+    (raw) => { raw.worker.result.brief = ['Modified after the worker fingerprint was produced.']; },
+  ];
+
+  for (const tamper of badReceipts) {
+    const raw = containerReceipt(workerRequest);
+    tamper(raw);
+    const sealed = sealFounderOsContainerReceipt(workerRequest, candidate, raw);
+    assert.equal(sealed.status, 'blocked');
+    assert.ok(sealed.violations.includes('worker_receipt_invalid'));
     assert.equal(sealed.receiptFingerprint, null);
     assert.equal(sealed.employee, null);
   }
