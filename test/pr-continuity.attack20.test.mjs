@@ -92,7 +92,7 @@ test('auto-merge intent distinguishes queued, not queued, and provider-unknown w
     assert.ok(block.includes(`auto_merge_intent: **${autoMergeIntent}**`));
     assert.match(block, /merge_approved: \*\*false\*\*/);
     assert.match(block, /authorizes_merge: \*\*false\*\*/);
-    assert.match(block, /required reviews, tests, checks, and branch protections/);
+    assert.match(block, /configured required checks, tests, review-thread resolution and branch protections/);
   }
 });
 
