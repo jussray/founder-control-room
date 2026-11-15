@@ -7,7 +7,6 @@
  * Run: npm run verify:operator-continuation-auth
  */
 import assert from 'node:assert/strict';
-import express from 'express';
 import { chromium } from '@playwright/test';
 
 // Force a local, deliberately unreachable Supabase URL. The proof never uses
@@ -17,12 +16,14 @@ process.env.SUPABASE_ALLOW_LOCAL = 'true';
 process.env.SUPABASE_URL = 'http://127.0.0.1:54321';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'synthetic-local-test-service-key';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'synthetic-local-test-publishable-key';
+process.env.FOUNDER_API_URL = 'http://localhost:8787';
+process.env.FOUNDER_ALLOWED_ORIGINS = 'http://localhost:8787';
 
-const { operatorContinuationRouter } = await import('../src/http/routes/operatorContinuation.ts');
+const { createServer } = await import('../src/http/server.ts');
 
-const app = express();
-app.use(express.json());
-app.use('/operator/continuity', operatorContinuationRouter);
+// Mount the real FCR server so Playwright exercises global CORS, CSRF,
+// rate limiting, JSON parsing, and founder auth instead of a router-only stub.
+const app = createServer();
 const server = await new Promise((resolve) => {
   const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
 });
@@ -41,23 +42,39 @@ try {
     'Founder session required',
   );
 
-  const post = await page.evaluate(async () => {
+  assert.equal(view?.headers()['cache-control'], 'private, no-store');
+  const crossOrigin = await page.evaluate(async () => {
     const response = await fetch('/operator/continuity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ continuation: {} }),
     });
-    return { status: response.status, body: await response.json() };
+    return { status: response.status };
   });
-  assert.equal(post.status, 401, 'anonymous POST must return 401');
-  assert.equal(post.body.error, 'Founder session required');
+  assert.equal(crossOrigin.status, 403, 'unexpected browser origin must be blocked');
+
+  // Simulate the configured canonical browser origin using Playwright's
+  // API request context. This verifies that the request passes CORS/CSRF
+  // before being rejected at the independent founder-authentication gate.
+  const sameOrigin = await page.request.post(baseUrl + '/operator/continuity', {
+    headers: {
+      Origin: process.env.FOUNDER_API_URL,
+      'Sec-Fetch-Site': 'same-origin',
+      'Content-Type': 'application/json',
+    },
+    data: { continuation: {} },
+  });
+  assert.equal(sameOrigin.status(), 401, 'no founder session must always return 401');
+  assert.equal((await sameOrigin.json()).error, 'Founder session required');
+  assert.equal(sameOrigin.headers()['cache-control'], 'private, no-store');
 
   console.log(JSON.stringify({
     contract: 'fcr/operator-continuation-anonymous-playwright-proof@v1',
     browser: 'chromium',
-    realExpressRoute: true,
+    fullFcrServer: true,
     anonymousGet: 401,
-    anonymousPost: 401,
+    unexpectedBrowserOriginPost: 403,
+    allowedOriginWithoutFounderPost: 401,
     authenticatedPersistenceVerified: false,
     liveDeploymentVerified: false,
     nativeModeSwitchVerified: false,
