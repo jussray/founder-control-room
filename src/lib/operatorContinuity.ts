@@ -580,7 +580,7 @@ function continuationIdentifier(value: string, field: string): string {
 
 function continuationRef(value: string, field: string): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
-  if (normalized.length > 256 || !/^[a-z][a-z0-9+.-]*:\S+$/i.test(normalized)) {
+  if (normalized.length > 256 || !/^(?:fcr|chatgpt|work|github|cloudflare|supabase|artifact|council):[A-Za-z0-9_.:/-]+$/i.test(normalized)) {
     throw new Error(field + ' must be a bounded source reference, not raw conversation content');
   }
   return normalized;
