@@ -68,6 +68,21 @@ try {
   assert.equal((await sameOrigin.json()).error, 'Founder session required');
   assert.equal(sameOrigin.headers()['cache-control'], 'private, no-store');
 
+  // The route-specific limit (60/minute) is stricter than the server's
+  // general limiter (120/minute). Verify its own response contract.
+  let rateLimitProof = null;
+  for (let attempt = 0; attempt < 65; attempt += 1) {
+    const response = await page.request.get(
+      baseUrl + '/operator/continuity/synthetic-task?projectSlug=founder-control-room&repositoryFullName=jussray%2Ffounder-control-room',
+    );
+    if (response.status() === 429) {
+      rateLimitProof = await response.json();
+      break;
+    }
+    assert.equal(response.status(), 401, 'pre-limit requests must still require founder auth');
+  }
+  assert.deepEqual(rateLimitProof, { code: 'continuation_rate_limited' });
+
   console.log(JSON.stringify({
     contract: 'fcr/operator-continuation-anonymous-playwright-proof@v1',
     browser: 'chromium',
@@ -75,6 +90,7 @@ try {
     anonymousGet: 401,
     unexpectedBrowserOriginPost: 403,
     allowedOriginWithoutFounderPost: 401,
+    routeSpecificRateLimit: 429,
     authenticatedPersistenceVerified: false,
     liveDeploymentVerified: false,
     nativeModeSwitchVerified: false,
