@@ -8,7 +8,7 @@ owner: Juss & Co.
 # CONTINUITY / PROOF LEDGER
 
 ## Purpose
-Make work resumable without confusing memory, intentions, artifacts, CI results or external outcomes. Preserve each product's independent authority and FCR's governance role. Extend rather than replace `ultrathink-attack-godmode`, `repair-to-proof`, `futureyou-me-v10` and `ultrathink-devil`.
+Make work resumable without confusing memory, intentions, artifacts, CI results or external outcomes. Preserve each product's independent authority and FCR's governance role. Extend rather than replace `ultrathink-attack-godmode`, `repair-to-proof`, `futureyou` standing command (`control-room-futureyou-leverage`) and `ultrathink-devil`.
 
 ## Triggers
 `/continuity`, `/receipt`, `fingerprints and cookies`, `handoff`, `resume work`, `proof ledger`, `record state`, `supersession`.
