@@ -70,7 +70,7 @@ This source/runtime membrane proves only that the branch-creation path is govern
 
 ## Independent review + founder-final authority for Founder Control Room merges
 
-The Founder Control Room in-app merge path keeps **independent review load-bearing**, but the canonical FCR policy no longer requires a second human semantic reviewer merely because the founder authored the patch.
+The Founder Control Room in-app merge path keeps **deterministic independent review load-bearing**. The approved GitHub-native policy also requires one eligible non-author human PR approval; deterministic or model review must not be treated as that human approval.
 
 For `jussray/founder-control-room` the canonical path requires, at minimum:
 
@@ -98,15 +98,15 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
-### Current native GitHub human-review phase
+### Approved native GitHub human-review policy (source; live provider pending)
 
-The canonical **current** provider-governance phase is `founder-only` on the human side. That means the GitHub-native pull-request membrane requests **zero native approving reviews** and does not require Code Owner or last-push human approval merely to satisfy a reviewer role that does not yet exist.
+The canonical **approved source policy** is `founder-plus-independent`: one native approving human review, with Code Owner and last-push approval required by the existing provider implementation. An eligible non-owner human with write authority must be verified before the provider ruleset is mutated. These source rules do not establish current live GitHub enforcement.
 
 This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
 
-The phase is intentionally upgradeable rather than permanent. When the founder deliberately activates a future-team phase by setting the canonical native approving-review count above zero, the GitHub provider must automatically require Code Owner review and last-push approval again, while preserving every existing machine, freshness, CodeQL, founder-final, and rollback boundary.
+The founder has approved upgrading the source phase to one native approval. The GitHub provider must require Code Owner review and last-push approval while preserving every machine, freshness, CodeQL, founder-final, and rollback boundary. If no eligible independent reviewer exists, reconciliation must stop before mutation rather than lock the repository.
 
-Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the founder-only phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
+Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the independent-review phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
 
 ### Deterministic witness production and bootstrap truth
 
@@ -206,6 +206,6 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 
 ## CI lockfile determinism — current exact-head source contract
 
-Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.
+Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. The approved source floor is one independent human approval; live GitHub enforcement is separately verified and may still be zero until trusted provider reconciliation.
 
 Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.

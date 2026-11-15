@@ -17,6 +17,10 @@ import {
   observedAutoMerge,
   collectRolloverOrder,
   sameRepositoryPull,
+  rolloverDeferral,
+  deferralAlreadyRecorded,
+  ROLLOVER_DEFER_LABEL,
+  DEFERRED_PROOF_STATE,
 } from '../scripts/pr-continuity.mjs';
 
 const repo = 'jussray/example';
@@ -167,22 +171,49 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
 });
-test('AT31 metadata identity binds base ref, live base SHA, and head SHA', () => {
+test('AT31 drafts are deferred from rollover instead of rolled forward', () => {
+  assert.equal(rolloverDeferral({ ...pr(1, 'main', 'a'), draft: true, labels: [] }), 'DEFERRED_DRAFT');
+});
+test('AT32 stale-labelled ready PRs are deferred; other labels are not', () => {
+  assert.equal(ROLLOVER_DEFER_LABEL, 'stale');
+  assert.equal(rolloverDeferral({ ...pr(2, 'main', 'b'), draft: false, labels: [{ name: 'stale' }] }), 'DEFERRED_STALE');
+  assert.equal(rolloverDeferral({ ...pr(3, 'main', 'c'), draft: false, labels: [{ name: 'keep-open' }] }), null);
+  assert.equal(rolloverDeferral({ ...pr(4, 'main', 'd'), draft: false }), null);
+  assert.equal(rolloverDeferral(undefined), null);
+});
+test('AT33 deferred receipts never claim current proof and are written once', () => {
+  assert.equal(DEFERRED_PROOF_STATE, 'REVERIFY_OR_ROLLOVER_REQUIRED');
+  const block = continuityBlock({ repository: repo, prNumber: 5, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'DEFERRED_DRAFT', proofState: DEFERRED_PROOF_STATE });
+  assert.match(block, /continuity: \*\*DEFERRED_DRAFT\*\*/);
+  assert.match(block, /authorizes_merge: \*\*false\*\*/);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_DRAFT'), true);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_STALE'), false);
+  assert.equal(deferralAlreadyRecorded('', 'DEFERRED_DRAFT'), false);
+});
+test('AT34 rollover routes deferred PRs away from update-branch and keeps them out of blocked debt', () => {
+  assert.match(continuitySource, /const deferral = rolloverDeferral\(byNumber\.get\(number\)\)/);
+  assert.match(continuitySource, /deferredCount: deferred\.length/);
+  assert.match(continuitySource, /const blocked = results\.filter\(\(item\) => item\.state\.startsWith\('BLOCKED'\)\)/);
+});
+test('AT35 stacked children are still ordered after a deferred parent', () => {
+  assert.deepEqual(collectRolloverOrder([{ ...pr(10, 'main', 'parent'), draft: true }, pr(11, 'parent', 'child')]), [10, 11]);
+});
+test('AT36 metadata identity binds base ref, live base SHA, and head SHA', () => {
   const identity = metadataIdentity(pr(31, 'main', 'candidate'), 'base-sha');
   assert.deepEqual(identity, { baseRef: 'main', baseSha: 'base-sha', headSha: 'candidate-sha' });
   assert.equal(assertMetadataIdentity(identity, { ...identity }), true);
 });
-test('AT32 metadata mutation fails closed when the head moves between read and write', () => {
+test('AT37 metadata mutation fails closed when the head moves between read and write', () => {
   const expected = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-a' };
   const actual = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-b' };
   assert.throws(() => assertMetadataIdentity(expected, actual), /METADATA_IDENTITY_MOVED/);
 });
-test('AT33 metadata mutation fails closed when main moves between read and write', () => {
+test('AT38 metadata mutation fails closed when main moves between read and write', () => {
   const expected = { baseRef: 'main', baseSha: 'base-a', headSha: 'head-a' };
   const actual = { baseRef: 'main', baseSha: 'base-b', headSha: 'head-a' };
   assert.throws(() => assertMetadataIdentity(expected, actual), /METADATA_IDENTITY_MOVED/);
 });
-test('AT34 body PATCH is guarded by a live metadata identity read and post-patch recheck', () => {
+test('AT39 body PATCH is guarded by a live metadata identity read and post-patch recheck', () => {
   assert.match(continuitySource, /assertMetadataIdentity\(expectedIdentity, liveIdentity\)/);
   assert.match(continuitySource, /POST_PATCH_\$\{error\.message\}/);
   assert.match(continuitySource, /patchBody\(repository, pr, block, expectedIdentity = null\)/);
