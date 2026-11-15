@@ -62,6 +62,8 @@ Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`,
 
 The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/work` URL through `env.ASSETS`, because the asset layer canonicalizes `/work.html` to `/work` with a 308 (requesting the filename loops) while the `FCR_API` proxy path answers that public page with a degraded 503. The bare `/welcome` and `/welcome/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/welcome` URL through `env.ASSETS`, because the extensionless welcome path otherwise falls through to the `FCR_API` proxy and answers with a degraded 503.
 
+Public MCP routing is an explicit allowlist. `public/_worker.js` forwards only `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the mounted `/mcp/portfolio/<slug>` bridges through `env.FCR_API`; every other `/mcp` path (founder administration such as `/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`, the write-capable `/mcp/founder-signal-engine`, and unknown or encoded variants) returns a fail-closed `404 MCP_ROUTE_NOT_PUBLIC` at the Pages edge without calling the API. Those routes remain on the API origin under their own authentication. The allowlist is not authentication and does not prove deployed Pages or Access state.
+
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
 ### Required Pages provider configuration
