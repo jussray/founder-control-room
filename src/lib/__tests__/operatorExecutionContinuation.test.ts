@@ -139,6 +139,33 @@ describe('cross-mode operator execution continuation', () => {
       .toContain('execution continuation cannot become an authorization, approval, or browser cookie');
   });
 
+  it('refuses arbitrary prose, paths and invalid Git syntax in an observation branch', () => {
+    for (const branch of [
+      'main\\nprivate-credential',
+      'main with credential',
+      '../hidden',
+      'feature//branch',
+      'topic..other',
+      'x'.repeat(129),
+    ]) {
+      const observationWithBranch = createOperatorContinuityReceiptV2({
+        ...input.observation,
+        targetBranch: branch,
+      });
+      expect(() => createOperatorExecutionContinuation({
+        ...input,
+        observation: observationWithBranch,
+      })).toThrow(/bounded Git branch name/);
+    }
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: createOperatorContinuityReceiptV2({
+        ...input.observation,
+        targetBranch: 'fix/chat-work-execution-continuity-20261113',
+      }),
+    })).not.toThrow();
+  });
+
   it('rejects private prose hidden in nested observation evidence references', () => {
     // The v2 receipt alone permits historical evidence labels; the
     // persistence contract must forbid copying private conversation text.
