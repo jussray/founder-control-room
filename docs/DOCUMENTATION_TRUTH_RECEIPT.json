@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Reject raw credential material in project connection config and secretRef on write (400 CONNECTION_CONFIG_SECRET_REJECTED, key path only, value never echoed) through one shared detector, and record a count-only flag for credential-shaped stored connection rows in the project read audit.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -824,6 +824,24 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": "src/lib/connectionConfigSecrets.ts",
+      "claims": [
+        "`connectionConfigSecretViolation` must return only a key path (credential-shaped keys redacted), never a value, and must flag credential-named keys with non-empty values and credential-shaped values under any key, failing closed on over-deep input. It is a heuristic and does not prove that no credential is stored."
+      ]
+    },
+    {
+      "path": "src/http/routes/projects.ts",
+      "claims": [
+        "`POST /projects/:slug/connections` must reject credential-shaped `config` or `secretRef` with a 400 before any project lookup or `project_connections` write, and the response must not echo the submitted value. It does not redact, migrate, or re-validate existing stored rows."
+      ]
+    },
+    {
+      "path": "src/http/middleware/projectReadAudit.ts",
+      "claims": [
+        "The project connections read audit records only `credential_shaped_connection_count`; it must not copy connection config, secret references, paths, or values into `project_events`. The flag is observation only and does not block or redact the read."
       ]
     }
   ]

@@ -198,4 +198,41 @@ describe('requireProjectReadAudit', () => {
     expect(response.status).toBe(201);
     expect(mockInsert).not.toHaveBeenCalled();
   });
+
+  it('flags credential-shaped stored connection rows by count only in the read audit', async () => {
+    const rawValue = `ghp_${'z'.repeat(36)}`;
+    const app = express();
+    app.use('/projects', (req: FounderRequest, _res, next) => {
+      req.founder = { email: 'founder@example.com', userId: 'founder-user-123' };
+      next();
+    }, requireProjectReadAudit);
+    app.get('/projects/:slug/connections', (_req, res) => {
+      res.json({
+        connections: [
+          { id: 'c1', config: { region: 'us-east' }, secret_ref: 'GITHUB_TOKEN' },
+          { id: 'c2', config: { auth: { apiKey: 'legacy-raw-value' } }, secret_ref: null },
+          { id: 'c3', config: {}, secret_ref: rawValue },
+        ],
+      });
+    });
+
+    const response = await request(app).get('/projects/one/connections');
+
+    expect(response.status).toBe(200);
+    expect(mockInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        event_type: 'project_connections_read',
+        metadata: expect.objectContaining({ credential_shaped_connection_count: 2 }),
+      }),
+    ]);
+    const audited = JSON.stringify(mockInsert.mock.calls[0][0]);
+    expect(audited).not.toContain('legacy-raw-value');
+    expect(audited).not.toContain(rawValue);
+  });
+
+  it('does not add the connection flag to other read surfaces', async () => {
+    await request(createProbeApp()).get('/projects/one/releases');
+    const metadata = mockInsert.mock.calls[0][0][0].metadata;
+    expect(metadata).not.toHaveProperty('credential_shaped_connection_count');
+  });
 });
