@@ -143,7 +143,7 @@ export function continuityBlock(value) {
     '- authorizes_merge: **false**',
     '- deploy_authority: **false**',
     '',
-    '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
+    '> Merge authority means the capability exists, not that an in-app FCR approval token has been issued. For an AI-initiated FCR in-app merge, a fresh founder-final receipt bound to the exact repository, PR, base SHA and head SHA remains required; without it the in-app merge must not execute. The separately observed founder-selected GitHub native Auto-merge queue is already the founder merge instruction. Base/head movement expires prior in-app approvals and exact-head proof.',
     '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
     '> A provider-observed FCR Auto-merge selection by the founder is the founder native GitHub merge instruction, not a formal APPROVED review or an in-app FCR execution token. GitHub executes only after the configured required checks, tests, review-thread resolution and branch protections pass. The merge_approved:false field applies to the separate FCR in-app merge route; the founder-only native source policy requires no second human approving reviewer. This receipt never dispatches a merge.',
     END_MARKER,
