@@ -109,6 +109,11 @@ export async function storeOperatorExecutionContinuation(
     ...record,
     observation: createOperatorContinuityReceiptV2(record.observation),
   });
+  // A client with a fast or corrupted clock must not make its observation
+  // permanently newer than legitimate follow-up checkpoints.
+  if (Date.parse(safeRecord.observation.observedAt) > Date.now() + 5 * 60_000) {
+    throw new OperatorContinuationStoreError('invalid_continuation');
+  }
   const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
   const existing = await latestFor(projectId, safeRecord.taskId);
   if (existing) {
