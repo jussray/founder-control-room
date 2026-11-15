@@ -18,6 +18,7 @@ function fixture() {
       version: FOUNDER_OS_STAGED_PATCH_VERSION,
       status: 'staged',
       mode: 'in-memory-only',
+      sourceClassification: 'repository-source',
       repository: 'jussray/founder-control-room',
       branch: 'mission/example',
       sourceSha: SHA,
@@ -86,6 +87,7 @@ describe('Founder OS staged workspace handoff to existing FCR mission route', ()
       { ...receipt, providerCalls: true },
       { ...receipt, filesystemWrites: true },
       { ...receipt, status: 'committed' },
+      { ...receipt, sourceClassification: 'synthetic' },
     ]) {
       expect(validateFounderOsStagedPatch(altered, context))
         .toContain('staged workspace receipt contract or isolation boundary is invalid');
