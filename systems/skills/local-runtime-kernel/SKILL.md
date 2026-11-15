@@ -106,7 +106,7 @@ python scripts/check_receipt.py receipt.json
 
 The checker enforces: PROVEN slots carry evidence; PROVEN WHO roles bind identity+action+authority;
 PROVEN WHY carries causal (not correlational) evidence; VERIFIED requires every Must slot PROVEN and a
-verifier distinct from the executor; prospective authority PROVEN before any ATTEMPT. Schema and an
+verifier distinct from the executor; prospective authority PROVEN before PERMIT; WHO.EXECUTED and WHO.VERIFIED actors must be identities, not status words. Schema and an
 example live in `references/receipt-schema.md`.
 
 ## Final states
