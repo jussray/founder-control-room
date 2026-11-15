@@ -161,7 +161,9 @@ const scope = '?projectSlug=founder-control-room&repositoryFullName=jussray%2Ffo
 
 describe('founder-only cross-mode continuation storage', () => {
   it('rejects unauthenticated lookups and posts', async () => {
-    expect((await request(app()).get(endpoint + '/task-12' + scope)).status).toBe(401);
+    const deniedGet = await request(app()).get(endpoint + '/task-12' + scope);
+    expect(deniedGet.status).toBe(401);
+    expect(deniedGet.headers['cache-control']).toBe('private, no-store');
     expect((await request(app()).post(endpoint).send({ continuation: basePacket })).status).toBe(401);
     expect(storeRows).toHaveLength(0);
   });
@@ -211,6 +213,24 @@ describe('founder-only cross-mode continuation storage', () => {
       endpoint + '/task-12?projectSlug=founder-control-room&repositoryFullName=other%2Frepo',
     ).set('Authorization', authorization);
     expect(wrongRepo.status).toBe(404);
+  });
+
+  it('rejects a future-dated task observation before it can block later saves', async () => {
+    const now = Date.now();
+    const futurePacket = createOperatorExecutionContinuation({
+      ...basePacket,
+      observation: createOperatorContinuityReceiptV2({
+        ...basePacket.observation,
+        observedAt: new Date(now + 60 * 60_000).toISOString(),
+        expiresAt: new Date(now + 2 * 60 * 60_000).toISOString(),
+      }),
+    });
+    const result = await request(app()).post(endpoint)
+      .set('Authorization', authorization)
+      .send({ continuation: futurePacket });
+    expect(result.status).toBe(400);
+    expect(result.body.code).toBe('invalid_continuation');
+    expect(storeRows).toHaveLength(0);
   });
 
   it('returns a sanitized 503 when storage is unavailable', async () => {
