@@ -420,3 +420,43 @@ export function stageFounderOsWorkspaceChange(request, plan, workspace) {
     artifacts: staged.artifacts,
   });
 }
+
+
+/**
+ * Compile one in-memory repository-source edit into the existing Founder Control
+ * Room authenticated mission patch request. This returns a request artifact,
+ * not a token, automatic HTTP call, or permission to commit.
+ */
+export function buildFounderOsMissionPatchHandoff(request, plan, workspace, details) {
+  if (workspace?.dataClassification !== 'repository-source') {
+    reject('workspace_source_not_real', 'live mission handoff requires an explicitly labeled repository-source snapshot');
+  }
+  if (!details || !/^[a-zA-Z0-9_-]{8,100}$/.test(details.missionId ?? '')) {
+    reject('mission_identity_invalid', 'an exact nonempty mission identifier is required');
+  }
+  if (typeof details.message !== 'string' || !details.message.trim() || details.message.length > 200) {
+    reject('commit_message_invalid', 'a bounded nonempty commit message is required');
+  }
+  if (typeof details.idempotencyKey !== 'string'
+    || !/^[a-zA-Z0-9:_-]{8,160}$/.test(details.idempotencyKey)) {
+    reject('idempotency_key_invalid', 'an explicit idempotency key is required');
+  }
+
+  const staged = stageFounderOsWorkspaceChange(request, plan, workspace);
+  return deepFreeze({
+    version: 'founder-os-mission-patch-handoff-v1',
+    status: 'ready_for_founder_route',
+    route: `/approvals/${encodeURIComponent(details.missionId)}/patch`,
+    method: 'POST',
+    requiresFounderSession: true,
+    requestSent: false,
+    authority: { executionAllowed: false, mergeAllowed: false, deploymentAllowed: false },
+    body: {
+      message: details.message.trim(),
+      idempotencyKey: details.idempotencyKey,
+      changes: staged.artifacts.map(({ path, content }) => ({ path, content })),
+      stagedWorkspaceReceipt: staged.receipt,
+    },
+    nextGate: 'Use the existing authenticated FCR mission patch route; it must independently reread the mission branch, pinned SHA, file hashes, and idempotency ledger before any provider write.',
+  });
+}
