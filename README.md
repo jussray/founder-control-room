@@ -1,5 +1,11 @@
 # Founder Control Room
 
+## October 29, 2026: Founder Proof Audit Shopify product-route candidate (not deployed)
+
+FCR Shopify Admin currently reports `Founder Proof Audit` as ACTIVE at $99 (SKU `FCR-PROOF-AUDIT-99`) with the product path `/products/founder-proof-audit`. Prior FCR Pages routing did not explicitly own that extensionless path. The candidate source adds a branded, inquiry-only public page under `public/products/founder-proof-audit/index.html`, routes both slash forms through `STATIC_EXACT_PATHS` in `public/_worker.js`, and adds `founderProofAuditPublicProduct.test.ts`.
+
+The inquiry page intentionally does not initiate checkout: the Shopify MAIN redirect was independently observed pointing to JBH, while the corrected FCR Shopify redirect theme targeting `www.foundercontrolroom.org` remains UNPUBLISHED. The candidate does not establish live DNS/Pages behavior, a sale, checkout, or fulfillment. Exact-head checks, browser and Cloudflare deployment proof, final reviewed merge approval, and a separate Shopify theme publication gate are outstanding. The Truthweaver store and JBH remain separate.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
