@@ -4,7 +4,7 @@ const { mockGetUser, mockFrom, storeRows, dbState } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockFrom: vi.fn(),
   storeRows: [] as Array<Record<string, unknown>>,
-  dbState: { fail: false },
+  dbState: { fail: false, conflictOnce: false, orderedByObservation: false },
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -91,32 +91,43 @@ function mockDatabase() {
     }
     if (table === 'continuity_records') {
       return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({
-                    data: storeRows.at(-1) ?? null,
-                    error: dbState.fail ? { code: 'down' } : null,
-                  }),
-                }),
-              }),
+        select: () => {
+          const query = {
+            eq: () => query,
+            order: (column: string) => {
+              if (column === 'checkpoint_observed_at') dbState.orderedByObservation = true;
+              return query;
+            },
+            limit: () => query,
+            maybeSingle: async () => ({
+              data: dbState.orderedByObservation
+                ? [...storeRows].sort((a, b) =>
+                  Date.parse(String(b.checkpoint_observed_at))
+                  - Date.parse(String(a.checkpoint_observed_at)))[0] ?? null
+                : storeRows.at(-1) ?? null,
+              error: dbState.fail ? { code: 'down' } : null,
             }),
-          }),
-        }),
+          };
+          return query;
+        },
         insert: (input: Record<string, unknown>) => ({
           select: () => ({
             single: async () => {
               const inserted = {
                 id: 'stored-row-1',
                 task_id: input.task_id,
+                checkpoint_observed_at: input.checkpoint_observed_at,
                 execution_state: input.execution_state,
                 subject_fingerprint: input.subject_fingerprint,
                 proof_cookie: input.proof_cookie,
                 invalidated_at: null,
                 created_at: '2026-11-15T20:00:00.000Z',
               };
+              if (dbState.conflictOnce) {
+                dbState.conflictOnce = false;
+                storeRows.push(inserted);
+                return { data: null, error: { code: '23505' } };
+              }
               if (!dbState.fail) storeRows.push(inserted);
               return {
                 data: dbState.fail ? null : inserted,
@@ -135,6 +146,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   storeRows.length = 0;
   dbState.fail = false;
+  dbState.conflictOnce = false;
+  dbState.orderedByObservation = false;
   mockGetUser.mockResolvedValue({
     data: { user: { id: 'founder-1', email: 'founder@example.org' } },
     error: null,
@@ -227,6 +240,89 @@ describe('founder-only cross-mode continuation storage', () => {
     expect(JSON.stringify(storeRows)).not.toContain('SECRET_');
     expect(JSON.stringify(response.body)).not.toContain('SECRET_');
     expect(response.body.continuation.record.fingerprint).toBe(basePacket.fingerprint);
+  });
+
+
+  it('keeps newer progress when an old Chat checkpoint arrives after Work', async () => {
+    const newer = createOperatorExecutionContinuation({
+      ...basePacket,
+      sourceMode: 'work',
+      completedSteps: [...basePacket.completedSteps, { stepId: 'verify', evidenceRefs: ['github:new-check'] }],
+      remainingStepIds: ['release-review'],
+      nextActionRef: 'fcr:actions/release-review',
+      observation: createOperatorContinuityReceiptV2({
+        ...basePacket.observation,
+        source: 'work',
+        observedAt: '2026-11-15T19:05:00.000Z',
+      }),
+    });
+    const old = await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: basePacket });
+    const current = await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: newer });
+    const stale = await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: basePacket });
+    expect([old.status, current.status, stale.status]).toEqual([201, 201, 409]);
+    expect(stale.body.code).toBe('stale_continuation');
+    expect(storeRows).toHaveLength(2);
+    const resumed = await request(app()).get(endpoint + '/task-12' + scope)
+      .set('Authorization', authorization);
+    expect(resumed.body.continuation.record).toMatchObject({
+      sourceMode: 'work',
+      remainingStepIds: ['release-review'],
+      nextActionRef: 'fcr:actions/release-review',
+    });
+    expect(dbState.orderedByObservation).toBe(true);
+  });
+
+  it('rejects different progress with the same observation timestamp', async () => {
+    const modified = createOperatorExecutionContinuation({
+      ...basePacket,
+      remainingStepIds: ['unexpected-new-step'],
+    });
+    await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: basePacket });
+    const result = await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: modified });
+    expect(result.status).toBe(409);
+    expect(storeRows).toHaveLength(1);
+  });
+
+  it('handles a unique-index collision by checking matching stored evidence', async () => {
+    dbState.conflictOnce = true;
+    const collided = await request(app()).post(endpoint)
+      .set('Authorization', authorization).send({ continuation: basePacket });
+    expect(collided.status).toBe(200);
+    expect(collided.body.disposition).toBe('duplicate');
+    expect(storeRows).toHaveLength(1);
+  });
+
+  it('picks the newest observed checkpoint even if an older record lands last', async () => {
+    const newer = createOperatorExecutionContinuation({
+      ...basePacket,
+      sourceMode: 'work',
+      remainingStepIds: ['finish'],
+      observation: createOperatorContinuityReceiptV2({
+        ...basePacket.observation,
+        source: 'work',
+        observedAt: '2026-11-15T19:15:00.000Z',
+      }),
+    });
+    const first = await request(app()).post(endpoint).set('Authorization', authorization)
+      .send({ continuation: newer });
+    expect(first.status).toBe(201);
+    storeRows.push({
+      ...storeRows[0],
+      id: 'late-delivered-old-checkpoint',
+      checkpoint_observed_at: basePacket.observation.observedAt,
+      execution_state: basePacket,
+      subject_fingerprint: basePacket.observation.fingerprint,
+      proof_cookie: basePacket.fingerprint,
+    });
+    const read = await request(app()).get(endpoint + '/task-12' + scope)
+      .set('Authorization', authorization);
+    expect(read.status).toBe(200);
+    expect(read.body.continuation.record.remainingStepIds).toEqual(['finish']);
   });
 
 });
