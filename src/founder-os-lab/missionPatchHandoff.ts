@@ -7,6 +7,7 @@ export interface FounderOsStagedPatchReceipt {
   version: typeof FOUNDER_OS_STAGED_PATCH_VERSION;
   status: 'staged';
   mode: 'in-memory-only';
+  sourceClassification: 'repository-source';
   repository: string;
   branch: string;
   sourceSha: string;
@@ -68,6 +69,7 @@ export function validateFounderOsStagedPatch(
   const receipt = candidate as Partial<FounderOsStagedPatchReceipt>;
   if (receipt.version !== FOUNDER_OS_STAGED_PATCH_VERSION
     || receipt.status !== 'staged' || receipt.mode !== 'in-memory-only'
+    || receipt.sourceClassification !== 'repository-source'
     || receipt.providerCalls !== false || receipt.filesystemWrites !== false
     || receipt.sourceBranchWrites !== false || receipt.externalExecutionAllowed !== false) {
     failures.push('staged workspace receipt contract or isolation boundary is invalid');
