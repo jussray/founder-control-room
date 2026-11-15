@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import {
   OPERATOR_CONTINUATION_STORAGE_CONTRACT,
   OperatorContinuationStoreError,
@@ -12,6 +13,16 @@ import {
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const operatorContinuationRouter = Router();
+
+// Rate-limit before founder authentication to bound credential probing and
+// storage readbacks, in addition to the server-wide general limiter.
+operatorContinuationRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { code: 'continuation_rate_limited' },
+}));
 
 // The continuity store is internal to the founder, not a public user workspace.
 // All mutations also inherit server-wide CSRF and rate-limit middleware.
