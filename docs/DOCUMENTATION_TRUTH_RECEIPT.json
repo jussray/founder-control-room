@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -17,7 +17,8 @@
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
-        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution.",
+        "`.github/workflows/ci.yml` must execute the exported Juss-authored receipt-chain tests and complete SHA-256 inventory under the load-bearing `Python tests` job, and `Required Gate` must require that job to succeed; this proves only source/test consistency, never installed FCR behavior, provider execution, or founder-final merge authority."
       ]
     },
     {
@@ -510,7 +511,8 @@
       "claims": [
         "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, Copilot-review, and required_signatures rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls.",
         "`src/providers/GitHubProvider.ts` must retain the live CodeQL `alerts_threshold: all` severity setting rather than downgrade it to `errors` while reconciling required-signatures and strict freshness; both source and independent governance preflight must enforce this, and successful source checks do not prove a live provider mutation.",
-        "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority."
+        "`src/providers/GitHubProvider.ts` must observe draft or closed PR identity through `observePullRequest` without writing its internal FCR merge-review context, while `getPullRequestReviewContext` continues to reject draft and closed PRs before review or integration authority.",
+        "`src/providers/GitHubProvider.ts` must snapshot an existing FCR review ruleset before two-membrane reconciliation, preserve required-linear-history, code-quality, and Copilot-review rules with their parameters unchanged, intentionally remove legacy pre-merge `required_deployments` because production release authority is exact-current-main/post-merge, reject unknown unowned rule types before provider mutation, and independently read back the preserved rules after update; bypass repair must never weaken unrelated live security controls."
       ]
     },
     {

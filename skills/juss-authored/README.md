@@ -1,11 +1,11 @@
 # skills/juss-authored
 
-Draft export of Juss-authored skills, prepared 2026-11-03. Files are copied unmodified. `SHA256SUMS.txt` lists every file.
+Review-only export of Juss-authored skills, originally prepared 2026-11-03. The receipt checker and its tests have since received scoped integrity repairs; source variants outside this folder remain unchanged. `SHA256SUMS.txt` inventories export bytes, but is not an authorship or provenance signature.
 
 ## Sources
 
 - 11 skills from the account-synced copies: godmode-devil-ultrathink, godmode, goalfix, truth-decay, sauce-guard, futureyou-me-v10, juss-command-codex, runtime-kernel, founder-action-implant-verify, patch-implant-verify, l99-v21-transactional-authority.
-- juss-os: canonical tree from jussray/ULTRATHINK- main @894bea7 (v3.1.1). The account copy (v3-DRAFT) is not used.
+- juss-os: exported tree from jussray/ULTRATHINK- main @894bea7 (v3.1.1), with subsequent receipt-checker security repairs. Formal `FOUNDER ACCEPT` canonicalization remains UNKNOWN. The account copy (v3-DRAFT) was not used.
 - confess, truthmode, reasoning-stack, juss-af-skills-pack: from jussray/ULTRATHINK- main @894bea7.
 
 ## Existing skills in this repo
@@ -24,4 +24,4 @@ Unchanged: `.agents/skills/`, `.ai/skills/`, and `skills/` outside this folder. 
 
 ## Status
 
-Nothing here is executed or tested. The juss-os scripts are Python and have not been run on this branch. No CI gate covers this path.
+The isolated receipt checker and inventory regression suites passed 21/21 tests locally against the repaired files; that is not a production result. The existing FCR CI `Python tests` lane now checks the export integrity and rejects missing/stale manifest entries. Hosted exact-head CI, actual skill activation, runtime/provider proof, and integration into FCR are still UNVERIFIED until separately observed.
