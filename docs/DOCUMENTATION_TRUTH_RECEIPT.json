@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, account-scoped founder-content metrics, and the StoryEngine ancestry gate so source wiring, account identity, configured bindings, live provider invocation, mutation authority, and peer-history safety remain separate claims with separate proof. The ancestry gate accepts forward peer merges while history rewrites fail closed; this does not claim live database or browser proof.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, account-scoped founder-content metrics, and the StoryEngine ancestry gate so source wiring, account identity, configured bindings, live provider invocation, mutation authority, and peer-history safety remain separate claims with separate proof. The ancestry gate accepts forward peer merges while history rewrites fail closed; this does not claim live database or browser proof. Correct docs/deployment/CLOUDFLARE_WORKER_TARGETS.md: the Workers Builds main trigger runs the verification-only script and uploads no Worker version, so a green Workers Build is build-verification evidence only; mark the November 2 plaintext CF_API_TOKEN sentence historical with a dated read-only correction; record the November 15 read-only observation that the active Worker was a placeholder stub. Docs-only; no provider change or deploy proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -878,6 +878,13 @@
       "path": "src/http/routes/__tests__/memberProjects.integration.test.ts",
       "claims": [
         "`src/http/routes/__tests__/memberProjects.integration.test.ts` checks separate member ownership, exact-ID cross-account read/update denial, forged-owner rejection, stale version conflicts, session/founder denial and CSRF/Bearer bypass denial through isolated request/database doubles. These tests do not prove live Supabase grants, database migration or production cookie behavior."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
       ]
     }
   ]

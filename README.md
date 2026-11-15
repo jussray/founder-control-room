@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
 Auth-origin consistency: the Pages source must route `GET` and `HEAD` requests for `www.foundercontrolroom.org/welcome` and `/member/` to the apex browser-session origin before login or member-session reads. The host-only founder/member cookies remain scoped to the apex; login POSTs are never redirected or granted cross-origin authority. This is a candidate Pages routing rule, not proof that live www DNS, Cloudflare redirects, or login are working.
 
 
