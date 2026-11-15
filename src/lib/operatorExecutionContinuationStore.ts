@@ -108,7 +108,7 @@ export async function storeOperatorExecutionContinuation(
   });
   const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
   const existing = await latestFor(projectId, safeRecord.taskId);
-  if (existing?.safeRecord.fingerprint === safeRecord.fingerprint) {
+  if (existing?.record.fingerprint === safeRecord.fingerprint) {
     return { disposition: 'duplicate', stored: existing };
   }
 
