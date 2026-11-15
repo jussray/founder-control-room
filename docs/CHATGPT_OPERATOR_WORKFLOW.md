@@ -134,7 +134,9 @@ service. The candidate founder-authenticated API provides:
 - `POST /operator/continuity` with `{ "continuation": <validated packet> }`;
 - `GET /operator/continuity/:taskId?projectSlug=...&repositoryFullName=...`;
 - server-only storage in existing `public.continuity_records`, using a
-  reviewed additive migration for `task_id` and `execution_state`;
+  reviewed additive migration for `task_id`, `execution_state`, and
+  `checkpoint_observed_at`; concurrent same-time versions are unique and stale
+  writes return HTTP 409 without replacing newer work;
 - responses explicitly marked `PERSISTED_NOT_REVALIDATED` and
   `currentEvidenceVerified: false`; no replayed approval or execution permit;
 - strict founder authentication, existing same-origin browser CSRF rules,
@@ -152,3 +154,8 @@ readback are required before any production claim.
 Execution, provider writes, CI, Playwright, approval and release still pass
 through their ordinary independent gates. An expired snapshot can preserve
 discussion momentum but cannot resurrect an expired approval or green check.
+
+Repeatable local Playwright proof: `npm run verify:operator-continuation-auth`.
+It checks anonymous access using Chromium, the real Express route, and a synthetic
+unreachable local Supabase URL. Passing this check is not authenticated live
+persistence, ChatGPT platform mode-switch integration, or production readiness.
