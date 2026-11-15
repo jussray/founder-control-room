@@ -7,6 +7,7 @@ const {
   mockResolveRef,
   mockIntegrate,
   mockCommitPatch,
+  mockReadFile,
   mockEnqueue,
   mockControllerRun,
 } = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const {
   mockResolveRef: vi.fn(),
   mockIntegrate: vi.fn(),
   mockCommitPatch: vi.fn(),
+  mockReadFile: vi.fn(),
   mockEnqueue: vi.fn(),
   mockControllerRun: vi.fn(),
 }));
@@ -28,8 +30,10 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 vi.mock('../../../providers/GitHubProvider.js', () => ({
   GitHubProvider: class MockGitHubProvider {
+    name = 'github';
     createBranch = mockCreateBranch;
     resolveRef = mockResolveRef;
+    readFile = mockReadFile;
     integrate = mockIntegrate;
     commitPatch = mockCommitPatch;
   },
@@ -43,6 +47,7 @@ vi.mock('../../../controllers/ProofGateController.js', () => ({
   },
 }));
 
+import { createHash } from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
 import { approvalsRouter } from '../approvals.js';
@@ -964,6 +969,92 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     expect(projectEventInsert).toHaveBeenCalledWith(
       expect.objectContaining({ event_type: 'mission_patch_committed' }),
     );
+  });
+
+
+  it('applies a matching simulator receipt only through the founder-authenticated sandbox mission path', async () => {
+    wireStandardTables({ policy_snapshot: { expectedHeadSha: EXPECTED_SHA, someExistingKey: 'preserved' } });
+    const original = 'export const active = false;\\n';
+    const changed = 'export const active = true;\\n';
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+    const receipt = {
+      version: 'founder-os-virtual-workspace-edit-v1',
+      status: 'staged',
+      mode: 'in-memory-only',
+      repository: 'jussray/test-project',
+      branch: 'mission/test',
+      sourceSha: EXPECTED_SHA,
+      changes: [{ path: 'src/example.ts', beforeSha256: digest(original), afterSha256: digest(changed) }],
+      providerCalls: false,
+      filesystemWrites: false,
+      sourceBranchWrites: false,
+      externalExecutionAllowed: false,
+    };
+    mockResolveRef.mockResolvedValue(EXPECTED_SHA);
+    mockReadFile.mockResolvedValue(original);
+    mockCommitPatch.mockResolvedValue('deadbeef'.repeat(5));
+    const res = await request(buildApp()).post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER).send({
+        message: 'Apply one staged edit',
+        idempotencyKey: 'simulator-patch-1',
+        changes: [{ path: 'src/example.ts', content: changed }],
+        stagedWorkspaceReceipt: receipt,
+      });
+    expect(res.status).toBe(201);
+    expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'mission/test');
+    expect(mockReadFile).toHaveBeenCalledWith('test-project', 'mission/test', 'src/example.ts');
+    expect(mockCommitPatch).toHaveBeenCalledWith(
+      'test-project',
+      'mission/test',
+      expect.objectContaining({ expectedHeadSha: EXPECTED_SHA }),
+    );
+  });
+
+  it('rejects a stale staged workspace before any commit is reserved', async () => {
+    wireStandardTables({ policy_snapshot: { expectedHeadSha: EXPECTED_SHA } });
+    mockResolveRef.mockResolvedValue('b'.repeat(40));
+    mockReadFile.mockResolvedValue('old');
+    const res = await request(buildApp()).post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER).send({
+        message: 'Apply stale simulator edit',
+        idempotencyKey: 'simulator-stale-patch',
+        changes: [{ path: 'src/example.ts', content: 'new' }],
+        stagedWorkspaceReceipt: {
+          version: 'founder-os-virtual-workspace-edit-v1',
+          status: 'staged',
+          mode: 'in-memory-only',
+          repository: 'jussray/test-project',
+          branch: 'mission/test',
+          sourceSha: EXPECTED_SHA,
+          changes: [{
+            path: 'src/example.ts',
+            beforeSha256: createHash('sha256').update('old').digest('hex'),
+            afterSha256: createHash('sha256').update('new').digest('hex'),
+          }],
+          providerCalls: false,
+          filesystemWrites: false,
+          sourceBranchWrites: false,
+          externalExecutionAllowed: false,
+        },
+      });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('STAGED_WORKSPACE_PROOF_REJECTED');
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe staged file paths before source reads or branch commits', async () => {
+    wireStandardTables({ policy_snapshot: { expectedHeadSha: EXPECTED_SHA } });
+    const res = await request(buildApp()).post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER).send({
+        message: 'Attempt unsafe simulator edit',
+        idempotencyKey: 'simulator-unsafe-patch',
+        changes: [{ path: 'src/.env.local', content: 'secret' }],
+        stagedWorkspaceReceipt: {},
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('STAGED_WORKSPACE_UNSAFE_FILES');
+    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(mockCommitPatch).not.toHaveBeenCalled();
   });
 
   it('surfaces a provider failure as 502 without treating it as success', async () => {
