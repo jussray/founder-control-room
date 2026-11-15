@@ -8,9 +8,11 @@ completed steps, unfinished steps, pending decisions, and next action. It
 reuses the v2 exact-state continuity receipt and does not treat Chat as
 read-only. Stale evidence requires reacquisition, not a conversation restart.
 Unit coverage lives in `src/lib/__tests__/operatorExecutionContinuation.test.ts`.
-This is a source-level contract only: no native ChatGPT mode-switch integration,
-conversation-store synchronization, provider deployment, or live runtime
-verification is established by this change. See
+The candidate also adds a founder-authenticated `POST /operator/continuity` and
+`GET /operator/continuity/:taskId` API, backed by additive columns on the
+existing RLS-protected `continuity_records` table. The migration must be
+reviewed and applied before API deployment. ChatGPT's native mode-switch events,
+full transcript syncing, and production readback are **not** implemented or verified. See
 `docs/CHATGPT_OPERATOR_WORKFLOW.md` for the integration boundary.
 
 
