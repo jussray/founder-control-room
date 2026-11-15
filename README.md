@@ -6,6 +6,10 @@ The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` r
 
 Rollover deferral does not cancel or skip any check on a pull request that is rolled forward. Separately, `e2e/control-room-read-truth-proof.mjs` now opens `/control-room/?screen=control&view=overview`: since the five-screen shell the Control Room boots to Home, where the Projects list is hidden, so this proof had failed on every run regardless of the change under test. Its assertions (UNKNOWN on a failed read, verified empty state on a successful empty read, no browser-readable tokens) are unchanged. Runner throughput after merge is not proven by this source change; read actual queue times on GitHub.
 
+## Governed execution candidate boundaries
+
+The governed-execution candidate binds every attempt to its project shell, mission, credential lane, provider, egress policy, and founder receipt. Matching blank targets or capabilities are denied; capability suitability cannot authorize an unbound effect. Private and local IPv6 literals remain denied even when listed as allowed hosts. Public literal allowlisting does not prove DNS resolution, redirect validation, or transport-level isolation; those require executor-side checks and separate runtime evidence. Source guards and unit tests never grant merge, deployment, provider mutation, or a verified production outcome.
+
 ## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
 
 `main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
@@ -651,6 +655,10 @@ The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-g
 ## October 14 source routing and exact-base federation provenance
 
 Claude Code `/ultrathink` remains an exclusive canonical entrypoint in `.claude/skills/ultrathink/SKILL.md`. The new ULTRATHINK / ATTACK / GODMODE companion has distinct cues and cannot register that exact command or override canonical Goalfix; the suite index documents explicit handoffs. The StoryEngine federation pin transition recorded for this review range (`a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` → `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`) is historical evidence. Current FCR `main` pins StoryEngine in `.github/workflows/playwright.yml`, which is the source of truth for the live pin. Prior PR-only `ae7a67c119503276f5525c412a49d05989a8dd6a` retained as historical intermediate evidence, not represented as the `main` predecessor. Neither correction grants deployment or merge authority.
+
+## Current-main reconciliation of the project-shell carrier
+
+The carrier preserves current-main provider adapters, semantic-review spending pause, 64 KiB response ceiling, and suppression of provider/transport error details. The earlier 512 KiB/redacted-error variants are superseded by these stricter controls, not restored. Existing main tests cover identity, error suppression, body-size and restricted-context behavior; retained carrier cases add workspace-header and timeout coverage, attaching rejection assertions before advancing fake time. The portable capability router carries the same strategic-lens and per-action authority restrictions as its canonical contract. CSV provenance now rejects calendar-invalid timestamps; follower aggregation remains explicitly unimplemented rather than claimed as a complete observed result. None of these source changes proves production activation.
 
 
 ## Portfolio conversion tracking contract

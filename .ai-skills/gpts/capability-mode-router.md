@@ -41,6 +41,17 @@ Do not flatten all labels into one precedence list. They operate on different pl
 
 If two labels conflict within the same plane, choose the interpretation that preserves the narrower authority, stronger evidence requirement, and safer reversible action. If a conflict cannot be resolved without materially changing a consequential action, return `CLARIFICATION_REQUIRED`.
 
+## Strategic founder/business lenses
+
+Named lenses such as `/hormozi`, `/billgates`, `/elonmusk`, `/garyvee`, `/futureyou`, and similar strategy labels are **hypothesis generators only**. They may affect questions, options, trade-offs, experiments, and risk analysis. They may never:
+
+- grant or widen authority;
+- authorize execution, mutation, disclosure, merge, deploy, publish, spending, or provider changes;
+- satisfy an evidence requirement;
+- impersonate the named person or convert their public framework into governance policy.
+
+A lens is reasoning input, not an authority object.
+
 ## /ultrathink — Bounded Decision Analysis
 
 Use only for genuinely complex architecture, debugging, multi-system integration, security, governance, or consequential decisions.
@@ -174,6 +185,14 @@ Execution proof and outcome proof are separate TruthPlane states.
 Route by observed capability and current access, not by permanent vendor rankings. A provider/model capability profile may include modality, reasoning class, context, latency, cost, structured output, and tool support. **Capability metadata is operational metadata, never authority metadata.**
 
 Never infer authority from model size, reasoning quality, architecture, modality, subscription tier, or tool availability.
+
+Operational capability claims used for consequential routing must be current enough for the decision and bound to evidence. Stale or unverified claims may guide experiments but may not stand in for release proof.
+
+## Per-action execution membrane
+
+A high-level approved goal or plan is not blanket permission for every child action produced during decomposition. Immediately before each consequential tool/effect attempt, FCR must revalidate the exact action identity, action class, target, capability, bound approval receipt, and evidence requirement against the still-valid authority envelope.
+
+A planning task that proposes a GitHub write, provider mutation, deploy, publish, or delete remains a planning task until that specific child action is independently authorized. Capability suitability and planning confidence cannot substitute for that check.
 
 ## Cross-model bridge roles
 

@@ -4,6 +4,10 @@
 
 The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
 
+## Governed execution candidate boundaries
+
+The governed-execution candidate binds every attempt to its project shell, mission, credential lane, provider, egress policy, and founder receipt. Matching blank targets or capabilities are denied; capability suitability cannot authorize an unbound effect. Private and local IPv6 literals remain denied even when listed as allowed hosts. Public literal allowlisting does not prove DNS resolution, redirect validation, or transport-level isolation; those require executor-side checks and separate runtime evidence. Source guards and unit tests never grant merge, deployment, provider mutation, or a verified production outcome.
+
 ## October 22, 2026: Council PR #996 — StoryEngine peer identity moved
 
 The FCR Council receipt candidate passed its scoped Council and most CI gates but its Playwright E2E job stopped at the live StoryEngine peer-ref equality gate. The workflow pinned `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; the independently observed StoryEngine `refs/heads/main` resolved to `1669d920f28bc81ddd04fea6d0bdb5ee41c29ec9`. GitHub comparison reports a strictly forward, three-commit transition across 24 files, adding tenant authorization safeguards and security tests. The successor had 15 completed successful commit check runs at the observation time. Those check runs verify StoryEngine's head, not FCR-to-StoryEngine compatibility.
@@ -644,6 +648,11 @@ The reviewed base `2189076de1d06bb7b78cf2e36a29e995cea863d4` carries StoryEngine
 ## 2026-10-23 StoryEngine pin refresh
 
 The live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow pin moved from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` because the live-ref check failed on exact head `30c095f5fa39f4288f870e0f818b970becd757ff`; the harness scenarios had passed before that check. Predecessor federation evidence is historical. Federation readiness is UNKNOWN until the successor head completes the full witness against the new pin. This refresh grants no merge, deploy, or provider authority.
+
+## Current-main reconciliation of the project-shell carrier
+
+The carrier preserves current-main provider adapters, semantic-review spending pause, 64 KiB response ceiling, and suppression of provider/transport error details. The earlier 512 KiB/redacted-error variants are superseded by these stricter controls, not restored. Existing main tests cover identity, error suppression, body-size and restricted-context behavior; retained carrier cases add workspace-header and timeout coverage, attaching rejection assertions before advancing fake time. The portable capability router carries the same strategic-lens and per-action authority restrictions as its canonical contract. CSV provenance now rejects calendar-invalid timestamps; follower aggregation remains explicitly unimplemented rather than claimed as a complete observed result. None of these source changes proves production activation.
+
 ## 2026-10-24 StoryEngine relay-proof peer refresh
 
 The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.

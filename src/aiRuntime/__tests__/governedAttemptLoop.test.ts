@@ -57,6 +57,24 @@ function lease(overrides: Partial<GovernedExecutionLease> = {}): GovernedExecuti
       modelId: 'none',
       pluginSetHash: HASH_D,
     },
+    boundary: {
+      missionId: 'mission-read-only-1',
+      shellId: 'shell-fcr-runtime',
+      credentialLane: 'project',
+      credentialProjectId: 'founder-control-room',
+      allowedProviderIds: ['simulated'],
+      providerFallback: 'deny',
+      network: {
+        mode: 'allowlist',
+        allowedHosts: [],
+        blockPrivateNetworks: true,
+      },
+      founderAuthorization: {
+        decisionReceiptId: 'founder-decision-1',
+        approvedByActorId: 'jussray',
+      },
+      humanFinalAuthorizationRequired: true,
+    },
     authoritySnapshot: {
       capabilityManifestHash: HASH_A,
       resourceManifestHash: HASH_B,
@@ -98,6 +116,19 @@ function world(overrides: Partial<BrokerWorld> = {}): BrokerWorld {
       providerId: 'simulated',
       modelId: 'none',
       pluginSetHash: HASH_D,
+    },
+    boundary: {
+      missionId: 'mission-read-only-1',
+      shellId: 'shell-fcr-runtime',
+      credentialLane: 'project',
+      credentialProjectId: 'founder-control-room',
+      requestedEgressHosts: [],
+      founderAuthorization: {
+        decisionReceiptId: 'founder-decision-1',
+        approvedByActorId: 'jussray',
+        valid: true,
+      },
+      killSwitches: { global: false, provider: false, project: false, capability: false },
     },
     authoritySnapshot: {
       capabilityManifestHash: HASH_A,
