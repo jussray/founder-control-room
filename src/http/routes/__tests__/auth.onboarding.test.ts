@@ -113,16 +113,20 @@ function setAllowlist(allowed: boolean) {
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_browser_sessions') return browserSessionTable();
     if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
-    return {
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({
-            data: allowed ? { email: EMAIL } : null,
-            error: null,
-          }),
-        }),
+    let requestedUserId = '';
+    const query: any = {
+      eq: (field: string, value: unknown) => {
+        if (field === 'user_id') requestedUserId = String(value);
+        return query;
+      },
+      not: () => query,
+      maybeSingle: () => Promise.resolve({
+        data: allowed && (!requestedUserId || requestedUserId === 'founder-user')
+          ? { email: EMAIL, user_id: 'founder-user' } : null,
+        error: null,
       }),
     };
+    return { select: () => query };
   });
 }
 
@@ -133,7 +137,7 @@ function validSession() {
     expires_at: 2_000_000_000,
     expires_in: 3600,
     token_type: 'bearer',
-    user: { id: 'founder-user', email: EMAIL },
+    user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' },
   };
 }
 
@@ -164,7 +168,7 @@ describe('founder browser onboarding', () => {
     });
     mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user', email: EMAIL } },
+      data: { user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
   });
@@ -217,7 +221,7 @@ describe('founder browser onboarding', () => {
     expect(response.body.error.details).toEqual([]);
   });
 
-  it('sends a first-login magic link only for the allowlisted email', async () => {
+  it('sends a magic link only for a pre-provisioned founder account', async () => {
     const response = await request(app())
       .post('/auth/magic-link')
       .send({ email: `  ${EMAIL.toUpperCase()}  ` });
@@ -226,7 +230,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
       email: EMAIL,
       options: expect.objectContaining({
-        shouldCreateUser: true,
+        shouldCreateUser: false,
         emailRedirectTo: expect.stringMatching(/\/auth\/callback$/),
       }),
     });
@@ -246,7 +250,7 @@ describe('founder browser onboarding', () => {
 
   it('verifies fragment credentials and establishes one strict opaque secure HttpOnly session cookie', async () => {
     mockSetSession.mockResolvedValue({
-      data: { session: validSession(), user: { id: 'founder-user', email: EMAIL } },
+      data: { session: validSession(), user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
 
