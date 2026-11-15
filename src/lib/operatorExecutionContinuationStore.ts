@@ -9,7 +9,7 @@ export const OPERATOR_CONTINUATION_STORAGE_CONTRACT =
   'fcr/operator-execution-continuation-store@v1' as const;
 
 export class OperatorContinuationStoreError extends Error {
-  constructor(public readonly code: 'invalid_continuation' | 'project_not_found' | 'storage_unavailable') {
+  constructor(public readonly code: 'invalid_continuation' | 'project_not_found' | 'storage_unavailable' | 'stale_continuation') {
     super(code);
   }
 }
@@ -42,6 +42,8 @@ function parsedStoredRow(row: Record<string, unknown> | null): PersistedOperator
   if (row.subject_fingerprint !== record.observation.fingerprint
     || row.proof_cookie !== record.fingerprint
     || row.task_id !== record.taskId
+    || typeof row.checkpoint_observed_at !== 'string'
+    || Date.parse(row.checkpoint_observed_at) !== Date.parse(record.observation.observedAt)
     || typeof row.id !== 'string'
     || typeof row.created_at !== 'string'
   ) {
@@ -78,9 +80,10 @@ async function projectFor(projectSlug: string, repositoryFullName: string): Prom
 async function latestFor(projectId: string, taskId: string): Promise<PersistedOperatorContinuation | null> {
   const { supabase } = await import('./supabaseClient.js');
   const { data, error } = await supabase.from('continuity_records')
-    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,invalidated_at,created_at')
+    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,checkpoint_observed_at,invalidated_at,created_at')
     .eq('project_id', projectId)
     .eq('task_id', taskId)
+    .order('checkpoint_observed_at', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -108,8 +111,16 @@ export async function storeOperatorExecutionContinuation(
   });
   const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
   const existing = await latestFor(projectId, safeRecord.taskId);
-  if (existing?.record.fingerprint === safeRecord.fingerprint) {
-    return { disposition: 'duplicate', stored: existing };
+  if (existing) {
+    const priorObservedAt = Date.parse(existing.record.observation.observedAt);
+    const incomingObservedAt = Date.parse(safeRecord.observation.observedAt);
+    if (priorObservedAt > incomingObservedAt
+      || (priorObservedAt === incomingObservedAt && existing.record.fingerprint !== safeRecord.fingerprint)) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (priorObservedAt === incomingObservedAt && existing.record.fingerprint === safeRecord.fingerprint) {
+      return { disposition: 'duplicate', stored: existing };
+    }
   }
 
   const { supabase } = await import('./supabaseClient.js');
@@ -117,6 +128,7 @@ export async function storeOperatorExecutionContinuation(
     .insert({
       project_id: projectId,
       task_id: safeRecord.taskId,
+      checkpoint_observed_at: safeRecord.observation.observedAt,
       execution_state: safeRecord,
       subject_fingerprint: safeRecord.observation.fingerprint,
       proof_cookie: safeRecord.fingerprint,
@@ -125,10 +137,22 @@ export async function storeOperatorExecutionContinuation(
       evidence_fingerprint: safeRecord.observation.proofFingerprint,
       valid_until: null, // Unverified handoff never extends the canonical truth lease.
     })
-    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,invalidated_at,created_at')
+    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,checkpoint_observed_at,invalidated_at,created_at')
     .single();
 
-  if (error) throw new OperatorContinuationStoreError('storage_unavailable');
+  if (error) {
+    if ((error as { code?: string }).code === '23505') {
+      // Concurrent same-version submission: check actual authoritative row,
+      // never report success for a conflicting version.
+      const raced = await latestFor(projectId, safeRecord.taskId);
+      if (raced?.record.fingerprint === safeRecord.fingerprint
+        && raced.record.observation.observedAt === safeRecord.observation.observedAt) {
+        return { disposition: 'duplicate', stored: raced };
+      }
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    throw new OperatorContinuationStoreError('storage_unavailable');
+  }
   const stored = parsedStoredRow(data as Record<string, unknown> | null);
   if (!stored) throw new OperatorContinuationStoreError('storage_unavailable');
   return { disposition: 'stored', stored };
