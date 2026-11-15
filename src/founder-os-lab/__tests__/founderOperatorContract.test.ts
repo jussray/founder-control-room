@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   runGoal,
   proposalDigest,
+  classifyExecutionLane,
   type AdvisoryContext,
   type Approval,
   type Task,
@@ -152,7 +153,11 @@ describe('four-system founder operator authority boundary', () => {
 
   it('requires Playwright proof for a UI repair, not only focused tests', async () => {
     const h = harness();
-    const result = await runGoal({ ...task, surface: 'ui' }, h.tools, approval);
+    const uiTask: Task = { ...task, surface: 'ui' };
+    const uiApproval = { ...approval, proposalHash: proposalDigest(uiTask, {
+      cause: 'Verified narrow blocker', files: ['src/guard.ts'], diff: 'focused-change',
+    }) };
+    const result = await runGoal(uiTask, h.tools, uiApproval);
     expect(result.status).toBe('BLOCKED');
     expect(result.nextGate).toContain('proof gate');
   });
@@ -307,5 +312,80 @@ describe('adversarial operator execution gates', () => {
   it('persists the PromptOS method integrity digest in support receipts', async () => {
     const h = harness();
     expect((await runGoal(task, h.tools, approval)).support.promptIntegrityDigest).toBe('sha256:approved');
+  });
+});
+
+
+describe('founder FAST and GUARDED lane routing', () => {
+  const narrow = { cause: 'Scoped visual repair', files: ['public/control-room/hero.css'], diff: 'adjust contrast' };
+
+  it('keeps a reversible visual-only change in FAST, without granting mutation authority', () => {
+    const routed = classifyExecutionLane({ ...task, surface: 'ui' }, narrow, { surface: 'ui' });
+    expect(routed.lane).toBe('FAST');
+    expect(routed.authority).toBe('CLASSIFICATION_ONLY');
+  });
+
+  it('forces authentication and release-control source through GUARDED despite a UI label', () => {
+    for (const filename of [
+      'src/security/access.ts',
+      'supabase/migrations/20261115_auth.sql',
+      '.github/workflows/deploy.yml',
+      'src/founder-os-lab/founderOperatorContract.ts',
+    ]) {
+      expect(classifyExecutionLane(task, { ...narrow, files: [filename] }, { surface: 'ui' }).lane).toBe('GUARDED');
+    }
+  });
+
+  it('upgrades to GUARDED from trusted classification even when the filename looks harmless', () => {
+    expect(classifyExecutionLane(task, { ...narrow, files: ['src/guard.ts'] }, {
+      surface: 'backend', guardedConcerns: ['authentication'],
+    }).lane).toBe('GUARDED');
+  });
+
+  it('binds task risk, scope and provider destination to the approval digest', () => {
+    const proposal = { cause: 'Verified narrow blocker', files: ['src/guard.ts'], diff: 'focused-change' };
+    expect(proposalDigest(task, proposal)).not.toBe(proposalDigest({ ...task, providerChange: true }, proposal));
+    expect(proposalDigest(task, proposal)).not.toBe(proposalDigest({ ...task, providerTarget: 'production' }, proposal));
+    expect(proposalDigest(task, proposal)).not.toBe(proposalDigest({ ...task, surface: 'ui' }, proposal));
+    expect(proposalDigest(task, proposal)).not.toBe(proposalDigest({ ...task, goal: 'Unapproved action' }, proposal));
+  });
+
+  it('denies guarded branch mutation without explicit guarded-lane approval', async () => {
+    const h = harness({ classify: async () => ({ surface: 'backend', guardedConcerns: ['security'] }) });
+    const receipt = await runGoal(task, h.tools, approval);
+    expect(receipt.executionLane).toBe('GUARDED');
+    expect(receipt.status).toBe('NEEDS_APPROVAL');
+    expect(h.writes).toBe(0);
+    expect(h.receipts).toHaveLength(1);
+  });
+
+  it('cannot report guarded verification without an eligible independent review receipt', async () => {
+    const h = harness({ classify: async () => ({ surface: 'backend', guardedConcerns: ['security'] }) });
+    const receipt = await runGoal(task, h.tools, { ...approval, approvedLane: 'GUARDED' });
+    expect(receipt.executionLane).toBe('GUARDED');
+    expect(receipt.status).toBe('BLOCKED');
+    expect(receipt.evidence.map(item => item.kind)).toEqual(['focused-check']);
+    expect(h.receipts).toHaveLength(1);
+  });
+
+  it('does not accept a claimed automated review as a human review witness', async () => {
+    const h = harness({
+      classify: async () => ({ surface: 'backend', guardedConcerns: ['security'] }),
+      prove: async (_task, sha) => [
+        { kind: 'focused-check', sha, passed: true, reference: 'https://github.com/jussray/founder-control-room/actions/runs/123', observation: 'CI', observedAt: NOW },
+        { kind: 'independent-review', sha, passed: true, reference: 'https://github.com/jussray/founder-control-room/pull/976', observation: 'bot comment', observedAt: NOW, reviewerId: 'automation', revision: sha, independentHumanReview: false },
+      ],
+    });
+    const receipt = await runGoal(task, h.tools, { ...approval, approvedLane: 'GUARDED' });
+    expect(receipt.status).toBe('BLOCKED');
+  });
+
+  it('records FAST classification on the same durable FCR receipt path', async () => {
+    const h = harness();
+    const receipt = await runGoal(task, h.tools, approval);
+    expect(receipt.status).toBe('VERIFIED');
+    expect(receipt.executionLane).toBe('FAST');
+    expect(h.receipts).toHaveLength(1);
+    expect(h.receipts[0]?.executionLane).toBe('FAST');
   });
 });

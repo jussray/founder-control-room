@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto';
 
-export type ProofKind = 'focused-check' | 'playwright' | 'provider-readback' | 'documentation-truth';
+export type ProofKind = 'focused-check' | 'playwright' | 'provider-readback' | 'documentation-truth' | 'independent-review';
 export type Status = 'BLOCKED' | 'NEEDS_APPROVAL' | 'FAILED' | 'VERIFIED';
 
 export interface Task {
@@ -20,6 +20,26 @@ export interface Task {
   providerChange: boolean;
   /** Exact external destination, when requesting a provider mutation. */
   providerTarget?: string;
+}
+
+export type ExecutionLane = 'FAST' | 'GUARDED';
+export type GuardedConcern =
+  | 'authentication' | 'security' | 'payments' | 'production-release'
+  | 'private-data' | 'database' | 'authority' | 'publication';
+
+export interface TrustedClassification {
+  surface: Task['surface'];
+  providerTarget?: string;
+  documentationTruth?: boolean;
+  /** Supplied by a trusted inspection adapter, never by task/issue prose. */
+  guardedConcerns?: readonly GuardedConcern[];
+}
+
+export interface LaneRouting {
+  lane: ExecutionLane;
+  reasons: readonly string[];
+  /** Routing metadata never grants permission, review, merge, or deployment. */
+  authority: 'CLASSIFICATION_ONLY';
 }
 
 export interface PatchProposal {
@@ -36,6 +56,8 @@ export interface Approval {
   files: readonly string[];
   approvalId: string;
   proposalHash: string;
+  /** Guarded action requires an explicit guarded-lane authorization. */
+  approvedLane?: ExecutionLane;
 }
 
 /** SolContinuity is a read-only source of project history, not a source of authority. */
@@ -85,6 +107,9 @@ export interface Evidence {
   observedAt: string;
   target?: string;
   revision?: string;
+  /** Trust-bound reviewer identity and eligibility must come from provider verification. */
+  reviewerId?: string;
+  independentHumanReview?: boolean;
 }
 
 export interface Receipt {
@@ -95,6 +120,8 @@ export interface Receipt {
   resultHead?: string;
   proposalHash?: string;
   reservationId?: string;
+  executionLane: ExecutionLane;
+  laneReasons: readonly string[];
   status: Status;
   cause?: string;
   changedFiles: readonly string[];
@@ -120,7 +147,7 @@ export interface TrustedTools {
   /** Trusted repository protection lookup. Fail closed on an unreadable ref. */
   isProtectedBranch(task: Task): Promise<boolean>;
   /** A trusted classification of the actual patch, independent of caller labels. */
-  classify(task: Task, proposal: PatchProposal): Promise<{ surface: Task['surface']; providerTarget?: string; documentationTruth?: boolean }>;
+  classify(task: Task, proposal: PatchProposal): Promise<TrustedClassification>;
   /** Persist an idempotent PENDING execution receipt BEFORE any write. */
   reserve(task: Task, proposal: PatchProposal, approval: Approval): Promise<string>;
   /** Read immutable Git commit identity after applying the patch. */
@@ -198,8 +225,36 @@ function canonicalFile(file: string): boolean {
     !/^[A-Za-z]:/.test(file);
 }
 
-function requiredProof(task: Task, proposal: PatchProposal, classified: { surface: Task['surface']; providerTarget?: string; documentationTruth?: boolean }): ProofKind[] {
+const GUARDED_FILE_PATH = /(?:^|\/)(?:auth(?:entication)?|security|secrets?|payments?|billing|checkout|privacy|permissions?|credentials?|access|identity|tokens?)(?:\/|[._-])/i;
+const GUARDED_CONTROL_PATH = /(?:founderOperatorContract|executionWorkflow|standingFounderPolicy|verify-independent-review|founder-authority|pr-continuity)/i;
+
+export function classifyExecutionLane(
+  task: Task,
+  proposal: PatchProposal,
+  classified: TrustedClassification,
+): LaneRouting {
+  const reasons: string[] = [];
+  if (task.providerChange || classified.providerTarget) reasons.push('provider mutation');
+  for (const concern of classified.guardedConcerns ?? []) {
+    reasons.push(`trusted guarded concern: ${concern}`);
+  }
+  if (proposal.files.some(file =>
+    GUARDED_FILE_PATH.test(file) || GUARDED_CONTROL_PATH.test(file) ||
+    /^supabase\/migrations\//i.test(file) ||
+    /^\.github\/workflows\/(?:deploy|release|prod|security|merge)/i.test(file)
+  )) {
+    reasons.push('sensitive or release-control source path');
+  }
+  return {
+    lane: reasons.length > 0 ? 'GUARDED' : 'FAST',
+    reasons: reasons.length > 0 ? reasons : ['scoped reversible branch patch with no guarded concern observed'],
+    authority: 'CLASSIFICATION_ONLY',
+  };
+}
+
+function requiredProof(task: Task, proposal: PatchProposal, classified: TrustedClassification, lane: ExecutionLane): ProofKind[] {
   const kinds = new Set<ProofKind>(['focused-check']);
+  if (lane === 'GUARDED') kinds.add('independent-review');
   if (task.surface === 'ui' || classified.surface === 'ui' ||
       proposal.files.some(file => ['tsx', 'jsx', 'css', 'html'].includes(file.split('.').at(-1) ?? ''))) kinds.add('playwright');
   if (task.providerChange || classified.providerTarget) kinds.add('provider-readback');
@@ -214,13 +269,20 @@ function within(changed: readonly string[], allowed: readonly string[]): boolean
 }
 
 export function proposalDigest(task: Task, proposal: PatchProposal): string {
-  return createHash('sha256').update(JSON.stringify([task.repo, task.branch, task.expectedHead, [...proposal.files].sort(), proposal.diff])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([
+    'founder-operator-proposal/v2',
+    task.repo, task.branch, task.expectedHead, task.goal,
+    [...task.focusFiles].sort(), task.surface,
+    task.providerChange, task.providerTarget ?? null,
+    [...proposal.files].sort(), proposal.diff,
+  ])).digest('hex');
 }
 
-function approved(task: Task, proposal: PatchProposal, authority?: Approval): boolean {
+function approved(task: Task, proposal: PatchProposal, routing: LaneRouting, authority?: Approval): boolean {
   return !!authority && authority.operation === 'patch' &&
     authority.repo === task.repo && authority.branch === task.branch &&
     authority.head === task.expectedHead &&
+    (routing.lane === 'FAST' || authority.approvedLane === 'GUARDED') &&
     authority.approvalId.trim().length > 0 && authority.proposalHash === proposalDigest(task, proposal) &&
     within(proposal.files, task.focusFiles) &&
     within(proposal.files, authority.files);
@@ -237,6 +299,8 @@ export async function runGoal(
     goal: task.goal,
     sourceHead: task.expectedHead,
     status: 'BLOCKED',
+    executionLane: 'GUARDED',
+    laneReasons: ['trusted scope classification not yet available'],
     changedFiles: [],
     evidence: [],
     support: { solDecisionRefs: [], warnings: [] },
@@ -295,11 +359,13 @@ export async function runGoal(
     if (!classified || (classified.surface !== 'ui' && classified.surface !== 'backend' && classified.surface !== 'docs')) {
       return finish({ ...lastKnown, nextGate: 'Trusted change classification unavailable; mutation denied.' });
     }
+    const routing = classifyExecutionLane(task, proposal, classified);
+    lastKnown = { ...lastKnown, executionLane: routing.lane, laneReasons: routing.reasons };
     if ((task.providerChange || classified.providerTarget) &&
         (!classified.providerTarget || (task.providerTarget && task.providerTarget !== classified.providerTarget))) {
       return finish({ ...lastKnown, nextGate: 'Exact provider target was not independently confirmed.' });
     }
-    if (!approved(task, proposal, authority)) {
+    if (!approved(task, proposal, routing, authority)) {
       return finish({ ...lastKnown, status: 'NEEDS_APPROVAL',
         reality: 'Exact-head diagnosis available; no write performed.',
         nextGate: 'Obtain approval bound to the exact proposal digest and source head.' });
@@ -366,9 +432,12 @@ export async function runGoal(
         Number.isFinite(observed) && observed <= now &&
         now - observed <= 10 * 60 * 1000 &&
         (e.kind !== 'provider-readback' ||
-          (e.target === classified.providerTarget && !!e.revision?.trim()));
+          (e.target === classified.providerTarget && !!e.revision?.trim())) &&
+        // The trusted adapter must verify provider eligibility and human identity.
+        (e.kind !== 'independent-review' ||
+          (e.independentHumanReview === true && !!e.reviewerId?.trim() && !!e.revision?.trim()));
     });
-    const kinds = requiredProof(task, proposal, classified);
+    const kinds = requiredProof(task, proposal, classified, routing.lane);
     const failed = admissible.some(e => kinds.includes(e.kind) && !e.passed);
     if (failed || !kinds.every(k => admissible.some(e => e.kind === k && e.passed))) {
       return finish({ ...mutated, status: failed ? 'FAILED' : 'BLOCKED', evidence: admissible,
