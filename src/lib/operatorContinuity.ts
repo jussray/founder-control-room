@@ -601,6 +601,19 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   }
   const observationErrors = validateOperatorContinuityReceiptV2(input.observation);
   if (observationErrors.length) throw new Error('observation invalid: ' + observationErrors.join('; '));
+  // A v2 observation may describe historic branches freely; task persistence
+  // must be stricter so a forged branch cannot become a transcript field.
+  const branch = input.observation.targetBranch;
+  if (typeof branch !== 'string'
+    || branch.length > 128
+    || !/^[A-Za-z0-9][A-Za-z0-9_./-]*$/.test(branch)
+    || branch.includes('..')
+    || branch.includes('//')
+    || branch.endsWith('/')
+    || branch.endsWith('.')
+    || branch.endsWith('.lock')) {
+    throw new Error('observation branch must be a bounded Git branch name');
+  }
   // A receipt's historical evidenceRefs can be arbitrary strings, but a
   // persisted continuation must contain opaque, bounded source pointers only.
   // Validate in place: reordering would invalidate the observation fingerprint.
