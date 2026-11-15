@@ -7,7 +7,7 @@ import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFo
 import { clearMemberSession, revokeMemberSession } from '../../auth/memberSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
-import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { authenticatedIdentity, founderAllowlisted, requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
 import { oauthConsentRouter } from './oauthConsent.js';
 
@@ -32,9 +32,18 @@ const rateLimitFounderPassword = rateLimit({
 function normalizeEmail(value: unknown): string { return typeof value === 'string' ? value.trim().toLowerCase() : ''; }
 function normalizePassword(value: unknown): string { return typeof value === 'string' ? value : ''; }
 async function isAllowlisted(email: string): Promise<boolean> {
-  const { data, error } = await supabase.from('founder_users').select('email').eq('email', email).maybeSingle();
+  // Send founder links only for pre-provisioned accounts; never provision from a login request.
+  const { data, error } = await supabase.from('founder_users')
+    .select('user_id').eq('email', email).not('user_id', 'is', null).maybeSingle();
   if (error) throw new Error('Founder allowlist check failed');
-  return Boolean(data);
+  return Boolean(data?.user_id);
+}
+async function isAuthorizedFounder(user: unknown): Promise<boolean> {
+  const identity = authenticatedIdentity(user);
+  if (!identity) return false;
+  const result = await founderAllowlisted(identity);
+  if (result === 'error') throw new Error('Founder allowlist check failed');
+  return result === 'allowed';
 }
 function sessionWithVerifiedUser(session: Session, user: Session['user']): Session { return { ...session, user }; }
 async function establishFounderSession(req: Request, res: Response, session: Session): Promise<boolean> {
@@ -71,7 +80,7 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   if (!email || !email.includes('@')) return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
   try {
     if (await isAllowlisted(email)) {
-      const { error } = await supabaseAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: `${FOUNDER_API_URL}/auth/callback`, shouldCreateUser: true } });
+      const { error } = await supabaseAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: `${FOUNDER_API_URL}/auth/callback`, shouldCreateUser: false } });
       if (error) console.error('signInWithOtp failed:', error.message);
     }
   } catch (error) { console.error('Founder magic-link request failed:', error instanceof Error ? error.message : String(error)); }
@@ -88,7 +97,7 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   const { data, error } = await requestAuth.auth.verifyOtp({ token_hash: tokenHash, type: type as 'magiclink' | 'email' });
   const verifiedUser = data.user;
   const email = normalizeEmail(verifiedUser?.email);
-  if (error || !data.session || !verifiedUser || !email || !(await isAllowlisted(email))) {
+  if (error || !data.session || !verifiedUser || !email || !(await isAuthorizedFounder(verifiedUser))) {
     return res.status(401).type('html').send(founderCallbackHtml());
   }
 
@@ -119,7 +128,7 @@ authRouter.post('/session', async (req, res) => {
   if (error || !data.session || !verifiedUser || !email) {
     return respondError(res, 401, 'UNAUTHENTICATED', 'The login link is invalid or expired.');
   }
-  if (!(await isAllowlisted(email))) return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
+  if (!(await isAuthorizedFounder(verifiedUser))) return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
   const founderSession = sessionWithVerifiedUser(data.session, verifiedUser);
   if (!(await establishFounderSession(req, res, founderSession))) return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Founder browser session storage is temporarily unavailable.');
   return respondSuccess(res, { founder: { email } }, 201);
@@ -146,7 +155,7 @@ authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder
     clearFounderSession(res);
     return respondError(res, 401, 'UNAUTHENTICATED', 'Founder session could not be verified.');
   }
-  if (!(await isAllowlisted(email))) { clearFounderSession(res); return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.'); }
+  if (!(await isAuthorizedFounder(verifiedUser))) { clearFounderSession(res); return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.'); }
 
   const { error: updateError } = await requestAuth.auth.updateUser({ password });
   if (updateError) { console.warn('Founder credential update failed:', updateError.message); return respondError(res, 400, 'PASSWORD_UPDATE_FAILED', 'The password could not be updated.'); }
