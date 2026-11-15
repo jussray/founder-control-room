@@ -43,7 +43,7 @@ function hash(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
-function safeWorkspacePath(path: unknown): path is string {
+export function isSafeFounderOsStagedPatchPath(path: unknown): path is string {
   if (typeof path !== 'string' || !/^[a-zA-Z0-9_.\/-]+$/.test(path)) return false;
   const segments = path.split('/');
   return segments.length > 1 && ['src', 'docs', 'test', 'tests', 'labs'].includes(segments[0]!)
@@ -83,9 +83,10 @@ export function validateFounderOsStagedPatch(
   }
   if (!FULL_SHA.test(context.liveHeadSha)
     || !FULL_SHA.test(context.missionExpectedHeadSha)
-    || !FULL_SHA.test(receipt.sourceSha ?? '')
+    || typeof receipt.sourceSha !== 'string'
+    || !FULL_SHA.test(receipt.sourceSha)
     || context.liveHeadSha.toLowerCase() !== context.missionExpectedHeadSha.toLowerCase()
-    || receipt.sourceSha?.toLowerCase() !== context.liveHeadSha.toLowerCase()) {
+    || receipt.sourceSha.toLowerCase() !== context.liveHeadSha.toLowerCase()) {
     failures.push('staged workspace exact head is stale or does not match the mission pin');
   }
 
@@ -101,7 +102,7 @@ export function validateFounderOsStagedPatch(
     const entry = receipt.changes[index];
     const change = context.changes[index];
     const before = context.sourceFiles[index];
-    if (!entry || !change || !before || !safeWorkspacePath(entry.path)
+    if (!entry || !change || !before || !isSafeFounderOsStagedPatchPath(entry.path)
       || entry.path !== change.path || entry.path !== before.path || paths.has(entry.path)) {
       failures.push('staged workspace changed files are unsafe, duplicated, or out of order');
       continue;
