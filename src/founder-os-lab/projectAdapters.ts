@@ -50,9 +50,9 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = 'e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150';
+const SEKRET_BIP_AUDITED_HEAD = 'dbd9e98ae691fec06e50abe6ef56353202b81726';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
-  'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
+  'app/index.tsx': 'e33bf50909ffbd1772f87f3db8adcffddb9292d0',
   'screens/WebWelcomeScreen.tsx': '9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c',
   'constants/frontDoorTheme.ts': '8e296dc2a546766c1a4fbefafdd4e11e7ad73dc2',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
@@ -61,13 +61,13 @@ const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
 } as const;
 const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
-const CHIEF_AI_AUDITED_HEAD = '0d1106424802fa21d37c6a05fc3e6f6422cc989a';
+const CHIEF_AI_AUDITED_HEAD = '99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e';
 const CHIEF_AI_AUDITED_CONTRACT_BLOBS = {
   'src/domain/capability-plan.js': '7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5',
   'src/domain/capability-registry.js': 'abb2daf0ee7ce85442cd4b04588b4881cc4b9b53',
   'src/domain/merge-intent.js': 'ba7b3d1ff4dbc846d79489ec9ffb0c346597b559',
-  'config/founder-chief-pair.contract.json': 'dd008420e1a91e78516b45d9e27de89344abf432',
-  'e2e/chief-capability-plan.pw.mjs': 'ad41d9f614dc94df7d5ebde3d9b3a8cefd96e39b',
+  'config/founder-chief-pair.contract.json': '7aaff727e0b460e42cf7a2a27d57381ce9f0a59a',
+  'e2e/chief-capability-plan.pw.mjs': '4b8046510ad67643972fc51bc5c703e076dc4e80',
 } as const;
 
 export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapterDescriptor[] = [

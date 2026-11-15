@@ -22,7 +22,7 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: b2397272a37ed5d987f0b71b2a37dc31c9c84cf5
+  STORYENGINE_PEER_SHA: 1a4a581687481b2ec2025539efae02032bef5287
   STORYENGINE_PEER_REF: refs/heads/main
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
@@ -99,14 +99,32 @@ jobs:
         env:
           NODE_ENV: test
 
-      - name: Verify live StoryEngine peer ref still pinned
+      - name: Verify pinned StoryEngine peer is still in live history
         shell: bash
         run: |
           set -euo pipefail
+          # The pin must remain an ancestor of (or equal to) live StoryEngine
+          # main. Forward peer merges keep FCR green; a force-push, rollback
+          # or rewrite that drops the pin from history still fails closed.
+          # Browser/federation proof below always runs against the exact pin.
           live="$(git ls-remote https://github.com/jussray/StoryEngine.git "$STORYENGINE_PEER_REF" | awk 'NR==1 {print $1}')"
           printf 'storyengine_live_ref=%s\nstoryengine_expected=%s\nstoryengine_live=%s\n' "$STORYENGINE_PEER_REF" "$STORYENGINE_PEER_SHA" "$live"
           test -n "$live"
-          test "$live" = "$STORYENGINE_PEER_SHA"
+          if [ "$live" = "$STORYENGINE_PEER_SHA" ]; then
+            echo "storyengine_pin_relation=equal"
+            exit 0
+          fi
+          probe="$(mktemp -d)"
+          git -C "$probe" init -q
+          git -C "$probe" fetch -q --filter=blob:none https://github.com/jussray/StoryEngine.git "$STORYENGINE_PEER_REF"
+          test "$(git -C "$probe" rev-parse FETCH_HEAD)" = "$live"
+          if git -C "$probe" merge-base --is-ancestor "$STORYENGINE_PEER_SHA" "$live"; then
+            ahead="$(git -C "$probe" rev-list --count "$STORYENGINE_PEER_SHA..$live")"
+            echo "storyengine_pin_relation=ancestor ahead=${ahead}"
+          else
+            echo "::error title=StoryEngine pin left live history::Pinned StoryEngine ${STORYENGINE_PEER_SHA} is not an ancestor of live ${STORYENGINE_PEER_REF} ${live}; repin to an independently observed successor."
+            exit 1
+          fi
 
       - name: Check out exact StoryEngine federation peer
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
