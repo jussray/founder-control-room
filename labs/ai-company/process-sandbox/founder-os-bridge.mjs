@@ -1,4 +1,5 @@
 import { runSyntheticEmployeeContainer } from './host.mjs';
+import { stageVirtualWorkspaceEdit } from './virtual-workspace.mjs';
 
 const BRIDGE_VERSION = 'founder-os-container-bridge-v1';
 const RECEIPT_VERSION = 'founder-os-container-control-receipt-v1';
@@ -381,4 +382,35 @@ export async function executeFounderOsContainerTask(request, plan, options = {})
   }
 
   return sealFounderOsContainerReceipt(workerRequest, plan, containerReceipt);
+}
+
+
+/**
+ * Make an actual text change inside the L0 virtual workspace, never the live
+ * source branch. A governed writer must separately reread exact-head evidence
+ * before accepting any staged artifacts. The container's L0 allowlist remains
+ * unchanged and cannot be used for repository/provider mutations.
+ */
+export function stageFounderOsWorkspaceChange(request, plan, workspace) {
+  const workerRequest = buildFounderOsWorkerRequest(request, plan);
+  if (request.action !== 'plan') {
+    reject('workspace_edit_action_invalid', 'virtual editing requires a Founder OS plan');
+  }
+  if (
+    !workspace
+    || workspace.repository !== request.evidence.repository.trim()
+    || typeof workspace.sourceSha !== 'string'
+    || workspace.sourceSha.toLowerCase() !== request.evidence.commitSha.toLowerCase()
+  ) {
+    reject('workspace_edit_source_mismatch', 'workspace edits must match the exact Founder OS source identity');
+  }
+  const staged = stageVirtualWorkspaceEdit(workspace);
+  return Object.freeze({
+    receipt: Object.freeze({
+      ...staged.receipt,
+      controlPlane: 'juss-chief-ai',
+      planTaskId: workerRequest.taskId,
+    }),
+    artifacts: staged.artifacts,
+  });
 }
