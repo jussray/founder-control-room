@@ -584,6 +584,20 @@ function bindFounderChat(mount) {
   mount.querySelector('[data-founder-chat-mission]')?.addEventListener('click', (event) => {
     const missionId = event.currentTarget.dataset.founderChatMission;
     if (!missionId) return;
+    const mission = state.missions.find((item) => item.id === missionId);
+    const navigate = window.__FCR_FIVE_SCREEN_NAVIGATE__;
+    if (typeof navigate === 'function') {
+      navigate({
+        screen: 'control',
+        view: 'work',
+        context: {
+          projectSlug: mission?.project?.slug ?? founderChatProjectSlug(),
+          missionId,
+          missionTitle: mission?.title ?? null,
+        },
+      });
+      return;
+    }
     state.tab = 'missions';
     guarded(() => selectMission(missionId));
   });

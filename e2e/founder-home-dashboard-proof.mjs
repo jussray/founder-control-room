@@ -129,6 +129,7 @@ function startServer(mode) {
       }), 250);
     }
     if (req.method === 'POST' && path === '/missions/chat-mission-1/council/run') {
+      if (mode === 'chat-down') return json(res, 503, { error: 'Council unavailable' });
       return json(res, 201, {
         executionState: 'complete',
         conversation: {
@@ -420,6 +421,15 @@ console.log('\n[6] Founder Chat routes intent into one proposed mission and boun
     await page.waitForFunction(()=>document.querySelectorAll('[data-founder-chat-message][data-role="council"]').length===2);
     assert(missionWrites().length===1,'second chat turn reuses the same mission instead of creating a duplicate');
     assert(councilWrites().length===2,'second chat turn continues reasoning through the same mission Council route');
+
+    await page.click('[data-founder-chat-mission]');
+    await page.waitForFunction(()=> {
+      const url=new URL(window.location.href);
+      return url.searchParams.get('screen')==='control' && url.searchParams.get('view')==='work';
+    });
+    await page.waitForSelector('#mission-detail',{state:'visible'});
+    assert((await page.locator('#mission-detail').innerText()).includes('Founder chat fixture'),
+      'Open thread mission routes through five-screen Control / Work and restores the chat mission detail');
     await noOverflow(page,'Founder Chat desktop');
   });
   assert(pageErrors.length===0,'Founder Chat has no JS exceptions: '+JSON.stringify(pageErrors));
@@ -427,7 +437,24 @@ console.log('\n[6] Founder Chat routes intent into one proposed mission and boun
   server.close();
 }
 
-console.log('\n[7] Signed-out founder cannot view private screens');
+console.log('\n[7] Founder Chat failures remain visible on five-screen Home');
+{
+  const {server,baseUrl}=await startServer('chat-down');
+  const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('[data-founder-chat]',{state:'visible'});
+    await page.selectOption('[data-founder-chat-project]','sekret-bip');
+    await page.fill('[data-founder-chat-input]','Test visible failure');
+    await page.click('[data-founder-chat-send]');
+    await page.waitForSelector('[data-founder-chat-feedback]',{state:'visible'});
+    assert((await page.locator('[data-founder-chat-feedback]').innerText()).includes('Council unavailable'),
+      'chat API failure is relocated beside visible Founder Chat instead of remaining in hidden legacy content');
+  });
+  assert(pageErrors.length===0,'Founder Chat failure path has no JS exceptions: '+JSON.stringify(pageErrors));
+  server.close();
+}
+
+console.log('\n[8] Signed-out founder cannot view private screens');
 {
   const {server,baseUrl}=await startServer('signed-out');
   const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{

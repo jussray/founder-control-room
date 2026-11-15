@@ -192,6 +192,11 @@ function setLocation(screen, view = null) {
   applyShell();
 }
 
+window.__FCR_FIVE_SCREEN_NAVIGATE__ = ({ screen, view = null, context = null } = {}) => {
+  if (context && typeof context === 'object' && !Array.isArray(context)) writeContext(context);
+  setLocation(screen, view);
+};
+
 function makeButton(label, current, onClick) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -327,9 +332,23 @@ async function apiJson(path) {
 function mountFounderChat(home, content) {
   const chatPanel = content.querySelector('[data-home-founder-chat]');
   if (!(chatPanel instanceof HTMLElement)) return false;
+  const feedback = content.querySelector(':scope > .error, :scope > .notice');
   const intro = home.querySelector('.founder-screen-intro');
-  if (intro instanceof HTMLElement) intro.insertAdjacentElement('afterend', chatPanel);
-  else home.prepend(chatPanel);
+  if (intro instanceof HTMLElement) {
+    let anchor = intro;
+    if (feedback instanceof HTMLElement) {
+      feedback.dataset.founderChatFeedback = '';
+      anchor.insertAdjacentElement('afterend', feedback);
+      anchor = feedback;
+    }
+    anchor.insertAdjacentElement('afterend', chatPanel);
+  } else {
+    home.prepend(chatPanel);
+    if (feedback instanceof HTMLElement) {
+      feedback.dataset.founderChatFeedback = '';
+      home.prepend(feedback);
+    }
+  }
   return true;
 }
 
