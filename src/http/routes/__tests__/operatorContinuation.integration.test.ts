@@ -207,4 +207,26 @@ describe('founder-only cross-mode continuation storage', () => {
     expect(posted.status).toBe(503);
     expect(posted.body).toEqual({ code: 'continuation_store_unavailable' });
   });
+
+  it('strips unrecognized fields so raw conversations cannot leak into the ledger', async () => {
+    const injected = {
+      ...basePacket,
+      transcript: 'SECRET_RAW_DIALOGUE',
+      completedSteps: [{
+        ...basePacket.completedSteps[0],
+        notes: 'SECRET_STEP_NOTES',
+      }],
+      observation: {
+        ...basePacket.observation,
+        accessToken: 'SECRET_TOKEN',
+      },
+    };
+    const response = await request(app()).post(endpoint)
+      .set('Authorization', authorization).send({ continuation: injected });
+    expect(response.status).toBe(201);
+    expect(JSON.stringify(storeRows)).not.toContain('SECRET_');
+    expect(JSON.stringify(response.body)).not.toContain('SECRET_');
+    expect(response.body.continuation.record.fingerprint).toBe(basePacket.fingerprint);
+  });
+
 });
