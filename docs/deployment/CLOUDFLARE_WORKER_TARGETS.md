@@ -1,5 +1,13 @@
 # Cloudflare Deployment Targets
 
+## November 15, 2026 — Workers Builds and active Worker observation (dated read-only readback, not deploy proof)
+
+Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API reads; no provider state was changed. This is a dated observation, not current truth at any later read.
+
+- The Workers Builds `main` trigger runs `npm run deploy:api:production`, which in repository source runs `cloudflare:build:verify` → `scripts/cloudflare-build-verification-only.mjs`. That script emits a receipt with `worker_version_upload: false` and `production_mutation: false` and uploads nothing. A green Workers Build is therefore build-verification evidence only, never deploy or Worker version evidence.
+- The active production `founder-control-room` Worker version observed was a placeholder stub (a fetch handler that returns a fixed placeholder response), not the API Worker built from `main`. No observed version carried a commit SHA, tag, or message.
+- Green Cloudflare Pages or Workers Builds checks on a commit do not prove that the API Worker runs that commit. Production promotion remains the manual GitHub `Deploy` / `FCR Worker Reconcile` lane, and runtime proof still requires exact-SHA `/health`, `/version`, Pages binding, and browser evidence.
+
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
 The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.
@@ -8,7 +16,7 @@ Before enabling: obtain founder-authorized scoped provider configuration; verify
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
-The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
+The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. *(Historical as of November 2, 2026. Correction observed November 15, 2026 by read-only Cloudflare API readback: Worker version 19, uploaded November 12, 2026, no longer carries a plaintext `CF_API_TOKEN` binding. That readback names no repository source or reconcile run as the cause and does not prove the remaining bindings are correct.)* The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
 
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
@@ -151,7 +159,7 @@ That hook makes the repository's production-authority boundary executable before
 
 - native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
 - native builds must retain branch and build UUID evidence;
-- native Workers Builds may run only the non-promoting `wrangler versions upload` lane;
+- native Workers Builds may run only the non-promoting `wrangler versions upload` lane; this is the ceiling the hook permits, not what the configured build does — see the November 15, 2026 note: the observed main build trigger runs the verification-only script and uploads no Worker version;
 - native `wrangler deploy` fails closed before production promotion;
 - GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
 - ordinary CI/local verification does not become production authority.
@@ -286,3 +294,8 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+
+## Production credential diagnostic boundary
+
+The diagnostic workflow may inspect the production deployment credential only after a founder dispatch supplies an exact current main SHA. It checks out and re-observes that SHA before invoking the checked-in read-only diagnostic. Pull-request code is excluded from the credential path. Its fingerprint/verdict receipt distinguishes the value GitHub resolves from remembered rotation history without revealing a secret or authorizing deploy, secret mutation, Pages publication, Worker promotion, or production acceptance.
