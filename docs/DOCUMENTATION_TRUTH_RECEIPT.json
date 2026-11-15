@@ -827,6 +827,13 @@
       ]
     },
     {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+      ]
+    },
+    {
       "path": "src/lib/n8nFounderContentProviderReadback.ts",
       "claims": [
         "src/lib/n8nFounderContentProviderReadback.ts must fail closed unless a sanitized provider-native API observation matches the pending scheduled n8n receipt and exact orchestration, provider item/request identity, source repository/SHA, platform/channel, and requested schedule; it must never elevate scheduled state into publication truth or retain unsupported provider payload fields, and passing tests prove only this source contract, not that any production adapter calls it or that a Buffer object exists."
