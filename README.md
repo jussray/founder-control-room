@@ -1,5 +1,13 @@
 # Founder Control Room
 
+## November 15, 2026 — production Worker deploys record and read back the exact commit (candidate, not deploy proof)
+
+`.github/workflows/deploy.yml` now passes `--tag <expected_head_sha>` and a short run-provenance `--message` to `wrangler deploy` for the canonical `founder-control-room` Worker, and a new fail-closed step in the same job reads back `wrangler deployments list --json` and `wrangler versions view --json` (names, ids and annotations only). The job fails unless the newest deployment sends 100% of traffic to one version whose `workers/tag` equals that exact SHA. The comparison lives in the pure, unit-tested `scripts/worker-deployment-version-tag.mjs`. This is source only: no deploy was run, and no Cloudflare call was made. A read-only provider audit on November 15, 2026 found that no Worker version yet has a tag, message or commit SHA, and no recent `Deploy` run has succeeded, so this check has not yet passed against the real provider.
+
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
