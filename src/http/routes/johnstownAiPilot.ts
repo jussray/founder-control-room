@@ -7,7 +7,6 @@ johnstownAiPilotRouter.use(requireFounder);
 
 const TYPES = new Set(['partner', 'participant', 'workflow', 'outcome', 'action']);
 const STAGES = new Set(['recruit', 'baseline', 'train', 'build', 'handoff', 'measure', 'decide']);
-const EVIDENCE = new Set(['confirmed', 'stale', 'unknown']);
 const text = (value: unknown, max: number) => typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null;
 
 johnstownAiPilotRouter.get('/records', async (_req: FounderRequest, res) => {
