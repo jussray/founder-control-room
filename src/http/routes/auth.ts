@@ -21,6 +21,13 @@ const rateLimitFounderOAuth = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts, please try again later.' },
 });
+const rateLimitFounderInvite = rateLimit({
+  windowMs: 60 * 60 * 1_000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many founder enrollment attempts. Try again later.' },
+});
 const rateLimitFounderPassword = rateLimit({
   windowMs: 15 * 60 * 1_000,
   limit: 5,
@@ -87,14 +94,51 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   return respondSuccess(res, { message: GENERIC_MAGIC_LINK_MESSAGE }, 202);
 });
 
+// Only an already authenticated founder may enroll a preapproved, unbound address.
+// This endpoint sends an invite only when explicitly invoked. A new account receives
+// no founder authority until its Supabase email is confirmed and its UUID is bound.
+authRouter.post('/founder/invite', rateLimitFounderInvite, requireInteractiveFounder, async (req: FounderRequest, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const email = normalizeEmail(req.body?.email);
+  if (!email || email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
+  }
+  try {
+    const { data: allowRow, error: lookupError } = await supabase
+      .from('founder_users').select('email,user_id').eq('email', email).maybeSingle();
+    if (lookupError) return respondError(res, 503, 'AUTHORIZATION_UNAVAILABLE', 'Founder enrollment unavailable.');
+    if (!allowRow) return respondError(res, 403, 'FORBIDDEN', 'Address has not been approved for founder enrollment.');
+    if (allowRow.user_id) return respondError(res, 409, 'ALREADY_BOUND', 'Founder account is already linked.');
+
+    const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${FOUNDER_API_URL}/auth/callback`,
+    });
+    const userId = invited?.user?.id;
+    if (inviteError || !userId || normalizeEmail(invited?.user?.email) !== email) {
+      return respondError(res, 503, 'INVITE_UNAVAILABLE', 'Invitation could not be confirmed.');
+    }
+    const { data: bound, error: bindError } = await supabase.from('founder_users')
+      .update({ user_id: userId }).eq('email', email).is('user_id', null)
+      .select('user_id').maybeSingle();
+    if (bindError || bound?.user_id !== userId) {
+      // A sent invite without a successful binding cannot pass founder authorization.
+      return respondError(res, 503, 'BINDING_UNAVAILABLE', 'Invitation sent but founder enrollment requires review.');
+    }
+    return respondSuccess(res, { status: 'invited_pending_email_verification' }, 202);
+  } catch {
+    return respondError(res, 503, 'ENROLLMENT_UNAVAILABLE', 'Founder enrollment unavailable.');
+  }
+});
+
 authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const tokenHash = typeof req.query.token_hash === 'string' ? req.query.token_hash : null;
-  const type = typeof req.query.type === 'string' ? req.query.type : 'magiclink';
+  const type = req.query.type === 'invite' ? 'invite'
+    : req.query.type === 'email' ? 'email' : 'magiclink';
   if (!tokenHash) return res.status(200).type('html').send(founderCallbackHtml());
 
   const requestAuth = createSupabaseAuthClient();
-  const { data, error } = await requestAuth.auth.verifyOtp({ token_hash: tokenHash, type: type as 'magiclink' | 'email' });
+  const { data, error } = await requestAuth.auth.verifyOtp({ token_hash: tokenHash, type });
   const verifiedUser = data.user;
   const email = normalizeEmail(verifiedUser?.email);
   if (error || !data.session || !verifiedUser || !email || !(await isAuthorizedFounder(verifiedUser))) {
