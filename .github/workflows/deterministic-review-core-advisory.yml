@@ -604,7 +604,7 @@ jobs:
             echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
             echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
             echo '- Full provider topology preflight: `READY` required before this completion summary can run'
-            echo '- Human review phase: founder-plus-independent; one native approval and eligible non-owner human reviewer required'
+            echo '- Human review phase: founder-only native Auto-merge; zero additional approving reviewers; deterministic independent checks and founder-final in-app authority remain separate'
             echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
             echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"
