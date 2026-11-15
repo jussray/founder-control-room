@@ -37,7 +37,7 @@ import {
   type IssuedCreateBranchAuthority,
 } from '../../founder-os-lab/authorityIssuance.js';
 import { executeAuthorizedCreateBranch } from '../../providers/authorizedRepositoryMutation.js';
-import { validateFounderOsStagedPatch } from '../../founder-os-lab/missionPatchHandoff.js';
+import { isSafeFounderOsStagedPatchPath, validateFounderOsStagedPatch } from '../../founder-os-lab/missionPatchHandoff.js';
 import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   evaluateIndependentReviewGate,
@@ -1198,6 +1198,13 @@ approvalsRouter.post(
     const stagedWorkspaceReceipt = (req.body as Record<string, unknown>)['stagedWorkspaceReceipt'];
     let stagedExpectedHeadSha: string | undefined;
     if (stagedWorkspaceReceipt !== undefined) {
+      if (changes.length > 3 || changes.some((change) => !isSafeFounderOsStagedPatchPath(change?.path) || change.delete === true)) {
+        return res.status(400).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_UNSAFE_FILES',
+          error: 'A staged workspace supports at most three non-destructive source edits.',
+        });
+      }
       if (project.repo_provider !== 'github' || provider.name !== 'github') {
         return res.status(409).json({
           ok: false,
