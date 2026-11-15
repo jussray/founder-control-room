@@ -48,6 +48,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: { ...supabaseMock, 
 import express from 'express';
 import request from 'supertest';
 import { writeFounderSession } from '../../../auth/founderSession.js';
+import { FOUNDER_API_URL } from '../../middleware/security.js';
 import { authRouter } from '../auth.js';
 import { onboardingRouter } from '../onboarding.js';
 
@@ -283,12 +284,13 @@ describe('founder browser onboarding', () => {
   });
 
   it('only the interactive verified founder can send an invitation to a preapproved, unbound address', async () => {
-    const blocked = await request(app()).post('/auth/founder/invite').send({ email: ALIAS });
+    const blocked = await request(app()).post('/auth/founder/invite')
+      .set('Origin', FOUNDER_API_URL).send({ email: ALIAS });
     expect(blocked.status).toBe(401);
     expect(mockInviteFounder).not.toHaveBeenCalled();
 
     const invited = await request(app()).post('/auth/founder/invite')
-      .set('Cookie', await browserCookie()).send({ email: ALIAS });
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL).send({ email: ALIAS });
     expect(invited.status).toBe(202);
     expect(invited.body.data.status).toBe('invited_pending_email_verification');
     expect(invited.headers['cache-control']).toBe('private, no-store');
@@ -298,8 +300,22 @@ describe('founder browser onboarding', () => {
     expect(founderState.aliasUserId).toBe(ALIAS_USER_ID);
 
     const unapproved = await request(app()).post('/auth/founder/invite')
-      .set('Cookie', await browserCookie()).send({ email: 'stranger@example.com' });
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .send({ email: 'stranger@example.com' });
     expect(unapproved.status).toBe(403);
+    expect(mockInviteFounder).toHaveBeenCalledTimes(1);
+
+    const foreignOrigin = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', 'https://attacker.example')
+      .send({ email: ALIAS });
+    expect(foreignOrigin.status).toBe(403);
+    const missingOrigin = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).send({ email: ALIAS });
+    expect(missingOrigin.status).toBe(403);
+    const bearerBypass = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .set('Authorization', 'Bearer attacker-token').send({ email: ALIAS });
+    expect(bearerBypass.status).toBe(400);
     expect(mockInviteFounder).toHaveBeenCalledTimes(1);
   });
 
