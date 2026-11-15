@@ -139,6 +139,19 @@ describe('cross-mode operator execution continuation', () => {
       .toContain('execution continuation cannot become an authorization, approval, or browser cookie');
   });
 
+  it('rejects private prose hidden in nested observation evidence references', () => {
+    // The v2 receipt alone permits historical evidence labels; the
+    // persistence contract must forbid copying private conversation text.
+    const nestedReceipt = createOperatorContinuityReceiptV2({
+      ...input.observation,
+      evidenceRefs: ['Private conversation text with credential information'],
+    });
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: nestedReceipt,
+    })).toThrow(/observation evidence must be a bounded source reference/);
+  });
+
   it('requires pointers rather than raw transcripts, and real evidence for completed steps', () => {
     expect(() => createOperatorExecutionContinuation({ ...input, contextRefs: ['raw conversation text'] }))
       .toThrow(/source reference, not raw conversation content/);
