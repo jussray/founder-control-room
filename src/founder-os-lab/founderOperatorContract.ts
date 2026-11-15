@@ -411,9 +411,11 @@ export async function runGoal(
         nextGate: 'Inspect and safely reconcile the uncertain mutation.' });
     }
     const immutableCommit = await tools.inspectCommit(task, written.sha);
+    const expectedFiles = [...proposal.files].sort().join('\n');
     if (immutableCommit.parentSha !== task.expectedHead ||
         !within(immutableCommit.changedFiles, proposal.files) ||
-        [...written.changedFiles].sort().join('\n') !== [...immutableCommit.changedFiles].sort().join('\n')) {
+        [...written.changedFiles].sort().join('\n') !== expectedFiles ||
+        [...immutableCommit.changedFiles].sort().join('\n') !== expectedFiles) {
       return finish({ ...mutated, risk: 'Immutable commit ancestry or changed-file readback did not match.',
         nextGate: 'Investigate the commit before any further mutation.' });
     }

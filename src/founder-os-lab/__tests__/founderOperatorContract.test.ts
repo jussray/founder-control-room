@@ -276,6 +276,52 @@ describe('adversarial operator execution gates', () => {
     expect((await runGoal(task, wrongParent.tools, approval)).status).toBe('BLOCKED');
   });
 
+  it('rejects an incomplete multi-file repair even when its partial commit has valid focused proof', async () => {
+    const multiTask: Task = { ...task, focusFiles: ['src/guard.ts', 'src/other.ts'] };
+    const proposal = {
+      cause: 'Two-file verified cause',
+      files: ['src/guard.ts', 'src/other.ts'],
+      diff: 'fix both files',
+    };
+    const multiApproval: Approval = {
+      ...approval,
+      files: [...proposal.files],
+      proposalHash: proposalDigest(multiTask, proposal),
+    };
+    const h = harness({
+      diagnose: async () => proposal,
+      applyPatch: async () => ({ sha: NEXT_HEAD, changedFiles: ['src/guard.ts'] }),
+      inspectCommit: async () => ({ parentSha: HEAD, changedFiles: ['src/guard.ts'] }),
+    });
+    const result = await runGoal(multiTask, h.tools, multiApproval);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.risk).toContain('readback');
+    expect(result.evidence).toHaveLength(0);
+    expect(h.receipts).toHaveLength(1);
+  });
+
+  it('rejects an adapter claiming both proposed files when immutable commit contains only one', async () => {
+    const multiTask: Task = { ...task, focusFiles: ['src/guard.ts', 'src/other.ts'] };
+    const proposal = {
+      cause: 'Two-file verified cause',
+      files: ['src/guard.ts', 'src/other.ts'],
+      diff: 'fix both files',
+    };
+    const multiApproval: Approval = {
+      ...approval,
+      files: [...proposal.files],
+      proposalHash: proposalDigest(multiTask, proposal),
+    };
+    const h = harness({
+      diagnose: async () => proposal,
+      applyPatch: async () => ({ sha: NEXT_HEAD, changedFiles: [...proposal.files] }),
+      inspectCommit: async () => ({ parentSha: HEAD, changedFiles: ['src/guard.ts'] }),
+    });
+    const result = await runGoal(multiTask, h.tools, multiApproval);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.evidence).toHaveLength(0);
+  });
+
   it('requires real UI and Documentation Truth checks based on trusted classification', async () => {
     const ui = harness({ classify: async () => ({ surface: 'ui' }) });
     expect((await runGoal(task, ui.tools, approval)).status).toBe('BLOCKED');
