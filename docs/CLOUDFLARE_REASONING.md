@@ -1,5 +1,9 @@
 # Cloudflare Reasoning Contract
 
+## November 15, 2026 — exact-commit Worker version tag readback (candidate)
+
+Reasoning about which commit the production Worker runs must not rely on the `/version` `gitSha` runtime marker alone. Candidate `.github/workflows/deploy.yml` tags each production Worker version with the exact approved SHA (`--tag`) and fails the deploy job unless provider readback shows the newest deployment routing 100% to one version whose `workers/tag` equals it (`scripts/worker-deployment-version-tag.mjs`). A matching tag shows only the commit recorded on the provider version. It does not show runtime behaviour, the Pages binding, or secret state. No deploy was run for this change. A read-only audit on November 15, 2026 observed that no existing version carries a tag, message or commit SHA.
+
 The www public entry is not a browser session origin. `public/_worker.js` must normalize safe `GET`/`HEAD` navigation for `/welcome` and `/member/` from `https://www.foundercontrolroom.org` to `https://foundercontrolroom.org`, retaining queries with no-store, no-referrer, and noindex headers. The existing apex-only cookies, form-origin validation, API-owned callback assets, OAuth consent forwarding and denied cross-origin POST behavior must remain unchanged. Source routing cannot establish live DNS, Pages, Worker binding, or OTP delivery.
 
 

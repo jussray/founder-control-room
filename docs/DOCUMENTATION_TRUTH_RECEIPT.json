@@ -33,7 +33,9 @@
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
         "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
         "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
-        "`.github/workflows/deploy.yml` must keep the `receipt = json.loads(receipt_text[array_start:array_end + 1])` statement within the `run: |` YAML shell body, retaining the provider-held secret-name receipt validation as an executable fail-closed production preflight; it must never mis-indent the parser into an invalid workflow or use source-only green as deployment authority."
+        "`.github/workflows/deploy.yml` must keep the `receipt = json.loads(receipt_text[array_start:array_end + 1])` statement within the `run: |` YAML shell body, retaining the provider-held secret-name receipt validation as an executable fail-closed production preflight; it must never mis-indent the parser into an invalid workflow or use source-only green as deployment authority.",
+        "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
+        "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy."
       ]
     },
     {
@@ -885,6 +887,12 @@
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+      ]
+    },
+    {
+      "path": "scripts/worker-deployment-version-tag.mjs",
+      "claims": [
+        "`evaluateWorkerVersionTag` is a pure function: it passes only when the newest deployment (by `created_on`, independent of list order) routes 100% to a single version, the viewed version id equals that active id, and its `workers/tag` equals a lowercase 40-character expected SHA; missing, prefix, different, split-traffic, empty, or malformed input fails closed. Its unit tests prove this comparison logic only, not wrangler JSON shape stability or Cloudflare behaviour."
       ]
     }
   ]
