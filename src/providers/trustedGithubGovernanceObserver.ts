@@ -5,6 +5,10 @@ import {
   observeGitHubRepositoryInstallation,
 } from "./githubAppAuth.js";
 import {
+  deriveGitHubAppRepositoryCapabilities,
+  requireGitHubAppRepositoryPermissions,
+} from "./githubAppCapabilities.js";
+import {
   CHIEF_GOVERNANCE,
   createTrustedGithubRulesetObservation,
   verifyChiefProofModeRulesetsAsIs,
@@ -60,8 +64,9 @@ function observationTime(value: Date | undefined): string {
  * token minted by FCR. The caller cannot supply a PAT or installation token,
  * choose another repository, or choose different ruleset ids.
  *
- * This capability is observation-only. It does not expose updateRepoRuleset,
- * merge, deploy, or any other provider mutation.
+ * Before token minting, FCR observes the live installation and requires
+ * administration:read because GitHub ruleset reads are administration-scoped.
+ * Missing authority fails closed before any ruleset request.
  */
 export async function observeChiefGovernanceWithGitHubApp(input: {
   appId: string;
@@ -72,10 +77,21 @@ export async function observeChiefGovernanceWithGitHubApp(input: {
   const privateKey = requirePrivateKey(input.privateKey);
   const observedAt = observationTime(input.now);
 
+  const installationEvidence = await observeGitHubRepositoryInstallation(
+    appId,
+    privateKey,
+    CHIEF_GOVERNANCE.repository,
+  );
+  const capabilityContract = deriveGitHubAppRepositoryCapabilities(installationEvidence);
+  requireGitHubAppRepositoryPermissions(capabilityContract, {
+    administration: "read",
+  });
+
   const token = await getGitHubInstallationToken(
     appId,
     privateKey,
     CHIEF_GOVERNANCE.repository,
+    { administration: "read" },
   );
   const octokit = new Octokit({
     auth: token,
@@ -133,6 +149,7 @@ export async function observeChiefCandidateProducerInstallationWithGitHubApp(inp
     privateKey,
     CHIEF_GOVERNANCE.repository,
   );
+  const capabilityContract = deriveGitHubAppRepositoryCapabilities(evidence);
   const checksPermission = evidence.permissions.checks ?? null;
 
   return {
@@ -142,7 +159,7 @@ export async function observeChiefCandidateProducerInstallationWithGitHubApp(inp
     repositorySelection: evidence.repositorySelection,
     permissions: evidence.permissions,
     checksPermission,
-    checksWriteAvailable: checksPermission === "write",
+    checksWriteAvailable: capabilityContract.can.writeChecks,
     observedAt,
     authority: {
       candidateCheckPublicationAuthority: false,

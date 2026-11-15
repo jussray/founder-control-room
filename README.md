@@ -653,6 +653,17 @@ The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-g
 Claude Code `/ultrathink` remains an exclusive canonical entrypoint in `.claude/skills/ultrathink/SKILL.md`. The new ULTRATHINK / ATTACK / GODMODE companion has distinct cues and cannot register that exact command or override canonical Goalfix; the suite index documents explicit handoffs. The StoryEngine federation pin transition recorded for this review range (`a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` → `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`) is historical evidence. Current FCR `main` pins StoryEngine in `.github/workflows/playwright.yml`, which is the source of truth for the live pin. Prior PR-only `ae7a67c119503276f5525c412a49d05989a8dd6a` retained as historical intermediate evidence, not represented as the `main` predecessor. Neither correction grants deployment or merge authority.
 
 
+## October 16 GitHub App installation and MCP handoff
+
+The current FCR GitHub App setup uses `/control-room/plugin-center.html` as its human-facing post-installation Setup URL, not the FCR MCP protocol endpoint. The founder-authenticated Plugin Center asks GitHub to read back the exact `jussray/founder-control-room` App installation, checks any GitHub-provided installation identifier against that readback, and leaves the connection unverified when the App is missing, unavailable, or identity-mismatched. `https://api.foundercontrolroom.org/mcp` remains a separate Supabase OAuth-protected, bounded MCP client connection. This code is a candidate awaiting current CI, provider installation and live browser proof; it is **not** evidence of live installation or MCP activation.
+
+GitHub App permission observation and permission-scoped token minting do not create founder approval, a merge or deployment grant, publication authority, or a broader provider capability. The current read-only genealogy provider remains the implementation behind the newly capability-aware constructor. See `docs/GITHUB_APP_AUTHORITY.md`.
+
+## October 16 GitHub App handoff proof successor
+
+The dedicated GitHub App installation handoff check now has founder-gated readback integration tests and Playwright browser states for verified, mismatched, unauthenticated and malformed GitHub installation callbacks. The Capability Contract workflow executes those checks on the exact PR head and retains a mobile screenshot artifact. This is test evidence of the source and locally served browser, **not** a production GitHub installation, an authenticated live MCP connection or a founder approval.
+
+The FCR-to-StoryEngine Playwright peer was refreshed to independently observed `jussray/StoryEngine main@26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` after comparing the former pin and verifying the successor is 22 forward commits with zero behind. A pin update only changes the exact peer subject; complete current-head live-ref, runtime identity and Playwright proof must pass before this federation can be described as verified.
 ## Portfolio conversion tracking contract
 
 FCR carries a privacy-minimal portfolio conversion contract in [`docs/PORTFOLIO_CONVERSION_TRACKING.md`](docs/PORTFOLIO_CONVERSION_TRACKING.md). The first approved event set is `call_click`, `whatsapp_click`, `pickup_request`, and `directions_click`. The source contract forbids customer identity/device fields from the conversion table and keeps automatic deletion disabled unless the founder separately approves a retention policy.

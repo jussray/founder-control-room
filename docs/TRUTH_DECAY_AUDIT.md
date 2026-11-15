@@ -641,6 +641,12 @@ The existing `.claude/skills/ultrathink/SKILL.md` is Claude Code's sole `/ultrat
 
 The reviewed base `2189076de1d06bb7b78cf2e36a29e995cea863d4` carries StoryEngine peer pin `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`. The PR #969 proposed successor pin is `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. Earlier `ae7a67c119503276f5525c412a49d05989a8dd6a` describes a superseded intermediate PR branch, **not** the direct base-to-head transition. This lineage correction preserves the intermediate incident record but cannot inherit its CI, independent review, merge approval, or production verification. The exact new branch head must pass all required gates.
 
+## GitHub App setup and StoryEngine browser peer (2026-10-16)
+
+The GitHub installation Setup URL is a founder-facing Plugin Center entry point, not an MCP OAuth callback. Local UI Playwright success, App permission readback, authenticated FCR API handling, actual GitHub App installation, and live production MCP OAuth are different evidence subjects. A successful mocked browser response cannot establish provider truth or founder authorization.
+
+The StoryEngine peer pin in `.github/workflows/playwright.yml` moves to `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` only after provider readback showed 22 descendant commits on `jussray/StoryEngine main`. The pin alone is **not** current browser federation proof: GitHub Actions must re-observe the live peer ref on the exact FCR PR head and complete the entire browser/runtime receipt loop. Prior green results are historical and cannot grant deploy or merge authority.
+
 ## 2026-10-23 StoryEngine pin refresh
 
 The live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow pin moved from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` because the live-ref check failed on exact head `30c095f5fa39f4288f870e0f818b970becd757ff`; the harness scenarios had passed before that check. Predecessor federation evidence is historical. Federation readiness is UNKNOWN until the successor head completes the full witness against the new pin. This refresh grants no merge, deploy, or provider authority.
