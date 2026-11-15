@@ -40,4 +40,25 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain('.founderSignalAutomationGrant.configured == true');
     expect(workflow).toContain('.founderSignalAutomationGrant.enabled == false');
   });
+
+  it('fails closed on missing provider-held Worker secret bindings before any mutation', () => {
+    // Current main owns the canonical reconcile secret-name preflight; this PR's
+    // contract binds that step rather than a parallel duplicate preflight.
+    const authority = workflow.slice(workflow.indexOf('  authority-gate:'), workflow.indexOf('  worker-deploy:'));
+    const secretPreflight = authority.indexOf('- name: Verify provider-held Worker secret names before reconciliation');
+    const authorityReceipt = authority.indexOf('- name: Record bounded authority receipt');
+    const reconcileMutation = workflow.indexOf('  worker-deploy:');
+
+    expect(secretPreflight).toBeGreaterThanOrEqual(0);
+    expect(authorityReceipt).toBeGreaterThan(secretPreflight);
+    expect(reconcileMutation).toBeGreaterThan(workflow.indexOf('  authority-gate:'));
+    expect(authority).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(authority).toContain('--config wrangler.worker.toml');
+    expect(authority).toContain('--format json');
+    expect(authority).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(authority).toContain('required = set(names) - workflow_written');
+    expect(authority).toContain('missing = sorted(required - present)');
+    expect(authority).not.toContain('wrangler secret get');
+    expect(authority).not.toContain("entry.get('value')");
+  });
 });

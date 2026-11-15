@@ -954,6 +954,8 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       });
 
     expect(res.status).toBe(201);
+    // The provider write is reachable only through a completed idempotency reservation.
+    expect(supabaseMock.from).toHaveBeenCalledWith('approval_executions');
     expect(mockCommitPatch).toHaveBeenCalledWith(
       'test-project',
       'mission/test',
