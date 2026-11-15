@@ -5,15 +5,21 @@ const {
   mockListReviewSignals,
   mockResolveRef,
   mockIntegrate,
+  mockAsyncMerge,
 } = vi.hoisted(() => ({
   mockGetPullRequestReviewContext: vi.fn(),
   mockListReviewSignals: vi.fn(),
   mockResolveRef: vi.fn(),
   mockIntegrate: vi.fn(),
+  mockAsyncMerge: vi.fn(),
 }));
 
 vi.mock("../githubAppAuth.js", () => ({
   getGitHubInstallationToken: vi.fn(),
+}));
+
+vi.mock("../githubAsyncMerge.js", () => ({
+  mergeGitHubPullRequestAsync: mockAsyncMerge,
 }));
 
 vi.mock("../GitHubProvider.js", () => ({
@@ -73,11 +79,13 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     vi.stubEnv("GITHUB_TOKEN", "test-token");
     vi.stubEnv("GITHUB_APP_ID", "");
     vi.stubEnv("GITHUB_PRIVATE_KEY", "");
+    vi.stubEnv("GITHUB_API_BASE_URL", "");
     mockGetPullRequestReviewContext.mockResolvedValue(reviewContext);
     mockListReviewSignals.mockResolvedValue([{ id: "review-1" }]);
     mockResolveRef.mockImplementation(async (_projectId: string, ref: string) =>
       ref === "main" ? BASE_SHA : HEAD_SHA);
-    mockIntegrate.mockResolvedValue("merge-sha");
+    mockIntegrate.mockResolvedValue("legacy-merge-sha");
+    mockAsyncMerge.mockResolvedValue("merge-sha");
   });
 
   afterEach(() => {
@@ -114,7 +122,7 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     expect(providerConfigurationError(FCR_PROJECT, env)).toMatch(/GitHub App authentication is incomplete/i);
   });
 
-  it("canonicalizes an alias of the FCR repository before review and integration authority", async () => {
+  it("canonicalizes an alias of the FCR repository before review and async integration authority", async () => {
     const provider = providerForProject(FCR_ALIAS_PROJECT);
 
     await expect(provider.getPullRequestReviewContext!("fcr-alias", 474))
@@ -125,7 +133,14 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
     expect(mockResolveRef).toHaveBeenNthCalledWith(1, "founder-control-room", "main");
     expect(mockResolveRef).toHaveBeenNthCalledWith(2, "founder-control-room", "mission/review-gate");
-    expect(mockIntegrate).toHaveBeenCalledWith("founder-control-room", "main", "mission/review-gate");
+    expect(mockAsyncMerge).toHaveBeenCalledWith({
+      token: "test-token",
+      repository: "jussray/founder-control-room",
+      pullRequestNumber: 474,
+      expectedHeadSha: HEAD_SHA,
+      baseUrl: "",
+    });
+    expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
   it("blocks FCR integration when no exact PR context was read in the same execution", async () => {
@@ -133,6 +148,7 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     await expect(provider.integrate("founder-control-room", "main", "mission/review-gate"))
       .rejects.toThrow(/requires provider-backed pull-request context/);
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
@@ -143,6 +159,7 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     await expect(provider.integrate("founder-control-room", "release", "mission/review-gate"))
       .rejects.toThrow(/reviewed integration authority is pinned to main/);
     expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
@@ -157,6 +174,7 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     await expect(provider.integrate("founder-control-room", "main", "mission/review-gate"))
       .rejects.toThrow(/reviewed integration authority is pinned to main/);
     expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
@@ -167,6 +185,7 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     await expect(provider.integrate("founder-control-room", "main", "mission/other"))
       .rejects.toThrow(/integration refs changed after review context/);
     expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
@@ -178,10 +197,11 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     await expect(provider.integrate("founder-control-room", "main", "mission/review-gate"))
       .rejects.toThrow(/base moved after review context/);
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
-  it("re-reads exact base and head immediately before a valid FCR integration", async () => {
+  it("re-reads exact base and head immediately before a valid FCR async integration", async () => {
     const provider = providerForProject(FCR_PROJECT);
     await provider.getPullRequestReviewContext!("founder-control-room", 474);
 
@@ -190,16 +210,24 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     expect(mockResolveRef).toHaveBeenNthCalledWith(1, "founder-control-room", "main");
     expect(mockResolveRef).toHaveBeenNthCalledWith(2, "founder-control-room", "mission/review-gate");
-    expect(mockIntegrate).toHaveBeenCalledWith("founder-control-room", "main", "mission/review-gate");
+    expect(mockAsyncMerge).toHaveBeenCalledWith({
+      token: "test-token",
+      repository: "jussray/founder-control-room",
+      pullRequestNumber: 474,
+      expectedHeadSha: HEAD_SHA,
+      baseUrl: "",
+    });
+    expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
-  it("does not impose the FCR PR-context membrane on other projects", async () => {
+  it("does not impose the FCR async PR-context membrane on other projects", async () => {
     const provider = providerForProject(OTHER_PROJECT);
 
     await expect(provider.integrate("sekret-bip", "main", "mission/feature"))
-      .resolves.toBe("merge-sha");
+      .resolves.toBe("legacy-merge-sha");
 
     expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockAsyncMerge).not.toHaveBeenCalled();
     expect(mockIntegrate).toHaveBeenCalledWith("sekret-bip", "main", "mission/feature");
   });
 });
