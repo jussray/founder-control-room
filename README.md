@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 15, 2026 — Documentation Truth claim freshness (candidate, not provider proof)
+
+`scripts/verify-documentation-truth.mjs` now reads `docs/DOCUMENTATION_TRUTH_RECEIPT.json` at the reviewed base and requires every changed truth-sensitive path to gain at least one fresh, meaningful path-bound invariant in the reviewed range. The receipt stays append-only: earlier claims remain as history, and a new claim appended (or an inherited claim rewritten with a new invariant) satisfies the gate. Claims copied unchanged, reformatted only cosmetically (casing, punctuation, link targets, comments, HTML wrappers), or recombined from inherited sentences do not. Claims for one path are read across every receipt entry that names it. Normalization lives in `scripts/documentation-truth-claim-fingerprint.mjs`, which is itself truth-sensitive. This is a receipt-novelty check only: it does not prove any claim is true, and it grants no merge, deploy, or provider authority. Rebuilt from the fingerprinting piece of PR #883.
+
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
