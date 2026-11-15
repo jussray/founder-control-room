@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and portfolio repository authority tiers: source wiring, canonical registry state, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -247,7 +247,9 @@
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
         "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
-        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary."
+        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary.",
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must state that `src/config/portfolio.ts` is the repository authority registry, that external and continuity-only repositories have zero FCR mutation authority, that quarantined aliases stay denied, and that governance-profile presence cannot promote a repository into active authority."
       ]
     },
     {
@@ -293,7 +295,8 @@
         "The audit records PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failing at stale StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f, while live StoryEngine main was independently observed at 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f with 15/15 successful peer checks. Rebinding does not prove PR #1004 federation or transfer another PR's exact-head evidence.",
         "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer.",
         "`docs/TRUTH_DECAY_AUDIT.md` must preserve PR #1044's prior local Playwright success and failed StoryEngine peer equality as separate historical facts: FCR expected `4601cc3a8297875c97e54717f2aeb47db44d0595`, observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, and cannot claim the successor pair VERIFIED until the new exact FCR head passes the full independent federation and browser witness.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat portfolio authority-tier movement as truth-sensitive: governance profiles, aliases, memory, Council context, or prior proof cannot grant mutation authority outside the current canonical active repository registry."
       ]
     },
     {
@@ -692,7 +695,10 @@
     {
       "path": "src/governance/portfolioGovernanceProfiles.ts",
       "claims": [
-        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent."
+        "`src/governance/portfolioGovernanceProfiles.ts` must register the SleepWealth account-model eligibility claims `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only, and must keep `live-trade`, `enable-live-broker`, `accept-pooled-funds` and `cross-account-credential-use` blocked so the customer-connected and pooled-managed scopes never share authority, and it fails closed when a required receipt gate is absent.",
+        "`src/governance/portfolioGovernanceProfiles.ts` must derive repository mutation authority class from canonical `src/config/portfolio.ts`; external, continuity-only, quarantined, and unknown identities cannot gain FCR mutation authority merely because a governance profile exists.",
+        "The portfolio governance registry must cover every authority-bearing active repository, including Sync Party, while preserving canonical continuity-only Bip Jr identity and keeping historical `jussray/Se-kretBip` quarantined even when its safety rules resolve through the Bip Jr profile.",
+        "Promotion, demotion, quarantine, or alias movement selects a new authority evidence subject and requires fresh successor proof; prior profiles, memory, Council observations, or exact-head green do not carry mutation authority across the tier transition."
       ]
     },
     {
