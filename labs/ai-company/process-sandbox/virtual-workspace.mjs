@@ -34,8 +34,8 @@ export function stageVirtualWorkspaceEdit(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new TypeError('workspace input must be an object');
   }
-  if (input.dataClassification !== 'synthetic') {
-    throw new TypeError('only synthetic snapshots are accepted');
+  if (input.dataClassification !== 'synthetic' && input.dataClassification !== 'repository-source') {
+    throw new TypeError('only synthetic or explicitly labeled repository source snapshots are accepted');
   }
   const repository = required(input.repository, 'repository');
   const sourceSha = required(input.sourceSha, 'sourceSha').toLowerCase();
@@ -92,6 +92,7 @@ export function stageVirtualWorkspaceEdit(input) {
       version: VIRTUAL_WORKSPACE_EDIT_VERSION,
       status: 'staged',
       mode: 'in-memory-only',
+      sourceClassification: input.dataClassification,
       repository, sourceSha, branch,
       changes: Object.freeze(changes),
       providerCalls: false,
