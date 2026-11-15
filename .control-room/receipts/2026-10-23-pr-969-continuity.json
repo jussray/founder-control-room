@@ -1,0 +1,102 @@
+{
+  "contract": "juss/pr-continuity-receipt@v1",
+  "observed_at": "2026-10-23T02:50:00Z",
+  "envelope": {
+    "schema": "juss/pr-continuity-fingerprint@v1",
+    "project": "founder-control-room",
+    "repository": "jussray/founder-control-room",
+    "pull_request": 969,
+    "branch": "skills/ultrathink-suite-rollover-20261012",
+    "base_observed": "main@3ba1265822ee1295700406f413d8913e65969554",
+    "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+    "scope": "skills, docs, receipts only; no runtime, deploy, merge or provider mutation",
+    "evidence_refs": [
+      {
+        "kind": "actions_run",
+        "id": "39890503503",
+        "name": "Portfolio Project Adapter Freshness",
+        "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+        "conclusion": "failure"
+      },
+      {
+        "kind": "actions_run",
+        "id": "39886114217",
+        "name": "Portfolio Project Adapter Freshness",
+        "head_sha": "3ba1265822ee1295700406f413d8913e65969554",
+        "conclusion": "failure",
+        "event": "schedule"
+      },
+      {
+        "kind": "actions_run",
+        "id": "39866499059",
+        "name": "Portfolio Project Adapter Freshness",
+        "head_sha": "3ba1265822ee1295700406f413d8913e65969554",
+        "conclusion": "failure",
+        "event": "schedule"
+      },
+      {
+        "kind": "check_run",
+        "id": "120208962212",
+        "name": "Cloudflare Pages",
+        "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+        "conclusion": "success"
+      },
+      {
+        "kind": "codex_review",
+        "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+        "state": "failed",
+        "reason": "usage_limit"
+      },
+      {
+        "kind": "local_verifier",
+        "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+        "name": "verify-ai-skill-contract",
+        "result": "pass"
+      },
+      {
+        "kind": "local_verifier",
+        "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+        "name": "verify-documentation-truth",
+        "result": "CURRENT"
+      }
+    ]
+  },
+  "fingerprint_sha256": "e8dff13fcf6056ded0738a8a6f25baac429c17400cc0f8d4077976e4af763be7",
+  "continuity_cookie": {
+    "cookie_id": "pr969-282a0952f3fd4896c223336c",
+    "type": "continuity-proof-cookie",
+    "source_path": ".control-room/receipts/2026-10-23-pr-969-continuity.json",
+    "head_sha": "e55490a936e5af6845a1773089ffdfcccc705d8c",
+    "parent_cookie_id": null,
+    "mode": "EVIDENCE_ONLY",
+    "grants": "none: cannot approve, merge, deploy, publish, provider or mutation",
+    "expires_after_hours": 72
+  },
+  "supersedes": [
+    {
+      "head_sha": "3e400d3fcc47ecdb07400f70143c9524deae1ceb",
+      "status": "STALE",
+      "reason": "head moved; checks and review on that head do not transfer"
+    }
+  ],
+  "claims": {
+    "VERIFIED": [
+      "PR head is e55490a9 (GitHub API read)",
+      "adapter-freshness check failed on e55490a9 (job log)",
+      "main scheduled adapter-freshness failed on 3ba12658 (runs 39886114217, 39866499059)",
+      "Codex review of e55490a9 failed with usage-limit notice",
+      "AI-skill verifier and Documentation Truth pass locally on e55490a9"
+    ],
+    "UNKNOWN": [
+      "Codex verdict on the eight open review threads",
+      "Provider CI for later heads"
+    ],
+    "BLOCKED": [
+      "merge: PR is draft, Codex review unavailable, adapter check red on main and PR"
+    ],
+    "STALE": [
+      "all proof on 3e400d3f"
+    ]
+  },
+  "next_gate": "Codex review on final head after usage limit resets; founder decision on draft status; explicit merge approval naming the exact head"
+}
