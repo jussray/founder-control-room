@@ -168,15 +168,17 @@ function modernPost(
 describe('Supabase OAuth token verifier', () => {
   it('accepts only a current user and founder allowlist row after claim checks', async () => {
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
+      data: { user: { id: 'founder-user-1', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     mockFrom.mockReturnValueOnce({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: { email: 'founder@example.com' }, error: null }),
-        }),
-      }),
+      select: () => {
+        const query = {
+          eq: () => query,
+          maybeSingle: async () => ({ data: { email: 'founder@example.com', user_id: 'founder-user-1' }, error: null }),
+        };
+        return query;
+      },
     });
 
     await expect(verifyRemoteMcpOauthToken(jwt(validClaims()), oauthEnv())).resolves.toEqual({
