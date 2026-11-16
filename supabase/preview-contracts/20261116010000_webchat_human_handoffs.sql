@@ -21,7 +21,13 @@ END
 $$;
 COMMIT;
 
+-- The preview branch persists across pushes and CI re-runs this contract on
+-- each new head after the migration's receipt is recorded. Apply the real
+-- migration only when the table is absent; the assertions below run every time.
+SELECT to_regclass('public.webchat_human_handoffs') IS NULL AS webchat_handoffs_needs_migration \gset
+\if :webchat_handoffs_needs_migration
 \ir ../migrations/20261116010000_webchat_human_handoffs.sql
+\endif
 
 DO $$
 DECLARE
