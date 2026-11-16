@@ -29,6 +29,31 @@ const rateLimitFounderInvite = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many founder enrollment attempts. Try again later.' },
 });
+// Session handoff and logout both reach server-held identity/authorization
+// state; bound them per client before any Supabase or allowlist lookup.
+// Bounds unauthenticated probing of the invite route before the founder
+// lookup; the stricter per-founder send budget still applies after auth.
+const rateLimitFounderInviteAttempts = rateLimit({
+  windowMs: 15 * 60 * 1_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many founder enrollment attempts. Try again later.' },
+});
+const rateLimitFounderSession = rateLimit({
+  windowMs: 15 * 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many session attempts, please try again later.' },
+});
+const rateLimitFounderLogout = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many logout attempts, please try again later.' },
+});
 const rateLimitFounderPassword = rateLimit({
   windowMs: 15 * 60 * 1_000,
   limit: 5,
@@ -105,7 +130,7 @@ authRouter.post('/founder/invite', (req, res, next) => {
     return respondError(res, 400, 'BAD_REQUEST', 'Use the interactive founder browser session.');
   }
   next();
-}, requireSameOriginBrowserMutation, requireInteractiveFounder, rateLimitFounderInvite, async (req: FounderRequest, res) => {
+}, rateLimitFounderInviteAttempts, requireSameOriginBrowserMutation, requireInteractiveFounder, rateLimitFounderInvite, async (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const email = normalizeEmail(req.body?.email);
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -163,7 +188,7 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   return res.redirect(303, '/');
 });
 
-authRouter.post('/session', async (req, res) => {
+authRouter.post('/session', rateLimitFounderSession, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -219,7 +244,7 @@ authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder
   return respondSuccess(res, { message: 'Founder password updated.' });
 });
 
-authRouter.post('/logout', async (req, res) => {
+authRouter.post('/logout', rateLimitFounderLogout, async (req, res) => {
   const revoked = await revokeFounderSession(req, 'logout');
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder browser session could not be revoked.');
   if (!(await revokeMemberSession(req))) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Member session could not be revoked.');
