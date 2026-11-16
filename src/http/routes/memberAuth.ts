@@ -17,6 +17,10 @@ const callbackThrottle = rateLimit({
 const sessionThrottle = rateLimit({
   windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false,
 });
+// Bounds session lookups and revocations on /me and /logout before any database work.
+const memberSessionReadThrottle = rateLimit({
+  windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false,
+});
 const GENERIC = 'If this address can receive mail, a secure sign-in link may arrive.';
 // The authenticated browser session must be set on the Pages origin, not the API subdomain.
 const MEMBER_CALLBACK_ORIGIN = process.env.NODE_ENV === 'production'
@@ -150,7 +154,7 @@ memberAuthRouter.post('/session', sessionThrottle, async (req, res) => {
   }
 });
 
-memberAuthRouter.get('/me', async (req, res) => {
+memberAuthRouter.get('/me', memberSessionReadThrottle, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const identity = await readMemberSession(req);
   if (!identity) return respondError(res, 401, 'UNAUTHENTICATED', 'Member sign-in required.');
@@ -165,7 +169,7 @@ memberAuthRouter.get('/me', async (req, res) => {
   return respondSuccess(res, { member: identity, workspace: { projects: [], agents: [], activity: [] } });
 });
 
-memberAuthRouter.post('/logout', async (req, res) => {
+memberAuthRouter.post('/logout', memberSessionReadThrottle, async (req, res) => {
   const revoked = await revokeMemberSession(req);
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Member session could not be revoked.');
   if (!(await revokeFounderSession(req, 'member_logout'))) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder session could not be revoked.');

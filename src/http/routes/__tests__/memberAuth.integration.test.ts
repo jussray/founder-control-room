@@ -214,3 +214,22 @@ describe('isolated member access', () => {
     expect(read.body.data).toBeUndefined();
   });
 });
+
+describe('member session route rate limiting', () => {
+  // Runs last: the router-level limiter is shared across this file.
+  it('bounds repeated /me and /logout session lookups before any database work', async () => {
+    const probe = app();
+    // Earlier tests in this file share the same per-minute budget, so count until the limit trips.
+    let sent = 0;
+    let status = 0;
+    while (sent < 61) {
+      status = (await request(probe).get('/auth/member/me')).status;
+      sent += 1;
+      if (status === 429) break;
+      expect(status).toBe(401);
+    }
+    expect(status).toBe(429);
+    expect(sent).toBeLessThanOrEqual(61);
+    expect((await request(probe).post('/auth/member/logout').send({})).status).toBe(429);
+  });
+});
