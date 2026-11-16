@@ -228,6 +228,12 @@ jobs:
           print(f'Canonical Worker secret-name preflight passed: {len(required)} provider-held names present; no values read.')
           PY
 
+          # Fail closed when a plain [vars] name already exists as a Worker
+          # secret (or is also in the [secrets] registry). Names only.
+          node scripts/verify-worker-var-secret-collisions.mjs \
+            --config wrangler.worker.toml \
+            --secret-receipt "$secret_receipt"
+
           # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
           # Inspect name/type only; no credential values enter logs or artifacts.
           node scripts/verify-worker-binding-types.mjs
