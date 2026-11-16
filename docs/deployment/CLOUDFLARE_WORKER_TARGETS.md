@@ -1,5 +1,11 @@
 # Cloudflare Deployment Targets
 
+## November 15, 2026 — exact-commit version tag on production Worker deploys (candidate)
+
+Candidate `.github/workflows/deploy.yml` passes `--tag ${{ inputs.expected_head_sha }}` and a short space-free `--message` (`fcr-deploy-run-<run_id>.<attempt>`) to `wrangler deploy --config wrangler.worker.toml`, keeping the existing `--var GIT_SHA` marker. The next step in the same job reads back `wrangler deployments list --json` and `wrangler versions view <active-version> --json` and runs `scripts/worker-deployment-version-tag.mjs verify`. It fails closed unless the newest deployment routes 100% to exactly one version whose `workers/tag` equals the exact SHA. This step reads names, ids and annotations only.
+
+Provider observation (read-only audit, November 15, 2026; historical once read, re-observe before relying on it): none of the 19 versions of `founder-control-room` carries a tag, message or commit SHA. The active version is a dashboard-uploaded stub, not a wrangler upload from `wrangler.worker.toml`, and none of the last 100 `Deploy` runs succeeded. The Workers Builds and plaintext `CF_API_TOKEN` corrections are recorded once, in the dated readback section below and on the build-lane and November 2 lines. This change runs no deploy, so the readback has not yet passed against the real provider.
+
 ## November 15, 2026 — Workers Builds and active Worker observation (dated read-only readback, not deploy proof)
 
 Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API reads; no provider state was changed. This is a dated observation, not current truth at any later read.
@@ -7,6 +13,10 @@ Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API read
 - The Workers Builds `main` trigger runs `npm run deploy:api:production`, which in repository source runs `cloudflare:build:verify` → `scripts/cloudflare-build-verification-only.mjs`. That script emits a receipt with `worker_version_upload: false` and `production_mutation: false` and uploads nothing. A green Workers Build is therefore build-verification evidence only, never deploy or Worker version evidence.
 - The active production `founder-control-room` Worker version observed was a placeholder stub (a fetch handler that returns a fixed placeholder response), not the API Worker built from `main`. No observed version carried a commit SHA, tag, or message.
 - Green Cloudflare Pages or Workers Builds checks on a commit do not prove that the API Worker runs that commit. Production promotion remains the manual GitHub `Deploy` / `FCR Worker Reconcile` lane, and runtime proof still requires exact-SHA `/health`, `/version`, Pages binding, and browser evidence.
+
+## November 15, 2026 — `[vars]`/secret name-collision preflight (candidate, not deployed)
+
+`scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. A name must live in exactly one place: a plain `[vars]` binding or a provider-held secret. The November 15, 2026 read-only audit (historical; re-observe before use) saw `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` on both sides, so the next gated deploy fails closed until a founder-authorized cleanup removes one side. No secret, var, deployment or provider resource is changed by this source change.
 
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
