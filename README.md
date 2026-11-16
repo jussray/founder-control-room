@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 16, 2026 — Pennsylvania funding workspace, split from #1094 (candidate, not runtime proof)
+
+This adds the founder-only Pennsylvania funding review workspace from PR #1094 on its own, without #1094's merge-review governance changes, which stay on #1094 for a separate decision. `public/control-room/pa-funding.html` lists nine official-source programs and keeps eligibility UNKNOWN until evidence passes; the REVIEW → VERIFY → PREPARE stages save private checklist state, and APPLY stays locked. `src/http/routes/paFundingReviews.ts` (`GET /pa-funding/reviews`, `PUT /pa-funding/reviews/:opportunityId`) requires `requireFounder`, has its own 60/min rate limit, accepts only the nine program ids and the three non-APPLY stages, and returns 503 rather than success when storage fails. `supabase/migrations/20261112043814_founder_pa_funding_reviews.sql` keeps `public.founder_pa_funding_reviews` RLS-enabled and service-role-only (select, insert, update); its filename is unchanged because #1094 reports that version already applied to the live Supabase project. The Playwright proof (`e2e/pa-funding-workspace-proof.mjs`) mocks the API and login, so it proves page behaviour, not authenticated live persistence.
+
 ## November 16, 2026 — webchat `/human` handoff wired behind a project allowlist (candidate, not runtime proof)
 
 `POST /webchat/messages` accepts first-party webchat messages, records a `/human` request as a `pending_human` row in the service-role-only `webchat_human_handoffs` table (at most one open row per conversation, enforced by a partial unique index, so retries collapse), and reports `botMayReply: false` for that conversation until a founder releases it through `POST /webchat/handoffs/:key/release` (queue: `GET /webchat/handoffs`). The public route returns 404 unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`, which is unset by default; it is rate limited, capped at 4 KB, stamps time server-side, never generates or sends a reply, and returns 503 rather than success when the queue cannot be written. Nothing is live until the migration is applied, the allowlist is set, and the webchat channel's notice, disclosure, consent, retention and security-review requirements are met.
@@ -33,6 +37,10 @@ A read-only Cloudflare audit on November 15, 2026 observed `SUPABASE_URL`, `FOUN
 ## November 15, 2026 — public Pages MCP route allowlist (candidate, not deployment proof)
 
 `public/_worker.js` now forwards only an explicit allowlist of MCP protocol routes from the public Pages origin to `FCR_API`: `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the `/mcp/portfolio/<slug>` bridges the API mounts. Any other `/mcp` path, including founder administration (`/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`), the write-capable `/mcp/founder-signal-engine` lane, unknown descendants, and case, slash, or percent-encoded variants, fails closed with a `404 MCP_ROUTE_NOT_PUBLIC` before any API call. Those routes stay reachable on the API origin under their existing authentication. This is source and unit-test behavior only; it does not prove the deployed Pages artifact, Cloudflare Access configuration, or live MCP authentication.
+
+## Founder OS mission-patch simulation contract (candidate, not release proof)
+
+A simulator-generated `repository-source` edit must remain an in-memory artifact until the existing founder-authenticated `POST /approvals/:missionId/patch` route accepts it. The server must independently verify the live mission branch, pinned SHA, original file contents and proposed file hashes, then reserve an idempotent action before its GitHub provider commits. A staged receipt cannot grant merge, deployment, or production authority; independent human review, full exact-head CI and Playwright proof remain separate gates.
 
 ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
