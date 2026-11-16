@@ -139,20 +139,47 @@ export function buildTestLedger({runtimeState = null,
   };
 }
 
-async function githubJson(url, token) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'control-room-test-ledger',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
-  if (!response.ok) {
+const GITHUB_TRANSIENT_ATTEMPTS = 4;
+const GITHUB_TRANSIENT_BASE_DELAY_MS = 2_000;
+
+function isTransientGithubStatus(status) {
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+// One check-run read inside a ~20-minute observation window. A transient
+// provider fault (5xx, 429, network error) is retried with backoff instead of
+// killing the whole window; any 4xx or final failure still throws, so a
+// partial or failed read is never treated as an observation.
+export async function githubJson(url, token, {
+  fetchImpl = fetch,
+  sleepImpl = sleep,
+  attempts = GITHUB_TRANSIENT_ATTEMPTS,
+  baseDelayMs = GITHUB_TRANSIENT_BASE_DELAY_MS,
+} = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'control-room-test-ledger',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+    } catch (error) {
+      lastError = new Error(`GitHub check lookup failed (network): ${error instanceof Error ? error.message : String(error)}`);
+      if (attempt < attempts) await sleepImpl(baseDelayMs * 2 ** (attempt - 1));
+      continue;
+    }
+    if (response.ok) return response.json();
     const body = await response.text();
-    throw new Error(`GitHub check lookup failed (${response.status}): ${body.slice(0, 500)}`);
+    lastError = new Error(`GitHub check lookup failed (${response.status}): ${body.slice(0, 500)}`);
+    if (!isTransientGithubStatus(response.status)) throw lastError;
+    if (attempt < attempts) await sleepImpl(baseDelayMs * 2 ** (attempt - 1));
   }
-  return response.json();
+  throw lastError;
 }
 
 export async function fetchAllCheckRuns({repository, sha, token, getJson = githubJson}) {

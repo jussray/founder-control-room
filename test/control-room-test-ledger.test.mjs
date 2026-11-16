@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   aggregateTestLedger,
   fetchAllCheckRuns,
+  githubJson,
   buildTestLedger,
   mapCheckState,
   selectLatestChecks,
@@ -143,4 +144,47 @@ test('refuses partial, duplicate, malformed, and saturated check-run snapshots',
       total_count: 1000, check_runs: first,
     }),
   }), /1000-record limit/u);
+});
+
+function fakeResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+
+test('retries transient GitHub 5xx and network faults, then returns the observed page', async () => {
+  const replies = [
+    () => fakeResponse(502, {message: 'Server Error'}),
+    () => { throw new Error('socket hang up'); },
+    () => fakeResponse(503, {message: 'Unavailable'}),
+    () => fakeResponse(200, {total_count: 0, check_runs: []}),
+  ];
+  const delays = [];
+  const payload = await githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => replies.shift()(),
+    sleepImpl: async (ms) => { delays.push(ms); },
+    baseDelayMs: 10,
+  });
+  assert.deepEqual(payload, {total_count: 0, check_runs: []});
+  assert.deepEqual(delays, [10, 20, 40]);
+  assert.equal(replies.length, 0);
+});
+
+test('fails closed after the transient retry budget and never retries a 4xx', async () => {
+  let calls = 0;
+  await assert.rejects(githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => { calls += 1; return fakeResponse(502, {message: 'Server Error'}); },
+    sleepImpl: async () => {},
+  }), /GitHub check lookup failed \(502\)/);
+  assert.equal(calls, 4);
+
+  calls = 0;
+  await assert.rejects(githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => { calls += 1; return fakeResponse(404, {message: 'Not Found'}); },
+    sleepImpl: async () => {},
+  }), /GitHub check lookup failed \(404\)/);
+  assert.equal(calls, 1);
 });
