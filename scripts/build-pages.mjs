@@ -4,6 +4,7 @@ import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/pro
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { relative, resolve } from 'node:path';
+import { localAssetReferences } from './pages-asset-references.mjs';
 
 await import('./verify-sekret-bip-control-room-bridge.mjs');
 
@@ -87,13 +88,14 @@ for (const relativePath of requiredAssets.filter(path => path.endsWith('.html'))
   if (!/<!doctype html>/i.test(markup) || !/<html\b/i.test(markup) || !/<body\b/i.test(markup) || !/<\/html\s*>/i.test(markup)) {
     throw new Error(`Cloudflare Pages output has malformed required HTML: ${relativePath}`);
   }
-  for (const match of markup.matchAll(/<(?:script|link)\b[^>]*?\b(?:src|href)\s*=\s*["'](\/[^"'?#]+)["']/gi)) {
-    const assetPath = match[1];
-    if (assetPath.startsWith('//') || assetPath.includes('..')) continue;
+  for (const { reference, path: assetPath, escapes } of localAssetReferences(markup, relativePath)) {
+    if (escapes) {
+      throw new Error(`Cloudflare Pages page ${relativePath} references an asset outside the output root: ${reference}`);
+    }
     try {
-      await access(resolve(outputDirectory, '.' + assetPath), constants.R_OK);
+      await access(resolve(outputDirectory, assetPath || '.'), constants.R_OK);
     } catch {
-      throw new Error(`Cloudflare Pages page ${relativePath} references missing asset: ${assetPath}`);
+      throw new Error(`Cloudflare Pages page ${relativePath} references missing asset: ${reference}`);
     }
   }
 }
