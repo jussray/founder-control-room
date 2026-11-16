@@ -1,5 +1,9 @@
 # Cloudflare Reasoning Contract
 
+## November 15, 2026 — exact-commit Worker version tag readback (candidate)
+
+Reasoning about which commit the production Worker runs must not rely on the `/version` `gitSha` runtime marker alone. Candidate `.github/workflows/deploy.yml` tags each production Worker version with the exact approved SHA (`--tag`) and fails the deploy job unless provider readback shows the newest deployment routing 100% to one version whose `workers/tag` equals it (`scripts/worker-deployment-version-tag.mjs`). A matching tag shows only the commit recorded on the provider version. It does not show runtime behaviour, the Pages binding, or secret state. No deploy was run for this change. A read-only audit on November 15, 2026 observed that no existing version carries a tag, message or commit SHA.
+
 ## November 7, 2026 — candidate Gmail AI Inbox read boundary
 
 PR #948 adds an on-demand founder-authenticated Gmail metadata read adapter under the existing FCR API Worker, with fixed account/project/custom-label checks, observation-only triage, and no message bodies or inbox mutations. `wrangler.worker.toml [secrets].optional` now declares Gmail configuration names **only as optional feature intent**, not boot-required bindings; no secret value, Google OAuth grant, Gmail label, or live provider read has been observed through this code change. Read permissions and send permissions are separate authorization boundaries, and connected ChatGPT Gmail does not automatically authorize an FCR Worker.
@@ -336,3 +340,8 @@ For an external connector's authorization request, the Pages edge redirects only
 ## November 14, 2026 — production credential observation boundary
 
 The production Cloudflare credential diagnostic is founder-dispatched only. It checks out the supplied full main SHA with persisted checkout credentials disabled, refetches live main, and stops unless both identities match. It prints only presence, non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it never prints a credential, deploys, rotates a secret, or changes a provider resource. Pull-request code must never receive the production deployment credential. A successful diagnostic proves only what the production environment resolved at that exact main identity, not release or runtime health.
+
+
+## November 15, 2026 — Worker `[vars]`/secret collision boundary (candidate)
+
+`scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. Why: a name bound both as plain text and as a secret makes the first canonical `wrangler deploy` fail or leaves the runtime binding ambiguous, and the current provider Worker has never been uploaded from `wrangler.worker.toml`, so the first real deploy is untested. The gate proves only that the checked-in names and the read-back names were disjoint at gate time; it does not prove which value the runtime would use, credential validity, release, or runtime health.
