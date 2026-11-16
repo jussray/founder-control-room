@@ -31,7 +31,9 @@
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
         "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
-        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts."
+        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
+        "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
+        "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy."
       ]
     },
     {
@@ -395,7 +397,8 @@
         "`scripts/verify-documentation-truth.mjs` must classify every mandatory ULTRATHINK governance companion under `skills/` as truth-sensitive and record these Markdown paths in changed documentation, rejecting future rule changes lacking path-bound receipt claims and substantive README/truth-decay refresh.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
+        "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized."
       ]
     },
     {
@@ -824,6 +827,31 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+      ]
+    },
+    {
+      "path": "scripts/worker-deployment-version-tag.mjs",
+      "claims": [
+        "`evaluateWorkerVersionTag` is a pure function: it passes only when the newest deployment (by `created_on`, independent of list order) routes 100% to a single version, the viewed version id equals that active id, and its `workers/tag` equals a lowercase 40-character expected SHA; missing, prefix, different, split-traffic, empty, or malformed input fails closed. Its unit tests prove this comparison logic only, not wrangler JSON shape stability or Cloudflare behaviour."
+      ]
+    },
+    {
+      "path": "scripts/documentation-truth-claim-fingerprint.mjs",
+      "claims": [
+        "`scripts/documentation-truth-claim-fingerprint.mjs` must fingerprint receipt claims by discarding only non-semantic HTML comments, Markdown link destinations, HTML wrappers, casing, and punctuation while keeping logical and comparison operators as distinct tokens, so inherited wording cannot be repackaged as a fresh invariant. A fingerprint proves textual identity only, never claim truth or authority."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentProviderReadback.ts",
+      "claims": [
+        "src/lib/n8nFounderContentProviderReadback.ts must fail closed unless a sanitized provider-native API observation matches the pending scheduled n8n receipt and exact orchestration, provider item/request identity, source repository/SHA, platform/channel, and requested schedule; it must never elevate scheduled state into publication truth or retain unsupported provider payload fields, and passing tests prove only this source contract, not that any production adapter calls it or that a Buffer object exists."
       ]
     },
     {
