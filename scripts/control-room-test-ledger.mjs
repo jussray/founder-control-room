@@ -182,37 +182,52 @@ export async function githubJson(url, token, {
   throw lastError;
 }
 
-export async function fetchAllCheckRuns({repository, sha, token, getJson = githubJson}) {
+// GitHub check runs can arrive while pages are being read. Re-enumerate the
+// complete set when an offset-based page boundary moves; never dedupe away
+// missing runs or treat an incomplete snapshot as a passing observation.
+const CHECK_SNAPSHOT_RETRY_DELAYS_MS = [250, 500];
+
+export async function fetchAllCheckRuns({
+  repository, sha, token, getJson = githubJson, sleepImpl = sleep,
+}) {
   const [owner, repo] = clean(repository).split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must use owner/repo format.');
 
-  const runs = [];
-  let providerTotal = null;
-  for (let page = 1; page <= 10; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`);
-    url.searchParams.set('filter', 'all');
-    url.searchParams.set('per_page', '100');
-    url.searchParams.set('page', String(page));
-    const payload = await getJson(url, token);
-    if (!Array.isArray(payload?.check_runs) || !Number.isSafeInteger(payload.total_count) || payload.total_count < 0) {
-      throw new Error('GitHub check-run page has an invalid or incomplete shape.');
+  let lastError;
+  for (let attempt = 0; attempt <= CHECK_SNAPSHOT_RETRY_DELAYS_MS.length; attempt += 1) {
+    const runs = [];
+    let providerTotal = null;
+    let countMoved = false;
+    for (let page = 1; page <= 10; page += 1) {
+      const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`);
+      url.searchParams.set('filter', 'all');
+      url.searchParams.set('per_page', '100');
+      url.searchParams.set('page', String(page));
+      const payload = await getJson(url, token);
+      if (!Array.isArray(payload?.check_runs) || !Number.isSafeInteger(payload.total_count) || payload.total_count < 0) {
+        throw new Error('GitHub check-run page has an invalid or incomplete shape.');
+      }
+      const pageRuns = payload.check_runs;
+      if (providerTotal === null) providerTotal = payload.total_count;
+      else if (payload.total_count !== providerTotal) countMoved = true;
+      runs.push(...pageRuns);
+      if (page === 10 && pageRuns.length === 100) {
+        throw new Error('GitHub check-run enumeration reached the 1000-record limit; refusing partial ledger.');
+      }
+      if (pageRuns.length < 100) break;
     }
-    const pageRuns = payload.check_runs;
-    providerTotal = payload.total_count;
-    runs.push(...pageRuns);
-    if (page === 10 && pageRuns.length === 100) {
-      throw new Error('GitHub check-run enumeration reached the 1000-record limit; refusing partial ledger.');
+    const ids = runs.map((run) => String(run?.id ?? ''));
+    const invalidIds = ids.some((id) => !/^\d+$/.test(id)) || new Set(ids).size !== runs.length;
+    if (!invalidIds && !countMoved && providerTotal === runs.length) return runs;
+
+    lastError = invalidIds
+      ? new Error('GitHub check-run pagination returned missing or duplicate IDs; refusing partial ledger.')
+      : new Error(`GitHub check-run enumeration incomplete: fetched ${runs.length} of ${providerTotal}; refusing partial ledger.`);
+    if (attempt < CHECK_SNAPSHOT_RETRY_DELAYS_MS.length) {
+      await sleepImpl(CHECK_SNAPSHOT_RETRY_DELAYS_MS[attempt]);
     }
-    if (pageRuns.length < 100) break;
   }
-  const ids = runs.map((run) => String(run?.id ?? ''));
-  if (ids.some((id) => !/^\d+$/.test(id)) || new Set(ids).size !== runs.length) {
-    throw new Error('GitHub check-run pagination returned missing or duplicate IDs; refusing partial ledger.');
-  }
-  if (providerTotal !== runs.length) {
-    throw new Error(`GitHub check-run enumeration incomplete: fetched ${runs.length} of ${providerTotal}; refusing partial ledger.`);
-  }
-  return runs;
+  throw lastError;
 }
 
 function sleep(milliseconds) {

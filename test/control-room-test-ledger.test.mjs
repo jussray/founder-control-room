@@ -124,7 +124,7 @@ test('paginates complete check-run snapshots and preserves all provider IDs', as
 });
 
 test('refuses partial, duplicate, malformed, and saturated check-run snapshots', async () => {
-  const base = { repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token' };
+  const base = { repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token', sleepImpl: async () => {} };
   await assert.rejects(fetchAllCheckRuns({
     ...base, getJson: async () => ({ total_count: 3, check_runs: [check({ id: 1 })] }),
   }), /incomplete/u);
@@ -144,6 +144,47 @@ test('refuses partial, duplicate, malformed, and saturated check-run snapshots',
       total_count: 1000, check_runs: first,
     }),
   }), /1000-record limit/u);
+});
+
+test('re-enumerates all pages after a transient duplicate from a moving GitHub check set', async () => {
+  const first = Array.from({length: 100}, (_, i) => check({id: i + 1}));
+  let snapshot = 0;
+  const delays = [];
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => {
+      if (url.searchParams.get('page') === '1') {
+        snapshot += 1;
+        return {total_count: 101, check_runs: first};
+      }
+      return {total_count: 101, check_runs: [check({id: snapshot === 1 ? 100 : 101})]};
+    },
+    sleepImpl: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(snapshot, 2);
+  assert.deepEqual(delays, [250]);
+  assert.equal(fetched.length, 101);
+  assert.equal(new Set(fetched.map(({id}) => id)).size, 101);
+});
+
+test('does not accept changing provider totals across pages as an exact-head snapshot', async () => {
+  const first = Array.from({length: 100}, (_, i) => check({id: i + 1}));
+  let snapshot = 0;
+  const delays = [];
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => {
+      if (url.searchParams.get('page') === '1') {
+        snapshot += 1;
+        return {total_count: 101, check_runs: first};
+      }
+      return {total_count: snapshot === 1 ? 102 : 101, check_runs: [check({id: 101})]};
+    },
+    sleepImpl: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(snapshot, 2);
+  assert.deepEqual(delays, [250]);
+  assert.equal(fetched.length, 101);
 });
 
 function fakeResponse(status, body) {
