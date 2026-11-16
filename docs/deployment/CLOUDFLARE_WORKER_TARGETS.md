@@ -14,6 +14,13 @@ Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API read
 - The active production `founder-control-room` Worker version observed was a placeholder stub (a fetch handler that returns a fixed placeholder response), not the API Worker built from `main`. No observed version carried a commit SHA, tag, or message.
 - Green Cloudflare Pages or Workers Builds checks on a commit do not prove that the API Worker runs that commit. Production promotion remains the manual GitHub `Deploy` / `FCR Worker Reconcile` lane, and runtime proof still requires exact-SHA `/health`, `/version`, Pages binding, and browser evidence.
 
+FCR member sign-in and workspace navigation are apex-cookie-bound: safe `GET`/`HEAD` visits from `www.foundercontrolroom.org` to `/welcome` or `/member/` must redirect to the apex Pages origin before browser authentication state is consumed. This change is separate from public SEO canonical URLs, cannot redirect mutating sign-in requests, cannot expose host-only cookies to `www`, and requires live browser/provider readback before a production-ready claim.
+
+
+## November 3, 2026 — separate member browser session candidate (PR #1060)
+
+The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.
+
 ## November 15, 2026 — `[vars]`/secret name-collision preflight (candidate, not deployed)
 
 `scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. A name must live in exactly one place: a plain `[vars]` binding or a provider-held secret. The November 15, 2026 read-only audit (historical; re-observe before use) saw `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` on both sides, so the next gated deploy fails closed until a founder-authorized cleanup removes one side. No secret, var, deployment or provider resource is changed by this source change.
@@ -239,8 +246,6 @@ The canonical Deploy workflow's authority gate performs the same Wrangler enumer
 
 The Deploy workflow's Post-Deploy Reconciliation job runs after `smoke-test`, is bounded by a 15-minute timeout, and sets `continue-on-error: true`. It inspects database state after promotion and does not gate the Worker target above. A reconciliation failure appears on that job but does not change the Deploy run's conclusion, so the Worker target is not evidence that reconciliation passed.
 
-The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.
-
 The Worker-only reconciliation runtime proof must check the `X-Founder-Control-Room-Service` header and exact approved `gitSha` in the **direct API `/version`** response, and then independently check that the **public Pages `/version`** proxy returns the same required header and exact SHA. Successful `/health` alone, a JSON `/version` body without its header, a Pages preview deployment, or the existence of `FCR_API` service binding is not sufficient. The redacted Pages-proxy proof receipt is produced only after live readback; a green source contract test never substitutes for that receipt.
 
 FCR's `public-web-observation-v1` contract does not require a dedicated provider-held Worker secret. Public-web adapter selection occurs behind FCR's governed read-only research hub, so changing or losing an adapter cannot silently change product authority or become proof of an observed outcome.
@@ -308,6 +313,8 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.
 
 
 ## Production credential diagnostic boundary

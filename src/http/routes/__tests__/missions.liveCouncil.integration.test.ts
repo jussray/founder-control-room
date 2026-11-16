@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock, runCouncilRoundMock } = vi.hoisted(() => ({
@@ -29,7 +30,7 @@ function app() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: FOUNDER_EMAIL } }, error: null });
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } }, error: null });
   runCouncilRoundMock.mockImplementation(async (input: any) => {
     const row = {
       mission_id: input.missionId,
@@ -74,7 +75,7 @@ describe('POST /missions/:missionId/council/run', () => {
     let inserted: Record<string, any> | null = null;
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') {
-        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }) }) }) };
+        return { ...boundFounderRow(FOUNDER_EMAIL, 'u1') };
       }
       if (table === 'missions') {
         return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: MISSION_ID, project_id: 'project-1' }, error: null }) }) }) };
@@ -120,7 +121,7 @@ describe('POST /missions/:missionId/council/run', () => {
     let inserted: Record<string, any> | null = null;
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') {
-        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }) }) }) };
+        return { ...boundFounderRow(FOUNDER_EMAIL, 'u1') };
       }
       if (table === 'missions') {
         return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: MISSION_ID, project_id: 'project-1' }, error: null }) }) }) };

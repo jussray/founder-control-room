@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 16, 2026 — Pennsylvania funding workspace, split from #1094 (candidate, not runtime proof)
+
+This adds the founder-only Pennsylvania funding review workspace from PR #1094 on its own, without #1094's merge-review governance changes, which stay on #1094 for a separate decision. `public/control-room/pa-funding.html` lists nine official-source programs and keeps eligibility UNKNOWN until evidence passes; the REVIEW → VERIFY → PREPARE stages save private checklist state, and APPLY stays locked. `src/http/routes/paFundingReviews.ts` (`GET /pa-funding/reviews`, `PUT /pa-funding/reviews/:opportunityId`) requires `requireFounder`, has its own 60/min rate limit, accepts only the nine program ids and the three non-APPLY stages, and returns 503 rather than success when storage fails. `supabase/migrations/20261112043814_founder_pa_funding_reviews.sql` keeps `public.founder_pa_funding_reviews` RLS-enabled and service-role-only (select, insert, update); its filename is unchanged because #1094 reports that version already applied to the live Supabase project. The Playwright proof (`e2e/pa-funding-workspace-proof.mjs`) mocks the API and login, so it proves page behaviour, not authenticated live persistence.
+
 ## November 16, 2026 — webchat `/human` handoff wired behind a project allowlist (candidate, not runtime proof)
 
 `POST /webchat/messages` accepts first-party webchat messages, records a `/human` request as a `pending_human` row in the service-role-only `webchat_human_handoffs` table (at most one open row per conversation, enforced by a partial unique index, so retries collapse), and reports `botMayReply: false` for that conversation until a founder releases it through `POST /webchat/handoffs/:key/release` (queue: `GET /webchat/handoffs`). The public route returns 404 unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`, which is unset by default; it is rate limited, capped at 4 KB, stamps time server-side, never generates or sends a reply, and returns 503 rather than success when the queue cannot be written. Nothing is live until the migration is applied, the allowlist is set, and the webchat channel's notice, disclosure, consent, retention and security-review requirements are met.
@@ -29,6 +33,17 @@ Migration `20261115194101_guard_federated_relay_v3_public_key_immutability.sql` 
 `scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. CI runs the unit tests and the offline check in the `Cloudflare bridge authority contract` job.
 
 A read-only Cloudflare audit on November 15, 2026 observed `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` installed as Worker secrets while `wrangler.worker.toml` declares them as plain `[vars]`; that observation is historical and must be re-read before use. If it is still true, production Deploy and Worker Reconcile will stop at this gate until the founder decides which side to remove; this change does not remove, rename or rotate any secret. Source and unit tests do not prove GitHub CI, credential validity, a deploy, or runtime health.
+
+Auth-origin consistency: the Pages source must route `GET` and `HEAD` requests for `www.foundercontrolroom.org/welcome` and `/member/` to the apex browser-session origin before login or member-session reads. The host-only founder/member cookies remain scoped to the apex; login POSTs are never redirected or granted cross-origin authority. This is a candidate Pages routing rule, not proof that live www DNS, Cloudflare redirects, or login are working.
+
+
+## November 3, 2026 — exact-head CI queue consolidation (candidate only)
+
+For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 3, 2026 — member sign-in and founder isolation (PR #1060, candidate only)
+
+This PR introduces a separate member email sign-in and an initially empty member workspace while retaining the founder's private authenticated control room. The Pages origin serves `/welcome` and `/member/` as static assets; same-origin `/auth/member/*` calls are proxied to the canonical API Worker. A verified Supabase member identity may receive a separate host-only, Secure, HttpOnly, SameSite=Strict browser session backed by a service-role-only, revocable database record. Founder sessions must be revoked on a member switch and founder allowlisted addresses cannot enter the member workspace. The merged welcome view preserves the approved full founder title, invitation-only founder instructions, and the distinct member entry. The separate Neon PR preview may provide only an isolated synthetic `auth.users` compatibility fixture, but must execute the original migration SQL atomically and verify the resulting FK, RLS and table privileges. This preview is not a Supabase production migration or real auth test. This is a source candidate: migration installation, email delivery, real callback, tenant isolation, Workers/Pages deployment, and live readback remain unverified. Do not count a successful isolated unit or simulated browser test as production evidence, nor use this PR to grant merge or deploy authority.
 
 ## November 15, 2026 — public Pages MCP route allowlist (candidate, not deployment proof)
 
@@ -747,6 +762,11 @@ Workflow YAML syntax is checked on the same exact head: the `python-tests` job r
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
+
+
+## Member-owned project drafts (source candidate)
+
+The ordinary-member workspace has private project create, list, resume and versioned save routes, using only the member's verified session and a separate owner-scoped project table. See [Member project drafts](docs/MEMBER_PROJECT_DRAFTS.md) for behavior, isolation, migration prerequisites and release gates. This source change does not establish that its migration or runtime is live.
 
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 

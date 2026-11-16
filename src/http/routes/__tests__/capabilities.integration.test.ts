@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, mockEnqueueReconcile, supabaseMock } = vi.hoisted(() => ({
@@ -29,18 +30,14 @@ function buildApp() {
 
 function authorizeFounder() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'u1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'u1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
 
 function founderAllowlistBuilder() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'u1'),
   };
 }
 
