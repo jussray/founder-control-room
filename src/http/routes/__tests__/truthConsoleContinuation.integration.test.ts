@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, fromSpy, taskFilterSpy } = vi.hoisted(() => ({
@@ -31,14 +32,12 @@ function app() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-1', email: 'founder@example.org' } },
+    data: { user: { id: 'founder-1', email: 'founder@example.org', email_confirmed_at: '2026-11-01T00:00:00.000Z' } },
     error: null,
   });
   fromSpy.mockImplementation((table: string) => {
     if (table === 'founder_users') {
-      return { select: () => ({ eq: () => ({
-        maybeSingle: async () => ({ data: { email: 'founder@example.org' }, error: null }),
-      }) }) };
+      return boundFounderRow('founder@example.org', 'founder-1');
     }
     if (table === 'continuity_records') {
       let excludesTaskPointers = false;
