@@ -133,7 +133,11 @@ provider webhook or inbound event
 - **Viber:** bot creation is commercially gated; users generally must subscribe
   before bot messaging. Treat it as a later adapter, not a launch dependency.
 - **Webchat:** first-party and highest-control, but still requires disclosure,
-  consent, retention, security, and human-handoff rules.
+  consent, retention, security, and human-handoff rules. Human handoff has a
+  contract-capable `/human` command (`src/growth/webchatHumanHandoff.ts`):
+  it pauses the bot for that conversation, queues `pending_human`, and returns
+  an acknowledgement with no response-time promise. It grants no dispatch
+  authority and is not yet wired to a live webchat route or persistence.
 - **Google Business Messages:** retired. Do not build a new adapter. Replace it
   with Google Business Profile links to the website, phone, and supported channels.
 
