@@ -853,6 +853,13 @@
       "claims": [
         "src/lib/n8nFounderContentProviderReadback.ts must fail closed unless a sanitized provider-native API observation matches the pending scheduled n8n receipt and exact orchestration, provider item/request identity, source repository/SHA, platform/channel, and requested schedule; it must never elevate scheduled state into publication truth or retain unsupported provider payload fields, and passing tests prove only this source contract, not that any production adapter calls it or that a Buffer object exists."
       ]
+    },
+    {
+      "path": "src/governance/capitalControlArchitecture.ts",
+      "claims": [
+        "`src/governance/capitalControlArchitecture.ts` must remain advisory-only in v1: it cannot return ALLOW or execution authority, cannot treat caller-supplied architecture state or evidence labels as independently verified legal truth, and must require a separate trusted evidence verifier plus founder/legal authority before any consequential capital action.",
+        "`src/governance/capitalControlArchitecture.ts` must hard-block automated founder-control surrender and investor operational authority, require legal-entity evidence for securities issuance/offering review, and keep project ownership/economic rights separate from repository, deploy, provider, credential, and product-execution authority."
+      ]
     }
   ]
 }
