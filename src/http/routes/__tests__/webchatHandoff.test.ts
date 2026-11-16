@@ -21,6 +21,9 @@ function memoryStore(): WebchatHandoffStore & { rows: Map<string, WebchatHandoff
     rows,
     async record(h: WebchatHumanHandoff) {
       if (rows.has(h.idempotencyKey)) return 'duplicate';
+      const openForConversation = [...rows.values()].some((r) => r.projectId === h.projectId
+        && r.conversationId === h.providerConversationId && r.state === 'pending_human');
+      if (openForConversation) return 'duplicate';
       rows.set(h.idempotencyKey, {
         idempotencyKey: h.idempotencyKey,
         projectId: h.projectId,
@@ -42,10 +45,10 @@ function memoryStore(): WebchatHandoffStore & { rows: Map<string, WebchatHandoff
     },
     async release(key) {
       const row = rows.get(key);
-      if (!row || row.state !== 'pending_human') return false;
+      if (!row || row.state !== 'pending_human') return null;
       row.state = 'released';
       row.releasedAt = NOW.toISOString();
-      return true;
+      return { projectId: row.projectId, conversationId: row.conversationId };
     },
   };
 }
@@ -105,6 +108,27 @@ describe('POST /webchat/messages', () => {
     const resumed = await request(a).post('/webchat/messages').send(message('hello again'));
     expect(resumed.body.botMayReply).toBe(true);
     expect((await request(a).post(`/webchat/handoffs/${encodeURIComponent(key)}/release`)).status).toBe(404);
+  });
+
+  it('collapses retried or repeated /human onto one open handoff per conversation', async () => {
+    const store = memoryStore();
+    let t = 0;
+    const a = express();
+    a.post('/webchat/messages', express.json(), createWebchatMessageHandler(store, {
+      env: ENV,
+      now: () => new Date(NOW.getTime() + (t += 1000)),
+    }));
+    a.use('/webchat', createWebchatHandoffRouter(store));
+    const first = await request(a).post('/webchat/messages').send(message('/human'));
+    const retry = await request(a).post('/webchat/messages').send(message('/human'));
+    expect(first.body.handoff.disposition).toBe('stored');
+    expect(retry.body.handoff.disposition).toBe('duplicate');
+    expect(store.rows.size).toBe(1);
+    const [key] = [...store.rows.keys()];
+    const released = await request(a).post(`/webchat/handoffs/${encodeURIComponent(key)}/release`);
+    expect(released.body.botMayReply).toBe(true);
+    const after = await request(a).post('/webchat/messages').send(message('hello'));
+    expect(after.body.botMayReply).toBe(true);
   });
 
   it('lets the bot reply in conversations without a handoff', async () => {

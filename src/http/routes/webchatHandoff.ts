@@ -115,7 +115,9 @@ export function createWebchatHandoffRouter(store: WebchatHandoffStore): Router {
         fail(res, 404, 'No pending handoff with that key.');
         return;
       }
-      res.json({ ok: true, released: key, botMayReply: true });
+      // Report the stored state, not an assumption.
+      const stillOpen = await store.hasOpenHandoff(released.projectId, released.conversationId);
+      res.json({ ok: true, released: key, botMayReply: !stillOpen });
     } catch {
       fail(res, 503, 'Handoff queue unavailable.');
     }

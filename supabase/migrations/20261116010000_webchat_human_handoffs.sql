@@ -19,7 +19,9 @@ create table public.webchat_human_handoffs (
   check ((state = 'released') = (released_at is not null))
 );
 
-create index webchat_human_handoffs_open_idx
+-- At most one open handoff per conversation: retries and repeated /human
+-- messages collapse onto the existing pending row.
+create unique index webchat_human_handoffs_one_open_idx
   on public.webchat_human_handoffs (project_id, conversation_id)
   where state = 'pending_human';
 create index webchat_human_handoffs_queue_idx

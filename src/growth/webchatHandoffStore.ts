@@ -29,8 +29,11 @@ export interface WebchatHandoffStore {
   record(handoff: WebchatHumanHandoff): Promise<WebchatHandoffStoreDisposition>;
   hasOpenHandoff(projectId: string, conversationId: string): Promise<boolean>;
   listPending(limit: number): Promise<WebchatHandoffRow[]>;
-  /** Returns false when no pending handoff matched the key. */
-  release(idempotencyKey: string, releasedBy: string): Promise<boolean>;
+  /**
+   * Releases a pending handoff. Returns null when no pending handoff matched
+   * the key, otherwise the released row's project and conversation.
+   */
+  release(idempotencyKey: string, releasedBy: string): Promise<{ projectId: string; conversationId: string } | null>;
 }
 
 const COLUMNS = 'idempotency_key,project_id,brand_id,conversation_id,visitor_hash,reason,state,requested_at,released_at';
@@ -56,9 +59,12 @@ function rowFrom(raw: Record<string, unknown>): WebchatHandoffRow {
 export function createSupabaseWebchatHandoffStore(client: SupabaseClient): WebchatHandoffStore {
   return {
     async record(handoff) {
-      const { data, error } = await client
+      // One open handoff per conversation, enforced by the partial unique index
+      // webchat_human_handoffs_one_open_idx. A retry or a repeated /human
+      // collides with it (or with the primary key) and is reported as duplicate.
+      const { error } = await client
         .from(WEBCHAT_HANDOFF_TABLE)
-        .upsert({
+        .insert({
           idempotency_key: handoff.idempotencyKey,
           project_id: handoff.projectId,
           brand_id: handoff.brandId,
@@ -68,10 +74,10 @@ export function createSupabaseWebchatHandoffStore(client: SupabaseClient): Webch
           reason: handoff.reason,
           state: handoff.state,
           requested_at: handoff.requestedAt,
-        }, { onConflict: 'idempotency_key', ignoreDuplicates: true })
-        .select('idempotency_key');
-      if (error) throw new Error(`webchat handoff store failed: ${error.message}`);
-      return (data ?? []).length > 0 ? 'stored' : 'duplicate';
+        });
+      if (!error) return 'stored';
+      if (error.code === '23505') return 'duplicate';
+      throw new Error(`webchat handoff store failed: ${error.message}`);
     },
 
     async hasOpenHandoff(projectId, conversationId) {
@@ -102,9 +108,10 @@ export function createSupabaseWebchatHandoffStore(client: SupabaseClient): Webch
         .update({ state: 'released', released_at: new Date().toISOString(), released_by: releasedBy })
         .eq('idempotency_key', idempotencyKey)
         .eq('state', 'pending_human')
-        .select('idempotency_key');
+        .select('project_id,conversation_id');
       if (error) throw new Error(`webchat handoff release failed: ${error.message}`);
-      return (data ?? []).length > 0;
+      const row = (data ?? [])[0] as Record<string, unknown> | undefined;
+      return row ? { projectId: str(row.project_id), conversationId: str(row.conversation_id) } : null;
     },
   };
 }
