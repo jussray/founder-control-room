@@ -213,3 +213,8 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. The approved source floor is one independent human approval; live GitHub enforcement is separately verified and may still be zero until trusted provider reconciliation.
 
 Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
+
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
