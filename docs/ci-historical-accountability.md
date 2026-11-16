@@ -2,7 +2,7 @@
 
 This record is append-only in meaning: a successor's green checks do not rewrite a predecessor's failed or cancelled checks. Entries distinguish observed CI from claimed remediation. Never mark a historical failure resolved solely because a later head is green.
 
-Base-bound: `0d97743f46cae788d0ecf0019351c34671a96501`
+Base-bound: `2e3a4263fadb1832145d67c9ff7fd1f654016efe`
 
 Rows below were reconciled against this main SHA. When main moves, the binding becomes stale and the audit fails closed until rows are re-verified.
 
