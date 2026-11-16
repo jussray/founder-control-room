@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth.js';
 import { memberAuthRouter } from './routes/memberAuth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
+import { paFundingReviewsRouter } from './routes/paFundingReviews.js';
 import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
@@ -408,6 +409,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/auth/member', memberAuthRouter);
   app.use('/onboarding', founderOnboardingRouter);
+  app.use('/pa-funding', paFundingReviewsRouter);
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/integration-cockpit', exactHeadCockpitRouter);
   app.use('/switchboard', switchboardRouter);
