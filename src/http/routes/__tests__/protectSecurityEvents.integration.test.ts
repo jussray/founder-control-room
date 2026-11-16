@@ -54,7 +54,7 @@ function signed(raw: string, secret = KEY, timestamp = TIMESTAMP, eventId = EVEN
 describe('authenticated Protect Me evidence-only ingestion', () => {
   it('fails closed with no separately configured credential', async () => {
     const store = vi.fn<ProtectSecurityEventStore>();
-    const result = await request(appFor(store, undefined))
+    const result = await request(appFor(store, ''))
       .post('/ingest/protect-security-events')
       .set(signed(JSON.stringify(payload())))
       .set('Content-Type', 'application/json')
@@ -65,8 +65,13 @@ describe('authenticated Protect Me evidence-only ingestion', () => {
 
   it('accepts only a signed redacted observation and strips any actor identity', async () => {
     const store = vi.fn<ProtectSecurityEventStore>().mockResolvedValue('stored');
-    const candidate = payload();
-    candidate.event.identity.actor = 'opaque-actor-fingerprint';
+    const candidate = {
+      ...payload(),
+      event: {
+        ...payload().event,
+        identity: { ...payload().event.identity, actor: 'opaque-actor-fingerprint' },
+      },
+    };
     const raw = JSON.stringify(candidate);
     const result = await request(appFor(store))
       .post('/ingest/protect-security-events')
