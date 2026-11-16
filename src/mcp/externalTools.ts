@@ -13,7 +13,9 @@ import {
 } from '../lib/fcrSkillRouter.js';
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
+import { OperatorRelayDispatchError } from '../lib/operatorRelayDispatch.js';
 import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
@@ -67,6 +69,12 @@ export interface RecordExternalMcpEvidenceInput {
   durationMs: number;
   risk?: 'read' | 'external_side_effect';
   estimatedCostUsd?: number;
+  outcomeStatus?: 'passed' | 'failed';
+  failure?: {
+    code: string;
+    provider?: string;
+    externalProviderCall: boolean;
+  };
 }
 
 export interface ExternalMcpToolDependencies {
@@ -126,6 +134,33 @@ const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function relayResultHasProviderEvidence(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const response = isRecord(value.response) ? value.response : null;
+  const evidenceRefs = Array.isArray(response?.evidenceRefs) ? response.evidenceRefs : [];
+  return evidenceRefs.some((entry) => typeof entry === 'string' && entry.startsWith('provider:'));
+}
+
+function relayFailureEvidence(error: unknown, targetOperator: RelayOperatorId): JsonRecord {
+  const providerBoundary = error instanceof OperatorRelayProviderBoundaryError ? error : null;
+  const dispatch = error instanceof OperatorRelayDispatchError ? error : null;
+  const externalProviderCall = providerBoundary !== null || dispatch?.externalProviderCall === true;
+  return {
+    contract: 'fcr/operator-relay-failure@v1',
+    status: 'failed',
+    targetOperator,
+    externalProviderCall,
+    ...(providerBoundary ? {
+      provider: providerBoundary.provider,
+      code: 'provider_boundary_failure',
+    } : dispatch ? {
+      code: dispatch.code,
+    } : {
+      code: 'relay_failed_before_provider',
+    }),
+  };
 }
 
 function text(value: unknown, field: string, maxLength = 200): string {
@@ -497,42 +532,69 @@ function defaultPreviewSkillRoute(input: {
   });
 }
 
+function boundedEvidenceLabel(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+  return normalized.slice(0, 120).replace(/[^a-zA-Z0-9._:-]/g, '_');
+}
+
+export function buildExternalMcpEvidenceRow(
+  projectId: string,
+  input: RecordExternalMcpEvidenceInput,
+): Record<string, unknown> {
+  const inputDigest = requestHash(input.arguments);
+  const resultDigest = requestHash(input.result);
+  const costEstimateAvailable = input.estimatedCostUsd !== undefined;
+  const outcomeStatus = input.outcomeStatus ?? 'passed';
+  const failure = outcomeStatus === 'failed'
+    ? {
+        code: boundedEvidenceLabel(input.failure?.code, 'external_mcp_failed'),
+        provider: input.failure?.provider
+          ? boundedEvidenceLabel(input.failure.provider, 'unknown')
+          : null,
+        externalProviderCall: input.failure?.externalProviderCall === true,
+      }
+    : undefined;
+
+  return {
+    project_id: projectId,
+    server_id: 'founder-control-room-external',
+    tool_name: input.toolName,
+    risk: input.risk ?? 'read',
+    policy_decision: 'allow',
+    status: outcomeStatus,
+    request_hash: inputDigest,
+    request_summary: {
+      contract: 'founder-control-room/external-mcp-receipt@v1',
+      requestId: input.requestId,
+      projectSlug: input.projectSlug,
+      argumentKeys: Object.keys(input.arguments).sort(),
+      actorHash: requestHash(input.identity.userId),
+      clientHash: requestHash(input.identity.clientId),
+      authMode: input.identity.authMode,
+      cookiesUsed: false,
+      fingerprintsUsed: false,
+    },
+    response_summary: {
+      resultHash: resultDigest,
+      rawResultStored: false,
+      costEstimateAvailable,
+      ...(failure ? { failure } : {}),
+    },
+    duration_ms: input.durationMs,
+    estimated_cost_usd: input.estimatedCostUsd ?? 0,
+  };
+}
+
 async function defaultRecordEvidence(
   input: RecordExternalMcpEvidenceInput,
 ): Promise<ExternalMcpReceipt> {
   const project = await projectRow(input.projectSlug);
   const inputDigest = requestHash(input.arguments);
   const resultDigest = requestHash(input.result);
-  const costEstimateAvailable = input.estimatedCostUsd !== undefined;
   const { data, error } = await supabase
     .from('mcp_tool_calls')
-    .insert({
-      project_id: project.id,
-      server_id: 'founder-control-room-external',
-      tool_name: input.toolName,
-      risk: input.risk ?? 'read',
-      policy_decision: 'allow',
-      status: 'passed',
-      request_hash: inputDigest,
-      request_summary: {
-        contract: 'founder-control-room/external-mcp-receipt@v1',
-        requestId: input.requestId,
-        projectSlug: input.projectSlug,
-        argumentKeys: Object.keys(input.arguments).sort(),
-        actorHash: requestHash(input.identity.userId),
-        clientHash: requestHash(input.identity.clientId),
-        authMode: input.identity.authMode,
-        cookiesUsed: false,
-        fingerprintsUsed: false,
-      },
-      response_summary: {
-        resultHash: resultDigest,
-        rawResultStored: false,
-        costEstimateAvailable,
-      },
-      duration_ms: input.durationMs,
-      estimated_cost_usd: input.estimatedCostUsd ?? 0,
-    })
+    .insert(buildExternalMcpEvidenceRow(project.id, input))
     .select('id,created_at')
     .single();
 
@@ -743,6 +805,7 @@ export function createExternalMcpToolExecutor(
     let result: unknown;
     let receiptProject = 'founder-control-room';
     let evidenceRisk: RecordExternalMcpEvidenceInput['risk'] = 'read';
+    let relayExternalProviderCall = false;
 
     if (input.name === 'chief_audit_repository') {
       allowedProject('chief-ai-machine', input.allowedProjects);
@@ -812,8 +875,7 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      evidenceRisk = 'external_side_effect';
-      result = await relayOperatorCall({
+      const relayInput = {
         fromOperator,
         toOperator,
         capability: relayCapability(input.arguments.capability),
@@ -821,7 +883,40 @@ export function createExternalMcpToolExecutor(
         contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
         sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
         sensitivity: relaySensitivity(input.arguments.sensitivity),
-      });
+      };
+      try {
+        result = await relayOperatorCall(relayInput);
+      } catch (error) {
+        const failure = relayFailureEvidence(error, toOperator);
+        const failedExternalProviderCall = failure.externalProviderCall === true;
+        try {
+          await recordEvidence({
+            identity: input.identity,
+            requestId: input.requestId,
+            projectSlug: receiptProject,
+            toolName: input.name,
+            arguments: input.arguments,
+            result: failure,
+            durationMs: Math.max(0, Date.now() - startedAt),
+            risk: failedExternalProviderCall ? 'external_side_effect' : 'read',
+            outcomeStatus: 'failed',
+            failure: {
+              code: typeof failure.code === 'string' ? failure.code : 'external_mcp_failed',
+              provider: typeof failure.provider === 'string' ? failure.provider : undefined,
+              externalProviderCall: failedExternalProviderCall,
+            },
+          });
+        } catch {
+          throw new Error(
+            failedExternalProviderCall
+              ? 'operator relay evidence recording failed after external provider call'
+              : 'operator relay evidence recording failed before external provider call',
+          );
+        }
+        throw error;
+      }
+      relayExternalProviderCall = relayResultHasProviderEvidence(result);
+      evidenceRisk = relayExternalProviderCall ? 'external_side_effect' : 'read';
     } else {
       noUnexpectedKeys(
         input.arguments,
@@ -878,7 +973,7 @@ export function createExternalMcpToolExecutor(
       receipt,
       governanceBoundary: {
         readOrPreviewOnly: !relay,
-        externalProviderCall: relay,
+        externalProviderCall: relay ? relayExternalProviderCall : false,
         mutationAuthority: false,
         executionAllowed: false,
         founderApprovalGranted: false,
