@@ -491,3 +491,9 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
   html { scroll-behavior: auto; }
   button, .card, .kpi, .tile { transition: none; }
 }
+
+/* Five-screen founder navigation: responsive compatibility with canonical FCR visual shell. */
+.capabilities-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media(max-width:760px) {
+  .topbar .founder-email { min-width:0; overflow-wrap:anywhere; }
+}
