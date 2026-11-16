@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   exact-head-audit:
-    name: PR Continuity Exact-Head Gate
+    name: ${{ github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (pull_request_target copy, not gating)' }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-22.04
     timeout-minutes: 5

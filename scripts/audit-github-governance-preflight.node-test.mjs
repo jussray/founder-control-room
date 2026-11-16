@@ -34,9 +34,9 @@ function canonicalRuleset(overrides = {}) {
         type: 'pull_request',
         parameters: {
           dismiss_stale_reviews_on_push: true,
-          require_code_owner_review: false,
-          require_last_push_approval: false,
-          required_approving_review_count: 0,
+          require_code_owner_review: true,
+          require_last_push_approval: true,
+          required_approving_review_count: 1,
           required_review_thread_resolution: true,
         },
       },
@@ -46,7 +46,7 @@ function canonicalRuleset(overrides = {}) {
           code_scanning_tools: [{
             tool: 'CodeQL',
             security_alerts_threshold: 'high_or_higher',
-            alerts_threshold: 'errors',
+            alerts_threshold: 'all',
           }],
         },
       },
@@ -57,11 +57,11 @@ function canonicalRuleset(overrides = {}) {
   };
 }
 
-function futureTeamRuleset(overrides = {}) {
+function founderOnlyRuleset(overrides = {}) {
   const value = canonicalRuleset();
-  value.rules[0].parameters.required_approving_review_count = 1;
-  value.rules[0].parameters.require_code_owner_review = true;
-  value.rules[0].parameters.require_last_push_approval = true;
+  value.rules[0].parameters.required_approving_review_count = 0;
+  value.rules[0].parameters.require_code_owner_review = false;
+  value.rules[0].parameters.require_last_push_approval = false;
   return { ...value, ...overrides };
 }
 
@@ -104,18 +104,18 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical FCR governance preserves founder-only review and zero-bypass freshness membranes', () => {
+test('canonical FCR governance requires independent review and zero-bypass freshness membranes', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const review = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
 
-  assert.equal(CANONICAL_NATIVE_APPROVAL_COUNT, 0);
+  assert.equal(CANONICAL_NATIVE_APPROVAL_COUNT, 1);
   assert.equal(review.targetsRequestedRef, true);
   assert.deepEqual(review.ruleTypes, ['code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
-  assert.equal(review.requiredApprovingReviewCount, 0);
+  assert.equal(review.requiredApprovingReviewCount, 1);
   assert.equal(review.dismissStaleReviewsOnPush, true);
-  assert.equal(review.requireCodeOwnerReview, false);
-  assert.equal(review.requireLastPushApproval, false);
+  assert.equal(review.requireCodeOwnerReview, true);
+  assert.equal(review.requireLastPushApproval, true);
   assert.equal(review.requiredReviewThreadResolution, true);
   assert.equal(review.strictRequiredStatusChecks, false);
   assert.deepEqual(review.requiredStatusCheckNames, []);
@@ -140,6 +140,7 @@ test('canonical review membrane permits only the known preservable provider rule
   const preserved = canonicalRuleset();
   preserved.rules.push(
     { type: 'required_linear_history' },
+    { type: 'required_signatures' },
     { type: 'code_quality', parameters: { severity: 'errors' } },
     {
       type: 'copilot_code_review',
@@ -148,7 +149,7 @@ test('canonical review membrane permits only the known preservable provider rule
   );
   assert.deepEqual(
     [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
-    ['code_quality', 'copilot_code_review', 'required_linear_history'].sort(),
+    ['code_quality', 'copilot_code_review', 'required_linear_history', 'required_signatures'].sort(),
   );
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
 
@@ -167,9 +168,9 @@ test('canonical review membrane permits only the known preservable provider rule
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(leakedStatus, 'main', 'main'), expectedBypass), false);
 });
 
-test('future-team phase is representable without weakening any machine or provider floor', () => {
+test('independent-review phase preserves every machine and provider floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
-  const future = rulesetSnapshot(futureTeamRuleset(), 'main', 'main');
+  const future = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   assert.equal(future.requiredApprovingReviewCount, 1);
   assert.equal(future.requireCodeOwnerReview, true);
   assert.equal(future.requireLastPushApproval, true);
@@ -192,7 +193,7 @@ test('default-branch sentinel resolves only to the observed repository default b
 
 test('wrong native-review phase or stale-review policy cannot satisfy the current review membrane', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
-  const future = futureTeamRuleset();
+  const future = founderOnlyRuleset();
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(future, 'main', 'main'), expectedBypass), false);
 
   const staleAllowed = canonicalRuleset();
@@ -203,13 +204,13 @@ test('wrong native-review phase or stale-review policy cannot satisfy the curren
 test('review membrane requires the exact phase flags and exact CodeQL security floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
 
-  const unexpectedCodeOwner = canonicalRuleset();
-  unexpectedCodeOwner.rules[0].parameters.require_code_owner_review = true;
-  const unexpectedCodeOwnerSnapshot = rulesetSnapshot(unexpectedCodeOwner, 'main', 'main');
-  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, true);
+  const missingCodeOwner = canonicalRuleset();
+  missingCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  const unexpectedCodeOwnerSnapshot = rulesetSnapshot(missingCodeOwner, 'main', 'main');
+  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, false);
   assert.equal(canonicalFloorSatisfied(unexpectedCodeOwnerSnapshot, expectedBypass), false);
 
-  const futureMissingCodeOwner = futureTeamRuleset();
+  const futureMissingCodeOwner = canonicalRuleset();
   futureMissingCodeOwner.rules[0].parameters.require_code_owner_review = false;
   assert.equal(
     canonicalFloorSatisfied(rulesetSnapshot(futureMissingCodeOwner, 'main', 'main'), expectedBypass, 1),
@@ -237,13 +238,14 @@ test('collaborator readiness remains observable and excludes owner and bots', ()
   assert.equal(collaboratorCanReview({ login: 'reviewer', permissions: { push: true } }, 'jussray'), true);
 });
 
-test('founder-only report is READY for exact topology even before a future reviewer exists', () => {
+test('independent-review topology refuses READY when only the PR owner can review', () => {
   const ready = readyReport({
     collaborators: [{ login: 'jussray', permissions: { admin: true } }],
   });
-  assert.equal(ready.status, 'READY');
-  assert.equal(ready.humanReviewPhase, 'founder-only');
-  assert.equal(ready.requiredNativeApprovalCount, 0);
+  assert.equal(ready.status, 'NOT_READY');
+  assert.equal(ready.blocker, 'independent_reviewer_unavailable');
+  assert.equal(ready.humanReviewPhase, 'founder-plus-independent');
+  assert.equal(ready.requiredNativeApprovalCount, 1);
   assert.equal(ready.observationComplete, true);
   assert.equal(ready.defaultBranch, 'main');
   assert.equal(ready.activeRulesetCountTargetingRef, 2);
@@ -267,6 +269,31 @@ test('founder-only report is READY for exact topology even before a future revie
   });
   assert.equal(duplicate.status, 'NOT_READY');
   assert.equal(duplicate.activeRulesetCountTargetingRef, 3);
+});
+
+test('a complete independent reviewer and exact two-membrane topology is READY', () => {
+  const ready = readyReport();
+  assert.equal(ready.status, 'READY');
+  assert.equal(ready.blocker, null);
+  assert.equal(ready.humanReviewPhase, 'founder-plus-independent');
+  assert.equal(ready.requiredNativeApprovalCount, 1);
+  assert.equal(ready.independentReviewerReady, true);
+  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
+  assert.equal(ready.canonicalFloorSatisfied, true);
+  assert.equal(ready.freshnessFloorSatisfied, true);
+});
+
+test('bot and owner-only reviewer lists cannot satisfy the independent review floor', () => {
+  for (const collaborators of [
+    [{ login: 'jussray', permissions: { admin: true } }],
+    [{ login: 'audit[bot]', type: 'Bot', permissions: { push: true } }],
+    [{ login: 'reader', permissions: { pull: true } }],
+  ]) {
+    const result = readyReport({ collaborators });
+    assert.equal(result.status, 'NOT_READY');
+    assert.equal(result.blocker, 'independent_reviewer_unavailable');
+    assert.equal(result.independentReviewerReady, false);
+  }
 });
 
 test('legacy monolithic ruleset is NOT_READY and cannot impersonate canonical two-component governance', () => {
@@ -344,7 +371,7 @@ test('review membrane rejects legacy pre-merge deployment requirements', () => {
 
 test('review membrane rejects unmodeled extra provider rules', () => {
   const extraRule = canonicalRuleset();
-  extraRule.rules.push({ type: 'required_signatures' });
+  extraRule.rules.push({ type: 'creation' });
   const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
   assert.equal(report.status, 'NOT_READY');
   assert.equal(report.canonicalFloorSatisfied, false);
@@ -417,8 +444,8 @@ test('provider-read failure produces a sanitized blocked receipt instead of fake
     reason: 'provider_read_forbidden',
   });
   assert.equal(report.status, 'BLOCKED');
-  assert.equal(report.humanReviewPhase, 'founder-only');
-  assert.equal(report.requiredNativeApprovalCount, 0);
+  assert.equal(report.humanReviewPhase, 'founder-plus-independent');
+  assert.equal(report.requiredNativeApprovalCount, 1);
   assert.equal(report.observationComplete, false);
   assert.equal(report.blocker, 'provider_read_forbidden');
   assert.equal(report.defaultBranch, null);
