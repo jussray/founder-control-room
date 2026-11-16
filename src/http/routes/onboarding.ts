@@ -9,12 +9,20 @@ import { controlRoomCss } from './onboardingAssets/controlRoomCss.js';
 import { controlRoomHtml } from './onboardingAssets/controlRoomHtml.js';
 import { controlRoomJs } from './onboardingAssets/controlRoomJs.js';
 import { controlRoomVisualBridge } from './onboardingAssets/controlRoomVisualBridge.js';
+import {
+  workspaceAppJs,
+  workspaceCallbackHtml,
+  workspaceCallbackJs,
+  workspaceControlRoomHtml,
+} from './onboardingAssets/workspaceSurface.js';
 
 export const onboardingRouter = Router();
 
 // Scoped to this router's own routes only. The dashboard SPA has a separate
 // policy, while this identity and onboarding surface stays same-origin.
 onboardingRouter.use(onboardingContentSecurityPolicy);
+
+// Workspace APIs are mounted by the server, not by this public static-assets router.
 
 function sendAsset(res: Response, type: string, body: string) {
   res.setHeader('Content-Type', type);
@@ -24,14 +32,24 @@ function sendAsset(res: Response, type: string, body: string) {
 
 onboardingRouter.get('/', (_req, res) =>
   sendAsset(res, 'text/html; charset=utf-8', controlRoomHtml));
+onboardingRouter.get(['/founder-onboarding', '/founder-onboarding/'], (_req, res) =>
+  sendAsset(res, 'text/html; charset=utf-8', controlRoomHtml));
+onboardingRouter.get(['/app', '/app/'], (_req, res) =>
+  sendAsset(res, 'text/html; charset=utf-8', workspaceControlRoomHtml));
+onboardingRouter.get('/founder-onboarding-script', (_req, res) =>
+  sendAsset(res, 'text/javascript; charset=utf-8', controlRoomJs));
 onboardingRouter.get('/assets/control-room.css', (_req, res) =>
   sendAsset(res, 'text/css; charset=utf-8', `${controlRoomCss}\n${controlRoomVisualBridge}`));
 onboardingRouter.get('/assets/control-room.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', controlRoomJs));
+onboardingRouter.get('/assets/workspace-app.js', (_req, res) =>
+  sendAsset(res, 'text/javascript; charset=utf-8', workspaceAppJs));
 onboardingRouter.get('/assets/auth-callback.js', (_req, res) =>
   sendAsset(res, 'text/javascript; charset=utf-8', callbackJs));
-// API-owned consent UI is proxied through the canonical Pages browser origin,
-// retaining that host's founder cookie, same-tab authorization state and CSRF policy.
+onboardingRouter.get('/assets/workspace-auth-callback.js', (_req, res) =>
+  sendAsset(res, 'text/javascript; charset=utf-8', workspaceCallbackJs));
+
+// Keep current OAuth-consent browser resources in the tenant-enabled router.
 onboardingRouter.get('/oauth/consent', (_req, res) =>
   sendAsset(res, 'text/html; charset=utf-8', oauthConsentHtml));
 onboardingRouter.get('/assets/oauth-consent.js', (_req, res) =>
@@ -41,4 +59,8 @@ onboardingRouter.get('/assets/oauth-consent.css', (_req, res) =>
 
 export function founderCallbackHtml(): string {
   return callbackHtml;
+}
+
+export function workspaceFounderCallbackHtml(): string {
+  return workspaceCallbackHtml;
 }

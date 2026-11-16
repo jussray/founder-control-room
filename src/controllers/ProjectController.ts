@@ -18,15 +18,20 @@ interface ProjectRow {
   repo_provider: string;
   repo_identifier: string | null;
   status: "active" | "paused" | "archived";
+  workspace_id?: string | null;
 }
 
 export class ProjectController extends BaseController {
   readonly name = "ProjectController";
 
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
+    // `select('*')` preserves the pre-tenancy rollout path: before workspace_id
+    // exists, legacy platform projects continue their current provider reads.
+    // Once workspace_id exists, the project must belong to the workspace that
+    // contains the unique platform_owner before platform credentials may be used.
     const { data, error } = await supabase
       .from("projects")
-      .select("id,slug,name,repo_provider,repo_identifier,status")
+      .select("*")
       .eq("id", req.projectId)
       .maybeSingle();
 
@@ -42,6 +47,28 @@ export class ProjectController extends BaseController {
         "converged",
         `Project ${project.slug} is active without a repository connection`,
       );
+    }
+
+    const ownerWorkspaceId = typeof project.workspace_id === "string"
+      ? project.workspace_id.trim()
+      : "";
+    if (ownerWorkspaceId) {
+      const { data: platformOwner, error: platformOwnerError } = await supabase
+        .from("founder_users")
+        .select("workspace_id")
+        .eq("workspace_id", ownerWorkspaceId)
+        .eq("account_role", "platform_owner")
+        .maybeSingle();
+
+      if (platformOwnerError) {
+        return this.retry(`Project workspace authority lookup failed: ${platformOwnerError.message}`);
+      }
+      if (!platformOwner) {
+        return this.done(
+          "converged",
+          `Project ${project.slug} is tenant-scoped; platform provider automation is disabled`,
+        );
+      }
     }
 
     try {

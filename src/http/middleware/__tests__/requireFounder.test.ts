@@ -172,7 +172,7 @@ beforeEach(() => {
   mocks.select.mockReturnValue(allowlistChain);
   mocks.eq.mockReturnValue(allowlistChain);
   mocks.maybeSingle.mockResolvedValue({
-    data: { email: 'founder@example.com' },
+    data: { email: 'founder@example.com', user_id: 'founder-user-1' },
     error: null,
   });
 
@@ -227,9 +227,37 @@ describe('requireFounder', () => {
       },
     });
     expect(mocks.getUser).toHaveBeenCalledWith('founder-access-token');
-    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('fails closed for a legacy email-only allowlist row during role migration', async () => {
+    // An email-only row cannot satisfy the exact user_id predicate used by the
+    // real Supabase query, so the provider returns no row to the middleware.
+    mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const response = await request(createProbeApp())
+      .get('/protected')
+      .set('Authorization', 'Bearer founder-access-token');
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: 'Not on the founder allowlist' });
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
+  });
+
+  it('fails closed when a legacy allowlist row is bound to a different immutable user id', async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: { email: 'founder@example.com', user_id: 'different-founder-user' },
+      error: null,
+    });
+
+    const response = await request(createProbeApp())
+      .get('/protected')
+      .set('Authorization', 'Bearer founder-access-token');
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: 'Not on the founder allowlist' });
   });
 
   it('does not refresh an invalid explicit bearer session through a cookie', async () => {
@@ -299,7 +327,7 @@ describe('requireFounder', () => {
     expect(mocks.refreshSession).toHaveBeenCalledWith({
       refresh_token: 'cookie-refresh-token',
     });
-    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');
