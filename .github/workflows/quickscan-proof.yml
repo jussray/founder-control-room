@@ -16,7 +16,9 @@ on:
       - 'scripts/build-pages.mjs'
       - '.github/workflows/quickscan-proof.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/revenue-strike-finalize-claim-id-ambiguity-20261115
     paths:
       - 'src/quickscan/**'
       - 'src/http/routes/quickscan.ts'
