@@ -363,6 +363,10 @@ The following GitHub Actions runs were independently read by run ID, commit SHA,
 | `4dc8110f66a1323733fed456d4575a391ef9f5b5` | Historical CI Accountability (run 42391915243) | failure | Observed ledger verifier reported missing historical failed runs 42389462544 and 42389462627 on predecessor SHA | Append the missing historical failed runs to this ledger; successor exact-head proof pending | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42391915243); failed job/step and log inspected, successor pass unverified | OPEN |
 | `5d5dae60c0eeecc9a62c3a7bfa55f5899937f43a` | CI (run 42156674960) | failure | Playwright screenshot protocol error (`Page.captureScreenshot`) at `e2e/plugin-center-ultrathink-proof.mjs:168`; the branch changes no `e2e/` file | `aaf1745189b58156afce0eda975186c065a869ce` | CI run 42439322334 succeeded on `aaf1745`, including Playwright e2e and Playwright E2E | REMEDIATED |
 
+## 2026-11-07 — independent historical-CI audit observations (source-only, unresolved)
+
+These 85 distinct failure/cancellation records were extracted from the existing GitHub Actions Historical CI Accountability auditor logs for PRs #1073, #1075, #1076 and #1077. The existing auditor queried GitHub workflow history by commit SHA. Seven representative run identities were additionally fetched from GitHub API and matched to their exact SHA, name, and conclusion. Individual root causes and remediation for the remaining entries are not asserted here. Every outcome stays OPEN; adding a row does not convert a failure into success or prove any release readiness.
+
 ## PR #463 historical run observations (November 7, 2026)
 
 These records preserve observed GitHub outcomes from the exact predecessor commits of PR #463. A successor's green check does not rewrite a cancellation or establish unrelated remediation.
@@ -804,6 +808,13 @@ These entries come from PR #1077's earlier ledger. Preservation of these source-
 | `2a9f78924a3c473bc22cbd5a28a2c166726482aa` | Historical CI Accountability (run 42410674333) | failure | UNKNOWN: historical run root cause not independently diagnosed in this entry | UNKNOWN: corrective action not independently verified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42410674333); auditor-observed historical conclusion, not a passing successor | OPEN |
 | `02bb6e7a33f10c5d8c0f7cb0a2371de7da4836af` | Repo Reality Evidence (run 42410840113) | failure | UNKNOWN: historical run root cause not independently diagnosed in this entry | UNKNOWN: corrective action not independently verified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42410840113); auditor-observed historical conclusion, not a passing successor | OPEN |
 | `d647a54202fd7d00cfa89b06aa102125bdd6472f` | Repo Reality Evidence (run 42411057867) | failure | UNKNOWN: historical run root cause not independently diagnosed in this entry | UNKNOWN: corrective action not independently verified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42411057867); auditor-observed historical conclusion, not a passing successor | OPEN |
+
+## 2026-11-07 — seven residual exact-run observations (append-only)
+
+The seven run identities below were independently confirmed via the GitHub Actions API. Failures and cancellations remain OPEN; neither a cause nor a corrective outcome is inferred from this evidence.
+
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
 | `32b918e4938dc3efe06586e67870526880a5c351` | Portfolio Project Adapter Freshness (run 42413951652) | failure | UNKNOWN: root cause unverified | UNKNOWN: correction unverified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42413951652); run identity and conclusion confirmed | OPEN |
 | `32b918e4938dc3efe06586e67870526880a5c351` | Juss & Co portfolio evidence sync (run 42418300361) | failure | UNKNOWN: root cause unverified | UNKNOWN: correction unverified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42418300361); run identity and conclusion confirmed | OPEN |
 | `2a9f78924a3c473bc22cbd5a28a2c166726482aa` | CI (run 42410674230) | cancelled | UNKNOWN: root cause unverified | UNKNOWN: correction unverified | [Exact GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42410674230); run identity and conclusion confirmed | OPEN |
