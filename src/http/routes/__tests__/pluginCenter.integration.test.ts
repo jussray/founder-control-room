@@ -30,19 +30,24 @@ function buildApp() {
 
 function authSuccess() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
+    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
+  let requestedUserId = '';
+  const chain = {
+    eq: (field: string, value: unknown) => {
+      if (field === 'user_id') requestedUserId = String(value);
+      return chain;
+    },
+    maybeSingle: () => Promise.resolve({
+      data: requestedUserId === FOUNDER_USER_ID ? { user_id: FOUNDER_USER_ID } : null,
+      error: null,
     }),
   };
+  return { select: () => chain };
 }
 
 function projectRow() {

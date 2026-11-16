@@ -34,15 +34,11 @@ function buildApp() {
   return app;
 }
 
-function founderAllowlistBuilder() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+function founderAllowlistBuilder() { const query = {
+    eq: () => query,
+    maybeSingle: () => Promise.resolve({ data: { user_id: 'u1' }, error: null }),
   };
-}
+  return { select: () => query }; }
 
 function observation() {
   const evidence = `sha256:${'b'.repeat(64)}`;
@@ -76,7 +72,7 @@ function observation() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'u1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'u1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   supabaseMock.from.mockImplementation((table: string) => {
