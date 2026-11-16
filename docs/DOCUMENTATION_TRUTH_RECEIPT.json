@@ -18,13 +18,24 @@
       "path": ".github/workflows/ci.yml",
       "claims": [
         "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution.",
-        "`.github/workflows/ci.yml` must execute `verify:terminal-contract`, `verify:juss-flow`, `verify:production-authority` and `verify:ai-skills` in the load-bearing Test job before Required Gate, preserving protected main PR coverage after moving duplicate extended quality jobs to staging-only."
+        "`.github/workflows/ci.yml` must execute `verify:terminal-contract`, `verify:juss-flow`, `verify:production-authority` and `verify:ai-skills` in the load-bearing Test job before Required Gate, preserving protected main PR coverage after moving duplicate extended quality jobs to staging-only.",
+        "`.github/workflows/ci.yml` must keep the existing crawler and public-work Playwright specs inside the load-bearing `Playwright e2e` job that feeds `Required Gate`; a separate advisory Pages workflow cannot substitute for required exact-head browser execution or grant merge authority.",
+        ".github/workflows/ci.yml must resolve and fetch the live PR target branch separately for Documentation Truth and test discovery, validate a full nonzero SHA and ancestry in the exact checked-out head, retain exact push-before ranges for push events, and fail without exporting a proof base on resolution or fetch failure.",
+        ".github/workflows/ci.yml must require npm ci --no-audit --no-fund in the Type check, Lint, Unit Tests, and Playwright e2e exact-head jobs, retain load-bearing Required Gate and independent review evidence, and must never treat lockfile-consistent installation alone as merge, deployment, or runtime authorization.",
+        "`.github/workflows/ci.yml` must keep four exact-head core installs lockfile-bound, enable package-lock-keyed npm cache without caching mutable node_modules, and run the CI performance regression contract inside its load-bearing test-discovery job; cache availability is an optimization, never a reason to bypass test execution or Required Gate.",
+        "`.github/workflows/ci.yml` must cancel superseded pull-request head runs using PR-specific concurrency while preserving main push checks, exact-head gating, and separate PR identities; cancellation of predecessor proof cannot authorize a successor head.",
+        "`.github/workflows/ci.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
+        "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation.",
+        "`.github/workflows/ci.yml` must explicitly verify that the exact-SHA migration scope step output is true or false; a missing, malformed, or unevaluated decision cannot skip every database lint step while leaving Required Gate green.",
+        "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority."
       ]
     },
     {
       "path": ".github/workflows/pr-continuity.yml",
       "claims": [
-        "`.github/workflows/pr-continuity.yml` names the exact-head job from its event: the pull_request run keeps the name `PR Continuity Exact-Head Gate`, and the pull_request_target copy is labeled as not gating so it cannot shadow the real gate. Trigger set, job condition, steps, and permissions are unchanged; a skipped pull_request_target copy is not evidence of gate success or failure."
+        "`.github/workflows/pr-continuity.yml` names the exact-head job from its event: the pull_request run keeps the name `PR Continuity Exact-Head Gate`, and the pull_request_target copy is labeled as not gating so it cannot shadow the real gate. Trigger set, job condition, steps, and permissions are unchanged; a skipped pull_request_target copy is not evidence of gate success or failure.",
+        "`.github/workflows/pr-continuity.yml` must trigger read-only exact-head continuity audit and trusted metadata refresh on `auto_merge_enabled` and `auto_merge_disabled` events without enabling, merging, deploying, or widening authority. GitHub native Auto-merge may integrate only after the live provider's configured required checks, tests, reviews and protections succeed; optional checks require explicit provider required-check configuration to block.",
+        "`.github/workflows/pr-continuity.yml` must keep the metadata reader on default-branch trusted code and preserve the existing event-permission floor. Queue observation is not exact-candidate founder-final approval; conflicts, stale refs, missing authority, or unverified provider rules must never be represented as merge-authorized."
       ]
     },
     {
@@ -42,7 +53,8 @@
       "path": "config/cloudflare-logpush.portfolio.json",
       "claims": [
         "`config/cloudflare-logpush.portfolio.json` must remain the source-only desired-state registry for the account-scoped `workers_trace_events` Logpush job; pull-request verification cannot mutate Cloudflare or prove delivery, and provider apply requires exact-current-main binding, a founder approval reference, a dedicated write credential, destination configuration, and post-write readback.",
-        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical or investigate-only from active Logpush participation; `jussray/sekret-bip-companions` remains provenance-only until its own governance is explicitly changed."
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose local governance marks them historical or investigate-only from active Logpush participation; `jussray/sekret-bip-companions` remains provenance-only until its own governance is explicitly changed.",
+        "`config/cloudflare-logpush.portfolio.json` must exclude repositories whose current-main governance forbids active participation and repositories without an actual Cloudflare Worker execution surface; governance-excluded repos are `jussray/sekret-bip-companions`, `jussray/Bip-Jr`, and `jussray/Sekret-Bip-Bridge`, while runtime-inapplicable repos are Roblox-only `jussray/jussray-bip-and-seek`, static-Pages `jussray/Sekret-Bip-Parents`, and governance-only `jussray/Sekret-Bip-Gov`."
       ]
     },
     {
@@ -119,7 +131,10 @@
         "`.github/workflows/playwright.yml` must select the independently observed StoryEngine successor `bffc9f771b673055403f52b29c86b30e5f4dd8c8` only as the next exact peer identity; a complete fresh live-ref, immutable checkout, federation runtime and browser/receipt witness is required before current pair compatibility can be claimed, and the pin cannot confer merge, deployment or provider authority.",
         "`.github/workflows/playwright.yml` must run FCR's exact-head welcome/login/logout `auth-lifecycle` Chromium scenario before the separately required guarded-terminal journey, verify real browser same-origin opaque-session identity and server-revoked logout through `e2e/run.mjs`, preserve both client-side and server-side V10 planless-action denial, and never treat an isolated passing test as deployed Site or production proof.",
         "`.github/workflows/playwright.yml` must install lockfile-bound dependencies and use Playwright's source-level browser discovery without mutating e2e/run.mjs at test time; after the first exact-head build it must run the complete prepared E2E harness without silently omitting browser, peer, authorization, or security proofs.",
-        "`.github/workflows/playwright.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries."
+        "`.github/workflows/playwright.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1730f316b74bdb9b638312c57987dc2897953948` only as the new exact peer evidence subject after a forward four-commit, zero-behind transition from `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5` that includes runtime code; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification.",
+        "`.github/workflows/playwright.yml` must pin StoryEngine `1a4a581687481b2ec2025539efae02032bef5287` only as the new exact peer evidence subject after a forward one-commit, zero-behind receipt-only transition from `1730f316b74bdb9b638312c57987dc2897953948`; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification.",
+        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit."
       ]
     },
     {
@@ -143,7 +158,9 @@
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
         "`wrangler.worker.toml` must declare only the named FCR evidence gateway identity as a public configuration and must keep Google Search Console refresh credentials and Cloudflare AI Gateway authorization tokens in the optional secret registry; no source variable authorizes delivery or proves the provider configuration is live.",
-        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release."
+        "`wrangler.worker.toml [secrets].optional` may list FCR Gmail account/project/label and OAuth feature binding names for an on-demand metadata-only AI Inbox read. This declaration does not install credentials, attest Google OAuth consent, activate multi-account ingestion, permit automated replies/outreach, or prove Cloudflare production readback; production use still requires independently observed provider binding types and exact-current authorized release.",
+        "`wrangler.worker.toml` must gate canonical deployment only on the boot-essential provider-held secret names declared in [secrets].required, and the thirteen feature secret names declared in [secrets].optional must never block deployment or Worker boot; each optional name is required only before its named feature is activated on the Worker.",
+        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence."
       ]
     },
     {
@@ -253,7 +270,10 @@
         "README.md records the October 24 StoryEngine peer refresh from 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f to 3c46b3649088ac4c6e1775102ba49abf5c779abf, the exact-head StoryEngine green source checks, and the FCR Playwright live-ref mismatch without promoting the successor to runtime-verified.",
         "`README.md` must describe review-email routing as one bounded Wrangler-managed desired-state address plus independent Cloudflare provider readback, subaddressing state, and runtime invocation proof; deploy success alone cannot mint `email_trigger_reconciled=true` or runtime truth.",
         "`README.md` must state that first deployment of a missing review-email Worker uses a temporary no-`addresses` bootstrap config and stops at secret provisioning before any Email Routing rule can move mail.",
-        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary."
+        "`README.md` must describe Chief ruleset handling as trusted read-only observation plus fingerprint-bound reconciliation planning, including candidate ProofMode producer binding, zero desired bypass actors, strict freshness, pre-merge deployment removal, post-merge production-proof obligations, and the explicit non-authorizing provider-mutation boundary.",
+        "`README.md` must state that the StoryEngine peer `1730f316b74bdb9b638312c57987dc2897953948` transition changes runtime code and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility.",
+        "`README.md` must state that the StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287` transition is receipt-only and that only a fresh exact-head witness, not predecessor receipts, can establish compatibility.",
+        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed."
       ]
     },
     {
@@ -299,7 +319,10 @@
         "The audit records PR #1004 head 607ec05be0bce5639bab36b75c3661a8af751be6 failing at stale StoryEngine peer 26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f, while live StoryEngine main was independently observed at 6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f with 15/15 successful peer checks. Rebinding does not prove PR #1004 federation or transfer another PR's exact-head evidence.",
         "TRUTH_DECAY_AUDIT records that the October 24 FCR Playwright failure occurred after the local E2E harness passed and was caused by StoryEngine peer identity drift to 3c46b3649088ac4c6e1775102ba49abf5c779abf; predecessor federation proof does not transfer.",
         "`docs/TRUTH_DECAY_AUDIT.md` must preserve PR #1044's prior local Playwright success and failed StoryEngine peer equality as separate historical facts: FCR expected `4601cc3a8297875c97e54717f2aeb47db44d0595`, observed `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d`, and cannot claim the successor pair VERIFIED until the new exact FCR head passes the full independent federation and browser witness.",
-        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record that the PR #1044 reconciliation candidate's StoryEngine peer `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` expired when `main` moved to `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, and cannot transfer predecessor federation proof, founder approval, merge or production authority to the successor FCR head.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 11, 2026 StoryEngine peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the later November 11, 2026 StoryEngine receipt-only peer drift found on FCR PR #1083 as dependency freshness evidence that keeps compatibility unknown until the repin head's own federation/browser witness passes.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 12, 2026 move from StoryEngine live-ref equality to ancestry as preserving the pin-disappearance failure mode without widening what the exact-pin witnesses prove."
       ]
     },
     {
@@ -307,7 +330,9 @@
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep canonical Worker runtime secret bindings provider-held while separating provider subscription, runtime delivery, production database state, and business outcomes into their own activation proof.",
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must declare exactly one Wrangler-managed review-email route, `review@foundercontrolroom.org -> founder-control-room-review-email`, while requiring independent provider readback, subaddressing verification for `review+<context-uuid>@...`, and runtime invocation proof before calling ingress live.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that a missing review-email Worker is bootstrapped without `addresses`, so first creation cannot implicitly reroute `review@` before secrets exist.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
       ]
     },
     {
@@ -401,7 +426,8 @@
         "`scripts/verify-documentation-truth.mjs` must classify every mandatory ULTRATHINK governance companion under `skills/` as truth-sensitive and record these Markdown paths in changed documentation, rejecting future rule changes lacking path-bound receipt claims and substantive README/truth-decay refresh.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
+        "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized."
       ]
     },
     {
@@ -893,6 +919,18 @@
       "path": "scripts/worker-deployment-version-tag.mjs",
       "claims": [
         "`evaluateWorkerVersionTag` is a pure function: it passes only when the newest deployment (by `created_on`, independent of list order) routes 100% to a single version, the viewed version id equals that active id, and its `workers/tag` equals a lowercase 40-character expected SHA; missing, prefix, different, split-traffic, empty, or malformed input fails closed. Its unit tests prove this comparison logic only, not wrangler JSON shape stability or Cloudflare behaviour."
+      ]
+    },
+    {
+      "path": "scripts/documentation-truth-claim-fingerprint.mjs",
+      "claims": [
+        "`scripts/documentation-truth-claim-fingerprint.mjs` must fingerprint receipt claims by discarding only non-semantic HTML comments, Markdown link destinations, HTML wrappers, casing, and punctuation while keeping logical and comparison operators as distinct tokens, so inherited wording cannot be repackaged as a fresh invariant. A fingerprint proves textual identity only, never claim truth or authority."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentProviderReadback.ts",
+      "claims": [
+        "src/lib/n8nFounderContentProviderReadback.ts must fail closed unless a sanitized provider-native API observation matches the pending scheduled n8n receipt and exact orchestration, provider item/request identity, source repository/SHA, platform/channel, and requested schedule; it must never elevate scheduled state into publication truth or retain unsupported provider payload fields, and passing tests prove only this source contract, not that any production adapter calls it or that a Buffer object exists."
       ]
     }
   ]

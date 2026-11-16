@@ -147,6 +147,16 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
+  it('requires a fresh path-bound invariant against the reviewed base receipt', () => {
+    expect(documentationVerifier).toContain("from './documentation-truth-claim-fingerprint.mjs'");
+    expect(documentationVerifier).toContain('receiptClaimsAtRevision(baseSha)');
+    expect(documentationVerifier).toContain('receiptClaimsUnionByPath');
+    expect(documentationVerifier).toContain('hasFreshMeaningfulInvariant(');
+    expect(documentationVerifier).toContain('documentation-truth-claim-fingerprint\\.mjs');
+    expect(documentationVerifier).toContain('must add or change a meaningful path-bound invariant in the reviewed range');
+    expect(documentationVerifier).toContain('must be readable to prove claim freshness');
+  });
+
   it('registers mandatory ULTRATHINK companions for documentation truth without overriding canonical Goalfix', () => {
     expect(documentationVerifier).toContain('ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger');
     expect(documentationVerifier).toContain('ultrathink-suite');
