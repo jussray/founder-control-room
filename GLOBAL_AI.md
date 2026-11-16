@@ -294,3 +294,7 @@ Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund`
 ## CI queue economy without authority reduction
 
 For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
