@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 16, 2026 — webchat `/human` handoff wired behind a project allowlist (candidate, not runtime proof)
+
+`POST /webchat/messages` accepts first-party webchat messages, records a `/human` request as a `pending_human` row in the service-role-only `webchat_human_handoffs` table, and reports `botMayReply: false` for that conversation until a founder releases it through `POST /webchat/handoffs/:key/release` (queue: `GET /webchat/handoffs`). The public route returns 404 unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`, which is unset by default; it is rate limited, capped at 4 KB, stamps time server-side, never generates or sends a reply, and returns 503 rather than success when the queue cannot be written. Nothing is live until the migration is applied, the allowlist is set, and the webchat channel's notice, disclosure, consent, retention and security-review requirements are met.
+
 ## November 15, 2026 — production Worker deploys record and read back the exact commit (candidate, not deploy proof)
 
 `.github/workflows/deploy.yml` now passes `--tag <expected_head_sha>` and a short run-provenance `--message` to `wrangler deploy` for the canonical `founder-control-room` Worker, and a new fail-closed step in the same job reads back `wrangler deployments list --json` and `wrangler versions view --json` (names, ids and annotations only). The job fails unless the newest deployment sends 100% of traffic to one version whose `workers/tag` equals that exact SHA. The comparison lives in the pure, unit-tested `scripts/worker-deployment-version-tag.mjs`. This is source only: no deploy was run, and no Cloudflare call was made. A read-only provider audit on November 15, 2026 found that no Worker version yet has a tag, message or commit SHA, and no recent `Deploy` run has succeeded, so this check has not yet passed against the real provider.
