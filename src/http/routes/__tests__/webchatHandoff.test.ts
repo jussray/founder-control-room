@@ -144,6 +144,17 @@ describe('POST /webchat/messages', () => {
     expect(store.rows.size).toBe(0);
   });
 
+  it('rejects mixed-case project or brand ids before anything is processed', async () => {
+    const store = memoryStore();
+    const env = { FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS: 'Founder-Control-Room,founder-control-room' } as NodeJS.ProcessEnv;
+    const a = app(store, env);
+    const mixedProject = await request(a).post('/webchat/messages').send({ ...message('/human'), projectId: 'Founder-Control-Room' });
+    const mixedBrand = await request(a).post('/webchat/messages').send({ ...message('/human'), brandId: 'Founder-Control-Room' });
+    expect(mixedProject.status).toBe(400);
+    expect(mixedBrand.status).toBe(400);
+    expect(store.rows.size).toBe(0);
+  });
+
   it('never reports success when the queue write fails', async () => {
     const store = memoryStore();
     store.record = async () => { throw new Error('db down'); };

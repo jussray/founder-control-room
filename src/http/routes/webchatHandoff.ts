@@ -17,6 +17,8 @@ import { requireFounder, type FounderRequest } from '../middleware/requireFounde
  */
 const SAFE_KEY = /^webchat-handoff:[a-f0-9]{64}$/;
 const PURPOSES = new Set(['support', 'updates', 'marketing']);
+// Must match the webchat_human_handoffs table constraints (lowercase only).
+const PERSISTABLE_ID = /^[a-z0-9][a-z0-9._:-]{1,63}$/;
 
 export function enabledWebchatProjects(env: NodeJS.ProcessEnv = process.env): Set<string> {
   return new Set(
@@ -45,11 +47,17 @@ export function createWebchatMessageHandler(
       return;
     }
 
+    const brandId = typeof body.brandId === 'string' ? body.brandId : projectId;
+    if (!PERSISTABLE_ID.test(projectId) || !PERSISTABLE_ID.test(brandId)) {
+      fail(res, 400, 'projectId and brandId must be lowercase identifiers.');
+      return;
+    }
+
     let observation;
     try {
       observation = observeFirstPartyWebchat({
         projectId,
-        brandId: typeof body.brandId === 'string' ? body.brandId : projectId,
+        brandId,
         entryFlowFingerprintId: String(body.entryFlowFingerprintId ?? ''),
         conversationId: String(body.conversationId ?? ''),
         anonymousVisitorId: String(body.anonymousVisitorId ?? ''),
