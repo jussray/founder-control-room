@@ -1,0 +1,62 @@
+name: FCR live visual witness
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'audit/fcr-live-visual-witness-20261009'
+    paths:
+      - 'public/index.html'
+      - 'e2e/founder-experience-shell-proof.mjs'
+      - 'e2e/fcr-live-visual-witness.mjs'
+      - '.github/workflows/fcr-live-visual-witness.yml'
+  pull_request:
+    paths:
+      - 'public/index.html'
+      - 'e2e/founder-experience-shell-proof.mjs'
+      - 'e2e/fcr-live-visual-witness.mjs'
+      - '.github/workflows/fcr-live-visual-witness.yml'
+permissions:
+  contents: read
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact witness source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify exact candidate public experience with Playwright
+        run: node e2e/founder-experience-shell-proof.mjs
+      - name: Capture public FCR production witness
+        env:
+          LIVE_ORIGIN: https://foundercontrolroom.org
+          GITHUB_SHA: ${{ env.EXPECTED_HEAD_SHA }}
+        run: node e2e/fcr-live-visual-witness.mjs
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-live-visual-witness
+          path: |
+            test-results/fcr-live-visual-witness/
+            test-results/public-fcr-user-*.png
+            test-results/public-fcr-founder-*.png
+            test-results/founder-experience-shell-*.png
+          if-no-files-found: warn
+          retention-days: 14

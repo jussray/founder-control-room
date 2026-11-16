@@ -233,6 +233,8 @@ console.log('\n[1] Home summary uses current data and drills into visible Contro
     assert((await page.locator('.founder-email').innerText())===FOUNDER_EMAIL,
       'Home retains the founder-only session');
     await noOverflow(page,'desktop Home');
+    assert((await page.locator('.chief-kicker .fcr-online[data-truth="unknown"]').innerText()).trim() === 'Availability not checked', 'AI Council availability is marked unknown rather than an invented online count');
+    assert((await page.locator('[data-fcr-nav-search]').getAttribute('placeholder')) === 'Find a page…', 'topbar search accurately describes navigation-only filtering');
     await page.screenshot({path:join(OUT_DIR,'founder-home-desktop.png'),fullPage:true});
 
     await page.locator('[data-home-target=control]').click();
