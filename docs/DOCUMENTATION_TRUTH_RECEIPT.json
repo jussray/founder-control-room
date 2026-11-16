@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Preserve the earlier StoryEngine ancestry proof while raising FCR main native GitHub review policy to one independent human approval and adding fail-closed pre-mutation reviewer eligibility.",
+  "purpose": "Make federated relay v3 public-key identity and key material immutable in place with a before-update trigger, and restrict service_role UPDATE on public.federated_relay_public_keys to the lifecycle columns state and valid_until. Lifecycle transitions stay possible and monotonic; revoked_at and updated_at stay database-owned. SELECT and INSERT grants and RLS are unchanged. Rebuilt from an older relay hardening PR; checked against scratch Postgres only, not applied to any provider database.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -17,7 +17,8 @@
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
-        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution."
+        "`.github/workflows/ci.yml` must run the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step in the `python-tests` job, because the checker's PERMIT-phase prospective-authority rule and its status-word actor rule are otherwise unexercised by CI; a passing run proves those tested rules only, not the validity of any real receipt or execution.",
+        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state."
       ]
     },
     {
@@ -31,7 +32,10 @@
       "claims": [
         "`.github/workflows/deploy.yml` must run `scripts/verify-worker-binding-types.mjs` before the first Cloudflare Worker mutation, rejecting plaintext credential bindings or unavailable name/type provider evidence while never logging secret values or treating a passing source preflight as live deployment proof.",
         "`.github/workflows/deploy.yml` must extract the JSON secret-name list from the wrangler receipt text before parsing it, because wrangler writes human authentication notices to stdout ahead of the JSON, and the production authority gate fails closed when no JSON list is present in the receipt.",
-        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts."
+        "`.github/workflows/deploy.yml` must keep the Python Cloudflare secret-name receipt parsing block correctly indented so GitHub can accept the workflow file; a source-only indentation repair is not proof of successful authorized production dispatch or deployed runtime behavior, which require separate exact-head receipts.",
+        "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
+        "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy.",
+        "The production Deploy authority gate in `.github/workflows/deploy.yml` must run the var/secret collision verifier on the same name-only secret receipt it already reads, after that readback and before the Supabase, Worker and Pages mutation jobs, so a [vars] name that already exists as a Worker secret stops the run. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
       ]
     },
     {
@@ -53,7 +57,8 @@
         "`.github/workflows/worker-reconcile.yml` must compare Cloudflare's canonical Worker secret-name enumeration against the complete `wrangler.worker.toml [secrets].required` registry (excluding only its subsequently forced-disabled Founder Signal grant) inside the exact-main authority gate, before any `wrangler secret put` or Worker deployment. Unavailable provider enumeration or missing names must fail closed without exposing secret values or acquiring merge/deploy authority.",
         "A passing Worker-only secret-name preflight proves binding-name presence, not credential validity, source-to-runtime identity, live service-health, or production V4 conformance; those require independent exact-source provider/runtime receipts.",
         "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority.",
-        "`worker-reconcile.yml` must accept a valid Cloudflare secret-name JSON list even when Wrangler precedes it with human authentication notices, reject missing or duplicate required names and malformed receipts without echoing provider text, and retain the exact-main approval, bounded legacy plaintext-removal exception, strict post-deploy binding-type verification, and live API/Pages proof requirements."
+        "`worker-reconcile.yml` must accept a valid Cloudflare secret-name JSON list even when Wrangler precedes it with human authentication notices, reject missing or duplicate required names and malformed receipts without echoing provider text, and retain the exact-main approval, bounded legacy plaintext-removal exception, strict post-deploy binding-type verification, and live API/Pages proof requirements.",
+        "`.github/workflows/worker-reconcile.yml`: The canonical Worker Reconcile authority gate must run the var/secret collision verifier on its name-only secret receipt before the secret-put and deploy job. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
       ]
     },
     {
@@ -384,7 +389,7 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
       ]
     },
     {
@@ -395,7 +400,8 @@
         "`scripts/verify-documentation-truth.mjs` must classify every mandatory ULTRATHINK governance companion under `skills/` as truth-sensitive and record these Markdown paths in changed documentation, rejecting future rule changes lacking path-bound receipt claims and substantive README/truth-decay refresh.",
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
-        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green."
+        "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
+        "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized."
       ]
     },
     {
@@ -824,6 +830,57 @@
       "claims": [
         "The Cloudflare credential diagnostic workflow must be founder-dispatched only, check out the explicitly supplied current main SHA with persisted credentials disabled, re-observe that main identity before executing its checked-in diagnostic, and never expose the production deployment credential to pull-request code.",
         "The production credential diagnostic may emit only a non-reversible fingerprint, shape classification, and Cloudflare verification verdicts; it must not print, rotate, deploy with, or otherwise mutate through the credential, and its observation is not release or runtime proof."
+      ]
+    },
+    {
+      "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
+      "claims": [
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+      ]
+    },
+    {
+      "path": "scripts/worker-deployment-version-tag.mjs",
+      "claims": [
+        "`evaluateWorkerVersionTag` is a pure function: it passes only when the newest deployment (by `created_on`, independent of list order) routes 100% to a single version, the viewed version id equals that active id, and its `workers/tag` equals a lowercase 40-character expected SHA; missing, prefix, different, split-traffic, empty, or malformed input fails closed. Its unit tests prove this comparison logic only, not wrangler JSON shape stability or Cloudflare behaviour."
+      ]
+    },
+    {
+      "path": "scripts/documentation-truth-claim-fingerprint.mjs",
+      "claims": [
+        "`scripts/documentation-truth-claim-fingerprint.mjs` must fingerprint receipt claims by discarding only non-semantic HTML comments, Markdown link destinations, HTML wrappers, casing, and punctuation while keeping logical and comparison operators as distinct tokens, so inherited wording cannot be repackaged as a fresh invariant. A fingerprint proves textual identity only, never claim truth or authority."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentProviderReadback.ts",
+      "claims": [
+        "src/lib/n8nFounderContentProviderReadback.ts must fail closed unless a sanitized provider-native API observation matches the pending scheduled n8n receipt and exact orchestration, provider item/request identity, source repository/SHA, platform/channel, and requested schedule; it must never elevate scheduled state into publication truth or retain unsupported provider payload fields, and passing tests prove only this source contract, not that any production adapter calls it or that a Buffer object exists."
+      ]
+    },
+    {
+      "path": "scripts/verify-worker-var-secret-collisions.mjs",
+      "claims": [
+        "`scripts/verify-worker-var-secret-collisions.mjs`: The collision verifier must compare names only \u2014 top-level [vars] names against the [secrets].required/optional registries and against a supplied `wrangler secret list` receipt \u2014 exit non-zero naming every collision, fail closed on an unparseable receipt or config, and never read, print or change a value. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20261115194101_guard_federated_relay_v3_public_key_immutability.sql",
+      "claims": [
+        "Updates to public.federated_relay_public_keys must not change member, key_id, algorithm, public_key_jwk, valid_from, or created_at; rotation creates a new key row. Revocation is terminal, retirement cannot reactivate, revoked_at and a set valid_until are immutable, a newly set valid_until must be in the future, and revoked_at and updated_at are database-owned.",
+        "This migration installs a trigger and revokes direct EXECUTE on its function only; it does not change table grants, RLS policies, or key registration, and it is not proof that the trigger is applied to any provider database."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/federatedRelayV3KeyLifecycle.contract.test.ts",
+      "claims": [
+        "The contract test pins the relay public-key immutability trigger text against the current relay table columns; it is static source evidence, not runtime or provider-database proof.",
+        "The contract test in `src/lib/__tests__/federatedRelayV3KeyLifecycle.contract.test.ts` must fail if the column grant for service_role widens beyond state and valid_until or touches SELECT, INSERT, anon or authenticated; it is a source check, not runtime database proof."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql",
+      "claims": [
+        "The migration in `supabase/migrations/20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql` must revoke table-wide UPDATE from service_role and grant UPDATE only on the state and valid_until columns of public.federated_relay_public_keys; it does not prove the grant is applied to any provider database."
       ]
     }
   ]
