@@ -21,6 +21,17 @@ afterEach(() => {
 });
 
 describe('createServer', () => {
+  it('keeps the mounted Protect Me event route inactive without a dedicated key', async () => {
+    vi.stubEnv('FCR_PROTECT_EVENT_INGEST_SECRET', '');
+    const res = await request(createServer())
+      .post('/ingest/protect-security-events')
+      .set('Content-Type', 'application/json')
+      .send({ event: { verdict: 'PROBE' } });
+    expect(res.status).toBe(503);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toEqual({ error: 'Protect security event ingest is not configured' });
+  });
+
   it('responds to /health without auth and identifies the deployed service', async () => {
     const res = await request(createServer()).get('/health');
     expect(res.status).toBe(200);
