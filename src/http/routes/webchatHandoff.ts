@@ -1,4 +1,5 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { observeFirstPartyWebchat } from '../../growth/webchatObserve.js';
 import { buildWebchatHumanHandoff, HUMAN_HANDOFF_ACKNOWLEDGEMENT } from '../../growth/webchatHumanHandoff.js';
 import type { WebchatHandoffStore } from '../../growth/webchatHandoffStore.js';
@@ -84,6 +85,13 @@ export function createWebchatMessageHandler(
 
 export function createWebchatHandoffRouter(store: WebchatHandoffStore): Router {
   const router = Router();
+  router.use(rateLimit({
+    windowMs: 60 * 1_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { ok: false, error: 'Rate limit exceeded.' },
+  }));
   router.use(requireFounder);
 
   router.get('/handoffs', async (_req: FounderRequest, res) => {

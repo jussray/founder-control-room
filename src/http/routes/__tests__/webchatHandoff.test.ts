@@ -136,3 +136,12 @@ describe('founder handoff routes', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('founder handoff route rate limiting', () => {
+  it('rate limits the founder queue routes', async () => {
+    const a = app(memoryStore());
+    let last = 200;
+    for (let i = 0; i < 61; i += 1) last = (await request(a).get('/webchat/handoffs')).status;
+    expect(last).toBe(429);
+  });
+});
