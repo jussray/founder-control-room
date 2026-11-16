@@ -30,11 +30,15 @@ Migration `20261115194101_guard_federated_relay_v3_public_key_immutability.sql` 
 
 A read-only Cloudflare audit on November 15, 2026 observed `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` installed as Worker secrets while `wrangler.worker.toml` declares them as plain `[vars]`; that observation is historical and must be re-read before use. If it is still true, production Deploy and Worker Reconcile will stop at this gate until the founder decides which side to remove; this change does not remove, rename or rotate any secret. Source and unit tests do not prove GitHub CI, credential validity, a deploy, or runtime health.
 
+## November 15, 2026 — public Pages MCP route allowlist (candidate, not deployment proof)
+
+`public/_worker.js` now forwards only an explicit allowlist of MCP protocol routes from the public Pages origin to `FCR_API`: `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the `/mcp/portfolio/<slug>` bridges the API mounts. Any other `/mcp` path, including founder administration (`/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`), the write-capable `/mcp/founder-signal-engine` lane, unknown descendants, and case, slash, or percent-encoded variants, fails closed with a `404 MCP_ROUTE_NOT_PUBLIC` before any API call. Those routes stay reachable on the API origin under their existing authentication. This is source and unit-test behavior only; it does not prove the deployed Pages artifact, Cloudflare Access configuration, or live MCP authentication.
+
 ## Founder OS mission-patch simulation contract (candidate, not release proof)
 
 A simulator-generated `repository-source` edit must remain an in-memory artifact until the existing founder-authenticated `POST /approvals/:missionId/patch` route accepts it. The server must independently verify the live mission branch, pinned SHA, original file contents and proposed file hashes, then reserve an idempotent action before its GitHub provider commits. A staged receipt cannot grant merge, deployment, or production authority; independent human review, full exact-head CI and Playwright proof remain separate gates.
 
-## ## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
+## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
 
 The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
 
