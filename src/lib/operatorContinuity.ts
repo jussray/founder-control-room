@@ -601,6 +601,19 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   }
   const observationErrors = validateOperatorContinuityReceiptV2(input.observation);
   if (observationErrors.length) throw new Error('observation invalid: ' + observationErrors.join('; '));
+  // The generic V2 receipt accepts human-readable date strings and freeform
+  // project labels for historical evidence. Persisted task continuation cannot:
+  // those known fields must not become covert transcript/credential storage.
+  const strictIsoUtc = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/;
+  for (const field of ['observedAt', 'expiresAt'] as const) {
+    const date = input.observation[field];
+    if (typeof date !== 'string' || !strictIsoUtc.test(date) || !Number.isFinite(Date.parse(date))) {
+      throw new Error('observation ' + field + ' must be a strict ISO UTC timestamp');
+    }
+  }
+  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(input.observation.projectSlug)) {
+    throw new Error('observation projectSlug must be a bounded project identifier');
+  }
   // A v2 observation may describe historic branches freely; task persistence
   // must be stricter so a forged branch cannot become a transcript field.
   const branch = input.observation.targetBranch;
