@@ -1,17 +1,12 @@
--- Forward-only correction for Supabase SQL lint, retaining historical migrations.
--- Preserve original security, role, and lease-consumption semantics.
--- Do not apply to live provider without separate reviewed release authorization.
-
+-- Forward-only correction for pre-existing lint errors exposed by exact-head local Supabase CI.
+-- Preserve historic migration checksums; do not rewrite the original applied functions.
+-- Existing function OIDs, signatures, permissions, SECURITY attributes and search paths are retained.
+-- The synthetic Neon preview may lack these historical tables/functions; its skip is not database proof.
 begin;
-
-do $$
+do $repair$
 begin
-  if to_regprocedure('extensions.digest(bytea,text)') is null then
-    raise exception 'Required extensions.digest(bytea,text) missing; no function altered';
-  end if;
-end;
-$$;
-
+  if to_regprocedure('public.truth_console_reconcile_claim(uuid,bigint)') is not null then
+    execute $ddl$
 create or replace function public.truth_console_reconcile_claim(
   p_claim_id uuid,
   p_expected_revision bigint
@@ -217,7 +212,21 @@ begin
   );
 end;
 $$;
+$ddl$;
+    -- Preserve the existing service-role-only callable authority.
+    if has_function_privilege('anon', 'public.truth_console_reconcile_claim(uuid,bigint)', 'EXECUTE')
+       or has_function_privilege('authenticated', 'public.truth_console_reconcile_claim(uuid,bigint)', 'EXECUTE') then
+      raise exception 'Function execute grants broadened for truth_console_reconcile_claim';
+    end if;
+  elsif to_regnamespace('ci_preview') is not null then
+    -- Neon synthetic previews lack the full historic FCR schema; do not claim this verifies the routine.
+    raise notice 'Preview only: truth_console_reconcile_claim not installed; full Supabase local lint is the authoritative execution gate';
+  else
+    raise exception 'Existing FCR routine missing: truth_console_reconcile_claim';
+  end if;
 
+  if to_regprocedure('public.claim_revenue_strike_customer_send_lease(text,smallint,text,text,text,text,text,text,timestamptz,text,timestamptz)') is not null then
+    execute $ddl$
 create or replace function public.claim_revenue_strike_customer_send_lease(
   p_run_id text,
   p_slot smallint,
@@ -277,8 +286,8 @@ begin
 
   select count(*)
     into run_send_count
-    from public.revenue_strike_customer_send_leases as count_leases
-   where count_leases.run_id = btrim(p_run_id);
+    from public.revenue_strike_customer_send_leases AS l
+   where l.run_id = btrim(p_run_id);
 
   if run_send_count >= 5 then
     return;
@@ -288,17 +297,17 @@ begin
   -- including when a provider later rejects or returns an ambiguous result.
   if exists (
     select 1
-      from public.revenue_strike_customer_send_leases as recipient_leases
-     where recipient_leases.recipient_fingerprint = lower(btrim(p_recipient_fingerprint))
+      from public.revenue_strike_customer_send_leases AS l
+     where l.recipient_fingerprint = lower(btrim(p_recipient_fingerprint))
   ) then
     return;
   end if;
 
   if exists (
     select 1
-      from public.revenue_strike_customer_send_leases as slot_leases
-     where slot_leases.run_id = btrim(p_run_id)
-       and slot_leases.slot = p_slot
+      from public.revenue_strike_customer_send_leases AS l
+     where l.run_id = btrim(p_run_id)
+       and l.slot = p_slot
   ) then
     return;
   end if;
@@ -344,7 +353,21 @@ exception
     return;
 end;
 $function$;
+$ddl$;
+    -- Preserve the existing service-role-only callable authority.
+    if has_function_privilege('anon', 'public.claim_revenue_strike_customer_send_lease(text,smallint,text,text,text,text,text,text,timestamptz,text,timestamptz)', 'EXECUTE')
+       or has_function_privilege('authenticated', 'public.claim_revenue_strike_customer_send_lease(text,smallint,text,text,text,text,text,text,timestamptz,text,timestamptz)', 'EXECUTE') then
+      raise exception 'Function execute grants broadened for claim_revenue_strike_customer_send_lease';
+    end if;
+  elsif to_regnamespace('ci_preview') is not null then
+    -- Neon synthetic previews lack the full historic FCR schema; do not claim this verifies the routine.
+    raise notice 'Preview only: claim_revenue_strike_customer_send_lease not installed; full Supabase local lint is the authoritative execution gate';
+  else
+    raise exception 'Existing FCR routine missing: claim_revenue_strike_customer_send_lease';
+  end if;
 
+  if to_regprocedure('public.finalize_revenue_strike_customer_send_lease(uuid,text,text,text,timestamptz)') is not null then
+    execute $ddl$
 create or replace function public.finalize_revenue_strike_customer_send_lease(
   p_claim_id uuid,
   p_founder_user_id text,
@@ -387,13 +410,13 @@ begin
     return;
   end if;
 
-  update public.revenue_strike_customer_send_leases as target_lease
+  update public.revenue_strike_customer_send_leases AS l
      set provider_outcome = p_provider_outcome,
          provider_receipt_id = nullif(btrim(p_provider_receipt_id), ''),
          finalized_at = p_finalized_at
-   where target_lease.claim_id = lease_row.claim_id
-     and target_lease.provider_outcome = 'claimed'
-     and target_lease.finalized_at is null
+   where l.claim_id = lease_row.claim_id
+     and l.provider_outcome = 'claimed'
+     and l.finalized_at is null
   returning * into lease_row;
 
   return query
@@ -404,5 +427,18 @@ begin
       lease_row.finalized_at;
 end;
 $function$;
-
+$ddl$;
+    -- Preserve the existing service-role-only callable authority.
+    if has_function_privilege('anon', 'public.finalize_revenue_strike_customer_send_lease(uuid,text,text,text,timestamptz)', 'EXECUTE')
+       or has_function_privilege('authenticated', 'public.finalize_revenue_strike_customer_send_lease(uuid,text,text,text,timestamptz)', 'EXECUTE') then
+      raise exception 'Function execute grants broadened for finalize_revenue_strike_customer_send_lease';
+    end if;
+  elsif to_regnamespace('ci_preview') is not null then
+    -- Neon synthetic previews lack the full historic FCR schema; do not claim this verifies the routine.
+    raise notice 'Preview only: finalize_revenue_strike_customer_send_lease not installed; full Supabase local lint is the authoritative execution gate';
+  else
+    raise exception 'Existing FCR routine missing: finalize_revenue_strike_customer_send_lease';
+  end if;
+end;
+$repair$;
 commit;
