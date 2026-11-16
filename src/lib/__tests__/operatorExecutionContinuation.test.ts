@@ -139,6 +139,43 @@ describe('cross-mode operator execution continuation', () => {
       .toContain('execution continuation cannot become an authorization, approval, or browser cookie');
   });
 
+  it('rejects parseable private text in observation timestamps and project identifiers', () => {
+    const unsafeExpiry = createOperatorContinuityReceiptV2({
+      ...input.observation,
+      expiresAt: 'November 16, 2026 (PRIVATE_CONVERSATION_TEXT synthetic-credential)',
+    });
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: unsafeExpiry,
+    })).toThrow(/observation expiresAt must be a strict ISO UTC timestamp/);
+
+    const unsafeObservation = createOperatorContinuityReceiptV2({
+      ...input.observation,
+      observedAt: 'Nov 13, 2026 with private text',
+    });
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: unsafeObservation,
+    })).toThrow(/observation observedAt must be a strict ISO UTC timestamp/);
+
+    const unsafeProject = createOperatorContinuityReceiptV2({
+      ...input.observation,
+      projectSlug: 'founder-control-room PRIVATE_ACCOUNT_DATA',
+    });
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: unsafeProject,
+    })).toThrow(/bounded project identifier/);
+
+    expect(() => createOperatorExecutionContinuation({
+      ...input,
+      observation: createOperatorContinuityReceiptV2({
+        ...input.observation,
+        expiresAt: '2026-11-13T19:30:00Z',
+      }),
+    })).not.toThrow();
+  });
+
   it('refuses arbitrary prose, paths and invalid Git syntax in an observation branch', () => {
     for (const branch of [
       'main\\nprivate-credential',
