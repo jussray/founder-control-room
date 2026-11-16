@@ -17,6 +17,21 @@ const API_OWNED_ASSET_PATHS = new Set([
   '/assets/oauth-consent.js',
   '/assets/oauth-consent.css',
 ]);
+// Only these MCP protocol routes may cross public Pages to FCR_API. Each one
+// carries its own OAuth/static-token/public-metadata contract at the API.
+// Founder administration (vault, founder-permissions, servers), the
+// write-capable founder-signal-engine lane, and any unknown /mcp descendant
+// fail closed here and stay reachable only on the API origin.
+const PUBLIC_MCP_PROTOCOL_PATHS = new Set([
+  '/mcp',
+  '/mcp/read',
+  '/mcp/public',
+  '/mcp/founder-signal-x-engagement',
+  '/mcp/registry/v0.1/servers',
+  '/mcp/portfolio/founder-control-room',
+  '/mcp/portfolio/solcontinuity',
+  '/mcp/portfolio/promptos',
+]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
   '/products/business-leak-quickscan/',
@@ -59,6 +74,39 @@ function shouldServeFromPages(request) {
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     )
     || STATIC_FILE_PATTERN.test(pathname);
+}
+
+function isBlockedMcpPath(pathname) {
+  // Canonicalize encoding, case, repeated and trailing slashes before deciding.
+  // An undecodable path is never a reason to open an unknown route.
+  let canonicalPath;
+  try {
+    canonicalPath = decodeURIComponent(pathname)
+      .toLowerCase()
+      .replace(/\/{2,}/g, '/')
+      .replace(/\/+$/, '') || '/';
+  } catch {
+    return true;
+  }
+  if (canonicalPath !== '/mcp' && !canonicalPath.startsWith('/mcp/')) return false;
+  return !PUBLIC_MCP_PROTOCOL_PATHS.has(canonicalPath);
+}
+
+function mcpRouteNotPublicResponse(request) {
+  return new Response(request.method === 'HEAD' ? null : JSON.stringify({
+    ok: false,
+    error: 'This MCP route is not available through the public Pages origin.',
+    code: 'MCP_ROUTE_NOT_PUBLIC',
+  }), {
+    status: 404,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
 }
 
 function createApiRequest(request) {
@@ -355,6 +403,10 @@ export default {
 
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
       return relaySyncControl(request, env);
+    }
+
+    if (isBlockedMcpPath(requestUrl.pathname)) {
+      return mcpRouteNotPublicResponse(request);
     }
 
     // The canonical FCR domain is a private product entrypoint, not a public
