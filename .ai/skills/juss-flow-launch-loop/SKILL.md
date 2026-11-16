@@ -12,6 +12,10 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+## FAST versus guarded simulator write gate
+
+FAST may stage exact text edits and SHA-256 receipts in memory without provider access. A `repository-source` patch must be handed to the existing authenticated FCR mission route, which rereads exact live GitHub branch, mission policy pin and original content before an idempotent branch commit. The exported request must not execute itself or carry credentials. A local focused test is not GitHub Actions, independent review or Playwright proof. Keep full guarded checks on a stable exact head, with separate founder-final merge and release gates.
+
 When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
 
 ## Goal
