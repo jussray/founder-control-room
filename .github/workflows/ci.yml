@@ -284,6 +284,8 @@ jobs:
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/verify-worker-var-secret-collisions.node-test.mjs
+          node scripts/verify-worker-var-secret-collisions.mjs --config wrangler.worker.toml
 
   test-discovery:
     name: Test discovery ratchet
