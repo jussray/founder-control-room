@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Make federated relay v3 public-key identity and key material immutable in place with a before-update trigger, and restrict service_role UPDATE on public.federated_relay_public_keys to the lifecycle columns state and valid_until. Lifecycle transitions stay possible and monotonic; revoked_at and updated_at stay database-owned. SELECT and INSERT grants and RLS are unchanged. Rebuilt from an older relay hardening PR; checked against scratch Postgres only, not applied to any provider database.",
+  "purpose": "Make the public Pages worker forward only an explicit allowlist of MCP protocol routes to FCR_API and fail closed with 404 for every other /mcp path, including founder administration, the write-capable founder-signal-engine lane, and encoded variants. Rebuilt from PR #769; source and unit-test proof only, not deployment or Access proof.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -88,7 +88,8 @@
         "`public/_worker.js` must serve the bare `/work` and `/work/` paths by requesting the canonical `/work` URL through the Pages `ASSETS` binding, never requesting the `/work.html` filename (the asset layer canonicalizes it back to `/work` with a 308, which loops when returned verbatim) and never falling through to the `FCR_API` proxy, because the API proxy answers that public page without the service identity header and returns a degraded 503.",
         "`public/_worker.js` must serve the bare `/welcome` and `/welcome/` paths by requesting the canonical `/welcome` URL through the Pages `ASSETS` binding, never falling through to the `FCR_API` proxy, because no static classification otherwise covers the extensionless welcome path and the API proxy answers that public page without the service identity header, returning a degraded 503 (`API_SERVICE_IDENTITY_MISMATCH`).",
         "`public/_worker.js` must keep consent navigation, API-owned consent assets, and consent POST on the canonical apex Pages browser origin by forwarding to FCR_API; only the www consent GET navigates to apex. Cookie authority, same-tab authorization state, and same-origin mutation checks must not silently change host, and source behavior is not live OAuth/provider proof.",
-        "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied."
+        "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied.",
+        "`public/_worker.js` must forward only the allowlisted MCP protocol routes (`/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the mounted `/mcp/portfolio/<slug>` bridges) to FCR_API and must fail closed with `404 MCP_ROUTE_NOT_PUBLIC` for every other `/mcp` path after canonicalizing case, encoding, and slashes, never calling FCR_API for it. The allowlist is not authentication and does not prove deployed Pages, Access, or live MCP auth state."
       ]
     },
     {
