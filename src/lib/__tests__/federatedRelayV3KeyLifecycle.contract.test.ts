@@ -9,8 +9,17 @@ const guardPath = resolve(
   repositoryRoot,
   'supabase/migrations/20261115194101_guard_federated_relay_v3_public_key_immutability.sql',
 );
+const grantsPath = resolve(
+  repositoryRoot,
+  'supabase/migrations/20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql',
+);
 const table = readFileSync(tablePath, 'utf8').toLowerCase();
 const guard = readFileSync(guardPath, 'utf8').toLowerCase();
+const grants = readFileSync(grantsPath, 'utf8')
+  .toLowerCase()
+  .split('\n')
+  .filter((line) => !line.trim().startsWith('--'))
+  .join('\n');
 
 const immutableColumns = ['member', 'key_id', 'algorithm', 'public_key_jwk', 'valid_from', 'created_at'];
 
@@ -49,5 +58,17 @@ describe('federated relay v3 public-key immutability guard', () => {
     expect(guard).toContain('revoke all on function public.guard_federated_relay_public_key_lifecycle_v3()');
     expect(guard).toContain('from public, anon, authenticated, service_role;');
     expect(guard).not.toMatch(/\bon table\b/);
+  });
+
+  it('limits service_role UPDATE to the lifecycle columns without touching SELECT or INSERT', () => {
+    expect(grants).toContain('revoke update on table public.federated_relay_public_keys from service_role;');
+    expect(grants).toMatch(
+      /grant update \(state, valid_until\)\s+on table public\.federated_relay_public_keys\s+to service_role;/,
+    );
+    for (const column of [...immutableColumns, 'revoked_at', 'updated_at']) {
+      expect(grants).not.toMatch(new RegExp(`grant update \\([^)]*\\b${column}\\b`));
+    }
+    expect(grants).not.toMatch(/\b(revoke|grant)\s+(all|select|insert|delete)\b/);
+    expect(grants).not.toMatch(/\b(anon|authenticated)\b/);
   });
 });
