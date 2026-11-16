@@ -18,10 +18,10 @@
 import type { Request, Response } from 'express';
 import { markPaidFromVerifiedStripeEvent } from '../../quickscan/engine.js';
 import {
-  getQuickScanProspect,
-  isStripeEventProcessed,
-  markStripeEventProcessed,
-  saveQuickScanProspect,
+  getQuickScanProspectDurable,
+  isStripeEventProcessedDurable,
+  markStripeEventProcessedDurable,
+  saveQuickScanProspectDurable,
 } from '../../quickscan/store.js';
 import { parseStripeCheckoutCompletedEvent, verifyStripeWebhookSignature } from '../../quickscan/stripeWebhook.js';
 
@@ -50,7 +50,7 @@ export async function handleStripeQuickScanWebhook(req: Request, res: Response):
     return;
   }
 
-  if (isStripeEventProcessed(event.eventId)) {
+  if (await isStripeEventProcessedDurable(event.eventId)) {
     res.status(200).json({ ok: true, applied: false, code: 'DUPLICATE_EVENT' });
     return;
   }
@@ -60,7 +60,7 @@ export async function handleStripeQuickScanWebhook(req: Request, res: Response):
     return;
   }
 
-  const prospect = getQuickScanProspect(event.clientReferenceId);
+  const prospect = await getQuickScanProspectDurable(event.clientReferenceId);
   if (!prospect) {
     res.status(200).json({ ok: true, applied: false, code: 'PROSPECT_NOT_FOUND' });
     return;
@@ -69,8 +69,8 @@ export async function handleStripeQuickScanWebhook(req: Request, res: Response):
   try {
     const expectedPaymentLinkId = process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID?.trim() || undefined;
     markPaidFromVerifiedStripeEvent(prospect, event, 'stripe-webhook', { expectedPaymentLinkId });
-    saveQuickScanProspect(prospect);
-    markStripeEventProcessed(event.eventId);
+    await saveQuickScanProspectDurable(prospect);
+    await markStripeEventProcessedDurable(event.eventId);
     res.status(200).json({
       ok: true,
       applied: true,
