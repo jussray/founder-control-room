@@ -151,7 +151,7 @@ describe('cross-mode operator execution continuation', () => {
 
     const unsafeObservation = createOperatorContinuityReceiptV2({
       ...input.observation,
-      observedAt: 'Nov 13, 2026 with private text',
+      observedAt: 'November 13, 2026 (PRIVATE_CONVERSATION_TEXT synthetic-credential)',
     });
     expect(() => createOperatorExecutionContinuation({
       ...input,
