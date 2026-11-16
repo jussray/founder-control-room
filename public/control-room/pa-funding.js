@@ -146,6 +146,7 @@ let searchValue='';
 let sessionData={};
 let storageAvailable=false;
 let saveQueue=Promise.resolve();
+let pendingSaves=0;
 let storageMessage='Loading private reviews…';
 function updateStorageMessage(){
  const element=document.getElementById('save-status');
@@ -185,6 +186,8 @@ function save(){
   const snapshot=Object.assign({stage:'REVIEW',checks:{},evidenceNote:''},state(opportunityId));
   storageMessage='Saving private review…';
   updateStorageMessage();
+  // Count edits not yet acknowledged; "Saved" is shown only once every queued edit is stored.
+  pendingSaves+=1;
   saveQueue=saveQueue.then(async function(){
     // A previous write failure disables storage; never execute already-queued saves.
     if(!storageAvailable)return;
@@ -195,8 +198,11 @@ function save(){
     if(!response.ok)throw Error('Write rejected');
     const reply=await response.json();
     if(!reply.record)throw Error('Persistence receipt missing');
-    storageMessage='Saved privately · applicant eligibility stays UNKNOWN';
-    updateStorageMessage();
+    pendingSaves-=1;
+    if(pendingSaves===0){
+      storageMessage='Saved privately · applicant eligibility stays UNKNOWN';
+      updateStorageMessage();
+    }
   }).catch(function(){
     storageAvailable=false;
     storageMessage='Private save failed · editing disabled until you reload';
