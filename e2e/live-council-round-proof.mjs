@@ -56,17 +56,17 @@ app.post('/fastlane-proof', async (req, res) => {
         'PROOF: VERIFIED local browser fixture',
         'RISK: INFERRED no live providers',
         'ROLLBACK: disable opt-in mode',
-        'NEXT GATE: external verification'].join('\\n');
+        'NEXT GATE: external verification'].join('\n');
     } else if (request.goal.includes('STAGE 2')) {
       answer = ['AGREE: preserve old runner','DISAGREE: none',
         'BLIND SPOT: provider not connected',
         'VERDICT: opt-in mode remains non-authorizing',
-        'CONVERGED: YES'].join('\\n');
+        'CONVERGED: YES'].join('\n');
     } else {
       answer = ['TASK: prove live provider identities',
         'OWNER: codex', 'REPO/SURFACE: founder-control-room',
         'DONE WHEN: provider backed receipts and authenticated browser proof exist',
-        'RECEIPT DUE: founder by release review'].join('\\n');
+        'RECEIPT DUE: founder by release review'].join('\n');
     }
     return buildOperatorRelayResponse(request, {answer,
       evidenceRefs: [`simulated:fastlane:${operator}`]});
