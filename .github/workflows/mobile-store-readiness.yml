@@ -335,3 +335,67 @@ jobs:
             mobile/dist/ios
           if-no-files-found: error
           retention-days: 30
+
+  browser-guest-route-proof:
+    name: Playwright guest route proof (Expo web)
+    # Branch-scoped browser regression only. No production secrets or EAS builds.
+    if: ${{ github.ref == 'refs/heads/fix/fcr-mobile-protected-auth-20261117' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-public-placeholder
+      EXPO_PUBLIC_FCR_ORIGIN: https://example.invalid
+    steps:
+      - name: Check out exact fix head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install app and web-only preview dependencies
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx expo install --npm react-dom react-native-web
+          npm install --no-save --no-audit --no-fund playwright@1.61.1
+
+      - name: Install Playwright Chromium
+        working-directory: mobile
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Expo web preview
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup npx expo start --web --port 19006 > expo-web-playwright.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:19006/ > /dev/null; then
+              echo "Expo web available"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat expo-web-playwright.log
+          exit 1
+
+      - name: Run Playwright protected navigation proof
+        working-directory: mobile
+        run: node e2e/protected-routes.playwright.mjs
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:19006
+
+      - name: Retain browser evidence and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-mobile-playwright-${{ github.sha }}
+          path: |
+            mobile/test-results/
+            mobile/expo-web-playwright.log
+          if-no-files-found: warn
+          retention-days: 30
