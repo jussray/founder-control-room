@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { boundFounderRow } from './founderAuthFixture.js';
 
 const { mockGetUser, mockReadEffectiveDesiredState, supabaseMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
@@ -32,19 +33,11 @@ function buildApp() {
 
 function authorizeFounder() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'founder_users') {
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-          }),
-        }),
-      };
-    }
+    if (table === 'founder_users') return boundFounderRow(FOUNDER_EMAIL, 'founder-1');
     throw new Error(`Unexpected table: ${table}`);
   });
 }

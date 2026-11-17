@@ -84,6 +84,23 @@ jobs:
         working-directory: mobile
         run: eas whoami
 
+      - name: Verify linked EAS project (read-only)
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { expo } = require('./app.json');
+          const id = expo?.extra?.eas?.projectId;
+          if (!/^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$/.test(id ?? '')) {
+            console.error('::error::FCR mobile lacks a valid linked EAS project ID.');
+            process.exit(1);
+          }
+          console.log(`Checking configured EAS project ID: ${id}`);
+          NODE
+          # Provider validation; does not create a project or start a build.
+          eas project:info
+
       - name: Discover existing EAS project (read-only)
         id: existing_eas_project
         working-directory: mobile
