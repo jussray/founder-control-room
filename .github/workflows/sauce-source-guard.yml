@@ -18,8 +18,9 @@ env:
 jobs:
   slack-agent-readiness:
     name: Slack agent secret readiness (no message sent)
-    # Never expose credentials to untrusted PR or merge_group workflow code.
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    # Secrets are unavailable to PRs and blocked in Actions until provisioned.
+    # Manual-only probe avoids repeatedly redlining main on an absent Actions secret.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
