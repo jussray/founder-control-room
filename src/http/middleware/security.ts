@@ -116,11 +116,36 @@ function appendVary(res: Response, value: string): void {
 // CORS
 // ---------------------------------------------------------------------------
 
+/**
+ * Routes meant to be called directly from a visitor's browser on a
+ * third-party brand site, not the founder admin frontend. These carry no
+ * cookies/credentials and are already project-allowlisted and rate-limited
+ * at the route; the founder-origin allowlist below does not apply to them,
+ * or the advertised "public, cross-origin" ingress could never be reached
+ * from any real browser.
+ */
+const PUBLIC_CROSS_ORIGIN_PATHS = new Set(['/webchat/messages']);
+
 export const corsMiddleware: RequestHandler = (req, res, next): void => {
   const origin = req.get('Origin');
 
   // Server-to-server requests do not carry an Origin header.
   if (!origin) {
+    next();
+    return;
+  }
+
+  if (PUBLIC_CROSS_ORIGIN_PATHS.has(req.path)) {
+    appendVary(res, 'Origin');
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
     next();
     return;
   }
