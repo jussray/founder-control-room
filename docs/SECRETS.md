@@ -67,14 +67,15 @@ and `portfolio-actions-audit.yml` both declare `environment: production` and ref
 environment and at repository or organization scope, GitHub supplies the **environment-level**
 value. Replacing a same-named repository secret therefore does not change what those jobs see.
 
-Environment secrets are read when the job starts; repository secrets are read when the run is
-queued. Before attributing a repeated failure to an unchanged value, read back secret **name and
+Before attributing a repeated failure to an unchanged value, read back secret **name and
 `updated_at` metadata** — never contents — for both scopes and compare against the failing job's
-start time.
+start time. Only a replacement in the scope the job reads, made before that job started, can have
+reached it.
 
 #### Portfolio evidence sync: App key not yet recognized
 
-Recorded 2026-10-31; **re-observed 2026-11-11 and still current**.
+Recorded 2026-10-31; **last re-observed 2026-11-11**. This is a dated observation, not current
+status: re-read the latest scheduled run before relying on it.
 
 `Juss & Co portfolio evidence sync` fails at its `Normalize key and mint portfolio GitHub App
 token` step, so evidence publication and the deployed Playwright proof are skipped and the
