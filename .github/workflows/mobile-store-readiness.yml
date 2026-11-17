@@ -23,6 +23,16 @@ on:
         type: boolean
         required: false
         default: false
+      build_all_platforms:
+        description: 'Build Android and iOS using the production EAS profile (may incur build charges; existing signing credentials required)'
+        type: boolean
+        required: false
+        default: false
+      existing_eas_project_id:
+        description: 'UUID of the EXISTING Expo EAS project; omit only if already linked in mobile/app.json or EXPO_EAS_PROJECT_ID Actions variable'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -75,22 +85,38 @@ jobs:
         run: eas whoami
 
       - name: Require existing EAS project association
-        if: ${{ inputs.build_android_preview }}
+        if: ${{ inputs.build_android_preview || inputs.build_all_platforms }}
+        working-directory: mobile
+        env:
+          EAS_PROJECT_ID: ${{ inputs.existing_eas_project_id || vars.EXPO_EAS_PROJECT_ID }}
+          BUILD_ANDROID_PREVIEW: ${{ inputs.build_android_preview }}
+          BUILD_ALL_PLATFORMS: ${{ inputs.build_all_platforms }}
         shell: bash
         run: |
-          node <<'NODE'
-          const { expo } = require('./mobile/app.json');
-          const projectId = expo?.extra?.eas?.projectId;
-          if (typeof projectId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(projectId)) {
-            console.error('::error::FCR mobile has no valid expo.extra.eas.projectId. Link the EXISTING Expo project before EAS builds; do not create a duplicate app.');
-            process.exitCode = 1;
-          } else {
-            console.log('EAS project association configured');
-          }
-          NODE
+          set -euo pipefail
+          if [ "$BUILD_ANDROID_PREVIEW" = "true" ] && [ "$BUILD_ALL_PLATFORMS" = "true" ]; then
+            echo "::error::Choose Android preview OR all-platform production, not both."
+            exit 1
+          fi
+          configured_id="$(node -e "const id=require('./app.json').expo?.extra?.eas?.projectId; if (id) process.stdout.write(id)")"
+          supplied_id="${EAS_PROJECT_ID:-}"
+          project_id="${configured_id:-$supplied_id}"
+          if ! [[ "$project_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::Existing EAS project ID required; set the manual input or EXPO_EAS_PROJECT_ID. No new Expo project will be created."
+            exit 1
+          fi
+          if [ -n "$configured_id" ] && [ -n "$supplied_id" ] && [ "$configured_id" != "$supplied_id" ]; then
+            echo "::error::Existing app project ID does not match the supplied EAS project ID."
+            exit 1
+          fi
+          if [ -z "$configured_id" ]; then
+            # --id links an existing provider project in this ephemeral runner; never create a duplicate.
+            npx eas-cli@latest project:init --id "$project_id" --non-interactive
+          fi
+          npx eas-cli@latest project:info
 
       - name: Require real public mobile runtime configuration
-        if: ${{ inputs.build_android_preview }}
+        if: ${{ inputs.build_android_preview || inputs.build_all_platforms }}
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -115,6 +141,18 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           eas build --platform android --profile preview --non-interactive --wait
+
+      - name: Build Android and iOS via EAS (production)
+        if: ${{ inputs.build_all_platforms }}
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_FCR_ORIGIN: ${{ vars.EXPO_PUBLIC_FCR_ORIGIN }}
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          npx eas-cli@latest build --platform all --non-interactive --wait
 
   native-source-contract:
     name: Native source contract
