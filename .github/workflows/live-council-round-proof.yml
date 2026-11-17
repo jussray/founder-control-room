@@ -16,6 +16,7 @@ on:
       - 'src/http/routes/__tests__/missions.liveCouncil.integration.test.ts'
       - 'src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts'
       - 'e2e/live-council-round-proof.mjs'
+      - 'e2e/fastlane-nonprod-live.spec.ts'
       - '.github/workflows/live-council-round-proof.yml'
   pull_request:
     branches: [main]
@@ -33,6 +34,7 @@ on:
       - 'src/http/routes/__tests__/missions.liveCouncil.integration.test.ts'
       - 'src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts'
       - 'e2e/live-council-round-proof.mjs'
+      - 'e2e/fastlane-nonprod-live.spec.ts'
       - '.github/workflows/live-council-round-proof.yml'
 
 permissions:
@@ -80,6 +82,9 @@ jobs:
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps
+
+      - name: Verify nonproduction Fastlane witness refuses production and Pages preview
+        run: npx playwright test e2e/fastlane-nonprod-live.spec.ts --reporter=line
 
       - name: Prove browser Council chain
         run: node e2e/live-council-round-proof.mjs
