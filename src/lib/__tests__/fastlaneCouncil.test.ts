@@ -127,6 +127,31 @@ describe('runFastlaneCouncil v1.1', () => {
     expect(result.transcript.stage2.rounds).toHaveLength(0);
     expect(result.transcript.stage3.state).toBe('FOUNDER_RULING');
     expect(result.transcript.stage3.tasks).toHaveLength(0);
+    // A reaction to another seat must be disqualified and rerun blind once.
+    expect(seen.filter((item) => item.goal.includes('STAGE 1'))).toHaveLength(4);
+    expect(seen.filter((item) => item.goal.includes('STAGE 1')
+      && item.context !== 'ORIGINAL PROMPT')).toHaveLength(0);
+  });
+
+  it('rejects ownership declared during Stage 2 reasoning', async () => {
+    const seen: Array<{name: string; goal: string; context: string}> = [];
+    const base = adapters(seen);
+    const withEarlyOwnership = (inner: OperatorRelayAdapter): OperatorRelayAdapter => async (request) => {
+      if (request.goal.includes('STAGE 2')) {
+        return buildOperatorRelayResponse(request, {
+          answer: reason(1, true) + '\\nOWNER: codex',
+          evidenceRefs: ['simulated:early-ownership'],
+        });
+      }
+      return inner(request);
+    };
+    const result = await runFastlaneCouncil(input, {
+      codex: withEarlyOwnership(base.codex!),
+      'claude-code': withEarlyOwnership(base['claude-code']!),
+    });
+    expect(result.transcript.stage2.unanimous).toBe(false);
+    expect(result.transcript.stage3.state).toBe('FOUNDER_RULING');
+    expect(result.transcript.stage3.tasks).toHaveLength(0);
   });
 
   it('rejects restricted context and duplicate seats without sending providers', async () => {
