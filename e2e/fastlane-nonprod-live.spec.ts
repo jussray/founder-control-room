@@ -40,6 +40,12 @@ function approvedNonproductionOrigin(raw: string, expectedHostname: string): str
   return url.origin;
 }
 
+function genuineNonproductionTier(tier: unknown): boolean {
+  // A missing /version.environment used to pass the older not-production
+  // assertion. Only explicit, server-attested nonproduction tiers can pass.
+  return tier === 'staging' || tier === 'preview' || tier === 'nonproduction';
+}
+
 function verifiedEvidence(verdict: {
   operator: Seat; state: string; requestHash: string | null;
   responseHash: string | null; evidenceRefs: string[];
@@ -57,6 +63,12 @@ test('Fastlane witness rejects production API and Pages preview routing', () => 
   const good = 'https://fastlane-nonprod.example.test/';
   expect(approvedNonproductionOrigin(good, 'fastlane-nonprod.example.test'))
     .toBe('https://fastlane-nonprod.example.test');
+  for (const tier of [undefined, null, '', 'production', 'prod', 'unknown']) {
+    expect(genuineNonproductionTier(tier)).toBe(false);
+  }
+  for (const tier of ['staging', 'preview', 'nonproduction']) {
+    expect(genuineNonproductionTier(tier)).toBe(true);
+  }
   for (const origin of [
     'https://api.foundercontrolroom.org/',
     'https://foundercontrolroom.org/',
@@ -96,7 +108,8 @@ test('authenticated Playwright reads real Fastlane provider receipts at exact no
     const body = await response.json() as {service?: string;gitSha?: string;environment?: string};
     expect(body.service).toBe('founder-control-room');
     expect(body.gitSha).toBe(sha);
-    expect(body.environment).not.toBe('production');
+    expect(genuineNonproductionTier(body.environment),
+      'BLOCKED: nonproduction /version must attest its environment explicitly').toBe(true);
   };
 
   await version();
