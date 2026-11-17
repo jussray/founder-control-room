@@ -22,6 +22,7 @@ export class OperatorRelayDispatchError extends Error {
       | 'relay_response_invalid'
       | 'relay_disclosure_denied',
     message: string,
+    public readonly externalProviderCall = false,
   ) {
     super(message);
     this.name = 'OperatorRelayDispatchError';
@@ -61,7 +62,7 @@ export async function dispatchOperatorRelay(
   const response = await adapter(request);
   const responseErrors = validateOperatorRelayResponse(response, request);
   if (responseErrors.length > 0) {
-    throw new OperatorRelayDispatchError('relay_response_invalid', responseErrors.join('; '));
+    throw new OperatorRelayDispatchError('relay_response_invalid', responseErrors.join('; '), true);
   }
   return response;
 }
