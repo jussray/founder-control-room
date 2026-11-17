@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/mobile-founder-client
+      - main
     paths:
       - mobile/**
       - src/http/middleware/requireFounder.ts
@@ -33,8 +34,9 @@ env:
 jobs:
   expo-robot-readiness:
     name: Expo fcr robot readiness
-    # Keep robot credentials out of PR and push-triggered build jobs.
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    # Secret-backed auth is limited to trusted main. PRs and feature-branch pushes cannot run it.
+    # Main workflow changes provide a no-build credential check; manual dispatch can request a preview.
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: expo-mobile
@@ -73,6 +75,7 @@ jobs:
         run: eas whoami
 
       - name: Require existing EAS project association
+        if: ${{ inputs.build_android_preview }}
         shell: bash
         run: |
           node <<'NODE'
