@@ -20,11 +20,19 @@ protected='^(\+?)((HEAD|[^:]*):)?(refs/heads/)?(main|production)$'
 # Walk every `git ... push ...` segment of the command line.
 while IFS= read -r seg; do
   read -r -a tok <<<"$seg"
-  i=0; n=${#tok[@]}
-  [[ "${tok[0]:-}" == git ]] || continue
-  i=1
+  n=${#tok[@]}; dir=""
+  # Find `git` anywhere in the segment, not only at its start: loop bodies
+  # (`do git push ...`), `env X=1 git push`, `timeout 5 git push` and similar
+  # wrappers must not slip past the gate.
+  g=0
+  while (( g < n )) && [[ "${tok[g]}" != git && "${tok[g]}" != */git ]]; do (( g++ )); done
+  (( g < n )) || continue
+  i=$((g + 1))
   while (( i < n )) && [[ "${tok[i]}" != push ]]; do
-    [[ "${tok[i]}" == -C || "${tok[i]}" == -c ]] && dir="${tok[i+1]:-}" && (( i++ ))
+    # -C <dir> changes the repository; -c <key=val> only sets config and must
+    # not be mistaken for a directory.
+    if [[ "${tok[i]}" == -C ]]; then dir="${tok[i+1]:-}"; (( i++ ));
+    elif [[ "${tok[i]}" == -c ]]; then (( i++ )); fi
     (( i++ ))
   done
   (( i < n )) || continue
