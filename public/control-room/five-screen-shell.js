@@ -151,11 +151,23 @@ function installStyles() {
     .founder-proof-links{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}
     .founder-proof-links a{display:inline-flex;padding:.5rem .75rem;border:1px solid var(--panel-border);border-radius:8px;text-decoration:none;color:var(--text)}
     .founder-proof-links a:hover{border-color:var(--accent)}
+    .founder-home-split{display:grid;grid-template-columns:1.3fr 1fr;gap:.75rem;margin-top:.75rem;align-items:start}
+    .founder-activity-feed,.founder-chief-widget{padding:1rem;border:1px solid var(--panel-border);border-radius:12px;background:var(--panel)}
+    .founder-activity-list{list-style:none;margin:.6rem 0 0;padding:0;display:grid;gap:.1rem}
+    .founder-activity-list li{display:grid;grid-template-columns:1fr auto;gap:.2rem .6rem;align-items:baseline;padding:.5rem 0;border-top:1px solid var(--panel-border)}
+    .founder-activity-list li:first-child{border-top:0}
+    .founder-activity-list .meta{grid-column:1/-1;color:var(--muted);font-size:.78rem}
+    .founder-activity-list .pill{font-size:.68rem;color:var(--muted);border:1px solid var(--panel-border);border-radius:999px;padding:.15rem .5rem;white-space:nowrap;justify-self:end}
+    .founder-chief-log{color:var(--muted);font-size:.86rem;line-height:1.5;margin:.6rem 0 .8rem}
+    .founder-chief-form{display:flex;gap:.5rem}
+    .founder-chief-form input{flex:1;min-height:2.5rem;padding:.5rem .7rem;border-radius:8px;border:1px solid var(--panel-border);background:transparent;color:var(--text)}
+    .founder-chief-form input:disabled,.founder-chief-form button:disabled{opacity:.55}
     @media(max-width:760px){
       .founder-screen-nav{padding:.45rem;gap:.18rem}
       .founder-screen-nav button{padding:.6rem .2rem;font-size:.74rem}
       .founder-home,.content{padding:.75rem}
       .founder-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .founder-home-split{grid-template-columns:1fr}
     }
   `;
   document.head.appendChild(style);
@@ -361,6 +373,21 @@ async function renderHome(home) {
         <p>${escapeText(nextGate)}</p>
         <p class="muted">Recent evidence events: ${activity.length}</p>
         <div class="founder-quick-actions"><button type="button" data-home-target="control">Open Control</button><button type="button" data-home-target="proof">Inspect Proof</button></div>
+      </div>
+      <div class="founder-home-split">
+        <div class="founder-activity-feed">
+          <small class="muted">RECENT ACTIVITY</small>
+          <ul class="founder-activity-list">${activity.slice(0, 6).map((event) => `<li><strong>${escapeText(event.event_type || 'event')}</strong><span class="pill">${escapeText(event.severity || 'info')}</span><span class="meta">${escapeText(event.project?.name || event.project?.slug || 'Unassigned')} · ${escapeText(event.created_at ? new Date(event.created_at).toLocaleString() : 'unknown time')}</span></li>`).join('')}</ul>
+          ${activity.length === 0 ? '<p class="muted">No recent activity yet.</p>' : ''}
+        </div>
+        <div class="founder-chief-widget">
+          <small class="muted">CHIEF AI ASSISTANT</small>
+          <p class="founder-chief-log">Chief AI Assistant has a home here, but no live conversation endpoint is wired to this screen yet. Sending a message below does nothing today — this stays UI-only until a real Chief endpoint is authorized and connected.</p>
+          <form class="founder-chief-form" data-chief-noop>
+            <input type="text" placeholder="Ask Chief…" disabled autocomplete="off" />
+            <button type="button" disabled>Send</button>
+          </form>
+        </div>
       </div>
     `;
     home.querySelectorAll('[data-home-target]').forEach((button) => {

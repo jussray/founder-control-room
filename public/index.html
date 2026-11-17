@@ -260,6 +260,50 @@
       .owner-cta { margin-left: 1rem; }
       .quote-card { max-width: none; }
     }
+
+    /* Sign-up / sign-in overlay */
+    .auth-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1.2rem; }
+    .auth-scrim { position: absolute; inset: 0; background: rgba(5, 6, 20, .72); backdrop-filter: blur(6px); }
+    .auth-modal {
+      position: relative; z-index: 1; width: min(440px, 100%); max-height: 92vh; overflow-y: auto;
+      padding: 1.6rem 1.5rem 1.4rem; border-radius: 1.3rem; border: 1px solid var(--line-strong);
+      background: linear-gradient(160deg, rgba(20, 25, 54, .94), rgba(8, 10, 24, .97));
+      box-shadow: 0 30px 90px rgba(0, 0, 0, .5), 0 0 60px rgba(120, 90, 255, .14);
+    }
+    .auth-close {
+      position: absolute; top: .9rem; right: .9rem; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .05); color: var(--ink); font-size: 1.1rem; line-height: 1; cursor: pointer;
+    }
+    .auth-tabs { display: flex; gap: .3rem; padding: .3rem; margin: 0 0 1.2rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(10, 13, 32, .8); }
+    .auth-tabs button {
+      flex: 1; border: 0; background: none; color: var(--muted); padding: .6rem .8rem; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: .86rem;
+    }
+    .auth-tabs button[aria-selected="true"] { color: #08091a; background: linear-gradient(100deg, #55c8ff, #9b6bff); }
+    .auth-eyebrow { margin: 0 0 .5rem; font-size: .7rem; letter-spacing: .2em; color: #d7d4ff; font-weight: 700; text-transform: uppercase; }
+    .auth-modal h2 { font-size: 1.5rem; font-weight: 800; margin: 0 0 .5rem; }
+    .auth-lede { margin: 0 0 1.1rem; color: var(--muted); font-size: .92rem; line-height: 1.5; }
+    .auth-panel form { display: grid; gap: .55rem; }
+    .auth-panel label { font-size: .78rem; color: var(--muted); }
+    .auth-panel input[type="email"] {
+      width: 100%; min-height: 2.8rem; padding: .7rem .85rem; border-radius: .85rem;
+      border: 1px solid var(--line); background: rgba(255, 255, 255, .035); color: var(--ink); font: inherit; font-size: .94rem;
+    }
+    .auth-panel input[type="email"]:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+    .auth-btn {
+      appearance: none; min-height: 2.8rem; display: inline-flex; align-items: center; justify-content: center; width: 100%;
+      border: 1px solid transparent; border-radius: .85rem; font: inherit; font-size: .88rem; font-weight: 800; cursor: pointer;
+      color: #08091a; background: linear-gradient(100deg, #55c8ff, #9b6bff); box-shadow: 0 10px 30px rgba(120, 90, 255, .3); margin-top: .2rem;
+    }
+    .auth-btn:disabled { opacity: .6; cursor: default; }
+    .auth-btn.ghost { color: var(--ink); background: rgba(255, 255, 255, .05); box-shadow: none; border-color: var(--line); margin-top: .6rem; text-decoration: none; }
+    .auth-err { margin: 0; color: #ff9fb0; font-size: .82rem; }
+    .auth-switch { margin: .9rem 0 0; font-size: .84rem; color: var(--muted); }
+    .auth-switch button { border: 0; background: none; color: var(--blue); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+    .auth-founder-toggle { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+    .auth-founder-toggle summary { cursor: pointer; font-size: .82rem; color: var(--muted); font-weight: 700; }
+    .auth-founder-toggle form { margin-top: .7rem; }
+    .auth-status { margin: 1rem 0 0; font-size: .82rem; color: var(--muted); min-height: 1.1em; }
+    @media (max-width: 480px) { .auth-modal { padding: 1.3rem 1.1rem 1.2rem; border-radius: 1.1rem; } }
   </style>
   <link rel="stylesheet" href="/cinematic-direction.css" />
 </head>
@@ -280,7 +324,7 @@
         <a href="#support">Support</a>
         <a href="#community">Community</a>
         <a href="#messages">Messages</a>
-        <a class="avatar" href="/welcome" aria-label="Founder sign-in">
+        <a class="avatar" href="/welcome" data-auth-open="signup" aria-label="Sign up or sign in">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <circle cx="12" cy="8.5" r="4" fill="currentColor" />
             <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -293,7 +337,7 @@
         <a href="#proof">Proof</a>
         <a href="#community-f">Community</a>
         <a href="#automations">Automations</a>
-        <a class="avatar" href="/welcome" aria-label="Founder sign-in">
+        <a class="avatar" href="/welcome" data-auth-open="signin" aria-label="Sign up or sign in">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <circle cx="12" cy="8.5" r="4" fill="currentColor" />
             <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -320,7 +364,7 @@
           <a class="btn" href="/work.html">Explore Founders →</a>
         </div>
         <figure class="hero-art">
-          <img src="/assets/front-door/hero-peak.jpg" alt="" width="940" height="730" decoding="async" />
+          <img src="/assets/front-door/hero-peak.jpg" alt="" width="596" height="336" decoding="async" />
           <p class="hero-tag" aria-hidden="true">PEOPLE<br />IDEAS<br />PROGRESS<br />A BRIGHTER<br />TOMORROW</p>
         </figure>
         <p class="quote-serif">“Bigger thinking.<br />Real outcomes.”</p>
@@ -425,7 +469,7 @@
       </div>
 
       <p class="notes">Only verified founders can open private project controls. Other members receive an empty personal workspace, separate from founder records.</p>
-      <a class="btn ghost owner-cta" href="/welcome">Enter authenticated Control Room →</a>
+      <a class="btn ghost owner-cta" href="/welcome" data-auth-open="signin">Enter authenticated Control Room →</a>
     </section>
     </main>
 
@@ -440,6 +484,56 @@
     </footer>
   </div>
 
+  <div class="auth-overlay" id="auth-overlay" hidden>
+    <div class="auth-scrim" data-auth-close></div>
+    <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <button class="auth-close" type="button" data-auth-close aria-label="Close">&times;</button>
+      <div class="auth-tabs" role="tablist" aria-label="Choose sign up or sign in">
+        <button type="button" role="tab" id="auth-tab-signup" aria-controls="auth-panel-signup" aria-selected="true" data-auth-tab="signup">Create account</button>
+        <button type="button" role="tab" id="auth-tab-signin" aria-controls="auth-panel-signin" aria-selected="false" data-auth-tab="signin">Welcome back</button>
+      </div>
+
+      <section id="auth-panel-signup" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-signup" data-auth-panel="signup">
+        <p class="auth-eyebrow">Join Founder Control Room</p>
+        <h2 id="auth-modal-title">Create your founder account</h2>
+        <p class="auth-lede">One email. No password. We'll send a secure link to get you building.</p>
+        <form id="auth-signup-form" novalidate>
+          <label for="auth-signup-email">Email</label>
+          <input id="auth-signup-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com" />
+          <button class="auth-btn" id="auth-signup-submit" type="submit">Send sign-in link</button>
+          <p class="auth-err" id="auth-signup-err" hidden></p>
+        </form>
+        <p class="auth-switch">Already have an account? <button type="button" data-auth-switch="signin">Welcome back</button></p>
+      </section>
+
+      <section id="auth-panel-signin" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-signin" data-auth-panel="signin" hidden>
+        <p class="auth-eyebrow">Good to see you</p>
+        <h2>Welcome back</h2>
+        <p class="auth-lede">Enter your email and we'll send a secure sign-in link.</p>
+        <form id="auth-signin-form" novalidate>
+          <label for="auth-signin-email">Email</label>
+          <input id="auth-signin-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com" />
+          <button class="auth-btn" id="auth-signin-submit" type="submit">Send sign-in link</button>
+          <p class="auth-err" id="auth-signin-err" hidden></p>
+        </form>
+        <p class="auth-switch">New here? <button type="button" data-auth-switch="signup">Create your founder account</button></p>
+        <details class="auth-founder-toggle">
+          <summary>Founder sign-in (allowlisted)</summary>
+          <form id="auth-founder-form" novalidate>
+            <label for="auth-founder-email">Founder email</label>
+            <input id="auth-founder-email" type="email" inputmode="email" autocomplete="email" required placeholder="founder@example.com" />
+            <button class="auth-btn ghost" id="auth-founder-submit" type="submit">Send founder sign-in link</button>
+            <p class="auth-err" id="auth-founder-err" hidden></p>
+          </form>
+          <a class="auth-btn ghost" href="/auth/google">Continue with Google as founder</a>
+        </details>
+      </section>
+
+      <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
   <script src="/fcr-public-tabs.js" defer></script>
+  <script src="/assets/front-door-auth.js" defer></script>
 </body>
 </html>
