@@ -139,6 +139,11 @@ function founderSignalAutomationGrantStatus() {
 }
 
 function deploymentVersion() {
+  // Runtime identity is public-safe metadata, not authority. Unknown values
+  // fail closed so nonproduction witnesses cannot mistake absence for safety.
+  const configuredEnvironment = process.env.ENVIRONMENT?.trim().toLowerCase() ?? '';
+  const environment = ['production', 'preview', 'staging', 'nonproduction'].includes(configuredEnvironment)
+    ? configuredEnvironment : null;
   const configuredSha = process.env.GIT_SHA?.trim() ?? '';
   const supabaseProjectRef = process.env.SUPABASE_PROJECT_REF?.trim() ?? '';
   const maxRuntimeAuthority = process.env.FCR_V10_MAX_RUNTIME_AUTHORITY?.trim() ?? '';
@@ -148,6 +153,7 @@ function deploymentVersion() {
   return {
     service: SERVICE_IDENTITY,
     gitSha: EXACT_COMMIT_SHA.test(configuredSha) ? configuredSha.toLowerCase() : null,
+    environment,
     v10: {
       capabilityPlanContract: V10_CAPABILITY_PLAN_CONTRACT,
       conveyorContract: FOUNDER_CONVEYOR_CONTRACT,
