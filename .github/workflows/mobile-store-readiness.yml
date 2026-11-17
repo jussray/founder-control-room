@@ -406,30 +406,44 @@ jobs:
 
   live-negative-auth-proof:
     name: Live FCR dashboard denial proof (no credentials)
-    # No tokens, no test-user creation, no login attempts. Only two GET requests.
+    # Observe both canonical origins; no account creation, tokens, or mutations.
     if: ${{ github.ref == 'refs/heads/fix/fcr-mobile-protected-auth-20261117' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     steps:
-      - name: Prove deployed dashboard denies unauthenticated requests
+      - name: Attribute live API denial to the real FCR backend
         shell: bash
-        env:
-          FCR_AUTH_PROOF_URL: https://foundercontrolroom.org/dashboard/tasks
         run: |
           set -euo pipefail
+          failures=0
           probe() {
-            local label="$1"
-            shift
-            local code
-            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 --connect-timeout 10 --retry 0 "$@" "$FCR_AUTH_PROOF_URL")"
-            printf '%s HTTP %s\n' "$label" "$code"
-            if [ "$code" != "401" ]; then
-              echo "::error::$label must be 401; got HTTP $code. The live denial gate is NOT verified."
-              exit 1
+            local label="$1" origin="$2"
+            shift 2
+            local temp code content_type service ray
+            temp="$(mktemp -d)"
+            if ! code="$(curl -sS -D "$temp/headers" -o "$temp/body" -w '%{http_code}' --connect-timeout 10 --max-time 20 --retry 0 -H 'Accept: application/json' "$@" "$origin/dashboard/tasks")"; then
+              echo "::warning::$label network request failed; backend identity unverified."
+              rm -rf "$temp"
+              return 1
+            fi
+            content_type="$(awk 'tolower($1)=="content-type:"{print $2}' "$temp/headers" | tr -d '\r' | tail -1)"
+            service="$(awk 'tolower($1)=="x-founder-control-room-service:"{print $2}' "$temp/headers" | tr -d '\r' | tail -1)"
+            ray="$(awk 'tolower($1)=="cf-ray:"{print $2}' "$temp/headers" | tr -d '\r' | tail -1)"
+            rm -rf "$temp"
+            echo "$label: HTTP $code; content-type=${content_type:-missing}; FCR-service=${service:-missing}; cf-ray=${ray:-missing}"
+            if [ "$code" != "401" ] || [ "$service" != "founder-control-room" ] || [[ "$content_type" != application/json* ]]; then
+              echo "::warning::$label was not a confirmed FCR API 401. No application-auth proof claimed."
+              return 1
             fi
           }
-          probe "No session"
-          probe "Invalid bearer" -H "Authorization: Bearer fcr-auth-denial-probe-not-a-token"
-          echo "Verified: deployed FCR dashboard rejects both unauthenticated probes."
+          for origin in https://foundercontrolroom.org https://api.foundercontrolroom.org; do
+            probe "$origin no session" "$origin" || failures=$((failures+1))
+            probe "$origin invalid bearer" "$origin" -H "Authorization: Bearer fcr-auth-denial-probe-not-a-token" || failures=$((failures+1))
+          done
+          if [ "$failures" -ne 0 ]; then
+            echo "::error::FCR live auth proof BLOCKED: $failures probe(s) lacked authenticated backend denial evidence."
+            exit 1
+          fi
+          echo "Verified live backend denial for both origins with no credentials."
