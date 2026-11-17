@@ -16,6 +16,12 @@ on:
       - src/http/routes/dashboard.ts
       - .github/workflows/mobile-store-readiness.yml
   workflow_dispatch:
+    inputs:
+      build_android_preview:
+        description: 'After Expo robot check, build an internal Android preview (requires linked EAS project and public runtime variables)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -25,6 +31,88 @@ env:
   CI: true
 
 jobs:
+  expo-robot-readiness:
+    name: Expo fcr robot readiness
+    # Keep robot credentials out of PR and push-triggered build jobs.
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: expo-mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Require Actions Expo credential
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::GitHub Actions secret EXPO_TOKEN is missing. Copilot Agents secrets do not automatically reach Actions."
+            exit 1
+          fi
+
+      - name: Check out exact main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Record proof subject
+        run: echo "proof_subject=$(git rev-parse HEAD)"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Configure EAS CLI with robot token
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Authenticate Expo robot
+        working-directory: mobile
+        run: eas whoami
+
+      - name: Require existing EAS project association
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { expo } = require('./mobile/app.json');
+          const projectId = expo?.extra?.eas?.projectId;
+          if (typeof projectId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(projectId)) {
+            console.error('::error::FCR mobile has no valid expo.extra.eas.projectId. Link the EXISTING Expo project before EAS builds; do not create a duplicate app.');
+            process.exitCode = 1;
+          } else {
+            console.log('EAS project association configured');
+          }
+          NODE
+
+      - name: Require real public mobile runtime configuration
+        if: ${{ inputs.build_android_preview }}
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_FCR_ORIGIN: ${{ vars.EXPO_PUBLIC_FCR_ORIGIN }}
+        shell: bash
+        run: |
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_FCR_ORIGIN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions variable $name required for usable Android preview."
+              exit 1
+            fi
+          done
+
+      - name: Build Android internal preview
+        if: ${{ inputs.build_android_preview }}
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_FCR_ORIGIN: ${{ vars.EXPO_PUBLIC_FCR_ORIGIN }}
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          eas build --platform android --profile preview --non-interactive --wait
+
   native-source-contract:
     name: Native source contract
     runs-on: ubuntu-latest
