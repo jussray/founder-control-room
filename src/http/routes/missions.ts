@@ -10,6 +10,7 @@
 
 import { Router } from 'express';
 import { runCouncilRound, type CouncilConversationRow } from '../../lib/councilRound.js';
+import { runFastlaneCouncil, type FastlaneConversationRow } from '../../lib/fastlaneCouncil.js';
 import { OPERATOR_RELAY_PEERS } from '../../lib/operatorRelayConstants.js';
 import { createServerOperatorRelayAdapters } from '../../lib/operatorRelayModelProviders.js';
 import type { RelayCapability, RelayOperatorId, RelaySensitivity } from '../../lib/operatorRelay.js';
@@ -218,6 +219,61 @@ missionsRouter.post('/:missionId/council/run', async (req: FounderRequest, res) 
       error: error instanceof Error ? error.message : 'Council relay failed.',
       code: 'council_relay_internal_failure',
     });
+  }
+});
+
+/**
+ * POST /missions/:missionId/council/fastlane
+ * Explicitly opt-in, founder-only Fastlane v1.1 Council. This does not modify
+ * the legacy sequential /council/run route or grant any execution authority.
+ * Body: { mode: 'fastlane', goal, seed?, participants?, sourceRef?, sensitivity? }
+ */
+missionsRouter.post('/:missionId/council/fastlane', async (req: FounderRequest, res) => {
+  const { missionId } = req.params;
+  const body = req.body as Record<string, unknown>;
+  if (body['mode'] !== 'fastlane') {
+    return res.status(400).json({ error: 'explicit mode: fastlane is required' });
+  }
+  const goal = typeof body['goal'] === 'string' ? body['goal'].trim() : '';
+  const seed = typeof body['seed'] === 'string' ? body['seed'].trim() : goal;
+  if (!goal || goal.length > 3000) return res.status(400).json({ error: 'goal must be 1..3000 characters' });
+  if (!seed || seed.length > 12_000) return res.status(400).json({ error: 'seed must be 1..12000 characters' });
+
+  const raw = body['participants'] ?? DEFAULT_COUNCIL_PARTICIPANTS;
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > 4 ||
+      !raw.every((seat) => typeof seat === 'string' && RELAY_PEERS.has(seat)) ||
+      new Set(raw).size !== raw.length) {
+    return res.status(400).json({ error: 'participants must be 2..4 distinct Council peers' });
+  }
+  const sensitivity = body['sensitivity'] === undefined ? 'internal' : body['sensitivity'];
+  if (sensitivity !== 'internal' && sensitivity !== 'public') {
+    return res.status(400).json({ error: 'Fastlane sensitivity must be public or internal' });
+  }
+  if (!(await missionExists(missionId))) return res.status(404).json({ error: 'Mission not found' });
+
+  const round = await nextCouncilRound(missionId);
+  const sourceRef = typeof body['sourceRef'] === 'string' && body['sourceRef'].trim()
+    ? body['sourceRef'].trim() : `mission:${missionId}`;
+  let conversation: unknown = null;
+  try {
+    const result = await runFastlaneCouncil({
+      goal, seed, seats: (raw as RelayOperatorId[]).map((operator) => ({operator, capability: 'propose'})),
+      missionId, round, sourceRef, sensitivity,
+      persist: async (row: FastlaneConversationRow) => {
+        const {data, error} = await supabase.from('council_conversations')
+          .insert(row).select('id, round, participants, transcript, outcome, created_at').single();
+        if (error) throw new Error(`Fastlane persistence failed: ${error.message}`);
+        conversation = data;
+      },
+    }, createServerOperatorRelayAdapters(process.env));
+    // 202 means advisory tasks still need actual owner acceptance receipts.
+    // 424 means a founder ruling is needed; never turn it into 2xx green.
+    return res.status(result.transcript.state === 'awaiting_acceptance' ? 202 : 424)
+      .set('Cache-Control', 'no-store')
+      .json({mode: 'fastlane', executionState: result.transcript.state, conversation, result});
+  } catch {
+    return res.status(500).set('Cache-Control', 'no-store')
+      .json({code: 'fastlane_round_failed', error: 'Fastlane relay or persistence failed'});
   }
 });
 
