@@ -55,17 +55,24 @@ async function loadSecurityWithEnv(
 async function probe(
   env: Record<string, string | undefined>,
   origin?: string,
+  options: { path?: string; method?: 'get' | 'post' | 'options' } = {},
 ) {
   const security = await loadSecurityWithEnv(env);
   const app = express();
+  const path = options.path ?? '/probe';
+  const method = options.method ?? 'get';
 
   app.use(security.corsMiddleware);
-  app.get('/probe', (_req, res) => {
+  app[method === 'post' ? 'post' : 'get'](path, (_req, res) => {
     res.status(200).json({ ok: true });
   });
   app.use(security.errorHandler);
 
-  const pending = request(app).get('/probe');
+  const pending = method === 'options'
+    ? request(app).options(path)
+    : method === 'post'
+      ? request(app).post(path)
+      : request(app).get(path);
   if (origin !== undefined) pending.set('Origin', origin);
   return pending;
 }
@@ -146,6 +153,39 @@ describe('CORS origin resolution', () => {
       const response = await probe({});
       expect(response.status).toBe(200);
       expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    });
+  });
+
+  describe('public cross-origin webchat ingress', () => {
+    const env = { FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com' };
+
+    it('allows a third-party brand site the admin origin allowlist does not list', async () => {
+      const response = await probe(env, 'https://brand-one-site.example', {
+        path: '/webchat/messages',
+        method: 'post',
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBe('https://brand-one-site.example');
+      expect(response.headers['access-control-allow-credentials']).toBeUndefined();
+    });
+
+    it('answers a browser preflight for the widget without naming the origin allowlist', async () => {
+      const response = await probe(env, 'https://brand-two-site.example', {
+        path: '/webchat/messages',
+        method: 'options',
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers['access-control-allow-origin']).toBe('https://brand-two-site.example');
+      expect(response.headers['access-control-allow-methods']).toBe('POST,OPTIONS');
+    });
+
+    it('does not widen any other path to arbitrary cross-origin access', async () => {
+      const response = await probe(env, 'https://brand-one-site.example', {
+        path: '/webchat/handoffs',
+        method: 'get',
+      });
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('CORS: origin not allowed');
     });
   });
 
