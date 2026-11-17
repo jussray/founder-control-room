@@ -45,7 +45,6 @@ function adapter(name: string, seen: Array<{name: string; goal: string; context:
     }
     return buildOperatorRelayResponse(request, {
       answer, evidenceRefs: ['simulated:fastlane:test'],
-      completedAt: '2026-11-17T12:00:00.000Z',
     });
   };
 }
