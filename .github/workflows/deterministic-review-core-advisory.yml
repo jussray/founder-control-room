@@ -480,8 +480,9 @@ jobs:
               throw new Error('Canonical repository provider does not expose applyBranchRuleset');
             }
 
-            // Verify an eligible non-author human can approve before activating
-            // a rule that would otherwise lock out every future PR.
+            // Always require complete trusted provider observation. An eligible
+            // outside reviewer is required only when the approved native phase
+            // actually mandates native approving reviews.
             const installationToken = await getGitHubInstallationToken(
               appId,
               privateKey,
@@ -493,12 +494,15 @@ jobs:
               targetRef: 'main',
               trustedGitHubAppId: appId,
             });
-            if (!beforeTopology.observationComplete || !beforeTopology.independentReviewerReady) {
-              throw new Error('INDEPENDENT_REVIEWER_UNAVAILABLE: governance is not safe to mutate until a non-owner human with write access is verified');
+            if (!beforeTopology.observationComplete) {
+              throw new Error('GOVERNANCE_OBSERVATION_INCOMPLETE: trusted provider readback is required before any ruleset mutation');
+            }
+            if (FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0 && !beforeTopology.independentReviewerReady) {
+              throw new Error('INDEPENDENT_REVIEWER_UNAVAILABLE: required native human approval cannot be enforced without an eligible non-owner reviewer');
             }
             const mainBeforeMutation = await provider.resolveRef(PROJECT_ID, 'main');
             if (mainBeforeMutation.toLowerCase() !== expectedMainSha) {
-              throw new Error('main moved during reviewer readiness preflight');
+              throw new Error('main moved during governance readiness preflight');
             }
 
             providerMutationAttempted = true;
@@ -604,7 +608,7 @@ jobs:
             echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
             echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
             echo '- Full provider topology preflight: `READY` required before this completion summary can run'
-            echo '- Human review phase: founder-plus-independent; one native approval and eligible non-owner human reviewer required'
+            echo '- Human review phase: founder-only native Auto-merge; zero additional approving reviewers; deterministic independent checks and founder-final in-app authority remain separate'
             echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
             echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"

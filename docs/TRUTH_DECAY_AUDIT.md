@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 17, 2026: silent exclusion is its own truth-decay failure mode
+
+An excluded fact is not the same as a false one, but a founder-facing read model that drops a load-bearing signal without saying so produces the same practical harm as stale evidence: the founder believes the brief is complete when it is not. `buildMissionControlBrief` (`src/futureyou/missionControl.ts`) already names every other reason evidence is withheld from `priorities` — stale, invalid, or future-dated observation times all surface in `blindSpots` — but a `critical`/`error` activity event aging past 14 days was dropped with no trace. A 20-day-old unresolved critical failure and a never-happened one were indistinguishable in the brief. The fix adds the missing `blindSpots` line; it does not change what counts as stale, does not resurface the event into `priorities`, and does not imply the underlying issue was ever resolved — only that its continued absence from the dashboard is now disclosed rather than silent.
+
 ## Paired hostile-PR repair guidance
 
 The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
@@ -723,3 +727,9 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: URLFIX's destination guard relied on a literal-only URL check, which did not stop DNS names resolving to private addresses or redirects into private space.
 - Now: the snapshot script resolves DNS and checks every request, and the URLFIX contract forbids persisting authenticated state or private artifacts. Routing ignores URL text when reading intent.
 - Historical evidence from earlier heads is superseded for this surface. Re-observe provider CI on the new exact head before any present-tense claim.
+
+## 2026-11-15 — Documentation Truth receipt claims must be fresh for the reviewed range
+
+- Previously current: a changed truth-sensitive path passed Documentation Truth if the receipt contained any meaningful claim naming it, including a claim written for an older change and carried forward unchanged. Once-true receipt text could therefore stand in for a range it never described.
+- Now (candidate): the verifier compares against the receipt at the reviewed base and requires at least one fresh meaningful path-bound invariant per changed truth-sensitive path. Inherited claims remain as provenance; they are classified historical for the new range, not deleted.
+- Not proven: claim truth, provider state, or any merge, deploy, or publication authority. Re-run Documentation Truth on the exact PR head and again on merged `main`.

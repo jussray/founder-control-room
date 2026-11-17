@@ -13,7 +13,7 @@ export function createSupabaseAuthClient() {
           return { data: { user: null }, error: { message: 'Invalid session' } };
         }
         return {
-          data: { user: { id: 'founder-e2e-user', email: FOUNDER_EMAIL } },
+          data: { user: { id: 'founder-e2e-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
           error: null,
         };
       },
