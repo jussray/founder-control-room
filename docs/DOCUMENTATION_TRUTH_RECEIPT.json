@@ -846,7 +846,7 @@
     {
       "path": ".github/workflows/deterministic-review-core-advisory.yml",
       "claims": [
-        "`.github/workflows/deterministic-review-core-advisory.yml` must preserve the trusted governance observation, current-main check, founder authorization and post-write provider proof, but its human review summary must describe the founder-only native Auto-merge phase with no additional reviewer requirement."
+        "`.github/workflows/deterministic-review-core-advisory.yml` must require complete trusted governance observation before any provider mutation and must condition non-owner reviewer availability on `FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0`, so founder-only native Auto-merge is never blocked by an invented second reviewer. It must keep exact-current-main founder command authorization, post-write provider topology readback, and separate in-app founder-final authority."
       ]
     },
     {
