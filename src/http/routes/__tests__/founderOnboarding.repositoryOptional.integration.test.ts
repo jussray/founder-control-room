@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -26,21 +27,14 @@ function app() {
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({
-          data: { email: FOUNDER_EMAIL },
-          error: null,
-        }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'founder-user'),
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 });
