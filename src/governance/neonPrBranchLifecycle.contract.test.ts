@@ -41,6 +41,30 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
+  it('executes the real Supabase migration with a Neon-only fixture and verifies schema isolation', () => {
+    const fixture = readFileSync('supabase/preview-fixtures/20261103000000_member_browser_sessions.sql', 'utf8');
+    const assertions = readFileSync('supabase/preview-assertions/20261103000000_member_browser_sessions.sql', 'utf8');
+    const migration = readFileSync('supabase/migrations/20261103000000_member_browser_sessions.sql', 'utf8');
+    expect(workflow).toContain('PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"');
+    expect(workflow).toContain('PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"');
+    expect(workflow).toContain('if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then');
+    expect(workflow).toContain('Run compatibility fixture and original migration atomically');
+    expect(workflow).toContain('-f "$PREVIEW_FIXTURE" -f "$migration"');
+    expect(workflow).toContain('-f "$PREVIEW_ASSERT"');
+    expect(fixture).toContain('CREATE SCHEMA IF NOT EXISTS auth');
+    expect(fixture).toContain('CREATE TABLE IF NOT EXISTS auth.users');
+    expect(fixture).toContain('CREATE ROLE %I NOLOGIN');
+    expect(assertions).toContain('relrowsecurity');
+    expect(assertions).toContain('has_table_privilege');
+    expect(assertions).toContain("contype = 'f'");
+    expect(migration).toContain('references auth.users(id)');
+    expect(migration).toContain('enable row level security');
+    expect(migration).toContain('from public, anon, authenticated');
+    expect(migration).toContain('to service_role');
+    expect(fixture).not.toContain('SERVICE_ROLE_KEY');
+    expect(assertions).not.toContain('CREATE TABLE');
+  });
+
   it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url_pooled');

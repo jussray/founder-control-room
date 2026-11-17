@@ -1,5 +1,9 @@
 # Founder Control Room Provider Guide
 
+## GitHub provider: staged branch patches only through FCR
+
+The Founder OS simulator cannot hold a GitHub credential or become an alternate repository writer. An explicitly classified `repository-source` edit emits an in-memory artifact and sanitized hash receipt; the established founder-authenticated mission patch route must independently validate live GitHub branch identity, policy-pinned expected head, original file and edited content hashes, safe paths, bounded size and idempotency. The GitHub provider must reject stale expected heads and preserve non-forced ref updates; a commit receipt does not authorize protected-main integration, human review, payment or production deployment.
+
 The Control Room uses providers as replaceable capabilities. Product authority, approvals, event history, and recovery remain owned by the Control Room.
 
 Provider-specific instructions may become stricter, but they do not replace the canonical product contract in `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` or the repository entry contract in `AGENTS.md`.
