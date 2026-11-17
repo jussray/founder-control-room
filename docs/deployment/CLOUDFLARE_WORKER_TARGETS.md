@@ -1,5 +1,30 @@
 # Cloudflare Deployment Targets
 
+## November 15, 2026 — exact-commit version tag on production Worker deploys (candidate)
+
+Candidate `.github/workflows/deploy.yml` passes `--tag ${{ inputs.expected_head_sha }}` and a short space-free `--message` (`fcr-deploy-run-<run_id>.<attempt>`) to `wrangler deploy --config wrangler.worker.toml`, keeping the existing `--var GIT_SHA` marker. The next step in the same job reads back `wrangler deployments list --json` and `wrangler versions view <active-version> --json` and runs `scripts/worker-deployment-version-tag.mjs verify`. It fails closed unless the newest deployment routes 100% to exactly one version whose `workers/tag` equals the exact SHA. This step reads names, ids and annotations only.
+
+Provider observation (read-only audit, November 15, 2026; historical once read, re-observe before relying on it): none of the 19 versions of `founder-control-room` carries a tag, message or commit SHA. The active version is a dashboard-uploaded stub, not a wrangler upload from `wrangler.worker.toml`, and none of the last 100 `Deploy` runs succeeded. The Workers Builds and plaintext `CF_API_TOKEN` corrections are recorded once, in the dated readback section below and on the build-lane and November 2 lines. This change runs no deploy, so the readback has not yet passed against the real provider.
+
+## November 15, 2026 — Workers Builds and active Worker observation (dated read-only readback, not deploy proof)
+
+Observed November 15, 2026 at about 19:50Z through read-only Cloudflare API reads; no provider state was changed. This is a dated observation, not current truth at any later read.
+
+- The Workers Builds `main` trigger runs `npm run deploy:api:production`, which in repository source runs `cloudflare:build:verify` → `scripts/cloudflare-build-verification-only.mjs`. That script emits a receipt with `worker_version_upload: false` and `production_mutation: false` and uploads nothing. A green Workers Build is therefore build-verification evidence only, never deploy or Worker version evidence.
+- The active production `founder-control-room` Worker version observed was a placeholder stub (a fetch handler that returns a fixed placeholder response), not the API Worker built from `main`. No observed version carried a commit SHA, tag, or message.
+- Green Cloudflare Pages or Workers Builds checks on a commit do not prove that the API Worker runs that commit. Production promotion remains the manual GitHub `Deploy` / `FCR Worker Reconcile` lane, and runtime proof still requires exact-SHA `/health`, `/version`, Pages binding, and browser evidence.
+
+FCR member sign-in and workspace navigation are apex-cookie-bound: safe `GET`/`HEAD` visits from `www.foundercontrolroom.org` to `/welcome` or `/member/` must redirect to the apex Pages origin before browser authentication state is consumed. This change is separate from public SEO canonical URLs, cannot redirect mutating sign-in requests, cannot expose host-only cookies to `www`, and requires live browser/provider readback before a production-ready claim.
+
+
+## November 3, 2026 — separate member browser session candidate (PR #1060)
+
+The canonical public Pages site continues to serve `/welcome` and the new `/member/` empty-state interface via `ASSETS`. Dynamic `/auth/member/*` requests and the API-generated callback script require the existing same-origin `FCR_API` binding to `founder-control-room`; they must not be served as static assets or bypass service-identity verification. The server-side `fcr_member_browser_sessions` migration is source-only and must not be treated as applied. A real release requires reviewed SQL migration and RLS checks, existing founder-cookie isolation, live account-switch revocation, deployed API and Pages SHA readback, founder authorization, and a zero-leak cross-account browser test. Do not publish or deploy from PR source or use a passing CI check as provider/runtime proof.
+
+## November 15, 2026 — `[vars]`/secret name-collision preflight (candidate, not deployed)
+
+`scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. A name must live in exactly one place: a plain `[vars]` binding or a provider-held secret. The November 15, 2026 read-only audit (historical; re-observe before use) saw `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` on both sides, so the next gated deploy fails closed until a founder-authorized cleanup removes one side. No secret, var, deployment or provider resource is changed by this source change.
+
 ## November 7, 2026 — proposed Gmail AI Inbox feature bindings
 
 The existing `founder-control-room` HTTP Worker is the intended home of FCR's source-only, founder-triggered Gmail AI Inbox metadata reader. PR #948 lists `FCR_GMAIL_EXPECTED_EMAIL`, `FCR_GMAIL_INBOX_PROJECT_SLUG`, `FCR_GMAIL_INBOX_LABEL_ID`, the existing pinned sender field, and Gmail OAuth credential names in `wrangler.worker.toml [secrets].optional`. Optional declarations are **not** evidence that Cloudflare has these values, that Google OAuth grants the required read scope, or that the API route is deployed. No production Worker, DNS, Gmail account or secret is changed by the candidate.
@@ -8,7 +33,7 @@ Before enabling: obtain founder-authorized scoped provider configuration; verify
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
-The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
+The isolated `feat/fcr-council-bus-handoff-guard-20261102` branch contains pinned Council/Court validators, a signed-ACK contract, and founder-gated Search Console and AI evidence review panels. The Search Console panel inspects five fixed public URLs and sitemap metadata; it does not claim a full indexed-page count. The evidence challenger is advisory, uses a dedicated authenticated BYOK Cloudflare AI Gateway, and never grants publishing or deployment authority. Current candidate source and tests do not prove live delivery. Google OAuth refresh credentials and the dedicated gateway token have not been installed in the Worker; `CF_API_TOKEN` remains incorrectly typed as plaintext and must be remediated through an exact-head authorized reconcile. *(Historical as of November 2, 2026. Correction observed November 15, 2026 by read-only Cloudflare API readback: Worker version 19, uploaded November 12, 2026, no longer carries a plaintext `CF_API_TOKEN` binding. That readback names no repository source or reconcile run as the cause and does not prove the remaining bindings are correct.)* The public homepage uses CSP-compatible WebPage Microdata, not inline scripts. No PR, merge, or production deployment follows from this source candidate.
 
 ## November 1, 2026 UTC: exact-head MCP credential preflight
 
@@ -61,6 +86,8 @@ Current merged source uses this contract:
 Public discovery artifacts including `/robots.txt`, `/sitemap.xml`, `/llms.txt`, and `/crawlers.json` are static Pages assets and must remain on `env.ASSETS`; API-owned callback assets remain on `env.FCR_API`. This path classification is not authentication and cannot create crawler write authority, provider mutation authority, deployment authority, or publication authority.
 
 The bare `/work` and `/work/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/work` URL through `env.ASSETS`, because the asset layer canonicalizes `/work.html` to `/work` with a 308 (requesting the filename loops) while the `FCR_API` proxy path answers that public page with a degraded 503. The bare `/welcome` and `/welcome/` paths carry the same static classification: `public/_worker.js` serves them by requesting the canonical `/welcome` URL through `env.ASSETS`, because the extensionless welcome path otherwise falls through to the `FCR_API` proxy and answers with a degraded 503.
+
+Public MCP routing is an explicit allowlist. `public/_worker.js` forwards only `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the mounted `/mcp/portfolio/<slug>` bridges through `env.FCR_API`; every other `/mcp` path (founder administration such as `/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`, the write-capable `/mcp/founder-signal-engine`, and unknown or encoded variants) returns a fail-closed `404 MCP_ROUTE_NOT_PUBLIC` at the Pages edge without calling the API. Those routes remain on the API origin under their own authentication. The allowlist is not authentication and does not prove deployed Pages or Access state.
 
 `API_ORIGIN = https://api.foundercontrolroom.org` remains part of request construction/loop protection in source. Dynamic network execution is performed through `FCR_API.fetch(...)`, not a direct public-origin `fetch()` call.
 
@@ -151,7 +178,7 @@ That hook makes the repository's production-authority boundary executable before
 
 - native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
 - native builds must retain branch and build UUID evidence;
-- native Workers Builds may run only the non-promoting `wrangler versions upload` lane;
+- native Workers Builds may run only the non-promoting `wrangler versions upload` lane; this is the ceiling the hook permits, not what the configured build does — see the November 15, 2026 note: the observed main build trigger runs the verification-only script and uploads no Worker version;
 - native `wrangler deploy` fails closed before production promotion;
 - GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
 - ordinary CI/local verification does not become production authority.
@@ -217,7 +244,7 @@ The Worker-only `.github/workflows/worker-reconcile.yml` authority gate must als
 
 The canonical Deploy workflow's authority gate performs the same Wrangler enumeration of provider-held secret names before its first mutation. Its receipt handling accounts for Wrangler writing human authentication notices to stdout ahead of the requested JSON: the gate extracts the JSON name list from the receipt text before parsing, and fails closed with a named receipt error when no JSON list is present. Only the parsing envelope is tolerant; the required-name comparison and the fail-closed posture are unchanged.
 
-The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.
+The Deploy workflow's Post-Deploy Reconciliation job runs after `smoke-test`, is bounded by a 15-minute timeout, and sets `continue-on-error: true`. It inspects database state after promotion and does not gate the Worker target above. A reconciliation failure appears on that job but does not change the Deploy run's conclusion, so the Worker target is not evidence that reconciliation passed.
 
 The Worker-only reconciliation runtime proof must check the `X-Founder-Control-Room-Service` header and exact approved `gitSha` in the **direct API `/version`** response, and then independently check that the **public Pages `/version`** proxy returns the same required header and exact SHA. Successful `/health` alone, a JSON `/version` body without its header, a Pages preview deployment, or the existence of `FCR_API` service binding is not sufficient. The redacted Pages-proxy proof receipt is produced only after live readback; a green source contract test never substitutes for that receipt.
 
@@ -286,3 +313,10 @@ Current executable source and authoritative provider readback outrank an older v
 ### External OAuth consent routing candidate
 
 `public/_worker.js` must normalize only a www `GET /oauth/consent` to canonical `https://foundercontrolroom.org/oauth/consent`, retaining query state with no-store/no-referrer protection. The apex Pages origin forwards consent GET, `/assets/oauth-consent.js`, `/assets/oauth-consent.css`, and interactive consent POST through `FCR_API`; the assets are never public Pages `ASSETS` content. Browser cookies, same-tab authorization state and mutation Origin remain on the configured Pages apex, while the API service checks the interactive founder session and decision. Streaming consent POST bodies must be forwarded intact through the Pages `FCR_API` service binding using a compatible half-duplex Request body; a 503 on that request is not a successful approval. This is source-defined until both the Pages and API deployments, Supabase authorization flow, and protected runtime are independently observed. Never weaken Cloudflare Access or founder session boundaries to make the flow pass.
+
+The Deploy workflow file must remain parseable on main at all times. A workflow that GitHub rejects as invalid blocks the entire production dispatch path before any authority-gate step can run, so file-level validity on the target branch is itself one of the deployment targets this document tracks.
+
+
+## Production credential diagnostic boundary
+
+The diagnostic workflow may inspect the production deployment credential only after a founder dispatch supplies an exact current main SHA. It checks out and re-observes that SHA before invoking the checked-in read-only diagnostic. Pull-request code is excluded from the credential path. Its fingerprint/verdict receipt distinguishes the value GitHub resolves from remembered rotation history without revealing a secret or authorizing deploy, secret mutation, Pages publication, Worker promotion, or production acceptance.

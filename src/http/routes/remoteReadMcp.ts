@@ -200,17 +200,21 @@ export async function verifyRemoteMcpOauthToken(
   const user = userData?.user;
   const email = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
   const userId = typeof user?.id === 'string' ? user.id.trim() : '';
-  if (userError || !email || !userId || !subject || subject !== userId) {
+  const confirmedEmail = typeof user?.email_confirmed_at === 'string' && user.email_confirmed_at.length > 0;
+  if (userError || !email || !userId || !confirmedEmail || !subject || subject !== userId) {
     throw new Error('OAuth access token is invalid or revoked');
   }
 
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
-    .select('email')
+    .select('user_id')
     .eq('email', email)
+    .eq('user_id', userId)
     .maybeSingle();
   if (allowError) throw new Error('Founder allowlist check failed');
-  if (!allowRow) throw new Error('OAuth identity is not on the founder allowlist');
+  if (!allowRow || allowRow.user_id !== userId) {
+    throw new Error('OAuth identity is not on the founder allowlist');
+  }
 
   return { userId, email, clientId, projectIds, authMode: 'oauth' };
 }

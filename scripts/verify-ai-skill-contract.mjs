@@ -10,6 +10,7 @@ const files = {
   typescriptTests: await readFile(new URL('../skills/typescript-behavior-tests/SKILL.md', import.meta.url), 'utf8'),
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
+  urlfix: await readFile(new URL('../skills/urlfix/SKILL.md', import.meta.url), 'utf8'),
   zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
   zapierGitHubMetadata: await readFile(new URL('../docs/founder-signal-engine/zapier-github-metadata-contract.md', import.meta.url), 'utf8'),
   chatgptZapierBridge: await readFile(new URL('../.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md', import.meta.url), 'utf8'),
@@ -90,6 +91,7 @@ for (const [label, source, metadata] of [
   ['typescript-behavior-tests', files.typescriptTests, ['name: typescript-behavior-tests', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-strict-review', files.typescriptReview, ['name: typescript-strict-review', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['product-design-gate', files.productDesign, ['name: product-design-gate', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['urlfix', files.urlfix, ['name: urlfix', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
@@ -141,6 +143,14 @@ for (const phrase of [
   'design QA can pass while Supabase verification remains blocked',
 ]) requireText('product-design invariant', files.productDesign, phrase);
 for (const phrase of [
+  'External or unowned URLs are observation-only',
+  'Do not mutate source.',
+  'BLOCKED_BY_AUTHORITY',
+  'do not create a duplicate PR merely because URLFIX found a defect',
+  'same failing browser path',
+  'A merge does not prove deployment',
+]) requireText('urlfix invariant', files.urlfix, phrase);
+for (const phrase of [
   'Credential plane',
   'Control plane',
   'GitHub metadata plane',
@@ -182,6 +192,7 @@ requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-mi
 requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-behavior-tests/SKILL.md');
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS Product Design entry', files.agents, 'skills/product-design-gate/SKILL.md');
+requireText('AGENTS URLFIX entry', files.agents, 'skills/urlfix/SKILL.md');
 requireText('AGENTS ChatGPT Zapier bridge skill', files.agents, '.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md');
 requireText('AGENTS Zapier cockpit rule', files.agents, 'treat Zapier as an operable workflow cockpit only');
 requireText('AGENTS Zapier connector discovery', files.agents, 'OpenAI Developers');
@@ -215,10 +226,31 @@ for (const [label, source, phrase] of [
   ['billgates artifact', files.billgates, 'Bill Gates Artifact'],
 ]) requireText(label, source, phrase);
 
-const all = Object.values(files).join('\n').toLowerCase();
+// This checks mandatory instruction presence, not agent execution or runtime adoption.
+const pairedRepairContract = await readFile(new URL('../skills/ultrathink-attack-godmode/SKILL.md', import.meta.url), 'utf8');
+
+const all = [...Object.values(files), pairedRepairContract].join('\n').toLowerCase();
 for (const forbidden of ['guaranteed conversion', 'bypass founder approval', 'automatic outreach without approval']) {
   if (all.includes(forbidden)) failures.push(`unsafe contract text: ${forbidden}`);
 }
+
+for (const phrase of [
+  '### 5W1H and precision',
+  '### 80/20 selection',
+  '### Paired passes',
+  '| Red Team / Devil |',
+  '| L99 |',
+  '| OODA |',
+  '| Bill Gates |',
+  '| Elon Musk |',
+  '| Lindy / lindymode |',
+  '### Hostile drafts and open PRs',
+  '### Required paired receipt',
+  'Run Playwright for every repair that changes a user-facing browser path',
+  '80/20 prioritizes effort; it never means checking only 20 percent',
+  'A paired reasoning pass is not independent semantic review',
+  'Never execute candidate code with production secrets merely to audit it',
+]) requireText('paired hostile-PR repair invariant', pairedRepairContract, phrase);
 
 if (failures.length) {
   console.error('AI skill contract failed:');

@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock, mockControllerRun, mockAuditInsert } = vi.hoisted(() => ({
@@ -38,19 +39,13 @@ function buildApp() {
 
 function authSuccess() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
+    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
-  };
+  return boundFounderRow(FOUNDER_EMAIL, FOUNDER_USER_ID);
 }
 
 const CONVERGED_RESULT = {
@@ -78,11 +73,7 @@ describe('dashboard router auth gate', () => {
     authSuccess();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') {
-        return {
-          select: () => ({
-            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
-          }),
-        };
+        return boundFounderRow('nonfounder@example.com', FOUNDER_USER_ID);
       }
       return {};
     });
