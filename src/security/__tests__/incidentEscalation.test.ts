@@ -59,7 +59,7 @@ describe('incident-escalation', () => {
     }) as any;
 
     const verdict = createMockVerdict('REPAIR_REQUIRED');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     const result = await escalateToSlack(verdict, env);
     expect(result).toBe(true);
@@ -89,7 +89,7 @@ describe('incident-escalation', () => {
 
   it('ignores non-escalatable verdicts', async () => {
     const verdict = createMockVerdict('OBSERVE');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     const result = await escalateToSlack(verdict, env);
     expect(result).toBe(false);
@@ -103,12 +103,114 @@ describe('incident-escalation', () => {
     expect(result).toBe(false);
   });
 
+  it('uses an explicit channel when SLACK is a bot token', async () => {
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, ts: '123.456' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe('https://slack.com/api/chat.postMessage');
+    expect(options.headers.Authorization).toBe('Bearer xoxb-test-only');
+    expect(JSON.parse(options.body).channel).toBe('C0BQ2Q2S9B4');
+  });
+
+  it('accepts SLACK as a webhook URL without leaking it into headers', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const webhook = 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER';
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: webhook });
+    expect(ok).toBe(true);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe(webhook);
+    expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it('blocks arbitrary legacy webhook hosts before sending incident data', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://collector.example.net/incident',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects lookalike Slack hostnames and prevents HTTP redirects', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com.evil.example/services/T/B/FAKE',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const accepted = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/PLACEHOLDER',
+    });
+    expect(accepted).toBe(true);
+    const [, options] = (global.fetch as any).mock.calls[0];
+    expect(options.redirect).toBe('error');
+  });
+
+  it('does not use SLACK bot credentials without an explicit FCR channel', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: 'xoxb-test-only' });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown SLACK credential shapes without sending', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xapp-not-a-bot-token',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an HTTP 200 Slack API error as delivered', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: false, error: 'missing_scope' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith('[incident-escalation] Slack API rejected delivery');
+    errorSpy.mockRestore();
+  });
+
+  it('does not log secret-bearing Slack transport error bodies', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response('xoxb-SECRET-DO-NOT-LOG', { status: 403 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SECRET-DO-NOT-LOG');
+    errorSpy.mockRestore();
+  });
+
   it('emits telemetry with escalation', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
 
     const verdict = createMockVerdict('REPAIR_REQUIRED');
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
 
     let waitUntilCalled = false;
     emitReciprocalTelemetryWithEscalation(verdict, env, {
@@ -130,7 +232,7 @@ describe('incident-escalation', () => {
     const verdict = createMockVerdict('OBSERVE');
     verdict.meaningful = false;
 
-    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' };
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
     emitReciprocalTelemetryWithEscalation(verdict, env);
 
     expect(logSpy).not.toHaveBeenCalled();
