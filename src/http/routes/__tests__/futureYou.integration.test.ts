@@ -25,15 +25,11 @@ function buildApp() {
   return app;
 }
 
-function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+function founderUsersRow() { const query = {
+    eq: () => query,
+    maybeSingle: () => Promise.resolve({ data: { user_id: 'founder-user-1' }, error: null }),
   };
-}
+  return { select: () => query }; }
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -48,7 +44,7 @@ describe('GET /futureyou/v8/brief', () => {
 
   it('returns a read-only evidence-aware brief for an allowlisted founder', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
 
