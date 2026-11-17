@@ -17,13 +17,22 @@ These names are used only by the founder-gated Logpush workflow. Values must rem
 
 `CLOUDFLARE_ACCOUNT_ID` remains the account selector. Secret-name documentation proves only the expected binding names; it does not prove a value is configured, valid, authorized, or currently present in GitHub or Cloudflare.
 
-This repository has three separate configuration planes:
+This repository has four separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
 2. **GitHub Actions secrets** used by repository workflows.
 3. **Cloudflare Worker runtime bindings** used by the surviving `founder-control-room` API Worker.
+4. **GitHub Copilot Agents secrets** available to the Copilot cloud agent development environment, not automatically to ordinary Actions jobs or Cloudflare Workers.
 
 A value configured in one plane does not automatically exist in another. Never copy secret values into repository files, PRs, logs, screenshots, or chat.
+
+### Slack secret scope (candidate integration, not live)
+
+The founder-reported GitHub Agents secret name `slack` becomes environment variable `SLACK` (GitHub secret names are case-insensitive). Its **value, credential type, and repository access have not been independently verified**. Copilot's Agents secret is not a Cloudflare Worker binding and does not provide runtime notification delivery. No production Slack secret has been provisioned by this source change.
+
+`src/security/incidentEscalation.ts` accepts an explicitly provided `SLACK_WEBHOOK_URL`, or a runtime-provided `SLACK` whose content is a Slack incoming-webhook URL or `xoxb-` bot token. Bot delivery additionally requires `FCR_SLACK_CHANNEL_ID` pointing to the authorized FCR channel and checks Slack's JSON `ok` result. Unsupported credential formats, absent channels, and low-severity verdicts fail closed. Webhook destinations are restricted to HTTPS Slack incoming-webhook URLs under `hooks.slack.com/services/` with three path segments; redirects are rejected. This applies to legacy `SLACK_WEBHOOK_URL` as well as the `SLACK` alias, preventing an accidental non-Slack destination from receiving incident details. An HTTP delivery response or a local test does not prove a Slack message appeared in the channel; channel readback is a separate gate. The existing production caller and the actual Cloudflare binding remain unverified. Do not add these as required deployment secrets until the existing runtime path and approved credential are independently proven.
+
+The existing `sauce-source-guard.yml` now includes **Slack agent secret readiness (no message sent)** on trusted `main` manual dispatch only (not on routine pushes while the Actions secret is absent). This job reads the GitHub **Actions** secret `SLACK`, not Copilot Agents credentials. If it is an `xoxb-` bot token, it calls Slack's read-only `auth.test` endpoint and reports only the authorization verdict. If it is a Slack incoming webhook URL, the job checks the exact approved URL structure without contacting the webhook; provider acceptance and channel delivery remain **UNVERIFIED**. A missing/unsupported secret or failed bot authentication is an explicit failing gate. No message is sent, and this diagnostic does not install credentials into the FCR production Worker or authorize security escalations.
 
 Cloudflare dashboard token **display names are operator labels, not execution bindings**. A label such as `founder-control-room build token` does not prove which GitHub secret or workflow consumes that credential. For operational truth, use the exact GitHub secret name referenced by the current workflow plus a successful provider verification/readback receipt. If either is missing, the binding is unknown.
 
@@ -48,6 +57,14 @@ Secrets marked required cause the named workflow job to fail if absent.
 GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trusted GitHub App workflows therefore store the App credentials as `APP_ID` and `APP_PRIVATE_KEY`, then map them into the server/runtime environment names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` inside the job. Those internal environment names remain the provider contract and are intentionally unchanged.
 
 The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
+
+### Expo mobile robot (`fcr`)
+
+| Secret | Required by | Description |
+|---|---|---|
+| `EXPO_TOKEN` | `mobile-store-readiness.yml` / `expo-robot-readiness` on trusted `main` push or manual dispatch | Expo robot access token for the existing FCR mobile app. The job uses `environment: expo-mobile` and passes this secret only to Expo authentication. Store under GitHub Actions repository secrets or the `expo-mobile` environment as appropriate, not only Copilot Agents; a same-name environment secret takes precedence. Never put the value in source, logs, screenshots, or chat. |
+
+The token check runs `eas whoami` without initiating a native build. An optional manual Android preview additionally requires an existing linked EAS `projectId` and the three public runtime variables (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_FCR_ORIGIN`). A configured secret name or successful JavaScript export is not proof of EAS provider authentication, a signed build, or device readiness.
 
 ### GitHub App authority
 
