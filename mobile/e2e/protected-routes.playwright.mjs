@@ -26,9 +26,20 @@ try {
         waitUntil: 'domcontentloaded',
         timeout: 45000,
       });
-      await page.getByText('Your control room, without cloning its authority.').waitFor({
-        timeout: 60000,
-      });
+      try {
+        await page.getByText('Your control room, without cloning its authority.').waitFor({
+          timeout: 30000,
+        });
+      } catch (error) {
+        await page.screenshot({ path: `test-results/failure-${entry.name}.png`, fullPage: true }).catch(() => {});
+        console.error('Browser diagnostic:', JSON.stringify({
+          viewport: entry.name,
+          url: page.url(),
+          body: (await page.locator('body').innerText().catch(() => '')).slice(0, 2000),
+          pageErrors,
+        }));
+        throw error;
+      }
       assert.equal(new URL(page.url()).pathname, '/', 'guest dashboard link should redirect to login');
       assert.equal(await page.getByText('Latest tasks', { exact: true }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Enter Control Room' }).count(), 1);
