@@ -246,11 +246,15 @@ export async function escalateToPagerDuty(
   const integrationKey = env.PAGERDUTY_ROUTING_KEY?.trim() || env.PAGERDUTY_INTEGRATION_KEY?.trim();
   if (!integrationKey) return false;
 
-  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
+  // PagerDuty Events API v2 accepts critical/error/warning/info, not 'high'.
+  const pagerDutySeverity = SEVERITY_MAP[effectiveVerdict(verdict)] === 'critical'
+    ? 'critical'
+    : 'error';
 
   try {
     const response = await fetch('https://events.pagerduty.com/v2/enqueue', {
       method: 'POST',
+      redirect: 'error',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         routing_key: integrationKey,
@@ -258,7 +262,7 @@ export async function escalateToPagerDuty(
         dedup_key: `${verdict.service}:${verdict.receipt?.slice(0, 16) || 'unknown'}`,
         payload: {
           summary: `${effectiveVerdict(verdict)} on ${verdict.service}`,
-          severity,
+          severity: pagerDutySeverity,
           source: 'chief-ai-security',
           component: verdict.service,
           custom_details: {
@@ -271,9 +275,16 @@ export async function escalateToPagerDuty(
       }),
     });
 
-    if (!response.ok) {
+    if (response.status !== 202) {
       // Provider response bodies are not log-safe and may echo request context.
       console.error('[incident-escalation] PagerDuty escalation failed:', response.status);
+      return false;
+    }
+
+    // A generic HTTP success does not establish Events API v2 acceptance.
+    const acknowledgment = await response.json().catch(() => null) as { status?: unknown } | null;
+    if (acknowledgment?.status !== 'success') {
+      console.error('[incident-escalation] PagerDuty acceptance receipt invalid');
       return false;
     }
 
