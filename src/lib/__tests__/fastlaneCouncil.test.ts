@@ -139,7 +139,7 @@ describe('runFastlaneCouncil v1.1', () => {
     const withEarlyOwnership = (inner: OperatorRelayAdapter): OperatorRelayAdapter => async (request) => {
       if (request.goal.includes('STAGE 2')) {
         return buildOperatorRelayResponse(request, {
-          answer: reason(1, true) + '\\nOWNER: codex',
+          answer: reason(1, true) + '\nOWNER: codex',
           evidenceRefs: ['simulated:early-ownership'],
         });
       }
