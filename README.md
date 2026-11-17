@@ -821,6 +821,14 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
 
+## Founder OS lab adapter promotion eligibility
+
+`assessProjectAdapterFreshness` in `src/founder-os-lab/projectAdapterFreshness.ts` reports `promotionAllowed: true` and `recommendation: 'candidate-promote'` only when the authoritative current head equals the audited exact head and every required contract blob matches. Head movement, drift, missing or invalid blobs, and unknown heads keep it `false`. Eligibility means the evidence may go to founder review; `founderReviewRequired` stays `true` and `mutationAuthorized` stays `false`, so it never grants merge, deploy, publication, or provider authority.
+
+## Project adapter re-pin (November 17, 2026)
+
+`src/founder-os-lab/projectAdapters.ts` now pins Se'kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` blob `e3430ef2c9bc99507f9040b90ec6d54977d28ca8`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (`src/domain/capability-registry.js` blob `5b1c6e39a9ec675e03032a480ff00c2967479f22`, `config/founder-chief-pair.contract.json` blob `dd008420e1a91e78516b45d9e27de89344abf432`). Every other pinned blob was unchanged. The reviewed changes: Bip routes to an age gate before consent when its compliance check requires one; Chief adds non-authorizing continuity fingerprint, cookie and execution-slot markers (`actionAuthority: false`) and states the standalone-peers relationship and stricter posting-approval rules in the pair contract, which now matches FCR's own copy. The re-pin is evidence identity only. It proves no Bip or Chief deployment or runtime behavior and grants no merge, deploy, publication, or provider authority. Any further source or blob movement must fail closed until reviewed again.
+
 ## Four-system Founder Operator contract (source candidate, October 15, 2026)
 
 `src/founder-os-lab/founderOperatorContract.ts` is **source-level staged code**, not wired to the live FCR Worker, GitHub provider or a production UI. The existing privileged V10 approval middleware, FCR authority envelope, PR merge gate, federated relay, and production launch authority remain canonical; this module cannot replace or bypass them.
