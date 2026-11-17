@@ -979,6 +979,24 @@
       "claims": [
         "Council transcripts persist every relay response field that participates in the canonical response hash, and recoverPersistedRelayResponses returns only responses whose recomputed hash matches; legacy projections are ignored and tampered projections rejected, never upgraded into synthetic receipts. Recovery is not outcome verification."
       ]
+    },
+    {
+      "path": "src/lib/connectionConfigSecrets.ts",
+      "claims": [
+        "`connectionConfigSecretViolation` must return only a key path (credential-shaped keys redacted), never a value, and must flag credential-named keys with non-empty values and credential-shaped values under any key, failing closed on over-deep input. It is a heuristic and does not prove that no credential is stored."
+      ]
+    },
+    {
+      "path": "src/http/routes/projects.ts",
+      "claims": [
+        "`POST /projects/:slug/connections` must reject credential-shaped `config` or `secretRef` with a 400 before any project lookup or `project_connections` write, and the response must not echo the submitted value. It does not redact, migrate, or re-validate existing stored rows."
+      ]
+    },
+    {
+      "path": "src/http/middleware/projectReadAudit.ts",
+      "claims": [
+        "The project connections read audit records only `credential_shaped_connection_count`; it must not copy connection config, secret references, paths, or values into `project_events`. The flag is observation only and does not block or redact the read."
+      ]
     }
   ]
 }
