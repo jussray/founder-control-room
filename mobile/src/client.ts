@@ -108,6 +108,13 @@ export type ProofSnapshot = {
   [key: string]: unknown;
 };
 
+/** Lightweight authorization probe against the actual FCR server allowlist gate.
+ * A valid Supabase user is not sufficient to grant dashboard navigation.
+ */
+export async function verifyFounderAccess(): Promise<void> {
+  await founderGet<{ tasks: DashboardTask[] }>('/dashboard/tasks');
+}
+
 export function loadTasks() {
   return founderGet<{ tasks: DashboardTask[] }>('/dashboard/tasks');
 }

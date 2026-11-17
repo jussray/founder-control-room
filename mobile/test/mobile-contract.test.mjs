@@ -84,3 +84,14 @@ test('browser proof never calls native SecureStore or persists web auth sessions
   assert.doesNotMatch(client, /localStorage|sessionStorage|AsyncStorage/);
   assert.match(client, /SecureStore\.getItemAsync\(key\)/);
 });
+
+test('navigation waits for backend founder authorization, not just a Supabase session', () => {
+  assert.match(layout, /await verifyFounderAccess\(\)/);
+  assert.match(layout, /mobileSupabase\.auth\.getUser\(\)/);
+  assert.match(layout, /if \(verificationIssue\)/);
+  assert.match(layout, /Founder access locked/);
+  assert.match(layout, /<Stack\.Protected guard=\{Boolean\(session\)\}>/);
+  assert.match(client, /export async function verifyFounderAccess\(\): Promise<void>/);
+  assert.match(client, /await founderGet<\{ tasks: DashboardTask\[\] \}>\('\/dashboard\/tasks'\)/);
+  assert.match(dashboardRoute, /dashboardRouter\.use\(requireFounder\)/);
+});
