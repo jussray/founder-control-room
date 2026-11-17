@@ -400,7 +400,7 @@ export function createServerOperatorRelayAdapters(
         const advisorCacheTtl = useAdvisor && anthropicAdvisorCacheEnabled
           ? (anthropicCache ?? '5m')
           : null;
-        const mcpBody = anthropicMcp?.body ?? {};
+        const mcpBody: Partial<NonNullable<typeof anthropicMcp>['body']> = anthropicMcp?.body ?? {};
         const tools = [
           ...(Array.isArray(mcpBody.tools) ? mcpBody.tools : []),
           ...(useAdvisor ? [anthropicAdvisorTool(anthropicAdvisorModel, advisorCacheTtl)] : []),
