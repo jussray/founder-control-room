@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Document current evidence-authority boundaries across cross-repository browser federation, resident Council/Muse relay activation, provider-held runtime-secret observation, and account-scoped founder-content metrics so source wiring, account identity, configured bindings, live provider invocation, and mutation authority remain separate claims with separate proof.",
+  "purpose": "Add the independent repository-repair outcome verifier that is the only producer of verifiedResponseHashes for the capability observation fold, and persist hash-relevant relay response fields in Council transcripts so recovered responses are hash-verifiable. No live route, store, deploy, provider, or authority change.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -965,6 +965,37 @@
       "path": "supabase/migrations/20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql",
       "claims": [
         "The migration in `supabase/migrations/20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql` must revoke table-wide UPDATE from service_role and grant UPDATE only on the state and valid_until columns of public.federated_relay_public_keys; it does not prove the grant is applied to any provider database."
+      ]
+    },
+    {
+      "path": "src/lib/capabilityOutcomeVerification.ts",
+      "claims": [
+        "A response hash enters verifiedResponseHashes only through a receipt issued in-process by verifyRepositoryRepairOutcome after exact-head provider evidence shows every required check passed by its declared producer identity for the repository subject the implement relay request was bound to; copied, deserialized, mismatched, unresolved, tampered, or out-of-window outcomes never produce proof.",
+        "Verification receipts carry no selection or execution authority and prove only the observed provider CI signals for one repository subject; they do not prove deployment, runtime, provider-outcome state, or any task class other than repository-repair, and no live route consumes them yet."
+      ]
+    },
+    {
+      "path": "src/lib/councilRound.ts",
+      "claims": [
+        "Council transcripts persist every relay response field that participates in the canonical response hash, and recoverPersistedRelayResponses returns only responses whose recomputed hash matches; legacy projections are ignored and tampered projections rejected, never upgraded into synthetic receipts. Recovery is not outcome verification."
+      ]
+    },
+    {
+      "path": "src/lib/connectionConfigSecrets.ts",
+      "claims": [
+        "`connectionConfigSecretViolation` must return only a key path (credential-shaped keys redacted), never a value, and must flag credential-named keys with non-empty values and credential-shaped values under any key, failing closed on over-deep input. It is a heuristic and does not prove that no credential is stored."
+      ]
+    },
+    {
+      "path": "src/http/routes/projects.ts",
+      "claims": [
+        "`POST /projects/:slug/connections` must reject credential-shaped `config` or `secretRef` with a 400 before any project lookup or `project_connections` write, and the response must not echo the submitted value. It does not redact, migrate, or re-validate existing stored rows."
+      ]
+    },
+    {
+      "path": "src/http/middleware/projectReadAudit.ts",
+      "claims": [
+        "The project connections read audit records only `credential_shaped_connection_count`; it must not copy connection config, secret references, paths, or values into `project_events`. The flag is observation only and does not block or redact the read."
       ]
     }
   ]
