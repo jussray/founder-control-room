@@ -150,12 +150,58 @@ jobs:
           console.log(`Existing EAS project verified for @${owner}/${slug}; project ID: ${app.id}`);
           NODE
 
+      - name: Discover existing org-owned EAS project (read-only)
+        id: org_eas_project
+        if: ${{ steps.existing_eas_project.outputs.project_id == '' }}
+        working-directory: mobile
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          const require = createRequire(import.meta.url);
+          const slug = require('./app.json')?.expo?.slug;
+          // Discover accessible accounts only. Never create, modify, or publish projects.
+          const query = 'query ExistingExpoOrgProjects { meUserActor { accounts { name apps(includeUnpublished: true, limit: 100, offset: 0) { id slug ownerAccount { name } } } } }';
+          try {
+            const response = await fetch('https://api.expo.dev/graphql', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.EXPO_TOKEN}`,
+              },
+              body: JSON.stringify({ query }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(20000),
+            });
+            if (!response.ok) throw new Error('http');
+            const payload = await response.json();
+            if (payload.errors?.length) throw new Error('graphql');
+            const accounts = payload.data?.meUserActor?.accounts;
+            if (!Array.isArray(accounts)) throw new Error('no-accessible-accounts');
+            const matches = accounts.flatMap((account) => (account.apps || [])
+              .filter((app) => app.slug === slug && app.ownerAccount?.name === account.name));
+            if (matches.length !== 1 || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(matches[0].id)) {
+              console.log(matches.length > 1
+                ? '::warning::Multiple accessible Expo projects share the FCR slug; an explicit verified project ID is required.'
+                : '::notice::No unique existing FCR project found among accessible Expo accounts; no project created.');
+              process.exit(0);
+            }
+            const app = matches[0];
+            appendFileSync(process.env.GITHUB_OUTPUT, `project_id=${app.id}\n`);
+            console.log(`Existing EAS project confirmed for @${app.ownerAccount.name}/${app.slug}; project ID: ${app.id}`);
+          } catch {
+            console.log('::warning::Expo accessible-account project lookup unavailable; explicit existing project ID required.');
+            process.exit(0);
+          }
+          NODE
+
       - name: Require existing EAS project association
         if: ${{ inputs.build_android_preview || inputs.build_all_platforms }}
         working-directory: mobile
         env:
-          EAS_PROJECT_ID: ${{ inputs.existing_eas_project_id || vars.EXPO_EAS_PROJECT_ID || steps.existing_eas_project.outputs.project_id }}
-          DISCOVERED_EAS_PROJECT_ID: ${{ steps.existing_eas_project.outputs.project_id }}
+          EAS_PROJECT_ID: ${{ inputs.existing_eas_project_id || vars.EXPO_EAS_PROJECT_ID || steps.existing_eas_project.outputs.project_id || steps.org_eas_project.outputs.project_id }}
+          DISCOVERED_EAS_PROJECT_ID: ${{ steps.existing_eas_project.outputs.project_id || steps.org_eas_project.outputs.project_id }}
           BUILD_ANDROID_PREVIEW: ${{ inputs.build_android_preview }}
           BUILD_ALL_PLATFORMS: ${{ inputs.build_all_platforms }}
         shell: bash
