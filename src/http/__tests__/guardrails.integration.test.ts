@@ -83,6 +83,7 @@ describe('public guardrail contract', () => {
       approvedRecipientIds: ['private-contact-id-must-not-leak'],
     };
     vi.stubEnv('GIT_SHA', gitSha.toUpperCase());
+    vi.stubEnv('ENVIRONMENT', 'production');
     vi.stubEnv('FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON', JSON.stringify(grant));
 
     try {
@@ -93,6 +94,7 @@ describe('public guardrail contract', () => {
       expect(res.body).toEqual({
         service: 'founder-control-room',
         gitSha,
+        environment: 'production',
         v10: {
           capabilityPlanContract: 'juss-v10/capability-plan@v1',
           conveyorContract: 'founder-control-room/n8n-conveyor@v3',
@@ -111,6 +113,26 @@ describe('public guardrail contract', () => {
       expect(serialized).not.toContain(grant.approvedRecipientIds[0]);
       expect(serialized).not.toMatch(/TOKEN|SECRET|PASSWORD|SERVICE_ROLE/i);
       expect(serialized).not.toMatch(/private-grant-id|private-contact-id/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('refuses to publish unrecognized runtime environment values as trusted tiers', async () => {
+    vi.stubEnv('ENVIRONMENT', 'looks-like-nonprod-but-is-not');
+    try {
+      const unknown = await request(createServer()).get('/version');
+      expect(unknown.status).toBe(200);
+      expect(unknown.body.environment).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    vi.stubEnv('ENVIRONMENT', 'staging');
+    try {
+      const stage = await request(createServer()).get('/version');
+      expect(stage.status).toBe(200);
+      expect(stage.body.environment).toBe('staging');
     } finally {
       vi.unstubAllEnvs();
     }
