@@ -114,6 +114,17 @@ describe('incident-escalation', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('does not page on a high-severity but non-meaningful verdict', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    verdict.meaningful = false;
+
+    expect(await escalateToPagerDuty(verdict, {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+    })).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('does not emit PagerDuty alerts for low-severity verdicts', async () => {
     global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
 
