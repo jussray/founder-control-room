@@ -50,7 +50,8 @@ describe('FCR governed agent enablement', () => {
 
     expect(gemini?.operator?.instructionContracts).toContain('docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md');
     expect(claude?.operator?.instructionContracts).toContain('CLAUDE.md');
-    expect(cursor?.operator?.instructionContracts).toContain('.cursor/rules');
+    expect(cursor?.operator?.instructionContracts).toContain('AGENTS.md');
+    expect(cursor?.operator?.instructionContracts).toContain('GLOBAL_AI.md');
     expect(cursor?.operator?.instructionContracts).toContain('docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md');
     expect(agentCanOperate('cursor', 'instruct')).toBe(false);
     expect(muse?.operator?.instructionContracts).toContain('.control-room/MUSE.md');
