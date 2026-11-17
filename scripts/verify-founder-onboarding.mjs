@@ -38,7 +38,7 @@ requireText('auth', 'Google OAuth route', "authRouter.get('/google'");
 requireText('auth', 'Google OAuth provider', "provider: 'google'");
 requireText('auth', 'Google OAuth callback', "redirectTo: `${FOUNDER_API_URL}/auth/callback`");
 requireText('auth', 'server-managed OAuth redirect', 'skipBrowserRedirect: true');
-requireText('auth', 'first-login identity creation', 'shouldCreateUser: true');
+requireText('auth', 'no founder identity creation during sign-in', 'shouldCreateUser: false');
 requireText('auth', 'session endpoint', "authRouter.post('/session'");
 requireText('auth', 'strict session establishment helper', 'await rotateFounderSession(req, res, session)');
 requireText('auth', 'verified session establishment', 'establishFounderSession(req, res, founderSession)');
