@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Add the independent repository-repair outcome verifier that is the only producer of verifiedResponseHashes for the capability observation fold, and persist hash-relevant relay response fields in Council transcripts so recovered responses are hash-verifiable. No live route, store, deploy, provider, or authority change.",
+  "purpose": "Close a FutureYou Mission Control blind spot: critical/error activity events older than 14 days were silently excluded from buildMissionControlBrief with no disclosure, instead of being named in blindSpots like every other excluded-evidence case this read model already reports. No live route, store, deploy, provider, or authority change.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -996,6 +996,12 @@
       "path": "src/http/middleware/projectReadAudit.ts",
       "claims": [
         "The project connections read audit records only `credential_shaped_connection_count`; it must not copy connection config, secret references, paths, or values into `project_events`. The flag is observation only and does not block or redact the read."
+      ]
+    },
+    {
+      "path": "src/futureyou/missionControl.ts",
+      "claims": [
+        "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
     }
   ]
