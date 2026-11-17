@@ -76,7 +76,7 @@ describe('incident-escalation', () => {
     global.fetch = vi.fn(async (url) => {
       if (typeof url === 'string' && new URL(url).hostname === 'events.pagerduty.com') {
         pdCalled = true;
-        return new Response('ok', { status: 202 });
+        return new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 });
       }
       return new Response('error', { status: 404 });
     }) as any;
@@ -90,7 +90,7 @@ describe('incident-escalation', () => {
   });
 
   it('uses PAGERDUTY_ROUTING_KEY and prefers it over the legacy alias', async () => {
-    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 })) as any;
 
     const sent = await escalateToPagerDuty(createMockVerdict('CONTAIN_ESCALATE'), {
       PAGERDUTY_ROUTING_KEY: 'routing-test-key',
@@ -104,7 +104,26 @@ describe('incident-escalation', () => {
     const event = JSON.parse(options.body as string);
     expect(event.routing_key).toBe('routing-test-key');
     expect(event.event_action).toBe('trigger');
-    expect(event.payload.severity).toBe('high');
+    expect(event.payload.severity).toBe('error');
+    expect(options.redirect).toBe('error');
+  });
+
+  it('requires the documented 202 success acknowledgment before reporting PagerDuty acceptance', async () => {
+    const verdict = createMockVerdict('CONTAIN_ESCALATE');
+    const env = { PAGERDUTY_ROUTING_KEY: 'routing-test-key' };
+    const responses = [
+      { code: 200, body: { status: 'success', dedup_key: 'test' } },
+      { code: 202, body: { status: 'error', message: 'Rejected' } },
+      { code: 202, body: null },
+    ];
+
+    for (const candidate of responses) {
+      global.fetch = vi.fn(async () => new Response(
+        candidate.body === null ? 'not-json' : JSON.stringify(candidate.body),
+        { status: candidate.code },
+      )) as any;
+      expect(await escalateToPagerDuty(verdict, env)).toBe(false);
+    }
   });
 
   it('does not emit PagerDuty alerts without a configured routing key', async () => {
@@ -135,7 +154,7 @@ describe('incident-escalation', () => {
   });
 
   it('escalates critical Chief unit verdicts even when the perimeter verdict is HALLWAY', async () => {
-    global.fetch = vi.fn(async () => new Response('ok', { status: 202 })) as any;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 })) as any;
     const verdict = createMockVerdict('HALLWAY');
     verdict.unit!.unitVerdict = 'REPAIR_REQUIRED';
 
