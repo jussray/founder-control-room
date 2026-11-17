@@ -403,3 +403,33 @@ jobs:
             mobile/expo-web-playwright.log
           if-no-files-found: warn
           retention-days: 30
+
+  live-negative-auth-proof:
+    name: Live FCR dashboard denial proof (no credentials)
+    # No tokens, no test-user creation, no login attempts. Only two GET requests.
+    if: ${{ github.ref == 'refs/heads/fix/fcr-mobile-protected-auth-20261117' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Prove deployed dashboard denies unauthenticated requests
+        shell: bash
+        env:
+          FCR_AUTH_PROOF_URL: https://foundercontrolroom.org/dashboard/tasks
+        run: |
+          set -euo pipefail
+          probe() {
+            local label="$1"
+            shift
+            local code
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 --connect-timeout 10 --retry 0 "$@" "$FCR_AUTH_PROOF_URL")"
+            printf '%s HTTP %s\n' "$label" "$code"
+            if [ "$code" != "401" ]; then
+              echo "::error::$label must be 401; got HTTP $code. The live denial gate is NOT verified."
+              exit 1
+            fi
+          }
+          probe "No session"
+          probe "Invalid bearer" -H "Authorization: Bearer fcr-auth-denial-probe-not-a-token"
+          echo "Verified: deployed FCR dashboard rejects both unauthenticated probes."
