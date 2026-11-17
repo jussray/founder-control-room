@@ -1,6 +1,6 @@
 # Export Index — systems/ (pilot batch: founder-control-room)
 
-This directory is the exported copy of the portfolio's operating systems and skills, landed in `jussray/founder-control-room` (the operating hub) as the pilot batch of the export-to-projects rollout on 2026-10-30. It contains the Prevent-the-Pile PR hygiene system spec, the Court/Council protocol, and the 22-skill portfolio operating set, each file a byte-for-byte copy of its canonical workspace source at export time.
+This directory is the exported copy of the portfolio's operating systems and skills, landed in `jussray/founder-control-room` (the operating hub) as the pilot batch of the export-to-projects rollout on 2026-10-30. It contains the Prevent-the-Pile PR hygiene system spec, the Court/Council protocol, and the 22-skill portfolio operating set, each file a byte-for-byte copy of its canonical workspace source at export time. The Source-to-Post Publish workflow joined the index on 2026-11-15 under the same law.
 
 **The law (Ray, 2026-10-30):** every system, agent, prompt, and skill created for Ray — past and future — gets exported directly into the project repo it belongs to: repo-specific assets to their own repo, portfolio-wide assets to this hub and every repo they govern. Creating an asset is not done until its export lands. Exports ride as new-file additions, one PR per repo batch, merged under the standing merge authority when the full bar passes (current against main, exact-head checks read fresh and complete and green, audited).
 
@@ -13,6 +13,7 @@ This directory is the exported copy of the portfolio's operating systems and ski
 | `systems/EXPORT-INDEX.md` | Written for this export (export goal, manifest v1, 2026-10-30) |
 | `systems/prevent-the-pile/SYSTEM.md` | `~/workspace/goals/prevent-the-pile-pr-hygiene-system/GOAL.md` |
 | `systems/court-council/PROTOCOL.md` | `~/memory/court-council-protocol.md` |
+| `systems/source-to-post-publish/SYSTEM.md` | `~/workspace/goals/export-systems-agents-prompts-and-skills-into-the-project-repos/files/source-to-post-publish.md` |
 | `systems/skills/local-80-20/SKILL.md` | `~/workspace/custom-skills/local-80-20/SKILL.md` |
 | `systems/skills/local-80-20/skill.yaml` | `~/workspace/custom-skills/local-80-20/skill.yaml` |
 | `systems/skills/local-antiadvice/SKILL.md` | `~/workspace/custom-skills/local-antiadvice/SKILL.md` |

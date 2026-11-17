@@ -726,3 +726,9 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: URLFIX's destination guard relied on a literal-only URL check, which did not stop DNS names resolving to private addresses or redirects into private space.
 - Now: the snapshot script resolves DNS and checks every request, and the URLFIX contract forbids persisting authenticated state or private artifacts. Routing ignores URL text when reading intent.
 - Historical evidence from earlier heads is superseded for this surface. Re-observe provider CI on the new exact head before any present-tense claim.
+
+## 2026-11-15 — Documentation Truth receipt claims must be fresh for the reviewed range
+
+- Previously current: a changed truth-sensitive path passed Documentation Truth if the receipt contained any meaningful claim naming it, including a claim written for an older change and carried forward unchanged. Once-true receipt text could therefore stand in for a range it never described.
+- Now (candidate): the verifier compares against the receipt at the reviewed base and requires at least one fresh meaningful path-bound invariant per changed truth-sensitive path. Inherited claims remain as provenance; they are classified historical for the new range, not deleted.
+- Not proven: claim truth, provider state, or any merge, deploy, or publication authority. Re-run Documentation Truth on the exact PR head and again on merged `main`.
