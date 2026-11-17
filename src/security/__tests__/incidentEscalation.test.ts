@@ -89,6 +89,40 @@ describe('incident-escalation', () => {
     expect(pdCalled).toBe(true);
   });
 
+  it('uses PAGERDUTY_ROUTING_KEY and prefers it over the legacy alias', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+
+    const sent = await escalateToPagerDuty(createMockVerdict('CONTAIN_ESCALATE'), {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+      PAGERDUTY_INTEGRATION_KEY: 'legacy-test-key',
+    });
+
+    expect(sent).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://events.pagerduty.com/v2/enqueue');
+    const event = JSON.parse(options.body as string);
+    expect(event.routing_key).toBe('routing-test-key');
+    expect(event.event_action).toBe('trigger');
+    expect(event.payload.severity).toBe('high');
+  });
+
+  it('does not emit PagerDuty alerts without a configured routing key', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+
+    expect(await escalateToPagerDuty(createMockVerdict('REPAIR_REQUIRED'), {})).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not emit PagerDuty alerts for low-severity verdicts', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+
+    expect(await escalateToPagerDuty(createMockVerdict('OBSERVE'), {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+    })).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('escalates critical Chief unit verdicts even when the perimeter verdict is HALLWAY', async () => {
     global.fetch = vi.fn(async () => new Response('ok', { status: 202 })) as any;
     const verdict = createMockVerdict('HALLWAY');
