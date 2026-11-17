@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { createClient, type Session } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
@@ -21,12 +22,24 @@ const secureSessionStorage = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
+// SecureStore has no browser implementation. For browser-only route proof, keep
+// sessions in memory rather than silently downgrading to persistent web storage.
+// Native iOS and Android continue to use encrypted Expo SecureStore.
+const transientWebStorage = (() => {
+  const values = new Map<string, string>();
+  return {
+    getItem: async (key: string) => values.get(key) ?? null,
+    setItem: async (key: string, value: string) => { values.set(key, value); },
+    removeItem: async (key: string) => { values.delete(key); },
+  };
+})();
+
 export const mobileSupabase = createClient(
   required(supabaseUrl, 'EXPO_PUBLIC_SUPABASE_URL'),
   required(supabasePublicKey, 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or legacy EXPO_PUBLIC_SUPABASE_ANON_KEY)'),
   {
     auth: {
-      storage: secureSessionStorage,
+      storage: Platform.OS === 'web' ? transientWebStorage : secureSessionStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
