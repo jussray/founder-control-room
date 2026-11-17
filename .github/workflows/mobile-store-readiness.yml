@@ -360,7 +360,9 @@ jobs:
         working-directory: mobile
         run: |
           npm install --no-audit --no-fund
-          npx expo install --npm react-dom react-native-web
+          # Expo SDK 56 pins Reanimated 4.3.x + Worklets 0.8.x for RN 0.85.
+          # Include them explicitly so npm does not select incompatible 4.7.x optional peers.
+          npx expo install --npm react-dom react-native-web react-native-reanimated react-native-worklets
           npm install --no-save --no-audit --no-fund playwright@1.61.1
 
       - name: Install Playwright Chromium
