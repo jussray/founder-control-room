@@ -117,12 +117,25 @@ jobs:
               redirect: 'error',
               signal: AbortSignal.timeout(20000),
             });
-            if (!response.ok) throw new Error('query unavailable');
+            if (!response.ok) {
+              console.log(`::warning::Existing EAS project lookup returned HTTP ${response.status}; no project link authorized.`);
+              process.exit(0);
+            }
             const payload = await response.json();
-            if (payload.errors?.length) throw new Error('query rejected');
+            if (payload.errors?.length) {
+              const messages = payload.errors.map((error) => String(error?.message || ''));
+              const reason = messages.some((message) => /not found|does not exist/i.test(message))
+                ? 'NOT_FOUND'
+                : messages.some((message) => /cannot query field|unknown argument|unknown type/i.test(message))
+                  ? 'QUERY_SCHEMA'
+                  : messages.some((message) => /unauthori[sz]ed|forbidden|permission|access denied/i.test(message))
+                    ? 'ACCESS_DENIED' : 'PROVIDER_REJECTED';
+              console.log(`::warning::Existing EAS project lookup: ${reason}. No project created or linked.`);
+              process.exit(0);
+            }
             app = payload.data?.app?.byFullName;
           } catch {
-            console.log('::warning::Existing EAS project lookup unavailable; an explicit existing project ID remains required for builds.');
+            console.log('::warning::Existing EAS project lookup failed before provider confirmation; explicit project ID remains required.');
             process.exit(0);
           }
           if (!app) {
