@@ -1,10 +1,11 @@
 import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetUser, supabaseMock, runCouncilRoundMock } = vi.hoisted(() => ({
+const { mockGetUser, supabaseMock, runCouncilRoundMock, runFastlaneCouncilMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   supabaseMock: { from: vi.fn() },
   runCouncilRoundMock: vi.fn(),
+  runFastlaneCouncilMock: vi.fn(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -12,6 +13,7 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
 }));
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 vi.mock('../../../lib/councilRound.js', () => ({ runCouncilRound: runCouncilRoundMock }));
+vi.mock('../../../lib/fastlaneCouncil.js', () => ({ runFastlaneCouncil: runFastlaneCouncilMock }));
 vi.mock('../../../lib/operatorRelayModelProviders.js', () => ({ createServerOperatorRelayAdapters: () => ({}) }));
 
 import express from 'express';
@@ -189,5 +191,65 @@ describe('POST /missions/:missionId/council/run', () => {
     expect(response.body.relay.transcript.state).toBe('interrupted');
     expect((inserted as unknown as { transcript: { state: string } }).transcript.state).toBe('interrupted');
     expect(runCouncilRoundMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('POST /missions/:missionId/council/fastlane (opt-in)', () => {
+  it('rejects implicit activation and unsupported participant sets before dispatch', async () => {
+    const noMode = await request(app()).post(`/missions/${MISSION_ID}/council/fastlane`)
+      .set('Authorization', 'Bearer test-token').send({goal: 'g'});
+    expect(noMode.status).toBe(400);
+    const duplicates = await request(app()).post(`/missions/${MISSION_ID}/council/fastlane`)
+      .set('Authorization', 'Bearer test-token')
+      .send({mode: 'fastlane', goal: 'g', participants: ['codex', 'codex']});
+    expect(duplicates.status).toBe(400);
+    expect(runFastlaneCouncilMock).not.toHaveBeenCalled();
+    expect(runCouncilRoundMock).not.toHaveBeenCalled();
+  });
+
+  it('persists the v1.1 round but returns 202 while task receipts are pending', async () => {
+    let inserted: Record<string, any> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return { ...boundFounderRow(FOUNDER_EMAIL, 'u1') };
+      if (table === 'missions') return {
+        select: () => ({ eq: () => ({ maybeSingle: () =>
+          Promise.resolve({data: {id: MISSION_ID, project_id: 'project-1'}, error: null}) }) }),
+      };
+      if (table === 'council_conversations') return {
+        select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle: () =>
+          Promise.resolve({data: {round: 6}, error: null}) }) }) }) }),
+        insert: (row: Record<string, any>) => {
+          inserted = row;
+          return {select: () => ({single: () =>
+            Promise.resolve({data: {id: 'fastlane-1', ...row}, error: null})})};
+        },
+      };
+      return {};
+    });
+    runFastlaneCouncilMock.mockImplementation(async (input: any) => {
+      const row = {
+        mission_id: input.missionId, round: input.round,
+        participants: ['fcr', ...input.seats.map((s: any) => s.operator)],
+        transcript: {contract: 'fcr.fastlane-council.v1.1', mode: 'fastlane',
+          state: 'awaiting_acceptance', stage3: {tasks: [{owner: 'codex', acceptance: 'PENDING'}]}},
+        outcome: 'awaiting_acceptance',
+      };
+      await input.persist(row);
+      return row;
+    });
+
+    const response = await request(app()).post(`/missions/${MISSION_ID}/council/fastlane`)
+      .set('Authorization', 'Bearer test-token')
+      .send({mode: 'fastlane', goal: 'Review the existing council', participants: ['codex', 'claude-code']});
+    expect(response.status).toBe(202);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body.executionState).toBe('awaiting_acceptance');
+    expect(response.body.conversation.id).toBe('fastlane-1');
+    expect((inserted as unknown as {transcript: {mode: string}}).transcript.mode).toBe('fastlane');
+    expect(runFastlaneCouncilMock).toHaveBeenCalledWith(expect.objectContaining({
+      sourceRef: `mission:${MISSION_ID}`, missionId: MISSION_ID, round: 7,
+      seats: [{operator: 'codex', capability: 'propose'}, {operator: 'claude-code', capability: 'propose'}],
+    }), {});
+    expect(runCouncilRoundMock).not.toHaveBeenCalled();
   });
 });
