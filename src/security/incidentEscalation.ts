@@ -43,6 +43,8 @@ export interface IncidentEnv extends Record<string, string | undefined> {
   SLACK?: string;
   FCR_SLACK_CHANNEL_ID?: string;
   SLACK_WEBHOOK_URL?: string;
+  /** Events API v2 routing key; legacy name supported during migration. */
+  PAGERDUTY_ROUTING_KEY?: string;
   PAGERDUTY_INTEGRATION_KEY?: string;
   LINEAR_API_KEY?: string;
   INCIDENT_WEBHOOK_URL?: string;
@@ -238,7 +240,7 @@ export async function escalateToPagerDuty(
   verdict: SecurityVerdict,
   env: IncidentEnv,
 ): Promise<boolean> {
-  const integrationKey = env.PAGERDUTY_INTEGRATION_KEY;
+  const integrationKey = env.PAGERDUTY_ROUTING_KEY?.trim() || env.PAGERDUTY_INTEGRATION_KEY?.trim();
   if (!integrationKey) return false;
 
   const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
