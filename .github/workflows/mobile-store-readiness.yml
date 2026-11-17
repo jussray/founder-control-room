@@ -363,7 +363,9 @@ jobs:
           # Expo SDK 56 pins Reanimated 4.3.x + Worklets 0.8.x for RN 0.85.
           # Include them explicitly so npm does not select incompatible 4.7.x optional peers.
           npx expo install --npm react-dom react-native-web react-native-reanimated react-native-worklets
-          npm install --no-save --no-audit --no-fund playwright@1.61.1
+          # React and React DOM must match exactly; mobile pins React 19.2.7.
+          npm install --no-save --no-audit --no-fund react-dom@19.2.7 playwright@1.61.1
+          node -e "const a=require('react/package.json').version,b=require('react-dom/package.json').version; if(a!==b) throw Error('React/DOM version mismatch: '+a+' / '+b); console.log('Matched React and React DOM:',a)"
 
       - name: Install Playwright Chromium
         working-directory: mobile
