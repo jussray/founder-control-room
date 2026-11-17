@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { chromium } from 'playwright';
 import { runCouncilRound } from '../dist/lib/councilRound.js';
+import { runFastlaneCouncil } from '../dist/lib/fastlaneCouncil.js';
 import { buildOperatorRelayResponse } from '../dist/lib/operatorRelayProviderResult.js';
 import { createOperatorRelayRouter } from '../dist/http/routes/operatorRelay.js';
 import { OPERATOR_RELAY_REQUEST_CONTRACT, operatorRelayRequestHash, relayContextFingerprint } from '../dist/lib/operatorRelay.js';
@@ -41,6 +42,41 @@ app.post('/proof', async (req, res) => {
     ],
   }, adapters);
   res.json(row);
+});
+
+// Explicitly simulated Fastlane providers; isolated from the sequential proof.
+app.post('/fastlane-proof', async (req, res) => {
+  const observations = [];
+  const fastlaneAdapter = (operator) => async (request) => {
+    observations.push({operator, goal: request.goal, seed: request.context.summary});
+    let answer;
+    if (request.goal.includes('STAGE 1')) {
+      answer = ['REALITY: VERIFIED synthetic fixture',
+        'FIX: separate opt-in Fastlane path',
+        'PROOF: VERIFIED local browser fixture',
+        'RISK: INFERRED no live providers',
+        'ROLLBACK: disable opt-in mode',
+        'NEXT GATE: external verification'].join('\\n');
+    } else if (request.goal.includes('STAGE 2')) {
+      answer = ['AGREE: preserve old runner','DISAGREE: none',
+        'BLIND SPOT: provider not connected',
+        'VERDICT: opt-in mode remains non-authorizing',
+        'CONVERGED: YES'].join('\\n');
+    } else {
+      answer = ['TASK: prove live provider identities',
+        'OWNER: codex', 'REPO/SURFACE: founder-control-room',
+        'DONE WHEN: provider backed receipts and authenticated browser proof exist',
+        'RECEIPT DUE: founder by release review'].join('\\n');
+    }
+    return buildOperatorRelayResponse(request, {answer,
+      evidenceRefs: [`simulated:fastlane:${operator}`]});
+  };
+  const row = await runFastlaneCouncil({
+    goal: req.body.goal, seed: req.body.seed,
+    seats: [{operator: 'codex', capability: 'propose'},
+      {operator: 'claude-code', capability: 'propose'}],
+  }, {codex: fastlaneAdapter('codex'), 'claude-code': fastlaneAdapter('claude-code')});
+  res.json({row, observations, liveProviderProof: false});
 });
 
 const server = app.listen(0, '127.0.0.1');
@@ -133,6 +169,27 @@ try {
   assert.equal(allowed.status, 200, 'ordinary internal relay must remain functional');
   assert.equal(allowed.body.status, 'completed');
   assert.equal(seen.length, beforeDenied + 1);
+
+  // Real Chromium HTTP flow through the Fastlane engine, without provider claims.
+  const fastlane = await page.evaluate(async () => {
+    const response = await fetch('/fastlane-proof', {
+      method: 'POST', headers: {'content-type': 'application/json'},
+      body: JSON.stringify({goal: 'Prove Fastlane isolation', seed: 'ORIGINAL ONLY'}),
+    });
+    return {status: response.status, body: await response.json()};
+  });
+  assert.equal(fastlane.status, 200);
+  const flat = fastlane.body;
+  assert.equal(flat.row.transcript.contract, 'fcr.fastlane-council.v1.1');
+  assert.equal(flat.row.transcript.stage1.complete, true);
+  assert.equal(flat.row.transcript.stage2.unanimous, true);
+  assert.equal(flat.row.transcript.stage3.state, 'AWAITING_ACCEPTANCE');
+  assert.equal(flat.row.transcript.stage3.tasks[0].acceptance, 'PENDING');
+  assert.equal(flat.liveProviderProof, false);
+  const blind = flat.observations.filter((entry) => entry.goal.includes('STAGE 1'));
+  assert.equal(blind.length, 2);
+  assert.equal(blind.every((entry) => entry.seed === 'ORIGINAL ONLY'), true);
+  assert.equal(flat.row.transcript.stage2.rounds.length <= 2, true);
 
   console.log(JSON.stringify({
     contract: 'fcr/live-council-browser-proof@v1',
