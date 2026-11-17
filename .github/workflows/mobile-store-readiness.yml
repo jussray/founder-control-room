@@ -84,11 +84,65 @@ jobs:
         working-directory: mobile
         run: eas whoami
 
+      - name: Discover existing EAS project (read-only)
+        id: existing_eas_project
+        working-directory: mobile
+        env:
+          EXPO_PROJECT_OWNER: ${{ vars.EXPO_PROJECT_OWNER }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { createRequire } from 'node:module';
+          const require = createRequire(import.meta.url);
+          const slug = require('./app.json')?.expo?.slug;
+          const account = execFileSync('eas', ['whoami'], { encoding: 'utf8', timeout: 20000 }).trim().split(/\s+/)[0];
+          const owner = process.env.EXPO_PROJECT_OWNER?.trim() || account;
+          if (!/^[a-zA-Z0-9_-]+$/.test(owner) || !/^[a-zA-Z0-9_-]+$/.test(slug ?? '')) {
+            console.log('::warning::Existing EAS project lookup skipped: unrecognized owner or slug.');
+            process.exit(0);
+          }
+          // Read-only query: never call project:init without a verified ID, never create an Expo app.
+          const query = 'query ExistingExpoApp($fullName: String!) { app { byFullName(fullName: $fullName) { id slug ownerAccount { name } } } }';
+          let app;
+          try {
+            const response = await fetch('https://api.expo.dev/graphql', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.EXPO_TOKEN}`,
+              },
+              body: JSON.stringify({ query, variables: { fullName: `@${owner}/${slug}` } }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(20000),
+            });
+            if (!response.ok) throw new Error('query unavailable');
+            const payload = await response.json();
+            if (payload.errors?.length) throw new Error('query rejected');
+            app = payload.data?.app?.byFullName;
+          } catch {
+            console.log('::warning::Existing EAS project lookup unavailable; an explicit existing project ID remains required for builds.');
+            process.exit(0);
+          }
+          if (!app) {
+            console.log('::notice::No existing EAS project confirmed under the authenticated Expo account and app slug. No project created.');
+            process.exit(0);
+          }
+          if (app.slug !== slug || app.ownerAccount?.name !== owner || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(app.id)) {
+            console.log('::warning::EAS project lookup returned unexpected identity; build link not authorized.');
+            process.exit(0);
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `project_id=${app.id}\n`);
+          console.log(`Existing EAS project verified for @${owner}/${slug}; project ID: ${app.id}`);
+          NODE
+
       - name: Require existing EAS project association
         if: ${{ inputs.build_android_preview || inputs.build_all_platforms }}
         working-directory: mobile
         env:
-          EAS_PROJECT_ID: ${{ inputs.existing_eas_project_id || vars.EXPO_EAS_PROJECT_ID }}
+          EAS_PROJECT_ID: ${{ inputs.existing_eas_project_id || vars.EXPO_EAS_PROJECT_ID || steps.existing_eas_project.outputs.project_id }}
+          DISCOVERED_EAS_PROJECT_ID: ${{ steps.existing_eas_project.outputs.project_id }}
           BUILD_ANDROID_PREVIEW: ${{ inputs.build_android_preview }}
           BUILD_ALL_PLATFORMS: ${{ inputs.build_all_platforms }}
         shell: bash
@@ -100,6 +154,10 @@ jobs:
           fi
           configured_id="$(node -e "const id=require('./app.json').expo?.extra?.eas?.projectId; if (id) process.stdout.write(id)")"
           supplied_id="${EAS_PROJECT_ID:-}"
+          if [ -n "${DISCOVERED_EAS_PROJECT_ID:-}" ] && [ -n "$supplied_id" ] && [ "$DISCOVERED_EAS_PROJECT_ID" != "$supplied_id" ]; then
+            echo "::error::Requested EAS project ID differs from verified existing project identity."
+            exit 1
+          fi
           project_id="${configured_id:-$supplied_id}"
           if ! [[ "$project_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
             echo "::error::Existing EAS project ID required; set the manual input or EXPO_EAS_PROJECT_ID. No new Expo project will be created."
