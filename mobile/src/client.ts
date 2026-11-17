@@ -3,12 +3,11 @@ import * as SecureStore from 'expo-secure-store';
 import { createClient, type Session } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
-const supabasePublicKey = (
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  ''
-).trim();
+const supabasePublicKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  process.env.EXPO_PUBLIC_SUPABASE_KEY?.trim() ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+  '';
 const fcrOrigin = (process.env.EXPO_PUBLIC_FCR_ORIGIN?.trim() ?? '').replace(/\/$/, '');
 
 function required(value: string, label: string): string {
