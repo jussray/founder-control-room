@@ -87,8 +87,11 @@ describe('runFastlaneCouncil v1.1', () => {
         seen.push(name);
         await new Promise<void>((resolve) => { resolves.push(resolve); });
       }
-      return buildOperatorRelayResponse(request, {answer: request.goal.includes('STAGE 1') ?
-        verdict(name) : request.goal.includes('STAGE 2') ? reason(1, true) : task});
+      return buildOperatorRelayResponse(request, {
+        answer: request.goal.includes('STAGE 1') ?
+          verdict(name) : request.goal.includes('STAGE 2') ? reason(1, true) : task,
+        evidenceRefs: ['simulated:fastlane:deferred-test'],
+      });
     };
     const pending = runFastlaneCouncil(input, {codex: slow('codex'), 'claude-code': slow('claude')});
     await Promise.resolve();
