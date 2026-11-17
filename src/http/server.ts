@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
+import { memberAuthRouter } from './routes/memberAuth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { paFundingReviewsRouter } from './routes/paFundingReviews.js';
@@ -406,6 +407,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
+  app.use('/auth/member', memberAuthRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/pa-funding', paFundingReviewsRouter);
   app.use('/portfolio', portfolioVerificationRouter);

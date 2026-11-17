@@ -34,6 +34,17 @@ Migration `20261115194101_guard_federated_relay_v3_public_key_immutability.sql` 
 
 A read-only Cloudflare audit on November 15, 2026 observed `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` installed as Worker secrets while `wrangler.worker.toml` declares them as plain `[vars]`; that observation is historical and must be re-read before use. If it is still true, production Deploy and Worker Reconcile will stop at this gate until the founder decides which side to remove; this change does not remove, rename or rotate any secret. Source and unit tests do not prove GitHub CI, credential validity, a deploy, or runtime health.
 
+Auth-origin consistency: the Pages source must route `GET` and `HEAD` requests for `www.foundercontrolroom.org/welcome` and `/member/` to the apex browser-session origin before login or member-session reads. The host-only founder/member cookies remain scoped to the apex; login POSTs are never redirected or granted cross-origin authority. This is a candidate Pages routing rule, not proof that live www DNS, Cloudflare redirects, or login are working.
+
+
+## November 3, 2026 — exact-head CI queue consolidation (candidate only)
+
+For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 3, 2026 — member sign-in and founder isolation (PR #1060, candidate only)
+
+This PR introduces a separate member email sign-in and an initially empty member workspace while retaining the founder's private authenticated control room. The Pages origin serves `/welcome` and `/member/` as static assets; same-origin `/auth/member/*` calls are proxied to the canonical API Worker. A verified Supabase member identity may receive a separate host-only, Secure, HttpOnly, SameSite=Strict browser session backed by a service-role-only, revocable database record. Founder sessions must be revoked on a member switch and founder allowlisted addresses cannot enter the member workspace. The merged welcome view preserves the approved full founder title, invitation-only founder instructions, and the distinct member entry. The separate Neon PR preview may provide only an isolated synthetic `auth.users` compatibility fixture, but must execute the original migration SQL atomically and verify the resulting FK, RLS and table privileges. This preview is not a Supabase production migration or real auth test. This is a source candidate: migration installation, email delivery, real callback, tenant isolation, Workers/Pages deployment, and live readback remain unverified. Do not count a successful isolated unit or simulated browser test as production evidence, nor use this PR to grant merge or deploy authority.
+
 ## November 15, 2026 — public Pages MCP route allowlist (candidate, not deployment proof)
 
 `public/_worker.js` now forwards only an explicit allowlist of MCP protocol routes from the public Pages origin to `FCR_API`: `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the `/mcp/portfolio/<slug>` bridges the API mounts. Any other `/mcp` path, including founder administration (`/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`), the write-capable `/mcp/founder-signal-engine` lane, unknown descendants, and case, slash, or percent-encoded variants, fails closed with a `404 MCP_ROUTE_NOT_PUBLIC` before any API call. Those routes stay reachable on the API origin under their existing authentication. This is source and unit-test behavior only; it does not prove the deployed Pages artifact, Cloudflare Access configuration, or live MCP authentication.
@@ -752,9 +763,18 @@ Workflow YAML syntax is checked on the same exact head: the `python-tests` job r
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
 
+
+## Member-owned project drafts (source candidate)
+
+The ordinary-member workspace has private project create, list, resume and versioned save routes, using only the member's verified session and a separate owner-scoped project table. See [Member project drafts](docs/MEMBER_PROJECT_DRAFTS.md) for behavior, isolation, migration prerequisites and release gates. This source change does not establish that its migration or runtime is live.
+
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 
 Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
+
+## 2026-11-05 Post-deploy reconciliation settings (candidate, not production proof)
+
+PR #1069 changes one line of `.github/workflows/deploy.yml` relative to main: it adds `continue-on-error: true` to the `reconcile` job (Post-Deploy Reconciliation), which keeps its existing `needs: smoke-test` and `timeout-minutes: 15`. A reconciliation failure after the Worker is live is therefore visible on that job but does not fail the Deploy run. No job depends on `reconcile`, so this tolerance does not change promotion or authority gates. `test/deploy-reconcile-settings.node-test.mjs` pins both settings in the workflow source. This is source and test evidence only; it does not prove a dispatched production run, reconciliation output, or deployed runtime behavior.
 
 ## PR Continuity gate naming (2026-11-05)
 
