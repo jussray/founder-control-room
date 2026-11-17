@@ -106,3 +106,56 @@ The operator workflow must stop or reacquire evidence when:
 - a provider/connector asks for broader authority than the current task needs.
 
 A fresh observation creates a new fingerprint. It does not renew an old approval.
+
+
+## Chat ↔ Work task continuation (repository contract only)
+
+The existing `juss-v10/operator-continuity@v2` receipt recognizes both `chatgpt` and
+`work` sources. Its state fingerprint deliberately excludes the observing
+surface so the same project evidence can be checked across modes. The additive
+`juss-v10/operator-execution-continuation@v1` contract in
+`src/lib/operatorContinuity.ts` links that receipt to an active task:
+
+- `taskId` and `intentRef` identify the ongoing goal without embedding raw chat;
+- `contextRefs` point to previously authorized, access-controlled conversation
+  history and artifacts;
+- `completedSteps` require evidence references, while `remainingStepIds`,
+  `nextActionRef`, and `pendingDecisionRefs` retain the unfinished execution path;
+- the packet fingerprint is mode-independent and does not grant action,
+  approval, cookie, merge, or deployment authority;
+- a fresh matching observation yields `CURRENT`, while moved or expired
+  evidence yields `REVALIDATE` without erasing the conversational context;
+- Chat is **not** treated as read-only. Tools are determined by the actual
+  current surface, connection, and separate action authority, not by mode name.
+
+The source references must resolve in an existing authorized persistence
+service. The candidate founder-authenticated API provides:
+
+- `POST /operator/continuity` with `{ "continuation": <validated packet> }`;
+- `GET /operator/continuity/:taskId?projectSlug=...&repositoryFullName=...`;
+- server-only storage in existing `public.continuity_records`, using a
+  reviewed additive migration for `task_id`, `execution_state`, and
+  `checkpoint_observed_at`; concurrent same-time versions are unique and stale
+  writes return HTTP 409 without replacing newer work;
+- responses explicitly marked `PERSISTED_NOT_REVALIDATED` and
+  `currentEvidenceVerified: false`; no replayed approval or execution permit;
+- strict founder authentication, existing same-origin browser CSRF rules,
+  project/repository binding, reference-only canonicalization, and readback.
+
+Task checkpoints are excluded from the legacy project-shell and Truth Console
+proof views. The unverified checkpoint does not extend `valid_until`.
+
+The integration still does **not** listen for native ChatGPT mode changes, fetch
+private ChatGPT/Work transcripts, or make unapproved provider actions. Clients
+must explicitly send and retrieve authorized task-reference packets through the
+API. An approved storage migration, review, deployment and live authentication
+readback are required before any production claim.
+
+Execution, provider writes, CI, Playwright, approval and release still pass
+through their ordinary independent gates. An expired snapshot can preserve
+discussion momentum but cannot resurrect an expired approval or green check.
+
+Repeatable local Playwright proof: `npm run verify:operator-continuation-auth`.
+It checks anonymous access using Chromium, the real Express route, and a synthetic
+unreachable local Supabase URL. Passing this check is not authenticated live
+persistence, ChatGPT platform mode-switch integration, or production readiness.

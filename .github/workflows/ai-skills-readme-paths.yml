@@ -1,0 +1,34 @@
+name: AI Skills README paths
+on:
+  pull_request:
+    paths:
+      - '.ai-skills/**'
+      - 'src/lib/founderControlDecision.ts'
+      - 'scripts/verify-ai-skills-readme-paths.mjs'
+      - 'test/verify-ai-skills-readme-paths.test.mjs'
+      - '.github/workflows/ai-skills-readme-paths.yml'
+  push:
+    paths:
+      - '.ai-skills/**'
+      - 'src/lib/founderControlDecision.ts'
+      - 'scripts/verify-ai-skills-readme-paths.mjs'
+      - 'test/verify-ai-skills-readme-paths.test.mjs'
+      - '.github/workflows/ai-skills-readme-paths.yml'
+permissions:
+  contents: read
+jobs:
+  verify-readme-paths:
+    name: AI Skills README paths
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Negative and positive regression tests
+        run: node --test test/verify-ai-skills-readme-paths.test.mjs
+      - name: Verify README paths against checked-out repository
+        run: node scripts/verify-ai-skills-readme-paths.mjs
