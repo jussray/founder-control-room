@@ -94,15 +94,20 @@ function field(answer: string, name: string): string | null {
   const value = line?.slice(name.length + 1).trim();
   return value || null;
 }
+function reactsToAnotherSeat(answer: string): boolean {
+  return /\b(?:agree with|in response to|building on)\s+(?:claude|codex|muse|deepseek|gemini|perplexity)\b/i.test(answer);
+}
 function validStage1(answer: string): boolean {
   return STAGE1_HEADINGS.every((name) => Boolean(field(answer, name))) &&
     /\b(?:VERIFIED|INFERRED|UNKNOWN|BLOCKED)\b/.test(answer) &&
-    !/^PROOF:\s*(?:UNVERIFIED|UNKNOWN|BLOCKED)\s*$/im.test(answer);
+    !/^PROOF:\s*(?:UNVERIFIED|UNKNOWN|BLOCKED)\s*$/im.test(answer) &&
+    !reactsToAnotherSeat(answer);
 }
 function validStage2(answer: string): boolean {
   return ['AGREE', 'DISAGREE', 'BLIND SPOT', 'VERDICT', 'CONVERGED']
     .every((name) => Boolean(field(answer, name))) &&
-    /^(?:YES|NO)$/i.test(field(answer, 'CONVERGED') ?? '');
+    /^(?:YES|NO)$/i.test(field(answer, 'CONVERGED') ?? '') &&
+    !/^(?:TASK|OWNER):/im.test(answer);
 }
 function inScope(value: string): boolean {
   return value.length > 0 && value.length <= MAX_CONTEXT;
@@ -191,8 +196,14 @@ export async function runFastlaneCouncil(
     }
   };
 
-  const first = await Promise.all(input.seats.map((seat) =>
+  let first = await Promise.all(input.seats.map((seat) =>
     collect(seat.operator, stage1Goal, input.seed, validStage1)));
+  // A Stage 1 reaction is disqualified. Re-run that seat with the original
+  // unchanged prompt, never another member's verdict; failed retry stays BLOCKED.
+  first = await Promise.all(first.map((reply) =>
+    reply.answer && reactsToAnotherSeat(reply.answer)
+      ? collect(reply.operator, stage1Goal, input.seed, validStage1)
+      : Promise.resolve(reply)));
   transcript.stage1.verdicts = first;
   const arrivals = first
     .filter((reply) => reply.state === 'COLLECTED' && reply.receivedAt)
