@@ -136,8 +136,10 @@ export const corsMiddleware: RequestHandler = (req, res, next): void => {
   }
 
   if (PUBLIC_CROSS_ORIGIN_PATHS.has(req.path)) {
-    appendVary(res, 'Origin');
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    // Literal '*', not a reflected Origin: this path takes no cookies/credentials
+    // and the CORS spec forbids combining '*' with Access-Control-Allow-Credentials,
+    // so this cannot be widened into a credentialed cross-origin hole later.
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

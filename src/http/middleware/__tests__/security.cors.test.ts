@@ -165,7 +165,7 @@ describe('CORS origin resolution', () => {
         method: 'post',
       });
       expect(response.status).toBe(200);
-      expect(response.headers['access-control-allow-origin']).toBe('https://brand-one-site.example');
+      expect(response.headers['access-control-allow-origin']).toBe('*');
       expect(response.headers['access-control-allow-credentials']).toBeUndefined();
     });
 
@@ -175,7 +175,7 @@ describe('CORS origin resolution', () => {
         method: 'options',
       });
       expect(response.status).toBe(204);
-      expect(response.headers['access-control-allow-origin']).toBe('https://brand-two-site.example');
+      expect(response.headers['access-control-allow-origin']).toBe('*');
       expect(response.headers['access-control-allow-methods']).toBe('POST,OPTIONS');
     });
 
