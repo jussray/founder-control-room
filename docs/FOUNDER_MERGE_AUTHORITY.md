@@ -1,5 +1,9 @@
 # Founder Merge Authority
 
+## Simulator-staged edits are not merge approvals
+
+The existing `POST /approvals/:missionId/patch` may write a bounded simulator-staged `repository-source` edit only after authenticated mission checks, current provider branch identity, pinned policy SHA, live source hashes and idempotent reservation. The GitHub provider must reject moved heads before its non-forced mission-branch commit. A staged artifact or successful sandbox branch patch is not a deterministic independent review, founder-final approval, exact-head merge authorization, Playwright production witness, or deployment authority.
+
 Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
 
 ## Current founder decision
@@ -207,6 +211,10 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. The approved source floor is one independent human approval; live GitHub enforcement is separately verified and may still be zero until trusted provider reconciliation.
+
+## Required CI owner after queue consolidation
+
+For `main` pull requests, `.github/workflows/ci.yml` must still execute the guarded terminal, Juss Flow, production-authority and AI-skill contracts within its load-bearing `Test` job, alongside required exact-head checks before `Required Gate` can pass. `.github/workflows/quality-gate.yml` may run its extended duplicate tests on `staging` only; this must not waive CodeQL, the required test ledger, Playwright, exact-candidate founder-final approval, review, production deployment or live provider proof. Source-side queue consolidation alone grants no merge or release authority.
 
 Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
 
