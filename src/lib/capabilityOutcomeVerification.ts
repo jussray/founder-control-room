@@ -38,6 +38,14 @@ const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const BROWSER_CHECK = /playwright|browser|e2e/i;
 const RELAY_OPERATORS = new Set<string>(OPERATOR_RELAY_PEERS);
 const RUNTIME_VERIFIED_RECEIPTS = new WeakSet<object>();
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value;
+}
 const CAPABILITY_TASK_CLASSES: ReadonlySet<string> = new Set<CapabilityTaskClass>([
   'repository-repair',
   'architecture-review',
@@ -555,10 +563,13 @@ export async function verifyRepositoryRepairOutcome(
     selectionAuthority: false,
     executionAuthority: false,
   };
-  const receipt: CapabilityOutcomeVerificationReceipt = {
+  // Freeze before registering: membership in RUNTIME_VERIFIED_RECEIPTS is by object identity,
+  // so a mutable receipt could be re-aimed at another response (and re-hashed with the exported
+  // hash helper) while keeping its runtime-verified status.
+  const receipt: CapabilityOutcomeVerificationReceipt = deepFreeze({
     ...identity,
     verificationHash: capabilityOutcomeVerificationHash(identity),
-  };
+  });
   RUNTIME_VERIFIED_RECEIPTS.add(receipt);
 
   return { verified: true, receipt, blockers: [], evidenceReceipt };

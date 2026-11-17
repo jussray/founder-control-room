@@ -449,6 +449,33 @@ describe('independently verified response hashes feed the capability observation
     }).size).toBe(0);
   });
 
+  it('cannot be re-aimed at another response by mutating the issued receipt in place', async () => {
+    const { response, receipt } = await verifiedPair();
+    const later = relayResponse(relayRequest(), { answer: 'forged answer', completedAt: '2026-10-06T20:30:00.000Z' });
+    expect(later.responseHash).not.toBe(response.responseHash);
+
+    const mutable = receipt as { -readonly [K in keyof typeof receipt]: (typeof receipt)[K] };
+    expect(() => {
+      mutable.responseHash = later.responseHash;
+      const { verificationHash: _ignored, ...identity } = mutable;
+      mutable.verificationHash = capabilityOutcomeVerificationHash(identity);
+    }).toThrow(TypeError);
+    expect(() => {
+      (receipt.evidenceRefs as string[]).push('forged:evidence');
+    }).toThrow(TypeError);
+    expect(() => {
+      (receipt.subject as { exactSha: string }).exactSha = 'b'.repeat(40);
+    }).toThrow(TypeError);
+
+    expect(receipt.responseHash).toBe(response.responseHash);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [later], verifications: [receipt],
+    }).size).toBe(0);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [response], verifications: [receipt],
+    }).size).toBe(1);
+  });
+
   it('does not let a later response on the same relay id borrow earlier verification', async () => {
     const { response, receipt } = await verifiedPair();
     const later = relayResponse(relayRequest(), { answer: 'second answer', completedAt: '2026-10-06T20:30:00.000Z' });
