@@ -12,6 +12,8 @@ on:
       - 'src/lib/__tests__/operatorRelayDispatch.test.ts'
       - 'src/http/routes/__tests__/operatorRelay.route.test.ts'
       - 'src/http/routes/missions.ts'
+      - 'src/http/server.ts'
+      - 'src/http/__tests__/guardrails.integration.test.ts'
       - 'src/http/routes/operatorRelay.ts'
       - 'src/http/routes/__tests__/missions.liveCouncil.integration.test.ts'
       - 'src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts'
@@ -30,6 +32,8 @@ on:
       - 'src/lib/__tests__/operatorRelayDispatch.test.ts'
       - 'src/http/routes/__tests__/operatorRelay.route.test.ts'
       - 'src/http/routes/missions.ts'
+      - 'src/http/server.ts'
+      - 'src/http/__tests__/guardrails.integration.test.ts'
       - 'src/http/routes/operatorRelay.ts'
       - 'src/http/routes/__tests__/missions.liveCouncil.integration.test.ts'
       - 'src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts'
@@ -69,7 +73,7 @@ jobs:
         run: npm run typecheck
 
       - name: Run focused Council tests
-        run: npx vitest run src/lib/__tests__/councilRound.test.ts src/lib/__tests__/fastlaneCouncil.test.ts src/lib/__tests__/operatorRelayBridge.test.ts src/lib/__tests__/operatorRelayAuthz.test.ts src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts src/http/routes/__tests__/missions.liveCouncil.integration.test.ts
+        run: npx vitest run src/lib/__tests__/councilRound.test.ts src/lib/__tests__/fastlaneCouncil.test.ts src/lib/__tests__/operatorRelayBridge.test.ts src/lib/__tests__/operatorRelayAuthz.test.ts src/http/routes/__tests__/operatorRelayFcrSource.route.test.ts src/http/routes/__tests__/missions.liveCouncil.integration.test.ts src/http/__tests__/guardrails.integration.test.ts
 
       - name: Red-team shared relay confidentiality gate
         run: npx vitest run src/lib/__tests__/operatorRelayPolicy.test.ts src/lib/__tests__/operatorRelayDispatch.test.ts src/http/routes/__tests__/operatorRelay.route.test.ts
