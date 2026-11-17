@@ -77,3 +77,10 @@ test('mobile publishable keys are public-only and backend authorization remains 
   assert.match(layout, /requireFounder/);
   assert.match(founderMiddleware, /founderAllowlisted\(identity\)/);
 });
+
+test('browser proof never calls native SecureStore or persists web auth sessions', () => {
+  assert.match(client, /Platform\.OS === 'web' \? transientWebStorage : secureSessionStorage/);
+  assert.match(client, /const values = new Map<string, string>\(\)/);
+  assert.doesNotMatch(client, /localStorage|sessionStorage|AsyncStorage/);
+  assert.match(client, /SecureStore\.getItemAsync\(key\)/);
+});
