@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -24,11 +25,7 @@ type MirrorAuditEventInput = Parameters<
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'founder-user-1'),
   };
 }
 
@@ -101,7 +98,7 @@ describe('POST /mirror/run', () => {
 
   it('rejects malformed bounded input before calling the model', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     const runMirror = vi.fn(async () => modelResult());
@@ -117,7 +114,7 @@ describe('POST /mirror/run', () => {
 
   it('returns one draft-only move and persists sanitized provenance', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     const writeAuditEvent = vi.fn(async (_event: MirrorAuditEventInput) => undefined);
@@ -169,7 +166,7 @@ describe('POST /mirror/run', () => {
 
   it('records a sanitized provider failure and returns no draft', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     const writeAuditEvent = vi.fn(async () => undefined);
@@ -197,7 +194,7 @@ describe('POST /mirror/run', () => {
 
   it('fails closed when the completion audit cannot persist', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     const writeAuditEvent = vi.fn(async () => {
