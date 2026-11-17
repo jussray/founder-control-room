@@ -240,11 +240,13 @@ export async function escalateToPagerDuty(
   verdict: SecurityVerdict,
   env: IncidentEnv,
 ): Promise<boolean> {
+  // Direct calls must enforce the same meaningful high-severity gate as the
+  // aggregate dispatcher; an untrusted synthetic verdict cannot create a page.
+  if (!shouldEscalate(verdict)) return false;
   const integrationKey = env.PAGERDUTY_ROUTING_KEY?.trim() || env.PAGERDUTY_INTEGRATION_KEY?.trim();
   if (!integrationKey) return false;
 
   const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
-  if (severity !== 'critical' && severity !== 'high') return false;
 
   try {
     const response = await fetch('https://events.pagerduty.com/v2/enqueue', {
