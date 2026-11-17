@@ -32,6 +32,8 @@ The founder-reported GitHub Agents secret name `slack` becomes environment varia
 
 `src/security/incidentEscalation.ts` accepts an explicitly provided `SLACK_WEBHOOK_URL`, or a runtime-provided `SLACK` whose content is a Slack incoming-webhook URL or `xoxb-` bot token. Bot delivery additionally requires `FCR_SLACK_CHANNEL_ID` pointing to the authorized FCR channel and checks Slack's JSON `ok` result. Unsupported credential formats, absent channels, and low-severity verdicts fail closed. Webhook destinations are restricted to HTTPS Slack incoming-webhook URLs under `hooks.slack.com/services/` with three path segments; redirects are rejected. This applies to legacy `SLACK_WEBHOOK_URL` as well as the `SLACK` alias, preventing an accidental non-Slack destination from receiving incident details. An HTTP delivery response or a local test does not prove a Slack message appeared in the channel; channel readback is a separate gate. The existing production caller and the actual Cloudflare binding remain unverified. Do not add these as required deployment secrets until the existing runtime path and approved credential are independently proven.
 
+The existing `sauce-source-guard.yml` now includes **Slack agent secret readiness (no message sent)** on trusted `main` manual dispatch only (not on routine pushes while the Actions secret is absent). This job reads the GitHub **Actions** secret `SLACK`, not Copilot Agents credentials. If it is an `xoxb-` bot token, it calls Slack's read-only `auth.test` endpoint and reports only the authorization verdict. If it is a Slack incoming webhook URL, the job checks the exact approved URL structure without contacting the webhook; provider acceptance and channel delivery remain **UNVERIFIED**. A missing/unsupported secret or failed bot authentication is an explicit failing gate. No message is sent, and this diagnostic does not install credentials into the FCR production Worker or authorize security escalations.
+
 ### PagerDuty routing key (candidate integration, not live)
 
 The incident adapter in `src/security/incidentEscalation.ts` reads the Events API v2 credential from `PAGERDUTY_ROUTING_KEY`. The legacy `PAGERDUTY_INTEGRATION_KEY` remains a fallback for existing private runtimes; the routing-key name takes precedence when both exist. This is a **PagerDuty Events API integration/routing key**, not a PagerDuty REST API token. Only high/critical meaningful security verdicts qualify for a trigger. Code changes never copy the secret value to source, logs, or test fixtures.
@@ -61,6 +63,14 @@ Secrets marked required cause the named workflow job to fail if absent.
 GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trusted GitHub App workflows therefore store the App credentials as `APP_ID` and `APP_PRIVATE_KEY`, then map them into the server/runtime environment names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` inside the job. Those internal environment names remain the provider contract and are intentionally unchanged.
 
 The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
+
+### Expo mobile robot (`fcr`)
+
+| Secret | Required by | Description |
+|---|---|---|
+| `EXPO_TOKEN` | `mobile-store-readiness.yml` / `expo-robot-readiness` on trusted `main` push or manual dispatch | Expo robot access token for the existing FCR mobile app. The job uses `environment: expo-mobile` and passes this secret only to Expo authentication. Store under GitHub Actions repository secrets or the `expo-mobile` environment as appropriate, not only Copilot Agents; a same-name environment secret takes precedence. Never put the value in source, logs, screenshots, or chat. |
+
+The token check runs `eas whoami` without initiating a native build. An optional manual Android preview additionally requires an existing linked EAS `projectId` and the three public runtime variables (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_FCR_ORIGIN`). A configured secret name or successful JavaScript export is not proof of EAS provider authentication, a signed build, or device readiness.
 
 ### GitHub App authority
 
