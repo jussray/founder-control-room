@@ -56,6 +56,14 @@ GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trus
 
 The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
 
+### Expo mobile robot (`fcr`)
+
+| Secret | Required by | Description |
+|---|---|---|
+| `EXPO_TOKEN` | `mobile-store-readiness.yml` / `expo-robot-readiness` on trusted `main` push or manual dispatch | Expo robot access token for the existing FCR mobile app. The job uses `environment: expo-mobile` and passes this secret only to Expo authentication. Store under GitHub Actions repository secrets or the `expo-mobile` environment as appropriate, not only Copilot Agents; a same-name environment secret takes precedence. Never put the value in source, logs, screenshots, or chat. |
+
+The token check runs `eas whoami` without initiating a native build. An optional manual Android preview additionally requires an existing linked EAS `projectId` and the three public runtime variables (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_FCR_ORIGIN`). A configured secret name or successful JavaScript export is not proof of EAS provider authentication, a signed build, or device readiness.
+
 ### GitHub App authority
 
 | Secret | Required by | Description |
