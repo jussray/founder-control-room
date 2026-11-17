@@ -540,7 +540,7 @@
     {
       "path": "scripts/pr-continuity.mjs",
       "claims": [
-        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN, include it in non-authorizing continuity receipts, and never infer merge_approved or authorizes_merge from a native auto-merge click. GitHub must remain the only actor performing the eventual merge after configured live required gates, and FCR's exact-candidate founder-final contract must remain separate."
+        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN and independently recognize an authenticated FCR founder selection only when the actor and same-repository identity match. A selected queue is the founder's native merge instruction, but must never infer in-app merge_approved or authorizes_merge, bypass required live checks or claim completed merge."
       ]
     },
     {
@@ -747,7 +747,7 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
-        "`src/providers/providerFactory.ts` must require exactly one native approving review for active canonical FCR main governance, reject a weaker caller-supplied review count, and preserve all exact-head status checks and other provider authority boundaries."
+        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt."
       ]
     },
     {
@@ -840,25 +840,25 @@
     {
       "path": "scripts/audit-github-governance-preflight.mjs",
       "claims": [
-        "`scripts/audit-github-governance-preflight.mjs` must treat one eligible non-owner human reviewer as a prerequisite for READY when canonical FCR native approvals equals one, and must never call owner-only or bot-only collaboration independent review proof."
+        "`scripts/audit-github-governance-preflight.mjs` must use founder-only native approval count zero and must not block READY merely because no outside human reviewer is available. It must keep collaborator eligibility observational and preserve independent deterministic proof and all other exact ruleset security floors."
       ]
     },
     {
       "path": ".github/workflows/deterministic-review-core-advisory.yml",
       "claims": [
-        "`.github/workflows/deterministic-review-core-advisory.yml` must perform a trusted read-only non-owner reviewer availability check and re-read exact main before any GitHub ruleset provider mutation, preserving current-main founder command authorization and post-write provider proof."
+        "`.github/workflows/deterministic-review-core-advisory.yml` must require complete trusted governance observation before any provider mutation and must condition non-owner reviewer availability on `FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0`, so founder-only native Auto-merge is never blocked by an invented second reviewer. It must keep exact-current-main founder command authorization, post-write provider topology readback, and separate in-app founder-final authority."
       ]
     },
     {
       "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
       "claims": [
-        "`docs/FOUNDER_MERGE_AUTHORITY.md` must distinguish the approved one-review source phase from live provider enforcement and keep independent human GitHub approval separate from deterministic review and founder-final authority."
+        "`docs/FOUNDER_MERGE_AUTHORITY.md` must describe founder-selected native Auto-merge as the founder's GitHub merge instruction without an extra native approving reviewer, while retaining separate deterministic independent review and authenticated founder-final authority for AI-initiated in-app merges."
       ]
     },
     {
       "path": "docs/PROVIDERS.md",
       "claims": [
-        "`docs/PROVIDERS.md` must describe one native independent human approval, Code Owner and last-push requirements, and fail-closed reviewer eligibility before FCR ruleset mutation, without claiming that provider state has been changed."
+        "`docs/PROVIDERS.md` must describe the founder-only native approval count of zero and no extra Code Owner/last-push reviewer, while preserving live required checks, review-thread resolution, CodeQL, freshness, bypass constraints and separate FCR in-app authority. Source changes must never be reported as live provider mutations."
       ]
     },
     {

@@ -103,10 +103,23 @@ export function observedAutoMerge(pr) {
   return 'UNKNOWN';
 }
 
+/** A current provider queue observation, not an in-app FCR authority receipt. */
+export function observedFounderAutoMerge(pr, repository) {
+  if (repository !== 'jussray/founder-control-room') return 'NOT_APPLICABLE';
+  if (!pr || pr.state !== 'open' || !Object.prototype.hasOwnProperty.call(pr, 'auto_merge')) return 'UNKNOWN';
+  if (pr.head?.repo?.full_name !== repository || pr.base?.repo?.full_name !== repository) return 'UNKNOWN';
+  if (pr.auto_merge === null) return 'NOT_QUEUED';
+  const login = pr.auto_merge?.enabled_by?.login;
+  if (typeof login !== 'string' || !login.trim()) return 'UNKNOWN';
+  return login.toLowerCase() === 'jussray' ? 'FOUNDER_SELECTED' : 'OTHER_ACTOR';
+}
+
 export function continuityBlock(value) {
   const autoMergeIntent = ['QUEUED', 'NOT_QUEUED', 'UNKNOWN'].includes(value.autoMergeIntent)
     ? value.autoMergeIntent
     : 'UNKNOWN';
+  const founderAutoMergeSelection = ['FOUNDER_SELECTED', 'OTHER_ACTOR', 'NOT_QUEUED', 'UNKNOWN', 'NOT_APPLICABLE'].includes(value.founderAutoMergeSelection)
+    ? value.founderAutoMergeSelection : 'UNKNOWN';
   return [
     START_MARKER,
     '## PR Continuity Receipt',
@@ -123,15 +136,16 @@ export function continuityBlock(value) {
     `- continuity: **${value.continuityState}**`,
     `- proof: **${value.proofState}**`,
     `- auto_merge_intent: **${autoMergeIntent}**`,
+    `- founder_auto_merge_selection: **${founderAutoMergeSelection}**`,
     '- merge_authority: **true**',
     '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
     '- merge_approved: **false**',
     '- authorizes_merge: **false**',
     '- deploy_authority: **false**',
     '',
-    '> Merge authority means the merge capability exists; it is not candidate approval. Without fresh explicit founder approval bound to this exact repository, PR, base SHA, and head SHA, the merge must not execute. Base/head movement expires any prior approval.',
+    '> Merge authority means the capability exists, not that an in-app FCR approval token has been issued. For an AI-initiated FCR in-app merge, a fresh founder-final receipt bound to the exact repository, PR, base SHA and head SHA remains required; without it the in-app merge must not execute. The separately observed founder-selected GitHub native Auto-merge queue is already the founder merge instruction. Base/head movement expires prior in-app approvals and exact-head proof.',
     '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
-    '> GitHub native Auto-merge, if queued, executes only when its configured required reviews, tests, checks, and branch protections permit it. Optional checks must be explicitly required to block; this receipt never authorizes or dispatches a merge.',
+    '> A provider-observed FCR Auto-merge selection by the founder is the founder native GitHub merge instruction, not a formal APPROVED review or an in-app FCR execution token. GitHub executes only after the configured required checks, tests, review-thread resolution and branch protections pass. The merge_approved:false field applies to the separate FCR in-app merge route; the founder-only native source policy requires no second human approving reviewer. This receipt never dispatches a merge.',
     END_MARKER,
   ].join('\n');
 }
@@ -262,6 +276,7 @@ const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
     continuityState: state,
     proofState: proof,
     autoMergeIntent: observedAutoMerge(pr),
+    founderAutoMergeSelection: observedFounderAutoMerge(pr, repository),
   });
 
 async function deferOnePull(repository, pr, rootRef, state) {
@@ -389,6 +404,7 @@ export async function auditMode() {
     state,
     proofSubjectSha: pr.head.sha,
     autoMergeIntent: observedAutoMerge(pr),
+    founderAutoMergeSelection: observedFounderAutoMerge(pr, repository),
     predecessorProofExpiresOnHeadMove: true,
     ...nonAuthorizingMergeState,
   };
