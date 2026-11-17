@@ -747,7 +747,7 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
-        "`src/providers/providerFactory.ts` must require exactly one native approving review for active canonical FCR main governance, reject a weaker caller-supplied review count, and preserve all exact-head status checks and other provider authority boundaries."
+        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt."
       ]
     },
     {
