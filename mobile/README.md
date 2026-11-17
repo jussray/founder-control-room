@@ -10,6 +10,7 @@ Mobile v1 is a read-first mission-control surface. It:
 - stores the mobile session with Expo SecureStore;
 - sends the Supabase access token as the existing API-client Bearer transport;
 - relies on FCR's existing `requireFounder` middleware and `founder_users` allowlist;
+- uses Expo Router protected navigation for authenticated dashboard access;
 - reads `/dashboard/tasks`, `/dashboard/activity`, `/dashboard/costs`, and `/dashboard/proof-engine`;
 - adds native pull-to-refresh, haptic feedback, and bounded proof-snapshot sharing.
 
@@ -35,7 +36,7 @@ Source or JavaScript export success alone must never be promoted to a signed-bui
 ## Required public runtime configuration
 
 - `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (preferred; `EXPO_PUBLIC_SUPABASE_KEY` or the existing `EXPO_PUBLIC_SUPABASE_ANON_KEY` also supported)
 - `EXPO_PUBLIC_FCR_ORIGIN`
 
 These identify public client endpoints/configuration only. No service-role key, refresh token, Apple signing credential, Google service-account file, EAS credential, or store-account secret belongs in the repository.

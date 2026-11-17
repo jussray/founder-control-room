@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 const client = read('mobile/src/client.ts');
+const layout = read('mobile/app/_layout.tsx');
+const protectedScreen = read('mobile/app/dashboard.tsx');
 const screen = read('mobile/app/index.tsx');
 const founderMiddleware = read('src/http/middleware/requireFounder.ts');
 const dashboardRoute = read('src/http/routes/dashboard.ts');
@@ -53,4 +55,25 @@ test('store identity is explicit without provider credentials', () => {
 
   const serialized = `${JSON.stringify(appConfig)}\n${JSON.stringify(pkg)}`;
   assert.doesNotMatch(serialized, /appleId|ascAppId|appleTeamId|serviceAccountKey|api[_-]?key|secret/i);
+});
+
+test('Expo Router keeps guest sign-in separate from an authenticated dashboard', () => {
+  assert.match(layout, /mobileSupabase\.auth\.getUser\(\)/);
+  assert.match(layout, /onAuthStateChange/);
+  assert.match(layout, /subscription\.unsubscribe\(\)/);
+  assert.match(layout, /Stack\.Protected guard=\{!session\}/);
+  assert.match(layout, /Stack\.Protected guard=\{Boolean\(session\)\}/);
+  assert.match(layout, /name="dashboard"/);
+  assert.match(protectedScreen, /<FounderControlRoomMobile protectedRoute \/>/);
+  assert.match(screen, /<Redirect href="\/dashboard" \/>/);
+  assert.match(screen, /<Redirect href="\/" \/>/);
+});
+
+test('mobile publishable keys are public-only and backend authorization remains authoritative', () => {
+  assert.match(client, /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(client, /EXPO_PUBLIC_SUPABASE_KEY/);
+  assert.match(client, /EXPO_PUBLIC_SUPABASE_ANON_KEY/);
+  assert.doesNotMatch(client, /DATABASE_URL|service_role|SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(layout, /requireFounder/);
+  assert.match(founderMiddleware, /founderAllowlisted\(identity\)/);
 });

@@ -3,7 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import { createClient, type Session } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+const supabasePublicKey = (
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  ''
+).trim();
 const fcrOrigin = (process.env.EXPO_PUBLIC_FCR_ORIGIN?.trim() ?? '').replace(/\/$/, '');
 
 function required(value: string, label: string): string {
@@ -19,7 +24,7 @@ const secureSessionStorage = {
 
 export const mobileSupabase = createClient(
   required(supabaseUrl, 'EXPO_PUBLIC_SUPABASE_URL'),
-  required(supabaseAnonKey, 'EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+  required(supabasePublicKey, 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or legacy EXPO_PUBLIC_SUPABASE_ANON_KEY)'),
   {
     auth: {
       storage: secureSessionStorage,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Redirect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -40,7 +41,7 @@ const EMPTY_DASHBOARD: DashboardState = {
   byAgent: [],
 };
 
-export default function FounderControlRoomMobile() {
+export default function FounderControlRoomMobile({ protectedRoute = false }: { protectedRoute?: boolean }) {
   const [session, setSession] = useState<Session | null>(null);
   const [booting, setBooting] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,7 +58,7 @@ export default function FounderControlRoomMobile() {
       try {
         const restored = await currentFounderSession();
         setSession(restored);
-        if (restored) await refreshDashboard(false);
+        if (restored && protectedRoute) await refreshDashboard(false);
       } catch (caught) {
         setError(messageFrom(caught));
       } finally {
@@ -110,7 +111,7 @@ export default function FounderControlRoomMobile() {
       const next = await signInFounder(email, password);
       setSession(next);
       setPassword('');
-      await refreshDashboard(false);
+      if (protectedRoute) await refreshDashboard(false);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (caught) {
       setError(messageFrom(caught));
@@ -167,6 +168,9 @@ export default function FounderControlRoomMobile() {
       </SafeAreaView>
     );
   }
+
+  if (session && !protectedRoute) return <Redirect href="/dashboard" />;
+  if (!session && protectedRoute) return <Redirect href="/" />;
 
   if (!session) {
     return (
