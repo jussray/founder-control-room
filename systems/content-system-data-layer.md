@@ -72,6 +72,11 @@ lane collects and that the observations table's metric family does not cover.
 - Exactly one chain head per queue item (partial unique index on
   `predecessor_receipt_id is null`), and `(platform, account, native_post_id)`
   is unique — the same native post can never be receipted twice.
+- The chain is linear and stays inside one queue item
+  (`20261117000000_content_receipt_chain_integrity.sql`): a receipt can have at
+  most one successor (partial unique index on `predecessor_receipt_id`), and a
+  predecessor must carry the same `queue_id` (composite foreign key on
+  `(predecessor_receipt_id, queue_id)`).
 
 ## The unseen-media guard (2026-11-03 failure class)
 
