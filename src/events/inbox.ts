@@ -98,32 +98,33 @@ export async function persistProviderEvent(
       },
     )
     .select('id, processing_status')
-    .single();
+    .maybeSingle();
 
   if (error) {
-    // PostgREST returns PGRST116 when ignoreDuplicates produces no row.
-    // Resolve the existing row, but never treat a failed or empty lookup as a
-    // successful duplicate receipt.
-    if (error.code === 'PGRST116') {
-      const { data: existing, error: existingError } = await supabase
-        .from('provider_events')
-        .select('id')
-        .eq('provider', event.provider)
-        .eq('provider_event_id', event.providerEventId)
-        .maybeSingle();
-
-      if (existingError) {
-        throw new Error(
-          `Failed to resolve duplicate provider event: ${existingError.message}`,
-        );
-      }
-
-      return {
-        id: requiredRowId(existing, 'Failed to resolve duplicate provider event'),
-        isDuplicate: true,
-      };
-    }
     throw new Error(`Failed to persist provider event: ${error.message}`);
+  }
+
+  // An idempotent upsert with ignoreDuplicates returns zero rows for an
+  // existing delivery. Avoid .single() turning that expected state into a
+  // PostgREST HTTP 406, but still require the durable original receipt.
+  if (!data) {
+    const { data: existing, error: existingError } = await supabase
+      .from('provider_events')
+      .select('id')
+      .eq('provider', event.provider)
+      .eq('provider_event_id', event.providerEventId)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(
+        `Failed to resolve duplicate provider event: ${existingError.message}`,
+      );
+    }
+
+    return {
+      id: requiredRowId(existing, 'Failed to resolve duplicate provider event'),
+      isDuplicate: true,
+    };
   }
 
   return {
