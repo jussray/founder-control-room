@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   tableSelect: vi.fn(),
   tableUpdate: vi.fn(),
   upsertSelect: vi.fn(),
-  upsertSingle: vi.fn(),
+  upsertMaybeSingle: vi.fn(),
   lookupEq: vi.fn(),
   lookupMaybeSingle: vi.fn(),
   updateEq: vi.fn(),
@@ -47,7 +47,7 @@ const tableChain = {
 
 const upsertChain = {
   select: mocks.upsertSelect,
-  single: mocks.upsertSingle,
+  single: mocks.upsertMaybeSingle,
 };
 
 const lookupChain = {
@@ -75,7 +75,7 @@ beforeEach(() => {
   mocks.updateEq.mockReturnValue(updateChain);
   mocks.updateSelect.mockReturnValue(updateChain);
 
-  mocks.upsertSingle.mockResolvedValue({ data: { id: 'event-1' }, error: null });
+  mocks.upsertMaybeSingle.mockResolvedValue({ data: { id: 'event-1' }, error: null });
   mocks.lookupMaybeSingle.mockResolvedValue({ data: { id: 'event-1' }, error: null });
   mocks.updateMaybeSingle.mockResolvedValue({ data: { id: 'event-1' }, error: null });
   mocks.rpc.mockResolvedValue({ error: null });
@@ -104,9 +104,9 @@ describe('persistProviderEvent', () => {
   });
 
   it('resolves a duplicate only after the existing row lookup succeeds', async () => {
-    mocks.upsertSingle.mockResolvedValue({
+    mocks.upsertMaybeSingle.mockResolvedValue({
       data: null,
-      error: { code: 'PGRST116', message: 'No row returned' },
+      error: null,
     });
     mocks.lookupMaybeSingle.mockResolvedValue({
       data: { id: 'existing-event' },
@@ -126,9 +126,9 @@ describe('persistProviderEvent', () => {
   });
 
   it('fails closed when the duplicate lookup errors', async () => {
-    mocks.upsertSingle.mockResolvedValue({
+    mocks.upsertMaybeSingle.mockResolvedValue({
       data: null,
-      error: { code: 'PGRST116', message: 'No row returned' },
+      error: null,
     });
     mocks.lookupMaybeSingle.mockResolvedValue({
       data: null,
@@ -141,9 +141,9 @@ describe('persistProviderEvent', () => {
   });
 
   it('fails closed when the duplicate lookup returns no row', async () => {
-    mocks.upsertSingle.mockResolvedValue({
+    mocks.upsertMaybeSingle.mockResolvedValue({
       data: null,
-      error: { code: 'PGRST116', message: 'No row returned' },
+      error: null,
     });
     mocks.lookupMaybeSingle.mockResolvedValue({ data: null, error: null });
 
@@ -152,16 +152,17 @@ describe('persistProviderEvent', () => {
     );
   });
 
-  it('fails closed when a nominally successful insert returns no row', async () => {
-    mocks.upsertSingle.mockResolvedValue({ data: null, error: null });
+  it('fails closed when the empty upsert has no original receipt', async () => {
+    mocks.upsertMaybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.lookupMaybeSingle.mockResolvedValue({ data: null, error: null });
 
     await expect(persistProviderEvent(event)).rejects.toThrow(
-      'Failed to persist provider event: database returned no row id',
+      'Failed to resolve duplicate provider event: database returned no row id',
     );
   });
 
   it('propagates ordinary persistence errors', async () => {
-    mocks.upsertSingle.mockResolvedValue({
+    mocks.upsertMaybeSingle.mockResolvedValue({
       data: null,
       error: { code: 'XX000', message: 'write unavailable' },
     });
