@@ -41,7 +41,7 @@ describe('FCR governed agent enablement', () => {
     expect(agentCanOperate('unknown-agent', 'implement')).toBe(false);
   });
 
-  it('keeps Cursor's source-level authority contract aligned with the registered operator', () => {
+  it("keeps Cursor's source-level authority contract aligned with the registered operator", () => {
     const cursor = AGENT_REGISTRY.find((agent) => agent.id === 'cursor');
     const contract = readFileSync(
       new URL('../../../docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md', import.meta.url),
