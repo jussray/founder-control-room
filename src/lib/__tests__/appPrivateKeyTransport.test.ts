@@ -1,5 +1,7 @@
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -296,5 +298,21 @@ describe('derEnvelope structural fact', () => {
   it('still emits no length or other reconstructable metadata', () => {
     const { diagnostics } = classifyPrivateKey(derPkcs8.toString('base64'));
     expect(diagnostics).not.toMatch(/len=|lines=\d|bytes=\d/);
+  });
+});
+
+describe('one-time FCR App-key Worker activation', () => {
+  it('executes the credential-safe exact-main and binding guard tests', () => {
+    // This test runs on ordinary PR CI without accessing any GitHub or Cloudflare secret.
+    const testPath = fileURLToPath(
+      new URL('../../../scripts/activate-fcr-worker-github-app-key.test.mjs', import.meta.url),
+    );
+    const output = execFileSync(process.execPath, ['--test', testPath], {
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    expect(output).toContain('# tests 3');
+    expect(output).toContain('# pass 3');
+    expect(output).toContain('# fail 0');
   });
 });
