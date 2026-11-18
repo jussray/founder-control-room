@@ -451,18 +451,28 @@ async function reserveDigest(date: Date): Promise<DigestReservation | undefined>
   const id = randomUUID();
   const digestHour = hourStart(date);
   const startedAt = date.toISOString();
-  const { error } = await supabase.from("external_code_use_digest_runs").insert({
-    id,
-    digest_hour: digestHour,
-    recipient: EXTERNAL_USE_DIGEST_RECIPIENT,
-    status: "running",
-    started_at: startedAt,
-    attempt_count: 1,
-  });
-  if (!error) return { id, digestHour };
-  if (error.code !== "23505") {
+  // ON CONFLICT DO NOTHING avoids a predictable HTTP 409 for every duplicate
+  // hourly tick. A skipped insert still goes through the existing bounded
+  // stale/failed-run reclaim path, with its compare-and-swap update.
+  const { data: inserted, error } = await supabase
+    .from("external_code_use_digest_runs")
+    .upsert({
+      id,
+      digest_hour: digestHour,
+      recipient: EXTERNAL_USE_DIGEST_RECIPIENT,
+      status: "running",
+      started_at: startedAt,
+      attempt_count: 1,
+    }, {
+      onConflict: "digest_hour",
+      ignoreDuplicates: true,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error) {
     throw new Error(`external_use_digest_reservation_failed:${error.message}`);
   }
+  if (inserted) return { id: String(inserted.id), digestHour };
 
   const { data: existingData, error: existingError } = await supabase
     .from("external_code_use_digest_runs")
