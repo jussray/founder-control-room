@@ -14,6 +14,11 @@ on:
       - 'e2e/fakePublicWorkspaceSupabaseClient.mjs'
       - 'e2e/workspace-new-user-real-chief-proof.mjs'
       - 'supabase/migrations/20260921012000_provision_workspace_founder.sql'
+      - 'supabase/migrations/20261118090000_fcr_workspace_task_queue.sql'
+      - 'src/tasks/**'
+      - 'src/http/routes/workspaceTasks.ts'
+      - 'src/http/routes/__tests__/workspaceTasks.integration.test.ts'
+      - 'src/http/server.ts'
       - '.github/workflows/workspace-founder-boundary.yml'
 
 permissions:
@@ -66,7 +71,10 @@ jobs:
             src/http/middleware/__tests__/requireFounder.test.ts \
             src/http/middleware/__tests__/requireFounder.explicitRoleIdentity.contract.test.ts \
             src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts \
-            src/lib/__tests__/chiefControlRoomRecommendation.test.ts
+            src/lib/__tests__/chiefControlRoomRecommendation.test.ts \
+            src/http/routes/__tests__/workspaceTasks.integration.test.ts \
+            src/tasks/__tests__/workspaceTaskBinding.test.ts \
+            src/tasks/__tests__/workspaceTaskQueue.contract.test.ts
 
       - name: Build exact candidate
         run: npm run build
