@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 17, 2026 — Cursor bounded operator source registration (not live connectivity)
+
+`src/lib/agentRegistry.ts` recognizes `cursor` as a bounded operator with `research`, `propose`, `review`, and `implement` capabilities under the existing founder-controlled authority contracts. PR #1144 merged that source registration and its registry/genealogy tests, but the change does not install or authenticate Cursor, enroll it in `OPERATOR_RELAY_PEERS`, allow unattended external writes, prove any live GitHub or Cursor session, or grant merge/deploy/publish authority. `docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md` is the canonical documentation of these limits. CI, Playwright, connected-provider evidence, and exact-head founder approval remain independent gates.
+
 ## November 17, 2026 — FutureYou Mission Control discloses aged-out critical events (source-only, not runtime proof)
 
 `src/futureyou/missionControl.ts`'s `buildMissionControlBrief` excluded `critical`/`error` severity activity events older than 14 days from `priorities` with no trace anywhere in the response, unlike every other excluded-evidence case this read model already names in `blindSpots` (stale, invalid, or future-dated observations). `GET /futureyou/v8/brief` now adds a `blindSpots` line naming the count whenever this happens, so an unresolved critical signal cannot silently age out of the founder's own dashboard. The function is pure and unit-tested (red before, green after); no `missions`/`project_events` query, authority level, or `requireFounder` gate changed.
