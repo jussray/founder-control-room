@@ -26,7 +26,8 @@ workspaceTasksRouter.get('/tasks', async (req: FounderRequest, res) => {
   res.set('Cache-Control', 'private, no-store');
   const owner = actor(req);
   if (!owner) return unavailable(res);
-  const { data, error } = await supabase.from('fcr_workspace_tasks')
+  try {
+    const { data, error } = await supabase.from('fcr_workspace_tasks')
     .select('id,project_id,capability_id,operation,request_json,cadence_minutes,next_due_at,state,created_at')
     .eq('workspace_id', owner.workspaceId)
     .eq('owner_user_id', owner.userId)
@@ -35,7 +36,10 @@ workspaceTasksRouter.get('/tasks', async (req: FounderRequest, res) => {
   if ((data ?? []).length > MAX_TASKS) {
     return res.status(409).json({ error: 'Workspace task listing requires pagination.' });
   }
-  return res.json({ tasks: data ?? [], executionAuthorized: false });
+    return res.json({ tasks: data ?? [], executionAuthorized: false });
+  } catch {
+    return unavailable(res);
+  }
 });
 
 /** Registers a PAUSED task and REVOKED grant atomically, never runs it. */
@@ -57,7 +61,8 @@ workspaceTasksRouter.post('/tasks', async (req: FounderRequest, res) => {
     return res.status(400).json({ error: 'A project, bounded read-only search, and 60-10080 minute cadence are required.' });
   }
   // The database enforces this project-to-workspace FK again during the RPC.
-  const { data: project, error: projectError } = await supabase.from('projects')
+  try {
+    const { data: project, error: projectError } = await supabase.from('projects')
     .select('id').eq('id', projectId).eq('workspace_id', owner.workspaceId)
     .maybeSingle();
   if (projectError) return unavailable(res);
@@ -73,7 +78,10 @@ workspaceTasksRouter.post('/tasks', async (req: FounderRequest, res) => {
   return res.status(201).json({
     taskId, state: 'paused', grant: 'revoked',
     executionAuthorized: false, providerInvoked: false,
-  });
+    });
+  } catch {
+    return unavailable(res);
+  }
 });
 
 workspaceTasksRouter.get('/tasks/:taskId/runs', async (req: FounderRequest, res) => {
@@ -81,7 +89,8 @@ workspaceTasksRouter.get('/tasks/:taskId/runs', async (req: FounderRequest, res)
   const owner = actor(req);
   if (!owner) return unavailable(res);
   if (!UUID.test(req.params.taskId)) return res.status(404).json({ error: 'Task not found.' });
-  const { data: task, error: taskError } = await supabase.from('fcr_workspace_tasks')
+  try {
+    const { data: task, error: taskError } = await supabase.from('fcr_workspace_tasks')
     .select('id').eq('id', req.params.taskId)
     .eq('workspace_id', owner.workspaceId)
     .eq('owner_user_id', owner.userId).maybeSingle();
@@ -94,5 +103,8 @@ workspaceTasksRouter.get('/tasks/:taskId/runs', async (req: FounderRequest, res)
     .eq('owner_user_id', owner.userId)
     .order('claimed_at', { ascending: false }).limit(20);
   if (error) return unavailable(res);
-  return res.json({ runs: data ?? [], evidenceIsIndependentVerification: false });
+    return res.json({ runs: data ?? [], evidenceIsIndependentVerification: false });
+  } catch {
+    return unavailable(res);
+  }
 });
