@@ -165,6 +165,9 @@ $$;
 -- A second completion or late lease can never become a fresh success.
 create or replace function public.complete_fcr_workspace_task_run(
   p_run_id uuid,
+  p_task_id uuid,
+  p_workspace_id uuid,
+  p_owner_user_id uuid,
   p_state text,
   p_evidence_fingerprint text default null,
   p_provider_receipt_id text default null,
@@ -193,7 +196,9 @@ begin
       evidence_fingerprint = p_evidence_fingerprint,
       provider_receipt_id = p_provider_receipt_id,
       result_count = p_result_count
-  where id = p_run_id and state = 'claimed' and expires_at > clock_timestamp();
+  where id = p_run_id and task_id = p_task_id
+    and workspace_id = p_workspace_id and owner_user_id = p_owner_user_id
+    and state = 'claimed' and expires_at > clock_timestamp();
   get diagnostics v_rows = row_count;
   return v_rows = 1;
 end;
@@ -259,20 +264,20 @@ end;
 $;
 
 revoke all on function public.claim_due_fcr_workspace_tasks(integer) from public;
-revoke all on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) from public;
+revoke all on function public.complete_fcr_workspace_task_run(uuid,uuid,uuid,uuid,text,text,text,integer) from public;
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     execute 'revoke all on function public.claim_due_fcr_workspace_tasks(integer) from anon';
-    execute 'revoke all on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) from anon';
+    execute 'revoke all on function public.complete_fcr_workspace_task_run(uuid,uuid,uuid,uuid,text,text,text,integer) from anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     execute 'revoke all on function public.claim_due_fcr_workspace_tasks(integer) from authenticated';
-    execute 'revoke all on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) from authenticated';
+    execute 'revoke all on function public.complete_fcr_workspace_task_run(uuid,uuid,uuid,uuid,text,text,text,integer) from authenticated';
   end if;
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     execute 'grant execute on function public.claim_due_fcr_workspace_tasks(integer) to service_role';
-    execute 'grant execute on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) to service_role';
+    execute 'grant execute on function public.complete_fcr_workspace_task_run(uuid,uuid,uuid,uuid,text,text,text,integer) to service_role';
   end if;
 end $$;
 
