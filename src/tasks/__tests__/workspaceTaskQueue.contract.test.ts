@@ -46,7 +46,7 @@ describe('workspace task queue migration safety contract', () => {
 
   it('records provider observation without promoting it to independently verified', () => {
     expect(source).toContain("'provider_observed_unverified'");
-    expect(source).toMatch(/where id = p_run_id and state = 'claimed' and expires_at > clock_timestamp\(\)/);
+    expect(source).toMatch(/where id = p_run_id and task_id = p_task_id[\\s\\S]*?and workspace_id = p_workspace_id and owner_user_id = p_owner_user_id[\\s\\S]*?and state = 'claimed' and expires_at > clock_timestamp\\(\\)/);
     expect(source).not.toMatch(/'verified'\s*,/);
     expect(source).toContain('p_evidence_fingerprint is null or p_provider_receipt_id is null');
   });
