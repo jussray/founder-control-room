@@ -49,6 +49,10 @@ create table if not exists public.fcr_workspace_task_grants (
       (id, workspace_id, owner_user_id, capability_id) on delete restrict
 );
 
+-- Run composite foreign key needs the exact-owner unique index first.
+create unique index if not exists fcr_tasks_run_owner_fk_idx
+  on public.fcr_workspace_tasks (id, workspace_id, owner_user_id);
+
 create table if not exists public.fcr_workspace_task_runs (
   id uuid primary key default gen_random_uuid(),
   task_id uuid not null references public.fcr_workspace_tasks(id) on delete restrict,
@@ -72,10 +76,6 @@ create table if not exists public.fcr_workspace_task_runs (
     references public.fcr_workspace_tasks(id, workspace_id, owner_user_id)
     on delete restrict
 );
--- The run FK has a narrower exact-owner key than the grant's capability key.
-create unique index if not exists fcr_tasks_run_owner_fk_idx
-  on public.fcr_workspace_tasks (id, workspace_id, owner_user_id);
-
 create index if not exists fcr_workspace_runs_owner_idx
   on public.fcr_workspace_task_runs (workspace_id, owner_user_id, claimed_at desc);
 
