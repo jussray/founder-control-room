@@ -1,6 +1,7 @@
 import { sign } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { normalizePrivateKey } from './mint-portfolio-github-app-token.mjs';
 
 const REPOSITORY = 'jussray/founder-control-room';
@@ -15,7 +16,7 @@ function required(name) {
   return value;
 }
 
-function checkDispatch({ actor, ref, confirmation, sha, expectedSha }) {
+export function checkDispatch({ actor, ref, confirmation, sha, expectedSha }) {
   if (actor !== 'jussray' || ref !== 'refs/heads/main' || confirmation !== CONFIRM) {
     throw new Error('FOUNDER_MAIN_APPROVAL_REQUIRED');
   }
@@ -77,7 +78,7 @@ async function cloudflare(path, apiToken, { method = 'GET', payload } = {}) {
   return result.result;
 }
 
-function hasBinding(bindings, name) {
+export function hasBinding(bindings, name) {
   return Array.isArray(bindings) && bindings.some((entry) => entry?.name === name);
 }
 
@@ -138,6 +139,7 @@ async function run() {
   console.log('Live reconciliation remains a separate verification gate.');
 }
 
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
 if (process.argv.includes('--self-test')) {
   checkDispatch({
     actor: 'jussray',
@@ -164,4 +166,5 @@ if (process.argv.includes('--self-test')) {
   console.log('One-time FCR App-key activation guards: local tests passed; no provider mutation.');
 } else {
   await run();
+}
 }
