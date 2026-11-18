@@ -39,6 +39,7 @@ jobs:
         run: |
           node --check scripts/activate-fcr-worker-github-app-key.mjs
           node scripts/activate-fcr-worker-github-app-key.mjs --self-test
+          node --test scripts/activate-fcr-worker-github-app-key.test.mjs
       - name: Verify GitHub App issuer and install key to fixed FCR Worker
         env:
           APP_ID: ${{ secrets.APP_ID }}
