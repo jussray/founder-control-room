@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_REGISTRY,
@@ -38,6 +39,22 @@ describe('FCR governed agent enablement', () => {
 
   it('does not permit an unknown agent to operate', () => {
     expect(agentCanOperate('unknown-agent', 'implement')).toBe(false);
+  });
+
+  it('keeps Cursor's source-level authority contract aligned with the registered operator', () => {
+    const cursor = AGENT_REGISTRY.find((agent) => agent.id === 'cursor');
+    const contract = readFileSync(
+      new URL('../../../docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md', import.meta.url),
+      'utf8',
+    );
+
+    expect(cursor?.operator?.enabled).toBe(true);
+    expect(contract).toContain('Cursor (repository coding operator)');
+    expect(contract).toContain('Gemini, Claude, Codex/ChatGPT, Cursor, and Perplexity may be assigned:');
+    expect(contract).toContain('`firstSliceRuntimeModel: false`');
+    expect(contract).toContain('`externalWritesRequireBoundAuthority: true`');
+    expect(contract).toContain('does not add Cursor to `OPERATOR_RELAY_PEERS`');
+    expect(contract).toContain('Source-level registration is not proof of Cursor runtime connectivity.');
   });
 
   it('binds provider-specific operators to their instruction contracts', () => {
