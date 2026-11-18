@@ -307,7 +307,7 @@ describe('one-time FCR App-key Worker activation', () => {
     const testPath = fileURLToPath(
       new URL('../../../scripts/activate-fcr-worker-github-app-key.test.mjs', import.meta.url),
     );
-    const output = execFileSync(process.execPath, ['--test', testPath], {
+    const output = execFileSync(process.execPath, ['--test', '--test-reporter=tap', testPath], {
       encoding: 'utf8',
       timeout: 10000,
     });
