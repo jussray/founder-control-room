@@ -622,7 +622,14 @@ async function sendWithResend(options: {
 
 export async function runExternalUseHourlyCycle(
   now = new Date(),
-): Promise<{ status: "sent" | "skipped" | "failed"; itemCount?: number; newItemCount?: number }> {
+): Promise<{ status: "sent" | "skipped" | "failed"; itemCount?: number; newItemCount?: number; reason?: "delivery_not_configured" }> {
+  // Optional delivery must stay dark until its own credential and sender are
+  // configured. Do not reserve/fail an hourly digest merely because the
+  // unrelated FCR email binding is present.
+  if (!process.env.RESEND_API_KEY?.trim() || !process.env.EXTERNAL_USE_EMAIL_FROM?.trim()) {
+    return { status: "skipped", reason: "delivery_not_configured" };
+  }
+
   const reservation = await reserveDigest(now);
   if (!reservation) return { status: "skipped" };
 
