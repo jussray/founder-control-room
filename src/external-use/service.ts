@@ -637,11 +637,6 @@ export async function runExternalUseHourlyCycle(
   // configured. Do not reserve/fail an hourly digest merely because the
   // unrelated FCR email binding is present.
   if (!process.env.RESEND_API_KEY?.trim() || !process.env.EXTERNAL_USE_EMAIL_FROM?.trim()) {
-    console.warn(JSON.stringify({
-      task: "external-use",
-      status: "skipped",
-      reason: "delivery_not_configured",
-    }));
     return { status: "skipped", reason: "delivery_not_configured" };
   }
 
