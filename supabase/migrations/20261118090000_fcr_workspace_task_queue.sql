@@ -199,6 +199,65 @@ begin
 end;
 $$;
 
+-- Draft creation is atomic: no enabled task or live grant is produced here.
+-- The FCR authenticated workspace route supplies owner identity server-side;
+-- the database rechecks exact owner/project tenancy before either insert.
+create or replace function public.create_fcr_workspace_task_draft(
+  p_workspace_id uuid,
+  p_owner_user_id uuid,
+  p_project_id uuid,
+  p_query text,
+  p_cadence_minutes integer
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $
+declare
+  v_task_id uuid;
+begin
+  if p_workspace_id is null or p_owner_user_id is null or p_project_id is null
+     or p_query is null or length(btrim(p_query)) < 1 or length(btrim(p_query)) > 2048
+     or p_cadence_minutes is null or p_cadence_minutes < 60
+     or p_cadence_minutes > 10080 then
+    raise exception 'invalid read-only task draft' using errcode = '22023';
+  end if;
+  if not exists (
+    select 1 from public.founder_users fu
+    where fu.user_id = p_owner_user_id and fu.workspace_id = p_workspace_id
+      and fu.account_role in ('workspace_owner', 'platform_owner')
+  ) or not exists (
+    select 1 from public.projects p
+    where p.id = p_project_id and p.workspace_id = p_workspace_id
+  ) then
+    raise exception 'workspace task owner or project unavailable'
+      using errcode = '42501';
+  end if;
+  if (select count(*) from public.fcr_workspace_tasks t
+      where t.workspace_id = p_workspace_id and t.owner_user_id = p_owner_user_id) >= 50 then
+    raise exception 'workspace task count exceeded' using errcode = '22023';
+  end if;
+  insert into public.fcr_workspace_tasks (
+    workspace_id, owner_user_id, project_id, operation,
+    request_json, cadence_minutes, next_due_at, state
+  ) values (
+    p_workspace_id, p_owner_user_id, p_project_id, 'search',
+    jsonb_build_object('query', btrim(p_query)), p_cadence_minutes,
+    clock_timestamp() + p_cadence_minutes * interval '1 minute', 'paused'
+  ) returning id into v_task_id;
+
+  insert into public.fcr_workspace_task_grants (
+    task_id, workspace_id, owner_user_id, capability_id,
+    scope, state, expires_at
+  ) values (
+    v_task_id, p_workspace_id, p_owner_user_id, 'public-web-observation-v1',
+    'READ', 'revoked', clock_timestamp()
+  );
+  return v_task_id;
+end;
+$;
+
 revoke all on function public.claim_due_fcr_workspace_tasks(integer) from public;
 revoke all on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) from public;
 do $$
@@ -214,5 +273,19 @@ begin
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     execute 'grant execute on function public.claim_due_fcr_workspace_tasks(integer) to service_role';
     execute 'grant execute on function public.complete_fcr_workspace_task_run(uuid,text,text,text,integer) to service_role';
+  end if;
+end $$;
+
+revoke all on function public.create_fcr_workspace_task_draft(uuid,uuid,uuid,text,integer) from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on function public.create_fcr_workspace_task_draft(uuid,uuid,uuid,text,integer) from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on function public.create_fcr_workspace_task_draft(uuid,uuid,uuid,text,integer) from authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant execute on function public.create_fcr_workspace_task_draft(uuid,uuid,uuid,text,integer) to service_role';
   end if;
 end $$;
