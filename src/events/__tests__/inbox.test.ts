@@ -47,7 +47,7 @@ const tableChain = {
 
 const upsertChain = {
   select: mocks.upsertSelect,
-  single: mocks.upsertMaybeSingle,
+  maybeSingle: mocks.upsertMaybeSingle,
 };
 
 const lookupChain = {
