@@ -106,6 +106,8 @@ async function run() {
   // PKCS8 PEM to the specific Worker secret endpoint, never logs/artifacts.
   const pem = key.export({ type: 'pkcs8', format: 'pem' }).toString();
   const path = '/accounts/' + ACCOUNT_ID + '/workers/scripts/' + WORKER;
+  const beforeDeployments = await cloudflare(path + '/deployments', cloudflareToken);
+  const previousDeploymentId = beforeDeployments?.deployments?.[0]?.id ?? null;
   const current = await cloudflare(path + '/secrets', cloudflareToken);
   if (!hasBinding(current, 'GITHUB_APP_ID')) throw new Error('WORKER_APP_ID_BINDING_MISSING');
   if (hasBinding(current, BINDING)) throw new Error('WORKER_PRIVATE_KEY_ALREADY_BOUND_REFUSE_OVERWRITE');
@@ -118,6 +120,8 @@ async function run() {
   });
 
   const after = await cloudflare(path + '/secrets', cloudflareToken);
+  const afterDeployments = await cloudflare(path + '/deployments', cloudflareToken);
+  const resultingDeploymentId = afterDeployments?.deployments?.[0]?.id ?? null;
   if (!hasBinding(after, BINDING)) throw new Error('WORKER_PRIVATE_KEY_READBACK_MISSING');
   const receipt = {
     contract: 'fcr/one-time-github-app-worker-activation@v1',
@@ -128,6 +132,8 @@ async function run() {
     githubAppIssuerVerified: true,
     repositoryInstallationVerified: true,
     cloudflareBindingPresent: true,
+    previousDeploymentId,
+    resultingDeploymentId,
     secretValuePrinted: false,
     liveReconciliationVerified: false,
     deploymentVerified: false,
