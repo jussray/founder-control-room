@@ -1,10 +1,112 @@
 # Founder Control Room
 
+## November 17, 2026 — FutureYou Mission Control discloses aged-out critical events (source-only, not runtime proof)
+
+`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` excluded `critical`/`error` severity activity events older than 14 days from `priorities` with no trace anywhere in the response, unlike every other excluded-evidence case this read model already names in `blindSpots` (stale, invalid, or future-dated observations). `GET /futureyou/v8/brief` now adds a `blindSpots` line naming the count whenever this happens, so an unresolved critical signal cannot silently age out of the founder's own dashboard. The function is pure and unit-tested (red before, green after); no `missions`/`project_events` query, authority level, or `requireFounder` gate changed.
+
+## November 16, 2026 — Pennsylvania funding workspace, split from #1094 (candidate, not runtime proof)
+
+This adds the founder-only Pennsylvania funding review workspace from PR #1094 on its own, without #1094's merge-review governance changes, which stay on #1094 for a separate decision. `public/control-room/pa-funding.html` lists nine official-source programs and keeps eligibility UNKNOWN until evidence passes; the REVIEW → VERIFY → PREPARE stages save private checklist state, and APPLY stays locked. `src/http/routes/paFundingReviews.ts` (`GET /pa-funding/reviews`, `PUT /pa-funding/reviews/:opportunityId`) requires `requireFounder`, has its own 60/min rate limit, accepts only the nine program ids and the three non-APPLY stages, and returns 503 rather than success when storage fails. `supabase/migrations/20261112043814_founder_pa_funding_reviews.sql` keeps `public.founder_pa_funding_reviews` RLS-enabled and service-role-only (select, insert, update); its filename is unchanged because #1094 reports that version already applied to the live Supabase project. The Playwright proof (`e2e/pa-funding-workspace-proof.mjs`) mocks the API and login, so it proves page behaviour, not authenticated live persistence.
+
+## November 16, 2026 — webchat `/human` handoff wired behind a project allowlist (candidate, not runtime proof)
+
+`POST /webchat/messages` accepts first-party webchat messages, records a `/human` request as a `pending_human` row in the service-role-only `webchat_human_handoffs` table (at most one open row per conversation, enforced by a partial unique index, so retries collapse), and reports `botMayReply: false` for that conversation until a founder releases it through `POST /webchat/handoffs/:key/release` (queue: `GET /webchat/handoffs`). The public route returns 404 unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`, which is unset by default; it is rate limited, capped at 4 KB, stamps time server-side, never generates or sends a reply, and returns 503 rather than success when the queue cannot be written. Nothing is live until the migration is applied, the allowlist is set, and the webchat channel's notice, disclosure, consent, retention and security-review requirements are met.
+
+The canonical Worker bundle pins `iconv-lite` to `0.6.3` through an npm `overrides` entry. Wrangler/esbuild honors `iconv-lite@0.4.x`'s `browser` map, which blanks `./lib/streams`, while that version still calls it whenever `process.versions.node` is set under `nodejs_compat`; Cloudflare then rejected the uploaded Worker at startup (`10021`, `require_streams(...) is not a function`). Verified locally by starting the bundled Worker in workerd (crash before, `/health` 200 after). This does **not** by itself prove a production deploy.
+
+## November 15, 2026 — Federated relay v3 public-key immutability trigger (candidate, not provider proof)
+
+Migration `20261115194101_guard_federated_relay_v3_public_key_immutability.sql` adds a before-update trigger on `public.federated_relay_public_keys`. A key row's identity and material (`member`, `key_id`, `algorithm`, `public_key_jwk`, `valid_from`, `created_at`) cannot change in place; rotation creates a new row. Lifecycle transitions stay possible but monotonic: revocation is terminal, a retired key cannot reactivate, `revoked_at` and a set `valid_until` are fixed, and `revoked_at`/`updated_at` are database-owned. A follow-up migration, `20261116053000_restrict_federated_relay_public_keys_service_role_update_columns.sql`, revokes table-wide UPDATE from `service_role` and grants UPDATE only on `state` and `valid_until`, so key identity, key material, `revoked_at` and `updated_at` are no longer writable by `service_role` at the privilege layer; SELECT, INSERT and RLS are unchanged. Behavior was checked against a scratch local Postgres only; this is not proof that the migration is applied to any provider database.
+
+## November 15, 2026 — production Worker deploys record and read back the exact commit (candidate, not deploy proof)
+
+`.github/workflows/deploy.yml` now passes `--tag <expected_head_sha>` and a short run-provenance `--message` to `wrangler deploy` for the canonical `founder-control-room` Worker, and a new fail-closed step in the same job reads back `wrangler deployments list --json` and `wrangler versions view --json` (names, ids and annotations only). The job fails unless the newest deployment sends 100% of traffic to one version whose `workers/tag` equals that exact SHA. The comparison lives in the pure, unit-tested `scripts/worker-deployment-version-tag.mjs`. This is source only: no deploy was run, and no Cloudflare call was made. A read-only provider audit on November 15, 2026 found that no Worker version yet has a tag, message or commit SHA, and no recent `Deploy` run has succeeded, so this check has not yet passed against the real provider.
+
+## November 15, 2026 — n8n provider-native readback witness (candidate, not provider proof)
+
+`src/lib/n8nFounderContentProviderReadback.ts` adds a strict, sanitized witness contract: an n8n `scheduled` founder-content receipt stays `provider_schedule_receipt_pending_readback` until an independent provider-native observation matches the exact orchestration, provider item/request identity, source repository/SHA, platform/channel and requested schedule. Mismatches, unsupported provider payload fields and any `published:true` claim fail closed, and a verified schedule is still not publication. Rebuilt on current main from #730, whose branch no longer shares history with main. No production adapter calls the witness yet; no provider call, Buffer scheduling, publication, deployment, database or secret change is made, and #299 (live native readback) remains open.
+
+## November 15, 2026 — Documentation Truth claim freshness (candidate, not provider proof)
+
+`scripts/verify-documentation-truth.mjs` now reads `docs/DOCUMENTATION_TRUTH_RECEIPT.json` at the reviewed base and requires every changed truth-sensitive path to gain at least one fresh, meaningful path-bound invariant in the reviewed range. The receipt stays append-only: earlier claims remain as history, and a new claim appended (or an inherited claim rewritten with a new invariant) satisfies the gate. Claims copied unchanged, reformatted only cosmetically (casing, punctuation, link targets, comments, HTML wrappers), or recombined from inherited sentences do not. Claims for one path are read across every receipt entry that names it. Normalization lives in `scripts/documentation-truth-claim-fingerprint.mjs`, which is itself truth-sensitive. This is a receipt-novelty check only: it does not prove any claim is true, and it grants no merge, deploy, or provider authority. Rebuilt from the fingerprinting piece of PR #883.
+
+## November 15, 2026 — Cloudflare Worker target doc correction (docs-only, not deploy proof)
+
+`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` now records that the Workers Builds `main` trigger runs the verification-only script (`worker_version_upload: false`) and uploads no Worker version, so a green Workers Build or Pages check is build-verification evidence only and does not prove the API Worker runs `main`. A read-only Cloudflare readback on November 15, 2026 (about 19:50Z) observed the active production Worker as a placeholder stub; the November 2 plaintext `CF_API_TOKEN` sentence is kept as history with a dated correction. No provider state, secret, or deployment was changed, and this is not runtime proof.
+
+## November 15, 2026 — Worker [vars]/secret name-collision deploy gate (candidate, not deployed)
+
+`scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. CI runs the unit tests and the offline check in the `Cloudflare bridge authority contract` job.
+
+A read-only Cloudflare audit on November 15, 2026 observed `SUPABASE_URL`, `FOUNDER_ALLOWED_ORIGINS` and `FOUNDER_API_URL` installed as Worker secrets while `wrangler.worker.toml` declares them as plain `[vars]`; that observation is historical and must be re-read before use. If it is still true, production Deploy and Worker Reconcile will stop at this gate until the founder decides which side to remove; this change does not remove, rename or rotate any secret. Source and unit tests do not prove GitHub CI, credential validity, a deploy, or runtime health.
+
+## November 15, 2026 — independent outcome verifier for capability proof (candidate, not provider proof)
+
+`src/lib/capabilityOutcomeVerification.ts` adds the producer for the capability observation fold's `verifiedResponseHashes`. A relay response hash is counted as proven only when a verification receipt issued in this process re-read provider evidence for the exact repository and full commit SHA the relay request was bound to, with every required check passed at that head by its declared producer identity (and a passed browser signal when Playwright is required). Copied or deserialized receipts, mismatched operators or task classes, unresolved work, tampered hashes, and responses completed outside the request window never produce proof. Council transcripts now persist the hash-relevant response fields, and `recoverPersistedRelayResponses` returns only hash-verifiable responses; older projections are ignored, not upgraded. Verification receipts grant no routing or execution authority. Nothing here wires a live route, store, deployment, or provider readback; only `repository-repair` has a verifier.
+
+## November 15, 2026 — raw credentials rejected in project connection config (candidate, not runtime proof)
+
+`POST /projects/:slug/connections` now rejects raw credential material before any project lookup or write. `src/lib/connectionConfigSecrets.ts` is the single check: it walks nested `config` objects and arrays and flags credential-named keys with a non-empty value (for example `apiKey`, `clientSecret`, `githubToken`, `password`) and credential-shaped values under any key (PEM private keys, including base64-wrapped, `Bearer` values, common provider key prefixes, JWT-shaped values, URLs with embedded `user:password`). A `secretRef` that itself looks like a credential is rejected too. The 400 response carries `code: CONNECTION_CONFIG_SECRET_REJECTED` and the offending key path only; it never echoes the submitted value. On `GET /projects/:slug/connections`, the read audit records `credential_shaped_connection_count` (a count only, no paths or values) so legacy rows written before this check are visible. This is a heuristic boundary, not a secret scanner: it does not redact or migrate existing rows, does not prove no credential is stored today, and is not deployment or runtime proof.
+
+Auth-origin consistency: the Pages source must route `GET` and `HEAD` requests for `www.foundercontrolroom.org/welcome` and `/member/` to the apex browser-session origin before login or member-session reads. The host-only founder/member cookies remain scoped to the apex; login POSTs are never redirected or granted cross-origin authority. This is a candidate Pages routing rule, not proof that live www DNS, Cloudflare redirects, or login are working.
+
+
+## November 3, 2026 — exact-head CI queue consolidation (candidate only)
+
+For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 3, 2026 — member sign-in and founder isolation (PR #1060, candidate only)
+
+This PR introduces a separate member email sign-in and an initially empty member workspace while retaining the founder's private authenticated control room. The Pages origin serves `/welcome` and `/member/` as static assets; same-origin `/auth/member/*` calls are proxied to the canonical API Worker. A verified Supabase member identity may receive a separate host-only, Secure, HttpOnly, SameSite=Strict browser session backed by a service-role-only, revocable database record. Founder sessions must be revoked on a member switch and founder allowlisted addresses cannot enter the member workspace. The merged welcome view preserves the approved full founder title, invitation-only founder instructions, and the distinct member entry. The separate Neon PR preview may provide only an isolated synthetic `auth.users` compatibility fixture, but must execute the original migration SQL atomically and verify the resulting FK, RLS and table privileges. This preview is not a Supabase production migration or real auth test. This is a source candidate: migration installation, email delivery, real callback, tenant isolation, Workers/Pages deployment, and live readback remain unverified. Do not count a successful isolated unit or simulated browser test as production evidence, nor use this PR to grant merge or deploy authority.
+
+## November 15, 2026 — public Pages MCP route allowlist (candidate, not deployment proof)
+
+`public/_worker.js` now forwards only an explicit allowlist of MCP protocol routes from the public Pages origin to `FCR_API`: `/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the `/mcp/portfolio/<slug>` bridges the API mounts. Any other `/mcp` path, including founder administration (`/mcp/vault`, `/mcp/founder-permissions`, `/mcp/servers`), the write-capable `/mcp/founder-signal-engine` lane, unknown descendants, and case, slash, or percent-encoded variants, fails closed with a `404 MCP_ROUTE_NOT_PUBLIC` before any API call. Those routes stay reachable on the API origin under their existing authentication. This is source and unit-test behavior only; it does not prove the deployed Pages artifact, Cloudflare Access configuration, or live MCP authentication.
+
+## Founder OS mission-patch simulation contract (candidate, not release proof)
+
+A simulator-generated `repository-source` edit must remain an in-memory artifact until the existing founder-authenticated `POST /approvals/:missionId/patch` route accepts it. The server must independently verify the live mission branch, pinned SHA, original file contents and proposed file hashes, then reserve an idempotent action before its GitHub provider commits. A staged receipt cannot grant merge, deployment, or production authority; independent human review, full exact-head CI and Playwright proof remain separate gates.
+
+## November 11, 2026 — CI runner load: rollover deferral for draft and stale PRs (candidate, not provider proof)
+
+The `Roll Current Main Through Open PR Graph` job (`scripts/pr-continuity.mjs` rollover mode) no longer merges `main` into draft pull requests or pull requests labelled `stale`. Those are recorded once in their continuity receipt as `DEFERRED_DRAFT` or `DEFERRED_STALE` with proof `REVERIFY_OR_ROLLOVER_REQUIRED`, and are counted as deferred, not blocked. A deferred receipt records the base observed when deferral was written, so it is historical, not a current-base claim. Deferral does not weaken any gate: every exact-head and merge gate still requires current-base ancestry, so a deferred pull request cannot merge until it is marked ready or loses the `stale` label and is rolled forward and re-verified.
+
+Rollover deferral does not cancel or skip any check on a pull request that is rolled forward. Separately, `e2e/control-room-read-truth-proof.mjs` now opens `/control-room/?screen=control&view=overview`: since the five-screen shell the Control Room boots to Home, where the Projects list is hidden, so this proof had failed on every run regardless of the change under test. Its assertions (UNKNOWN on a failed read, verified empty state on a successful empty read, no browser-readable tokens) are unchanged. Runner throughput after merge is not proven by this source change; read actual queue times on GitHub.
+
+## November 10, 2026 — direct-push detector and PR hygiene (candidate, not provider proof)
+
+`main` changes only through merged pull requests. `.github/workflows/direct-push-detector.yml` runs on every push to `main`, requires a merged pull request for the pushed head commit, and otherwise fails and opens a `direct-push-to-main` issue so any break-glass push is recorded. It detects; it does not prevent. Prevention is the live GitHub ruleset, which source cannot prove: read it back on GitHub before claiming direct pushes are blocked.
+
+`.github/workflows/pr-hygiene.yml` runs weekly using `scripts/pr-hygiene.mjs`: drafts with no new commit for 21 days are labelled `stale` and closed 7 days later (reversible, branches kept); ready pull requests with no new commit for 30 days are labelled `stale` but never closed automatically. Idle time is measured from the last non-merge commit, because automated merges of `main` into every open pull request reset GitHub's updated time; `keep-open` exempts any pull request. Manual runs default to dry run. Neither workflow grants merge, approval, or deploy authority.
+
+## November 7, 2026 — Worker-only secret receipt parser (candidate, not deployed)
+
+The canonical FCR Worker Reconcile authority gate now extracts Wrangler's secret-name JSON list from surrounding human notices, including bracketed lines such as `▲ [WARNING] …` before it or `[wrangler] …` after it (it decodes at each `[` and keeps the first list made only of objects; a follow-up to the original first-`[`/last-`]` slice, which rejected those shapes), validates unique nonempty name-bearing entries, and fails closed for malformed or incomplete receipts without logging provider text or credential values. The checked-in Python workflow-guard test executes that inline gate with synthetic successful, notice-prefixed, duplicate, missing, and malformed name-only receipts. This is source-level defense against a previously inconsistent parser; it does **not** prove GitHub CI, approval, credential validity, production remediation, or runtime API health.
+
+The existing exact-current-main founder approval requirement, bounded removal of the stale undeclared `CF_API_TOKEN` plaintext binding, strict post-deployment binding-type check, and direct API + public Pages identity proofs remain mandatory. No value migration or secret rotation is authorized by this candidate; the canonical Worker Reconcile workflow is the only approved execution path for legacy-binding removal.
+
+Before the first Cloudflare API call, both the production Deploy and the canonical Worker Reconcile authority gates now run `scripts/verify-cloudflare-token.sh`, which asks Cloudflare to verify the resolved `CLOUDFLARE_API_TOKEN` (user-token endpoint, then the account-token endpoint for the `wrangler.worker.toml` account) and fails closed unless the response has `success: true` and `result.status == "active"`. The token travels via curl stdin config, never argv or logs. Both jobs run in the `production` environment, so a production environment secret named `CLOUDFLARE_API_TOKEN` overrides the repository secret. This is a source-level gate; it does **not** prove that the currently stored credential is valid.
+
+## November 5, 2026: Exact-head companion diagnosis (candidate, not release proof)
+
+The founder-only `/integration-cockpit/projects` and `/integration-cockpit/inspect/:id/:number` endpoints operate alongside the existing Control Room on its authenticated origin. The read-only diagnostic `observePullRequest` capability includes draft and closed PR identities so an operator can see blocked work. The existing independent `getPullRequestReviewContext` gate still rejects draft or closed PRs and exclusively controls the review context used by merge authority. Read-only observation must never populate that review context, grant merge or deployment authority, or treat skipped checks as proof. Exact-head checks, current base/head, and browser session are separate observations; live FCR/Cloudflare/Supabase production proof is not established by a local fixture, passing CI slice, or preview build. Games Hub repository mapping remains unresolved and is not guessed.
+
+
+## Paired hostile-PR repair guidance
+
+The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
+
 ## November 3, 2026: FCR welcome, login and logout browser authority
 
 PR #978 reuses the existing FCR welcome page and same-origin opaque founder cookie. `.github/workflows/playwright.yml` now runs an explicit `auth-lifecycle` browser scenario that must verify signed-out welcome, real magic-link callback, `/auth/me` founder identity, Secure HttpOnly cookie attributes, signed-in welcome redirect, server-revoked logout, and denial of the private Control Room after logout. The same workflow retains the guarded-terminal negative authority check and broader federation proof; one passing auth slice cannot substitute for the entire required gate.
 
 At predecessor candidate `82d0e7139d3876e166844de64e17b4a770c23b90`, the isolated auth-lifecycle printed `E2E RESULT: PASS` in Playwright run `41728146923`; that same run failed the separate guarded-terminal negative test because the browser's V10 plan guard intercepted a planless request before its expected server-side denial. The successor test must prove **both** browser and API rejection without performing a privileged mutation. The predecessor passing slice is historical once the PR head moves. No source/browser result establishes the actual ChatGPT Site binding, live Cloudflare cookie delivery, production sign-in, portfolio readiness, merge approval, or release authority.
+
+## November 2, 2026: project-owned Monday founder orientation candidate
+
+Existing PR #894 is the carrier for FCR's Monday 08:00 America/New_York founder orientation. It reuses the single per-minute Cloudflare Worker scheduler and adds no ChatGPT automation slot or competing cron owner. Verification freshness is measured from the repository observation timestamp (scanned_at), not packet ingestion time, so delayed stale evidence cannot become current merely by arriving late; invalid and future observation times fail closed to UNKNOWN.
+
+This remains source-candidate truth only until exact-head CI and Playwright pass, the protected migration is applied through the normal release path, the current Worker is deployed with its project-scoped email binding, and a real scheduled receipt is observed. It grants no automatic merge, deploy, publication, provider mutation, or cross-project authority.
 
 ## November 2, 2026 — FCR Council Bus and search evidence source candidate
 
@@ -19,8 +121,30 @@ The existing PR #986 reconciles bounded private-key wrapper parsing against curr
 
 FCR PR #1056 protects the existing `founder-control-room` Worker by requiring `scripts/verify-worker-binding-types.mjs` in both canonical pre-mutation workflows. The verifier reads provider binding names and types only, rejects plaintext credential bindings, withholds deployment when the provider response is unavailable, and never reports credential values as proof. Cloudflare readback previously classified `CF_API_TOKEN` as `plain_text`, so this candidate does not authorize production promotion or secret re-upload.
 
-FCR Playwright also selects a newly observed StoryEngine peer `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5`, four commits ahead and zero behind the prior pin `bffc9f771b673055403f52b29c86b30e5f4dd8c8`. The changed peer files are documentation and governance content, but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
+FCR Playwright selects the newly observed StoryEngine peer `1a4a581687481b2ec2025539efae02032bef5287`, one commit ahead and zero behind the prior pin `1730f316b74bdb9b638312c57987dc2897953948`. The changed peer file is a governance receipt (no runtime code), but only a fresh exact-head live-ref check, immutable checkout, runtime and browser/receipt witness can establish compatibility. Previous skipped steps and green predecessor receipts cannot transfer.
 
+The live-peer gate requires the pinned StoryEngine commit to be equal to, or an ancestor of, live StoryEngine `main`, so ordinary forward StoryEngine merges no longer turn FCR CI red. A force-push, rollback or rewrite that drops the pin from StoryEngine history still fails closed, and all federation and browser proof still runs against the exact pinned commit; compatibility with newer StoryEngine commits is not claimed until the pin is moved and re-witnessed.
+
+The existing Portfolio Actions and Stale Evidence Audit is configured to observe
+default-branch GitHub Actions daily, in parallel batches of six repositories.
+Its receipt includes a prioritized, non-authorizing next-task handoff bound to
+the observed repository/head and the audit source/run. The workflow preserves
+that handoff even when collection is blocked and presents the next action in its
+job summary.
+The credential-bearing observation job is restricted to main push, schedule,
+or manual-dispatch events and verifies its checked-out SHA against freshly
+fetched main immediately before token minting. Production-environment branch
+restrictions still require independent provider readback.
+Consumers must re-read the current head before acting. This is an
+artifact handoff, not a hosted task-queue write or proof of deployed protection;
+Cloudflare checks, unmerged repair branches, and production behavior need
+separate evidence. Integration on the default branch and a successful scheduled
+run are required before claiming the new handoff operates automatically.
+
+Lantern policy validation requires every sandbox safeguard to be an explicit
+boolean matching the isolated, evidence-only policy. Missing values and string
+or numeric substitutes fail validation; this source contract does not establish
+a running decoy, deployed protection, or permission to execute.
 
 Documentation Truth and test discovery resolve a pull request's live target branch at verification time, fetch its exact commit, and require it to be an ancestor of the checked-out candidate before evaluating the change. The event's stored base SHA remains historical context. Push verification instead uses the exact push-before SHA; missing, malformed, unavailable, or non-ancestor bases block proof. Passing these source checks grants no merge or deployment authority.
 
@@ -95,6 +219,8 @@ A fresh GitHub observation resolves StoryEngine `refs/heads/main` to `6b97b78370
 ## October 16, 2026 StoryEngine peer refresh for FCR browser federation
 
 The FCR Playwright workflow's StoryEngine peer identity was changed from `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` to the separately observed StoryEngine `main` SHA `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`. GitHub comparison showed a forward, 22-commit peer transition, and the successor had 15 passing checks at observation time, including the Control Room federation contract. This pin refresh is a prerequisite for running the FCR-to-StoryEngine browser test, **not** a passing FCR peer witness or an authorization to deploy.
+
+On 2026-10-23 the live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` and the workflow pin was refreshed to it. The previous `26b1c34…` pin failed the live-ref equality check on the exact head `30c095f5`. This refresh is recovery setup only: federation readiness stays withheld until the exact successor FCR head passes the full witness against the new pin.
 
 The former FCR browser run passed all local Control Room journeys before deliberately stopping on the stale peer-ref check. All predecessor FCR/StoryEngine federation evidence remains historical. Only an exact FCR head which independently checks StoryEngine's live ref, checks out the pinned commit, proves the peer runtime identity, and completes the full Playwright directive/receipt loop can claim current federation integration at this pair. Any movement of either head expires that claim again.
 
@@ -174,7 +300,7 @@ Bundling does not merge product identity, runtime, authority, receipts, pricing 
 
 ### Founder Home surface
 
-The signed-in Control Room at `/control-room/` opens on a **Home** tab rendered by `public/control-room/app.js` (styles in `public/control-room/styles.css`): a sidebar of in-app tabs plus links to the sibling Control Room pages, a hero with the `ULTRATHINK` headline, a Chief route panel (links into existing surfaces; no model is called from it), a KPI strip, and Projects / Today's focus / Live signals panels. Every KPI figure is derived from JSON the founder API returned in the session (`/projects`, `/dashboard/tasks`, `/dashboard/activity`, `/l99/status`, `/dashboard/costs`) and each tile carries a `data-truth` marker: `observed` only after that read succeeded, `unknown` (shown as `UNKNOWN` with "not read yet" or "read failed") before it settles or when it fails, and `not-wired` (shown as `Not connected`) for revenue and community, which have no source in FCR. The sidebar systems status is rendered as not observed. Read-audit events the page load itself produces (`*_read`) are excluded from the Live signals panel and count, and windowed reads are labelled when they hit the server window. The Home tab embeds the real projects module, so `#new-project-form` and `#project-list` remain the first signed-in screen; the tab ids consumed by `stack-router.js` and `e2e/run.mjs` are unchanged (`home` is prepended and some labels changed).
+The signed-in Control Room at `/control-room/` opens on a **Home** tab rendered by `public/control-room/app.js` (styles in `public/control-room/styles.css`): a sidebar of in-app tabs plus links to the sibling Control Room pages, a hero with the `ULTRATHINK` headline, a Chief/Council panel with a founder chat composer plus links into existing surfaces, a KPI strip, and Projects / Today's focus / Live signals panels. Every KPI figure is derived from JSON the founder API returned in the session (`/projects`, `/dashboard/tasks`, `/dashboard/activity`, `/l99/status`, `/dashboard/costs`) and each tile carries a `data-truth` marker: `observed` only after that read succeeded, `unknown` (shown as `UNKNOWN` with "not read yet" or "read failed") before it settles or when it fails, and `not-wired` (shown as `Not connected`) for revenue and community, which have no source in FCR. The sidebar systems status is rendered as not observed. Read-audit events the page load itself produces (`*_read`) are excluded from the Live signals panel and count, and windowed reads are labelled when they hit the server window. The Home tab embeds the real projects module, so `#new-project-form` and `#project-list` remain the first signed-in screen; the tab ids consumed by `stack-router.js` and `e2e/run.mjs` are unchanged (`home` is prepended and some labels changed).
 
 `npm run verify:founder-home` runs `e2e/founder-home-dashboard-proof.mjs` (also wave two of `npm run verify:parallel`): real Chromium against the checked-out `public/` directory served with the `public/_headers` Content-Security-Policy, with the founder API stubbed at the network boundary. It proves the first paint claims nothing as observed, rendered KPIs equal the served data once reads settle, `*_read` rows are excluded, not-wired tiles contain no digits, failed L99 / projects / activity reads show `UNKNOWN` with "read failed" while sibling reads stay observed and the banner names every failed read, the `?tab=` deep link still activates a tab, bottom-of-tab submit buttons scroll clear of the fixed launch dock, nothing overflows at 1280, 1440, or 390, no console errors occur under the production CSP, and the signed-out surface still renders the magic-link card. It does not prove the real Express routes, Supabase, GitHub, or production deployment; `npm run test:e2e` and CI remain that authority.
 
@@ -188,7 +314,7 @@ The current FCR Cowork lane intentionally labels its native receipt integration 
 
 ### Founder-selected GitHub Auto-merge
 
-When the founder enables GitHub's native Auto-merge on an individual PR, GitHub queues that PR until all **configured required** reviews, checks, tests, and branch-protection or merge-queue conditions pass; no second manual merge click is required after those gates clear. Checks that are merely optional are not automatically merge blockers, so intended load-bearing checks must be configured as required in the live ruleset. The PR Continuity workflow now observes `auto_merge_enabled` and `auto_merge_disabled` and records `auto_merge_intent` from provider PR readback as `QUEUED`, `NOT_QUEUED`, or `UNKNOWN`. This is queue metadata, **not** exact-candidate founder-final approval, deterministic independent review, production proof, or merge/deploy authority. Merge conflicts, draft PRs, stale exact heads, missing required gates, or missing applicable founder approval remain blocked. Verify GitHub's current ruleset before claiming native enforcement; no source workflow can silently change that provider setting.
+When the authenticated founder enables GitHub's native Auto-merge on an individual PR, that is the founder's **native GitHub merge instruction**. GitHub queues the PR until every configured required check, review-thread resolution and branch protection or merge-queue condition passes; no second human reviewer or manual founder approval is imposed by the checked-in founder-only native phase. Checks that are merely optional are not automatically blockers, so all load-bearing proof must be configured as required. The PR Continuity observer records provider state (`auto_merge_intent`) and the verified founder actor (`founder_auto_merge_selection`) distinctly. Neither label is a formal GitHub `APPROVED` review, an in-app FCR authority token, merge completion or deployment proof. The separate FCR in-app merge route still requires its authenticated exact-candidate founder-final receipt and independent deterministic proof. Source phase and current live ruleset must always be reported separately.
 
 ### PR continuity
 
@@ -249,9 +375,9 @@ The repository contains FCR's founder-final merge policy, deterministic independ
 
 Source policy is not live GitHub provider truth. Current rulesets, bypass actors, required checks, native review settings, and provider enforcement require fresh GitHub provider readback before a merge decision.
 
-Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again.
+Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate. Merge capability and merge approval are also separate: green evidence, mergeability, review requests, `merge review`, broad `approved`/`cont` language, or `merge_authority: true` cannot silently authorize integration. Before every merge, the founder must explicitly approve the exact current repository, pull request number, current base SHA, and current head SHA; if the candidate moves, approval expires and must be requested again. The in-app FCR merge route in `src/http/routes/approvals.ts` enforces the base half of that rule in source: immediately before provider integration it re-resolves the live base ref and fails closed with `Base moved after verification` (HTTP 409) unless it equals the pinned reviewed base SHA. This is source and mock-test evidence only, not live GitHub ruleset proof.
 
-For Chief governance, FCR contains a **read-only trusted observation and verification boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass and deployment readback, and fingerprints the provider observation. Under the current founder decision, ruleset `20818149` is accepted exactly as observed when it preserves zero bypass actors, its approved source checks, `Cloudflare Production`, `proofmode-access-admin`, and the unbound reserved candidate runtime context. A compliant observation returns `NO_CHANGE_REQUIRED` with `mutation:null`; drift blocks verification rather than producing a desired-state rewrite. This boundary never grants provider mutation, merge, deploy, or execution authority.
+For Chief governance, FCR contains a **read-only trusted observation and reconciliation-planning boundary** pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`. It uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` identity, requires complete bypass and deployment readback, accepts provider-native bypass actors such as DeployKey entries whose `actor_id` is null, and fingerprints the complete provider observation. The founder-approved desired topology requires `Verify candidate ProofMode runtime with Playwright` on no-bypass exact-head ruleset `20818149` with GitHub Actions integration `15368`; that App binding is necessary but does not independently prove the workflow file or event that produced the check. The governance-boundary unconditional merge checks narrow to `Typecheck` and `Verify operational authority`, desired bypass actors are empty, and strict status freshness is required. `Cloudflare Production` and `proofmode-access-admin` are removed from the pre-merge desired state but remain explicit post-merge/current-main production-proof obligations. The plan is bound to complete provider fingerprints, declares unmanaged security-rule preservation requirements, and remains non-authorizing. Existing non-FCR ruleset mutation stays fail-closed until a separately reviewed drift-safe execution design is explicitly authorized and followed by fresh provider readback. This boundary never grants provider mutation, merge, deploy, production-proof, or execution authority.
 
 See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
 
@@ -415,6 +541,7 @@ Repository manifests, operational packets, analytics, receipts, and public conte
 | Database migration | Separate migration/database authority |
 | Credentials / secrets | Separate credential authority |
 | Publication | Exact route-specific Current You authority + FCR one-shot approval claim + provider outcome proof |
+| PromptOS registry promotion | Exact founder decision + trusted live-state revalidation + atomic one-shot consume + server-side effect gate + provider-native outcome proof |
 | Investor email | Applicable policy + recipient qualification + send authority |
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
@@ -465,6 +592,7 @@ Public-safe configuration may live in `.env.example`. Secret values do not belon
 - [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md) — repository and bounded product-build federation
 - [`docs/JIRA_AUTOMATION.md`](docs/JIRA_AUTOMATION.md) — Jira/n8n bounded automation and activation gate
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — repository integration authority
+- [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md) — exact founder decisions and server-side execution binding
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth aging and documentation drift
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
@@ -579,6 +707,24 @@ StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902f
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+## October 13 federation recovery and PR continuity
+
+FCR PR #969 refreshed its StoryEngine peer identity after a live-ref check proved that the historical peer SHA no longer matched StoryEngine `main`. The successor must still pass the complete exact-head federation Playwright flow: immutable peer checkout, runtime identity, directive and receipt binding, replay protections, and browser witness. The first successor branch run passed, but later branch reconciliation with `main` changed the FCR head, so that result is historical for the new head and must not be reused as current proof. Branch ancestry repair also does not repair documentation truth by itself; this documentation transition records the source and evidence limits. Neither the peer pin nor a successful CI job establishes production deployment, Shopify payments, provider mutation, or merge authority.
+
+## Governance skill Documentation Truth coverage (October 14, 2026)
+
+The mandatory ULTRATHINK companion skill sources `skills/ultrathink-attack-godmode/SKILL.md`, `skills/repair-to-proof/SKILL.md`, `skills/continuity-proof-ledger/SKILL.md`, and `skills/ultrathink-suite/README.md` are now classified as truth-governance-sensitive by `scripts/verify-documentation-truth.mjs`. Source changes to these skill paths must refresh this README, `docs/TRUTH_DECAY_AUDIT.md`, and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` with meaningful path-bound invariants. Otherwise Documentation Truth must fail closed; new skill registration and green CI do not prove runtime activation or authorize merge.
+
+The canonical `/goalfix` command is owned by `.ai/skills/goalfix/SKILL.md`. The ULTRATHINK companion must not register that same activation independently: Goalfix may delegate into its companion contracts only under the canonical execution sequence and repository authority. This source correction does not claim a deployed agent skill registry or production execution.
+
+## October 14 independent review: proof-skill routing
+
+The independent review of FCR PR #969 confirmed that `skills/ultrathink-attack-godmode/SKILL.md` incorrectly advertised `repair-to-proof` alongside `skills/repair-to-proof/SKILL.md`'s canonical `/repair-to-proof` trigger. The investigative ULTRATHINK companion no longer claims that activation in its frontmatter or Activation section. The companion hands completed work to the dedicated proof/release contract through the governed suite, without creating duplicate invocation authority. The source-only routing change does not establish installed runtime command registration, an independent reviewer approval, merge authorization, or deployment.
+
+## October 14 source routing and exact-base federation provenance
+
+Claude Code `/ultrathink` remains an exclusive canonical entrypoint in `.claude/skills/ultrathink/SKILL.md`. The new ULTRATHINK / ATTACK / GODMODE companion has distinct cues and cannot register that exact command or override canonical Goalfix; the suite index documents explicit handoffs. The StoryEngine federation pin transition recorded for this review range (`a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` → `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`) is historical evidence. Current FCR `main` pins StoryEngine in `.github/workflows/playwright.yml`, which is the source of truth for the live pin. Prior PR-only `ae7a67c119503276f5525c412a49d05989a8dd6a` retained as historical intermediate evidence, not represented as the `main` predecessor. Neither correction grants deployment or merge authority.
+
 
 ## Portfolio conversion tracking contract
 
@@ -601,6 +747,27 @@ StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f
 
 The successor FCR head must still pass the live-ref equality check, immutable StoryEngine checkout, exact peer runtime identity, directive/receipt binding, replay protections, and the complete Playwright browser witness before the pair may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+### Founder permission execution membrane
+
+Founder permission is not a transferable execution token. The Ask-Founder broker records exact founder decisions, while consequential execution remains a separate server-side membrane.
+
+For the PromptOS workflow-registry promotion action, source now binds the approved subject to the canonical repository and branch, exact head SHA, workflow id/version, workflow content hash, registry content hash, canonical workflow/registry paths, provider identity, capability version, and consequence class. Before one-shot consumption, FCR must re-observe the current PromptOS head and the approved workflow/registry bytes through its trusted repository provider. After consumption, it must revalidate that same provider state again at the effect boundary.
+
+```text
+exact founder decision
+-> trusted server-side provider observation
+-> exact subject/hash comparison
+-> atomic one-shot consume
+-> immediate effect-boundary revalidation
+-> separately gated provider effect
+-> provider-native outcome verification
+```
+
+A caller-supplied “live context,” copied consume response, binding fingerprint, approval row, continuity receipt, or provider acceptance cannot become reusable provider-write authority. Public consume responses remain `executionAuthorized: false`; they may expose sanitized verification evidence, but the internal execution permit stays server-side. State drift after consumption requires a new approval rather than a blind retry.
+
+This is **source-implemented authority plumbing**, not proof that a PromptOS registry mutation has occurred. A provider effect and its resulting registry state still require separate execution and provider-native readback before an outcome claim becomes `PROVEN`.
+
+See [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md).
 ### FCR external MCP consent candidate (not deployed)
 
 The OAuth consent UI is served by the FCR API service **through the same-origin Pages proxy** at `https://foundercontrolroom.org/oauth/consent`, matching the configured founder callback, CSRF origin, host-only session cookie, and same-tab `sessionStorage`. An exact www consent GET navigates to the canonical apex before login. The API serves the consent UI and assets behind the Pages proxy and requires an interactive, explicitly UUID-bound founder before approve/deny. The OAuth callback resumes a pending, syntax-validated authorization ID on the same apex origin. These are candidate source behaviors, not evidence that Supabase OAuth is enabled, Cloudflare Access permits discovery, or ChatGPT can connect.
@@ -608,12 +775,69 @@ The OAuth consent UI is served by the FCR API service **through the same-origin 
 
 ## CI lockfile determinism — current exact-head source contract
 
-Source changes to `.github/workflows/ci.yml` are release-governance changes: its four core Type check, Lint, Unit Tests, and Playwright e2e jobs must install from the committed npm lockfile with `npm ci --no-audit --no-fund`, without bypassing existing jobs, independent review, Required Gate, or founder-final approval. This exact-head source contract prevents unconstrained dependency resolution during CI but does not prove deploy/runtime identity, production behavior, or customer outcomes.
+Source changes to `.github/workflows/ci.yml` are release-governance changes: its four core Type check, Lint, Unit Tests, and Playwright e2e jobs must install from the committed npm lockfile with `npm ci --no-audit --no-fund`, without bypassing existing jobs, independent review, Required Gate, or founder-final approval. This exact-head source contract prevents unconstrained dependency resolution during CI but does not prove deploy/runtime identity, production behavior, or customer outcomes. The `python-tests` job also runs the runtime-kernel receipt checker tests (`systems/skills/local-runtime-kernel/scripts/test_check_receipt.py`) as a separate step; a passing run proves the checker's rules, not the validity of any receipt.
+
+Workflow YAML syntax is checked on the same exact head: the `python-tests` job runs `scripts/verify_workflow_yaml.py` over every `.github/workflows/*.yml` and `*.yaml` file and fails closed on a parse error, an unreadable file, or an empty workflow set. This proves YAML syntax only. It does not validate the GitHub Actions schema and does not prove that GitHub accepts a workflow at dispatch time.
 
 ## Governance profile: SleepWealth account-model scopes
 
 The portfolio governance profile for `jussray/SleepWealth-Agent` now registers `customer_scope_eligibility` and `pooled_scope_eligibility` as observation-only eligibility claims. Each requires its own signed receipts, and the two account models never share a scope or credentials. Live trading, broker enablement and capital ceiling increases remain blocked. This README entry is documentation only and is not deployment or runtime proof.
 
+
+## Member-owned project drafts (source candidate)
+
+The ordinary-member workspace has private project create, list, resume and versioned save routes, using only the member's verified session and a separate owner-scoped project table. See [Member project drafts](docs/MEMBER_PROJECT_DRAFTS.md) for behavior, isolation, migration prerequisites and release gates. This source change does not establish that its migration or runtime is live.
+
 ## 2026-11-04 Deploy workflow syntax recovery (candidate, not production proof)
 
 Existing PR #1067 restores Python indentation inside `.github/workflows/deploy.yml` while parsing Cloudflare's name-only secret receipt. GitHub rejected the previous file as invalid before any production gate could run; the associated Founder Deploy Command returned HTTP 422. This candidate must pass current exact-head CI, GitHub workflow acceptance, and explicit founder-authorized dispatch before any release is claimed. Successful Cloudflare Pages builds and installed `OPENAI_API_KEY` binding-name metadata do not establish Worker deployment, model-invocation success, customer isolation, or paid customer outcomes.
+
+## 2026-11-05 Post-deploy reconciliation settings (candidate, not production proof)
+
+PR #1069 changes one line of `.github/workflows/deploy.yml` relative to main: it adds `continue-on-error: true` to the `reconcile` job (Post-Deploy Reconciliation), which keeps its existing `needs: smoke-test` and `timeout-minutes: 15`. A reconciliation failure after the Worker is live is therefore visible on that job but does not fail the Deploy run. No job depends on `reconcile`, so this tolerance does not change promotion or authority gates. `test/deploy-reconcile-settings.node-test.mjs` pins both settings in the workflow source. This is source and test evidence only; it does not prove a dispatched production run, reconciliation output, or deployed runtime behavior.
+
+## PR Continuity gate naming (2026-11-05)
+
+`.github/workflows/pr-continuity.yml` now derives the exact-head job name from its event. The `pull_request` run keeps the name `PR Continuity Exact-Head Gate`. The `pull_request_target` copy is labeled as not gating, because it is skipped by its own condition and previously shared the gate's name. Trigger set, job condition, steps, and permissions are unchanged. This is a naming change only; it does not prove exact-head CI for any SHA.
+
+### URLFIX destination and artifact guard (2026-11-05)
+
+- `scripts/external-site-snapshot.mjs` now resolves DNS and rejects non-public addresses for the target, every redirect hop and every sub-resource before the browser loads them. Failures abort the request and are recorded as `blockedDestinations`.
+- `skills/urlfix/SKILL.md` adds artifact hygiene: synthetic identities only, no persisted cookies, headers, bodies or private text, and `BLOCKED` when redaction cannot be verified.
+- Standing-command routing evaluates intent predicates on the goal with URLs removed, so URL path text cannot create URLFIX routing on its own.
+- Verified locally only: snapshot tests 6/6, registry and router tests 35/35, AI-skill verifier passed, typecheck passed. Provider CI on the new head is not yet observed. Claims about live runtime behaviour remain unproven.
+- Redirect handling: the snapshot script walks the top-level redirect chain one validated hop at a time before navigation. Known limits: sub-resource redirects and DNS rebinding between check and connection are not covered.
+- Redirect fragments: a redirect `Location` without a fragment keeps the requested URL's fragment, as a browser does; an explicit fragment replaces it.
+- Redirect cookies: Set-Cookie from validated redirect hops is sent back to later validated hops on the same host during the walk, then carried into the ephemeral browser context (host-bound, no Domain widening, path-scoped to the response directory when Path is absent and matched only at `/` boundaries and sent longest path first, expired cookies dropped by Max-Age or Expires with Max-Age taking precedence). Cookie values are never written to reports or artifacts.
+## FCR GitHub ruleset reconciliation: signed commits and deployment authority
+
+The FCR source reconciler in `src/providers/GitHubProvider.ts` must preserve existing `required_signatures` and the stronger live CodeQL `alerts_threshold: all` merge protection, without lowering it to `errors`. The two-membrane model places required status checks in a separate strict-freshness ruleset with zero bypass actors, while leaving signed commits, linear history, quality and Copilot controls in the review membrane. Only legacy *pre-merge* `required_deployments` is intentionally removed as circular because production deployment authority is exact-current-`main` **after** merge. Deployment approval and production runtime proof remain separate requirements.
+
+This changes candidate source policy, tests, and documentation only. It does **not** prove GitHub's live ruleset is reconciled or a deployment occurred. Authoritative evidence requires independently read-back provider state after explicitly authorized mutation; green PR checks and auto-merge intent do not substitute for merge or release authority.
+
+## Gmail AI Inbox — candidate scoped runtime
+
+PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinned to one account, project, and business label; triage is observation-only. It does not establish live OAuth access, automatic monitoring, reply verification, AI drafting, deployment, or permission for outreach. The existing explicit-approved single-reply path remains separate. Configuration, tests and blocked gates: [`docs/GMAIL_AI_INBOX_RUNTIME.md`](docs/GMAIL_AI_INBOX_RUNTIME.md).
+
+## X user-context publisher — source candidate
+
+The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
+
+## Founder OS lab adapter promotion eligibility
+
+`assessProjectAdapterFreshness` in `src/founder-os-lab/projectAdapterFreshness.ts` reports `promotionAllowed: true` and `recommendation: 'candidate-promote'` only when the authoritative current head equals the audited exact head and every required contract blob matches. Head movement, drift, missing or invalid blobs, and unknown heads keep it `false`. Eligibility means the evidence may go to founder review; `founderReviewRequired` stays `true` and `mutationAuthorized` stays `false`, so it never grants merge, deploy, publication, or provider authority.
+
+## Project adapter re-pin (November 17, 2026)
+
+`src/founder-os-lab/projectAdapters.ts` now pins Se'kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` blob `e3430ef2c9bc99507f9040b90ec6d54977d28ca8`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (`src/domain/capability-registry.js` blob `5b1c6e39a9ec675e03032a480ff00c2967479f22`, `config/founder-chief-pair.contract.json` blob `dd008420e1a91e78516b45d9e27de89344abf432`). Every other pinned blob was unchanged. The reviewed changes: Bip routes to an age gate before consent when its compliance check requires one; Chief adds non-authorizing continuity fingerprint, cookie and execution-slot markers (`actionAuthority: false`) and states the standalone-peers relationship and stricter posting-approval rules in the pair contract, which now matches FCR's own copy. The re-pin is evidence identity only. It proves no Bip or Chief deployment or runtime behavior and grants no merge, deploy, publication, or provider authority. Any further source or blob movement must fail closed until reviewed again.
+
+## Four-system Founder Operator contract (source candidate, October 15, 2026)
+
+`src/founder-os-lab/founderOperatorContract.ts` is **source-level staged code**, not wired to the live FCR Worker, GitHub provider or a production UI. The existing privileged V10 approval middleware, FCR authority envelope, PR merge gate, federated relay, and production launch authority remain canonical; this module cannot replace or bypass them.
+
+- **Chief AI Machine** diagnoses and proposes; its recommendations do not grant authority.
+- **PromptOS** provides versioned, scoped, approved method metadata, with digest retained for provenance; it cannot execute writes.
+- **SolContinuity** provides source-head-bound advisory decision history; stale context is ignored without reducing existing capabilities.
+- **FCR** controls trusted approval readback, durable pending reservation, guarded patch execution, exact ref and immutable commit readback, proof verification, and final receipt persistence.
+
+The candidate rejects protected branch writes, noncanonical repository paths, unbound proposal hashes, failed pending-reservation storage, stale commits, absent browser/documentation/pro-vider proof, and unverified target identity. A trusted adapter must atomically validate/consume live approval and compare-and-swap the branch head immediately before mutation. Merely implementing this interface **does not prove** the actual adapter exists or is secure. Any connection to real execution requires a separate scoped review and real-path evidence. Exact-head tests and PR evidence do not grant a merge or deployment. The full proof must be reacquired when PR/base/head changes.

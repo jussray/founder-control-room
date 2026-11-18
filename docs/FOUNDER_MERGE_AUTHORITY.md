@@ -1,5 +1,9 @@
 # Founder Merge Authority
 
+## Simulator-staged edits are not merge approvals
+
+The existing `POST /approvals/:missionId/patch` may write a bounded simulator-staged `repository-source` edit only after authenticated mission checks, current provider branch identity, pinned policy SHA, live source hashes and idempotent reservation. The GitHub provider must reject moved heads before its non-forced mission-branch commit. A staged artifact or successful sandbox branch patch is not a deterministic independent review, founder-final approval, exact-head merge authorization, Playwright production witness, or deployment authority.
+
 Documentation Truth and the test-discovery ratchet must evaluate PR changes against the freshly resolved target branch, with exact-SHA fetch and candidate-ancestry validation. A stored PR-event base can predate inherited main changes and cannot replace that live observation. Push events retain their exact before-SHA range. Resolution, fetch, or ancestry failures block the associated proof; a corrected input or passing gate never supplies founder-final merge approval.
 
 ## Current founder decision
@@ -46,6 +50,7 @@ A merge is appropriate only when:
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
 - **Quality Gate jobs on pull requests must checkout and verify the exact `github.event.pull_request.head.sha`; GitHub's synthetic PR merge ref is merge-simulation evidence and cannot satisfy exact-head proof for the candidate;**
 - FCR `Required Gate` includes the secret-free exact-head Cloudflare bridge authority contract, and that dependency must succeed whenever the required gate is used; live Cloudflare/GitHub provider state remains separate evidence;
+- FCR `Required Gate` depends on the `python-tests` job, which also runs the runtime-kernel receipt checker tests; a passing checker run is receipt-consistency evidence only and grants no merge, founder, or provider authority;
 - zero-step/no-log GitHub Actions failures are classified as `runner_startup_failure` or `workflow_no_jobs`, not as code regressions;
 - a `workflow_step_failure` is not waved away as infrastructure when logs show a real failing command, assertion, build, type, lint, or Playwright step;
 - Playwright has passed for any changed user-facing web/runtime path, or is explicitly inapplicable;
@@ -69,7 +74,7 @@ This source/runtime membrane proves only that the branch-creation path is govern
 
 ## Independent review + founder-final authority for Founder Control Room merges
 
-The Founder Control Room in-app merge path keeps **independent review load-bearing**, but the canonical FCR policy no longer requires a second human semantic reviewer merely because the founder authored the patch.
+The Founder Control Room in-app merge path keeps **deterministic independent review load-bearing**. For GitHub's native queue, the authenticated founder's own **Enable Auto-merge** selection is the human merge instruction; the FCR native GitHub source policy requires **zero additional approving reviews**. A queued Auto-merge is not a formal GitHub `APPROVED` review event and never becomes a separate in-app FCR founder-final token.
 
 For `jussray/founder-control-room` the canonical path requires, at minimum:
 
@@ -81,7 +86,8 @@ For `jussray/founder-control-room` the canonical path requires, at minimum:
 - an authenticated founder-final receipt bound to the exact PR number, base SHA, head SHA, founder identity, and approval time;
 - the founder-final receipt to remain fresh inside the merge proof window;
 - the provider PR identity and diff to be re-read after approval;
-- the mutable head to be re-read immediately before provider integration; and
+- the mutable head to be re-read immediately before provider integration;
+- the live base ref to be re-resolved immediately before provider integration and to equal the pinned reviewed base SHA, failing closed with `Base moved after verification` (HTTP 409) if `main` advanced after review; and
 - the founder-final policy presented to the evaluator to match the server-owned deterministic founder-final policy.
 
 The canonical founder-final policy is intentionally narrow:
@@ -96,15 +102,15 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
-### Current native GitHub human-review phase
+### Founder-controlled native Auto-merge policy (source; live provider separately observed)
 
-The canonical **current** provider-governance phase is `founder-only` on the human side. That means the GitHub-native pull-request membrane requests **zero native approving reviews** and does not require Code Owner or last-push human approval merely to satisfy a reviewer role that does not yet exist.
+The canonical **founder-only native source policy** requires zero additional GitHub approving reviews and does not require Code Owner or last-push approval from a second person. The founder's authenticated GitHub Auto-merge selection is the native merge instruction. GitHub's existing pull-request path, required checks, exact-head freshness, review-thread resolution, stale-evidence invalidation, CodeQL security scanning, force-push/deletion protection, and separate strict-freshness membrane remain load-bearing.
 
-This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
+Deterministic independent review and the authenticated founder-final receipt **remain required for an AI-initiated FCR in-app merge**. They are separate from GitHub's native Auto-merge path and cannot be falsely inferred from the click. An automated reviewer, issue comment, PR description, or queued status never grants a new in-app authority envelope.
 
-The phase is intentionally upgradeable rather than permanent. When the founder deliberately activates a future-team phase by setting the canonical native approving-review count above zero, the GitHub provider must automatically require Code Owner review and last-push approval again, while preserving every existing machine, freshness, CodeQL, founder-final, and rollback boundary.
+No external GitHub human reviewer is a prerequisite for the current founder-only native policy. The governance preflight may report availability of eligible collaborators as observational data, but it must not block the founder-only source phase for lack of an outside reviewer. A future move to require outside human approval would need a new explicit founder decision and current provider readback.
 
-Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the founder-only phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
+Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the independent-review phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
 
 ### Deterministic witness production and bootstrap truth
 
@@ -185,9 +191,9 @@ Those actions still require their own exact approval unless a later founder dire
 
 ## GitHub native Auto-merge — founder-selected queue
 
-When the founder explicitly selects **Enable auto-merge** on a specific pull request, GitHub may queue that PR for automatic integration after *all configured required* reviews, exact-head checks, tests, and branch protection or merge-queue conditions succeed. The founder should not have to perform a second manual merge click once every actual provider gate permits integration. Optional workflows are **not** implicitly required by GitHub: keep each load-bearing workflow/job wired to an authoritative required status check or required aggregate gate. Source declarations are not proof of live GitHub ruleset configuration.
+When the founder explicitly selects **Enable auto-merge** on a specific pull request, that authenticated GitHub action is the founder's native merge instruction. GitHub may queue the PR for automatic integration after *all configured required* reviews, exact-head checks, tests, and branch protection or merge-queue conditions succeed. The founder should not have to perform a second manual merge click once every actual provider gate permits integration. Optional workflows are **not** implicitly required by GitHub: keep each load-bearing workflow/job wired to an authoritative required status check or required aggregate gate. Source declarations are not proof of live GitHub ruleset configuration.
 
-The queue request is **not** proof that merge happened, does not waive founder-final exact PR/base/head approval where required by the canonical FCR authority membrane, and grants no deployment or other mutation. PR Continuity may observe `auto_merge_intent: QUEUED` from provider readback, but its `merge_approved` and `authorizes_merge` fields remain false. A merge conflict, draft state, stale review, changed base/head, incomplete required check, or missing applicable approval must block integration; do not force-merge, auto-fabricate receipts, silently rebase, or downgrade rules. A new candidate requires fresh exact-head verification and approvals. GitHub's native Auto-merge machinery—not PR Continuity or an AI agent—performs any eventual merge.
+The queue request is **not** proof that merge happened and does not mint the separate authenticated founder-final receipt required by the FCR in-app merge API. It grants no deployment or other mutation. A verified founder selection does not require a second manual founder approval for GitHub-native Auto-merge. PR Continuity may observe `auto_merge_intent: QUEUED` from provider readback, but its `merge_approved` and `authorizes_merge` fields remain false. A merge conflict, draft state, stale review, changed base/head, incomplete required check, or missing applicable approval must block integration; do not force-merge, auto-fabricate receipts, silently rebase, or downgrade rules. A new candidate requires fresh exact-head verification and approvals. GitHub's native Auto-merge machinery—not PR Continuity or an AI agent—performs any eventual merge.
 
 ## Operating rule
 
@@ -204,4 +210,15 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 
 ## CI lockfile determinism — current exact-head source contract
 
-Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. Native GitHub approving-human count remains intentionally zero in the founder-only phase.
+Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as truth-sensitive: Type check, Lint, Unit Tests, and Playwright e2e must use `npm ci --no-audit --no-fund` against the checked-in npm lockfile; required tests and status contexts must remain load-bearing. Locked installs constrain dependency resolution; they cannot substitute for deterministic independent review, trusted witness, authenticated exact-PR/base/head Founder Final, provider readback, or actual production proof. The approved founder-only native source floor is zero additional human approving reviews, consistent with the observed live GitHub native review-count setting; deterministic verification and in-app founder authority remain distinct gates.
+
+## Required CI owner after queue consolidation
+
+For `main` pull requests, `.github/workflows/ci.yml` must still execute the guarded terminal, Juss Flow, production-authority and AI-skill contracts within its load-bearing `Test` job, alongside required exact-head checks before `Required Gate` can pass. `.github/workflows/quality-gate.yml` may run its extended duplicate tests on `staging` only; this must not waive CodeQL, the required test ledger, Playwright, exact-candidate founder-final approval, review, production deployment or live provider proof. Source-side queue consolidation alone grants no merge or release authority.
+
+Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
+
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
