@@ -38,6 +38,42 @@ describe("external-use hourly digest runtime readiness", () => {
     }));
   });
 
+  it("treats an existing hourly digest as a clean skip without producing a 409", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-only-key");
+    vi.stubEnv("EXTERNAL_USE_EMAIL_FROM", "sender@example.invalid");
+
+    const insertMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const insertSelect = vi.fn().mockReturnValue({ maybeSingle: insertMaybeSingle });
+    const upsert = vi.fn().mockReturnValue({ select: insertSelect });
+    const lookupMaybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: "existing-digest",
+        digest_hour: "2026-11-18T20:00:00.000Z",
+        status: "sent",
+        started_at: "2026-11-18T20:00:00.000Z",
+        updated_at: "2026-11-18T20:00:00.000Z",
+        attempt_count: 1,
+      },
+      error: null,
+    });
+    const lookupEq = vi.fn().mockReturnValue({ maybeSingle: lookupMaybeSingle });
+    const lookupSelect = vi.fn().mockReturnValue({ eq: lookupEq });
+
+    from.mockImplementationOnce(() => ({ upsert }))
+      .mockImplementationOnce(() => ({ select: lookupSelect }));
+
+    await expect(runExternalUseHourlyCycle(new Date("2026-11-18T20:03:00.000Z")))
+      .resolves.toEqual({ status: "skipped" });
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ digest_hour: "2026-11-18T20:00:00.000Z", status: "running" }),
+      { onConflict: "digest_hour", ignoreDuplicates: true },
+    );
+    expect(insertSelect).toHaveBeenCalledWith("id");
+    expect(insertMaybeSingle).toHaveBeenCalled();
+    expect(lookupEq).toHaveBeenCalledWith("digest_hour", "2026-11-18T20:00:00.000Z");
+  });
+
   it("preserves the reservation path once the sender and key are configured", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-only-key");
     vi.stubEnv("EXTERNAL_USE_EMAIL_FROM", "sender@example.invalid");
