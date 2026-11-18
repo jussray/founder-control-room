@@ -2,12 +2,12 @@
 
 **Status:** founder-approved additive operator contract  
 **Authority host:** `jussray/founder-control-room`  
-**Applies to:** Gemini Command, Codex / ChatGPT, Claude / Claude Code, Perplexity, DeepSeek Instructor  
+**Applies to:** Gemini Command, Codex / ChatGPT, Cursor (repository coding operator), Claude / Claude Code, Perplexity, DeepSeek Instructor  
 **Canonical product rules:** FCR master specification plus the v1.4 ULTRATHINK Self-Attack addendum
 
 ## Boundary
 
-Founder Control Room is the sole implementation host for the current first slice. Gemini is enabled as the foremost operational media-command lane for intake, interpretation, planning, routing, bounded production decisions, targeted repair, and release disposition. Claude and Perplexity remain governed operator lanes alongside Codex/ChatGPT. DeepSeek remains a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
+Founder Control Room is the sole implementation host for the current first slice. Gemini is enabled as the foremost operational media-command lane for intake, interpretation, planning, routing, bounded production decisions, targeted repair, and release disposition. Claude and Perplexity remain governed operator lanes alongside Codex/ChatGPT. Cursor is registered as a bounded repository coding operator, not a live model provider, authentication session, or automatically connected GitHub client. DeepSeek remains a bounded instructor lane for research, proposal, review, adversarial challenge, and cross-project pattern extraction.
 
 Gemini's media command authority is constrained by the non-bypassable `/LEEVIZE` truth/policy kernel implemented in `src/lib/mediaProductionAuthority.ts`. Gemini may decide what the media workflow should do, but it may not manufacture evidence, promote an unverified claim, convert a continuity fingerprint into authority, or bypass exact-head/canon/freshness/budget/verification gates. Gemini/Veo output receives the same policy and verification treatment as any delegated renderer.
 
@@ -21,7 +21,7 @@ DeepSeek specifically does not receive the `implement` capability. Its instructi
 
 These are different capability classes:
 
-- `gemini`, `claude-code`, `codex`, `perplexity`, and `deepseek-instructor` are bounded operator identities.
+- `gemini`, `claude-code`, `codex`, `cursor`, `perplexity`, and `deepseek-instructor` are bounded operator identities.
 - `google-ai-platform`, `anthropic-platform`, `openai-platform`, and `deepseek-platform` are replaceable server-side model-provider identities.
 - Operator enablement does not automatically enable the corresponding model provider.
 - Model-provider availability does not grant operator, truth, mutation, spend, render, or publish authority.
@@ -40,11 +40,11 @@ Founder auth
 -> usefulness feedback
 ```
 
-For that slice, Gemini, Claude, ChatGPT/Codex, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
+For that slice, Gemini, Claude, ChatGPT/Codex, Cursor, Perplexity, and DeepSeek may help inspect, design, test, review, and verify the repository within their registered capabilities, but the live product path must not call Google AI, OpenAI, Anthropic, Perplexity, DeepSeek, or another external model.
 
 ## Enabled operator capabilities
 
-Gemini, Claude, Codex/ChatGPT, and Perplexity may be assigned:
+Gemini, Claude, Codex/ChatGPT, Cursor, and Perplexity may be assigned:
 
 - `research`
 - `propose`
@@ -60,7 +60,7 @@ DeepSeek Instructor may be assigned:
 - `review`
 - `instruct`
 
-Every external write still requires the exact repository/provider authority applicable to that action. Capability is not permission.
+Every external write still requires the exact repository/provider authority applicable to that action. Capability is not permission. Cursor's registry entry has `firstSliceRuntimeModel: false` and `externalWritesRequireBoundAuthority: true`. The entry does not add Cursor to `OPERATOR_RELAY_PEERS`, issue credentials, establish a Cursor or GitHub login, prove a live integration, or authorize merge, deployment, publication, or cross-repository writes. CI, Playwright, provider access, and founder release authority remain separate evidence and permission gates.
 
 ## AI-to-AI interop
 
@@ -116,6 +116,8 @@ Perplexity must also obey:
 DeepSeek Instructor must also obey:
 
 - `docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md`
+
+Cursor must also follow `AGENTS.md`, `GLOBAL_AI.md`, the current repository source and the same canonical FCR v1.4 boundary; its legacy `.cursor/rules` content is not assumed to be automatically loaded by the editor. Source-level registration is not proof of Cursor runtime connectivity.
 
 Codex/ChatGPT remains governed by the repository entry contracts, `GLOBAL_AI.md`, and the same canonical FCR v1.4 boundary.
 
