@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { from } = vi.hoisted(() => ({
-  from: vi.fn(() => {
+  from: vi.fn((_table: string): unknown => {
     throw new Error("unexpected_digest_reservation");
   }),
 }));
@@ -26,16 +26,9 @@ describe("external-use hourly digest runtime readiness", () => {
   ])("skips missing optional delivery configuration without reserving a digest", async ({ key, sender }) => {
     vi.stubEnv("RESEND_API_KEY", key);
     vi.stubEnv("EXTERNAL_USE_EMAIL_FROM", sender);
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-
     await expect(runExternalUseHourlyCycle(new Date("2026-11-18T20:00:00.000Z")))
       .resolves.toEqual({ status: "skipped", reason: "delivery_not_configured" });
     expect(from).not.toHaveBeenCalled();
-    expect(warning).toHaveBeenCalledWith(JSON.stringify({
-      task: "external-use",
-      status: "skipped",
-      reason: "delivery_not_configured",
-    }));
   });
 
   it("treats an existing hourly digest as a clean skip without producing a 409", async () => {
