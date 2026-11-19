@@ -15,35 +15,6 @@ env:
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  lockfile_candidate:
-    if: github.ref == 'refs/heads/security/fcr-dependency-audit-20261119'
-    name: Generate targeted lockfile candidate
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out exact head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Verify exact checkout
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Generate candidate without modifying committed source
-        run: |
-          npm update body-parser ip-address --package-lock-only --ignore-scripts --no-audit --no-fund
-          git diff --stat -- package-lock.json
-          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package-lock.json","utf8")).packages; console.log("target-versions",p["node_modules/body-parser"].version,p["node_modules/ip-address"].version)'
-      - name: Preserve candidate lockfile for review
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: candidate-lockfile-${{ github.sha }}
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
-
   audit:
     name: Verify dependency advisories
     runs-on: ubuntu-latest
