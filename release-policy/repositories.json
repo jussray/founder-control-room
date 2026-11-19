@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "repositories": {
+    "storyengine": "jussray/StoryEngine",
+    "chiefAi": "jussray/chief-ai-machine",
+    "sekretBip": "jussray/Sekret-Bip"
+  },
+  "requiredRecoveryAncestors": {
+    "storyengine": [
+      "7dbfecd53408590ea54c30fa95d18f0701ae52d9",
+      "645d929af79da95971c20ad8dbf3a1370f16ffd5",
+      "85e325d12ff3f0c37d6be10d264af2e588bb8d6a",
+      "87f519d7c81d9a3c9a8a95c81d6c9e189ff2ba4e"
+    ]
+  },
+  "candidatePolicy": "approved-history",
+  "testCommands": {
+    "storyengine": [
+      "npm test",
+      "node --test test/tenantRouteGuards.test.js test/tenantHttpBoundary.test.js test/securityHardening.test.js"
+    ],
+    "chiefAi": [
+      "npm run typecheck",
+      "npm run lint",
+      "npm test",
+      "npm run verify:cookies",
+      "npx vitest run src/domain/merge-intent.test.js src/domain/evidence-decision-loop.test.js src/domain/capability-security.test.js"
+    ],
+    "sekretBip": [
+      "npm run type-check",
+      "npm test",
+      "node --test test/age-gate.test.mjs test/bridge-privacy-validator.test.mjs test/parent-route-guard.test.mjs test/privacy-boundaries.test.mjs"
+    ],
+    "peerContracts": [
+      "python scripts/portfolio_matrix_contract.py --mode peers --sources sources"
+    ],
+    "portfolioIntegration": null,
+    "securityRegression": [
+      "StoryEngine securityHardening.test.js",
+      "Chief AI capability-security.test.js",
+      "Se'kret Bip privacy-boundaries.test.mjs"
+    ]
+  },
+  "peerManifestRequired": {
+    "storyengine": true,
+    "chiefAi": true,
+    "sekretBip": false
+  },
+  "testInventoryMeaning": "Documented review-only commands. Execution defined by workflow; candidate release file cannot inject commands. Portfolio runtime E2E integration remains a mandatory blocker."
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Portfolio Release Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "release",
+    "repositories"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "release": {
+      "type": "string",
+      "pattern": "^portfolio-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "repositories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storyengine",
+        "chiefAi",
+        "sekretBip"
+      ],
+      "properties": {
+        "storyengine": {
+          "$ref": "#/$defs/pin"
+        },
+        "chiefAi": {
+          "$ref": "#/$defs/pin"
+        },
+        "sekretBip": {
+          "$ref": "#/$defs/pin"
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    }
+  },
+  "$defs": {
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "not": {
+            "const": "0000000000000000000000000000000000000000"
+          }
+        }
+      }
+    }
+  }
+}
