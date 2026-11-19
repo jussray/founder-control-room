@@ -376,7 +376,7 @@ describe('POST /founder-os/preview', () => {
 
 
 describe('GET /founder-os/distribution/skills', () => {
-  const PIN = 'e0ac65b36971caf9873bace4971b110ab7422760';
+  const PIN = 'de476e73754ca9616cb7ed178e1ff9c2f84416ba';
   const READ_TOKEN = 'test-fcr-distribution-read-token-at-least-24-chars';
   const upstreamBody = {
     repo: 'jussray/ULTRATHINK-',
