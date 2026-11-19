@@ -1,0 +1,73 @@
+name: Actions Mail Audit Monitor
+
+# Off until the founder explicitly enables the repository variable and
+# configures separate Gmail read-only OAuth grants. This is not a repair agent.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: actions-mail-audit-monitor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Read-only Gmail-to-GitHub evidence audit
+    if: ${{ vars.FCR_GMAIL_AUDIT_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pinned v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # pinned v4
+        with:
+          node-version: '24'
+      - name: Verify offline evidence contract
+        run: node --test .github/skills/actions-mail-audit/tests/*.mjs
+      - name: Read founder notification mailbox
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GMAIL_AUDIT_CLIENT_ID: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_ID }}
+          GMAIL_AUDIT_CLIENT_SECRET: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_SECRET }}
+          GMAIL_AUDIT_REFRESH_TOKEN: ${{ secrets.FCR_GMAIL_AUDIT_MAIN_REFRESH_TOKEN }}
+          GMAIL_AUDIT_MAILBOX: mcgillraylene@gmail.com
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/skills/actions-mail-audit/scripts/gmail-readonly.mjs |
+            node .github/skills/actions-mail-audit/scripts/triage.mjs |
+            node .github/skills/actions-mail-audit/scripts/report.mjs
+      - name: Read Se'kret Bip notification mailbox
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GMAIL_AUDIT_CLIENT_ID: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_ID }}
+          GMAIL_AUDIT_CLIENT_SECRET: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_SECRET }}
+          GMAIL_AUDIT_REFRESH_TOKEN: ${{ secrets.FCR_GMAIL_AUDIT_BIP_REFRESH_TOKEN }}
+          GMAIL_AUDIT_MAILBOX: sekretbip@gmail.com
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/skills/actions-mail-audit/scripts/gmail-readonly.mjs |
+            node .github/skills/actions-mail-audit/scripts/triage.mjs |
+            node .github/skills/actions-mail-audit/scripts/report.mjs
+      - name: Read secondary notification mailbox
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GMAIL_AUDIT_CLIENT_ID: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_ID }}
+          GMAIL_AUDIT_CLIENT_SECRET: ${{ secrets.FCR_GMAIL_AUDIT_CLIENT_SECRET }}
+          GMAIL_AUDIT_REFRESH_TOKEN: ${{ secrets.FCR_GMAIL_AUDIT_RAY_REFRESH_TOKEN }}
+          GMAIL_AUDIT_MAILBOX: raymcg9@gmail.com
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/skills/actions-mail-audit/scripts/gmail-readonly.mjs |
+            node .github/skills/actions-mail-audit/scripts/triage.mjs |
+            node .github/skills/actions-mail-audit/scripts/report.mjs
