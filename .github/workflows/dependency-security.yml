@@ -18,7 +18,7 @@ jobs:
   audit:
     name: Verify dependency advisories
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -95,6 +95,19 @@ jobs:
           }
           if (blocked) process.exitCode = 1;
           NODE
+      - name: Verify reproducible lockfile installation
+        id: locked_install
+        if: always()
+        run: npm ci --no-audit --no-fund
+      - name: Run focused HTTP security regression
+        if: always() && steps.locked_install.outcome == 'success'
+        run: npx vitest run src/http/routes/__tests__/auth.rate-limit.test.ts src/http/routes/__tests__/mcpRateLimit.test.ts
+      - name: Install Chromium for existing browser proof
+        if: always() && steps.locked_install.outcome == 'success'
+        run: npx playwright install --with-deps chromium
+      - name: Verify existing Playwright browser paths
+        if: always() && steps.locked_install.outcome == 'success'
+        run: npm run test:e2e
       - name: Preserve complete audit reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
