@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `e0ac65b36971caf9873bace4971b110ab7422760`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 15, 2026 — exact-commit Worker version tag readback (candidate)
 
 Reasoning about which commit the production Worker runs must not rely on the `/version` `gitSha` runtime marker alone. Candidate `.github/workflows/deploy.yml` tags each production Worker version with the exact approved SHA (`--tag`) and fails the deploy job unless provider readback shows the newest deployment routing 100% to one version whose `workers/tag` equals it (`scripts/worker-deployment-version-tag.mjs`). A matching tag shows only the commit recorded on the provider version. It does not show runtime behaviour, the Pages binding, or secret state. No deploy was run for this change. A read-only audit on November 15, 2026 observed that no existing version carries a tag, message or commit SHA.
