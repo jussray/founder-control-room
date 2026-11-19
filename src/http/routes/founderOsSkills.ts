@@ -411,7 +411,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
 // Server-side, founder-only read receipt. Never publish provider credentials or skill bodies.
 // This exact source pin is a governance gate, not a claim of founder canonicalization.
 const DISTRIBUTION_SKILLS_URL = 'https://juss-distribution.mcgill-raylene.workers.dev/api/v1/skills';
-const DISTRIBUTION_REPO_SHA = 'e0ac65b36971caf9873bace4971b110ab7422760';
+const DISTRIBUTION_REPO_SHA = 'de476e73754ca9616cb7ed178e1ff9c2f84416ba';
 const DISTRIBUTION_REPO = 'jussray/ULTRATHINK-';
 
 founderOsSkillsRouter.get('/distribution/skills', async (_req, res) => {
