@@ -1,0 +1,105 @@
+name: Locked Dependency Security
+
+on:
+  push:
+    branches: [main, security/fcr-dependency-audit-20261119]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  audit:
+    name: Verify dependency advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: \${{ env.EXPECTED_HEAD_SHA }}
+      - name: Verify exact checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Collect lockfile advisory evidence
+        shell: bash
+        run: |
+          mkdir -p audit-reports
+          set +e
+          npm audit --json --audit-level=high > audit-reports/all.json
+          all_exit=$?
+          npm audit --omit=dev --json --audit-level=high > audit-reports/runtime.json
+          runtime_exit=$?
+          set -e
+          printf '%s\n' "$all_exit" > audit-reports/all.exit
+          printf '%s\n' "$runtime_exit" > audit-reports/runtime.exit
+      - name: Classify and gate advisory findings
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+
+          const results = [];
+          let blocked = false;
+          for (const scope of ['runtime', 'all']) {
+            let report;
+            let exitCode;
+            try {
+              report = JSON.parse(readFileSync('audit-reports/' + scope + '.json', 'utf8'));
+              exitCode = Number(readFileSync('audit-reports/' + scope + '.exit', 'utf8').trim());
+            } catch (error) {
+              blocked = true;
+              results.push(scope + ': scan unreadable (' + error.message + ')');
+              continue;
+            }
+            const v = report?.metadata?.vulnerabilities;
+            if (!v || report.error || !Number.isInteger(exitCode)) {
+              blocked = true;
+              results.push(scope + ': audit unavailable or invalid; refusing a green result');
+              continue;
+            }
+            const critical = Number(v.critical || 0);
+            const high = Number(v.high || 0);
+            const moderate = Number(v.moderate || 0);
+            const low = Number(v.low || 0);
+            const packages = Object.entries(report.vulnerabilities || {})
+              .filter(([, detail]) => ['critical', 'high'].includes(detail?.severity))
+              .map(([name]) => name)
+              .sort();
+            const highRisk = critical + high > 0;
+            if (highRisk || exitCode !== 0) blocked = true;
+            results.push(scope + ': critical=' + critical + ' high=' + high +
+              ' moderate=' + moderate + ' low=' + low + ' npm_exit=' + exitCode);
+            if (packages.length) {
+              results.push(scope + ' high/critical packages: ' + packages.join(', '));
+            }
+          }
+          const summary = '## Exact-lockfile dependency audit\n\n' +
+            'Commit: ' + process.env.EXPECTED_HEAD_SHA + '\n\n' +
+            results.join('\n\n') + '\n\n' +
+            (blocked ? 'BLOCKED: high/critical findings or failed audit' : 'PASS: both scopes checked') + '\n';
+          process.stdout.write(summary);
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          }
+          if (blocked) process.exitCode = 1;
+          NODE
+      - name: Preserve complete audit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: locked-dependency-audit-\${{ github.sha }}
+          path: audit-reports/
+          if-no-files-found: error
+          retention-days: 14
