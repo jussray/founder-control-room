@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Close a FutureYou Mission Control blind spot: critical/error activity events older than 14 days were silently excluded from buildMissionControlBrief with no disclosure, instead of being named in blindSpots like every other excluded-evidence case this read model already reports. No live route, store, deploy, provider, or authority change.",
+  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -14,6 +14,12 @@
     "founder-permission-authority"
   ],
   "changes": [
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."
+      ]
+    },
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
