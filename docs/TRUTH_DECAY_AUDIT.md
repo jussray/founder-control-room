@@ -629,6 +629,27 @@ The successor StoryEngine head is strictly forward of the predecessor pin and ha
 
 Rebinding `.github/workflows/playwright.yml` to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` selects the successor federation evidence subject only. All predecessor FCR-to-StoryEngine browser/federation green is historical. The successor FCR head remains `UNKNOWN` for current federation until the complete live-ref equality check, immutable peer checkout, runtime identity binding, directive/receipt loop, replay protections, and Playwright witness succeed against this exact peer. No founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers with the pin.
 
+### 2026-10-09 StoryEngine peer drift
+
+FCR `main@73399839899463d5e9db001f7397903ee1f87739` completed its direct E2E harness, then Playwright failed closed at the StoryEngine peer-freshness gate because the workflow expected `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3` while fresh provider readback resolved StoryEngine `refs/heads/main` to `6852f350304d4d6103497fd5220ac9d7a6b92765`.
+
+PR #945 is reused as the focused recovery carrier and rebinds only that evidence identity. Pin equality is recovery setup, not compatibility proof: predecessor browser/federation green is historical, and the successor FCR head remains `UNKNOWN` until live-ref equality, immutable peer checkout, runtime identity, directive/receipt binding, replay protections, and the complete Playwright federation witness succeed against `6852f350304d4d6103497fd5220ac9d7a6b92765`. No merge, deploy, production, publication, billing, or provider-mutation authority transfers with the peer pin.
+
+### 2026-10-09 StoryEngine repaired successor
+
+The first October 9 successor binding to StoryEngine `6852f350304d4d6103497fd5220ac9d7a6b92765` correctly passed live-ref equality and immutable checkout, then failed closed while starting the exact peer runtime because the peer contained a duplicate workspace-guard import. StoryEngine PR #129 repaired that syntax defect and the stale authenticated chapter-route test fixtures without weakening production workspace isolation, earned terminal green across its exact-head CI, Guardrails Playwright, Control Room Test Ledger, L99 Promotion Gates, and Agent Contract v1, and merged to `main@1a4a2d9a21ec13e10784f7c13c60a56191e14899`.
+
+The October 9 FCR PR #945 successor treated `1a4a2d9a21ec13e10784f7c13c60a56191e14899` as its StoryEngine evidence subject; that pair is historical after subsequent peer movement. The successful StoryEngine repair packet does not donate federation/browser proof to FCR: the FCR successor head must independently pass live-ref equality, immutable peer checkout, peer runtime identity, directive/receipt reconciliation, replay safety, and the complete Playwright browser witness against `1a4a2d9a21ec13e10784f7c13c60a56191e14899`. No merge, deploy, production, publication, provider-mutation, billing, or approval authority transfers with this rebind.
+
+
+### 2026-10-11 StoryEngine authorization successor
+
+Provider readback resolved StoryEngine `refs/heads/main` to `6d6fe0d84464ceee783fa86543ab9a335f6f0246`. The comparison from the prior pin `1a4a2d9a21ec13e10784f7c13c60a56191e14899` was strictly forward (three commits, zero behind) and limited to Studio workspace authorization and its evidence ledger. Exact-peer Node tests, Guardrails Playwright, federation contracts, promotion gates, and the test ledger completed successfully.
+
+Those green checks do not establish complete Studio authorization: independent synthetic route checks found that denied idea selection mutates before its workspace guard and unscoped idea listing exposes rows from other workspaces. Studio authorization/release remains on HOLD pending a focused peer repair; selecting this immutable peer for the bounded federation witness does not clear those separate product defects.
+
+PR #945 reuses its existing repair branch to select that exact successor, preserving the live-ref equality, immutable checkout, runtime identity, directive/receipt, and browser gates. The StoryEngine packet does not transfer FCR federation proof: the successor FCR head remains UNKNOWN until its complete exact-pair Playwright witness executes successfully. No merge, deployment, production, publication, provider, billing, or approval authority transfers with this pin.
+
 ## 2026-10-13 StoryEngine federation identity and PR #969 head transition
 
 At FCR PR #969 branch head `404d32aefa5dea4a676209ab0f832b67987e8b8a`, the Playwright peer freshness check failed because `.github/workflows/playwright.yml` pinned StoryEngine `ae7a67c119503276f5525c412a49d05989a8dd6a`, while the live `refs/heads/main` resolved to `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. This was peer-identity drift, not proof that the browser loop itself failed. FCR branch commit `fd7dad22df42df37d007b2b31a8de9782819b1b0` refreshed only that pin, and CI Playwright run `38361687062`, job `115177123643`, completed successfully for that head. It is evidence for that exact FCR/StoryEngine pair, not a transferable result.
@@ -654,6 +675,7 @@ The reviewed base `2189076de1d06bb7b78cf2e36a29e995cea863d4` carries StoryEngine
 ## 2026-10-23 StoryEngine pin refresh
 
 The live StoryEngine `main` was independently observed at `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The workflow pin moved from `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f` because the live-ref check failed on exact head `30c095f5fa39f4288f870e0f818b970becd757ff`; the harness scenarios had passed before that check. Predecessor federation evidence is historical. Federation readiness is UNKNOWN until the successor head completes the full witness against the new pin. This refresh grants no merge, deploy, or provider authority.
+
 ## 2026-10-24 StoryEngine relay-proof peer refresh
 
 The StoryEngine peer used by FCR's browser federation witness advanced to independently re-observed `refs/heads/main@87501be2da31d12f421b0ed2da49df357fc9fcb1`. Updating `.github/workflows/playwright.yml` to that exact SHA invalidates all predecessor pair-specific federation evidence; the new pin is an evidence-subject selection, not current runtime proof.
