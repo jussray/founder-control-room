@@ -1,5 +1,12 @@
 # Cloudflare Deployment Targets
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `e0ac65b36971caf9873bace4971b110ab7422760`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 15, 2026 — exact-commit version tag on production Worker deploys (candidate)
 
 Candidate `.github/workflows/deploy.yml` passes `--tag ${{ inputs.expected_head_sha }}` and a short space-free `--message` (`fcr-deploy-run-<run_id>.<attempt>`) to `wrangler deploy --config wrangler.worker.toml`, keeping the existing `--var GIT_SHA` marker. The next step in the same job reads back `wrangler deployments list --json` and `wrangler versions view <active-version> --json` and runs `scripts/worker-deployment-version-tag.mjs verify`. It fails closed unless the newest deployment routes 100% to exactly one version whose `workers/tag` equals the exact SHA. This step reads names, ids and annotations only.
