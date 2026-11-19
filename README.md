@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 17, 2026 — FutureYou Mission Control discloses aged-out critical events (source-only, not runtime proof)
 
 `src/futureyou/missionControl.ts`'s `buildMissionControlBrief` excluded `critical`/`error` severity activity events older than 14 days from `priorities` with no trace anywhere in the response, unlike every other excluded-evidence case this read model already names in `blindSpots` (stale, invalid, or future-dated observations). `GET /futureyou/v8/brief` now adds a `blindSpots` line naming the count whenever this happens, so an unresolved critical signal cannot silently age out of the founder's own dashboard. The function is pure and unit-tested (red before, green after); no `missions`/`project_events` query, authority level, or `requireFounder` gate changed.
