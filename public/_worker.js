@@ -345,6 +345,44 @@ async function relaySyncControl(request, env) {
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(snapshot), { status: 200, headers });
 }
 
+
+const SHIELD_INSPECTION_SCHEMA = 'protect-me/shield-inspection@v1';
+
+// Bounded, observation-only first slice. Cloudflare WAF and FCR's private
+// session/API controls remain authoritative. This RPC never grants crawler
+// privileges, and unsigned/unverified decisions cannot block public content.
+async function inspectPublicWorkRequest(request, env) {
+  const pathname = new URL(request.url).pathname;
+  if (!STATIC_METHODS.has(request.method) ||
+      (pathname !== '/work' && pathname !== '/work/')) return;
+  const inspector = env?.PROTECT_ME_2_SHIELD;
+  if (!inspector || typeof inspector.inspect !== 'function') return;
+  try {
+    const cf = request.cf ?? {};
+    const bot = cf.botManagement ?? {};
+    const result = await inspector.inspect({
+      method: request.method,
+      pathname,
+      userAgent: request.headers.get('user-agent') ?? '',
+      verifiedBot: bot.verifiedBot === true,
+      botScore: typeof bot.score === 'number' && Number.isFinite(bot.score) ? bot.score : null,
+      country: typeof cf.country === 'string' ? cf.country : null,
+      asn: Number.isSafeInteger(cf.asn) ? cf.asn : null,
+    });
+    if (result?.schema !== SHIELD_INSPECTION_SCHEMA ||
+        result.receiptKind !== 'hmac-sha256' ||
+        !/^[0-9a-f]{64}$/.test(result.receipt ?? '') ||
+        !['pass', 'deny'].includes(result.action)) {
+      throw new Error('SHIELD_INSPECTION_UNVERIFIED');
+    }
+    // A receipt-shaped string is not cryptographic verification.
+    // Deny enforcement stays disabled until signed payload verification,
+    // replay protection and the live service-binding contract are proven.
+  } catch {
+    console.warn('[fcr-shield] inspection unavailable; public policy unchanged');
+  }
+}
+
 export default {
   async fetch(request, env) {
     if (!env?.ASSETS || typeof env.ASSETS.fetch !== 'function') {
@@ -418,6 +456,8 @@ export default {
       assetUrl.pathname = '/welcome';
       return env.ASSETS.fetch(new Request(assetUrl, request));
     }
+
+    await inspectPublicWorkRequest(request, env);
 
     // The Pages asset layer canonicalizes /work.html -> /work with a 308,
     // and /work is a public page, not an API route. Ask ASSETS for the
