@@ -87,7 +87,9 @@ describe('first-party Facebook Page text adapter', () => {
     expect(sent.get('message')).toBe(COPY);
     expect(sent.get('published')).toBe('true');
     expect(JSON.stringify(receipt)).not.toContain(TOKEN);
-    expect(JSON.stringify(fetchMock.mock.calls[2][1])).not.toContain(TOKEN);
+    expect(fetchMock.mock.calls[1][0]).not.toContain(TOKEN);
+    expect(fetchMock.mock.calls[1][1].body).not.toContain(TOKEN);
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe(`Bearer ${TOKEN}`);
   });
 
   it('refuses to write when the server-owned token belongs to a different Page', async () => {
