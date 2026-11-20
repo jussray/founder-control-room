@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 17, 2026 — FutureYou Mission Control discloses aged-out critical events (source-only, not runtime proof)
 
 `src/futureyou/missionControl.ts`'s `buildMissionControlBrief` excluded `critical`/`error` severity activity events older than 14 days from `priorities` with no trace anywhere in the response, unlike every other excluded-evidence case this read model already names in `blindSpots` (stale, invalid, or future-dated observations). `GET /futureyou/v8/brief` now adds a `blindSpots` line naming the count whenever this happens, so an unresolved critical signal cannot silently age out of the founder's own dashboard. The function is pure and unit-tested (red before, green after); no `missions`/`project_events` query, authority level, or `requireFounder` gate changed.
@@ -626,6 +633,8 @@ The exact StoryEngine peer configured in `.github/workflows/playwright.yml` is a
 When the live StoryEngine ref advances after a previously proven FCR head, updating the pin is recovery setup, not recovered proof. The successor FCR head remains `UNKNOWN` for federation until its own exact-head Playwright job proves runtime identity, directive/receipt binding, replay safety, and the browser loop against that newly observed peer.
 
 The exact predecessor/successor SHAs and the comparison that justified a peer refresh belong in the audit/receipt provenance, not as a durable “current SHA” in this README. Rebinding the peer selects a new evidence subject only; it never carries predecessor green forward.
+
+The October 14 StoryEngine peer advance identified during FCR draft PR #975 is a peer-freshness gate failure, not a failed local browser journey. The successor pin is recovery setup only. Independent StoryEngine checks must be examined separately, and FCR federation remains `UNKNOWN` until its own successor-head Playwright run completes; partial or unrelated provider-preview failures must be reported, never concealed.
 
 ## Resident Council and Muse relay truth
 
