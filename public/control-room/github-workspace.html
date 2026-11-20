@@ -309,7 +309,7 @@
         throw new Error('Proposal source changed. Re-read and regenerate before staging.');
       }
       nodes.fileContent.value = candidate.content;
-      nodes.aiProposalStatus.textContent = 'Staged in editor only. Review the code. The existing founder mission patch route independently verifies branch authority and source freshness. No commit or tests have run.';
+      nodes.aiProposalStatus.textContent = 'Staged in editor only. Review the code. The mission patch route separately checks mission and branch authority, but does not bind this AI proposal fingerprint. Re-read the mission branch and compare changes before committing. No commit or tests have run.';
       pendingBuildProposal = null;
       document.getElementById('stage-ai-proposal').disabled = true;
     }
