@@ -114,3 +114,48 @@ test('real local git bundle with mocked Sprite stays checkpointed and receipt-bo
   assert.equal(run('status','--porcelain=v1'),'');
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
+
+test('generated remote import executes a real incremental bundle in a disposable worktree',()=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'bip-sprite-remote-test-'));
+ const source=path.join(base,'source'),proof=path.join(base,'proof');
+ fs.mkdirSync(source);
+ const command=(cwd,...args)=>{
+   const r=spawnSync('git',args,{cwd,encoding:'utf8',timeout:30000});
+   assert.equal(r.status,0,r.stderr||r.stdout);
+   return r.stdout.trim();
+ };
+ try{
+   command(source,'init','-q');
+   command(source,'config','user.name','Test');
+   command(source,'config','user.email','test@example.invalid');
+   fs.writeFileSync(path.join(source,'README.md'),'before\n');
+   command(source,'add','.');command(source,'commit','-qm','baseline');
+   const oldSha=command(source,'rev-parse','HEAD');
+   command(base,'clone','-q','--no-hardlinks',source,proof);
+   fs.writeFileSync(path.join(source,'README.md'),'after\n');
+   command(source,'add','.');command(source,'commit','-qm','new-main');
+   const nextSha=command(source,'rev-parse','HEAD');
+   command(source,'update-ref','refs/heads/fcr-sprite-sync-target',nextSha);
+   const bundle=path.join(base,'source.bundle');
+   command(source,'bundle','create',bundle,'refs/heads/fcr-sprite-sync-target','^'+oldSha);
+   const bytes=fs.readFileSync(bundle);
+   const digest=createHash('sha256').update(bytes).digest('hex');
+   const transfer=path.join(base,'transfer');
+   fs.mkdirSync(transfer);
+   fs.writeFileSync(path.join(transfer,'chunk-000'),bytes);
+   const receipt=path.join(base,'receipt.json');
+   const marker='e'.repeat(32);
+   const generated=buildRemoteScript({sha:nextSha,old:oldSha,hash:digest,invocation:marker,count:1});
+   const patched=generated
+    .replace(JSON.stringify(TARGET.checkoutDir),JSON.stringify(proof))
+    .replace(JSON.stringify('/home/sprite/.sprite-proof/source-sync/'+marker),JSON.stringify(transfer))
+    .replace(JSON.stringify('/home/sprite/.sprite-proof/receipts/source-sync-'+marker+'.json'),JSON.stringify(receipt));
+   assert.notEqual(generated,patched);
+   const invoked=spawnSync('node',['-e',patched],{cwd:base,encoding:'utf8',timeout:60000,maxBuffer:1e6});
+   assert.equal(invoked.status,0,invoked.stderr||invoked.stdout);
+   assert.equal(command(proof,'rev-parse','HEAD'),nextSha);
+   assert.equal(command(proof,'status','--porcelain=v1'),'');
+   const received=JSON.parse(fs.readFileSync(receipt,'utf8'));
+   assert.equal(isTransferReceipt(received,{sha:nextSha,old:oldSha,hash:digest,invocation:marker}),true);
+ }finally{fs.rmSync(base,{recursive:true,force:true})}
+});
