@@ -96,6 +96,21 @@
       </section>
     </div>
 
+
+    <section class="panel" id="ai-builder" style="margin-top:1rem">
+      <h2>AI build proposal</h2>
+      <p class="muted read-gate">FCR reads the exact repository file and requests one AI-generated replacement. This is a review-only proposal, not a test, approval, commit, or deployment. Source code is sent to the configured AI provider; do not submit sensitive files.</p>
+      <label for="ai-goal">What should FCR change in the selected file?</label>
+      <textarea id="ai-goal" rows="3" maxlength="1200" placeholder="Describe one specific repair or feature, and what must stay unchanged."></textarea>
+      <div class="toolbar" style="margin-top:0.75rem">
+        <button id="request-ai-proposal" class="primary" type="button">Generate bounded AI proposal</button>
+        <button id="stage-ai-proposal" type="button" disabled>Stage reviewed proposal in editor</button>
+      </div>
+      <p class="muted" id="ai-proposal-status" role="status">No proposal. Select a source file and a ref first.</p>
+      <label for="ai-proposal-preview">Candidate full-file replacement (read-only)</label>
+      <textarea id="ai-proposal-preview" class="code" readonly hidden aria-label="AI proposed replacement file"></textarea>
+    </section>
+
     <section class="panel" style="margin-top:1rem">
       <h2>Write patch to GitHub</h2>
       <p class="muted">This does not push to main. It commits to the selected mission branch and re-pins the mission expected head SHA for proof gates.</p>
@@ -150,6 +165,9 @@
       missionId: document.getElementById('mission-id'),
       commitMessage: document.getElementById('commit-message'),
       result: document.getElementById('result'),
+      aiGoal: document.getElementById('ai-goal'),
+      aiProposalStatus: document.getElementById('ai-proposal-status'),
+      aiProposalPreview: document.getElementById('ai-proposal-preview'),
       terminalMissionId: document.getElementById('terminal-mission-id'),
       terminalHead: document.getElementById('terminal-head'),
       terminalCommand: document.getElementById('terminal-command'),
@@ -221,6 +239,79 @@
       nodes.filePath.value = data.path || nodes.filePath.value;
       nodes.fileContent.value = data.content || '';
       nodes.result.textContent = `Loaded ${data.path}@${data.ref}`;
+    }
+
+
+    let pendingBuildProposal = null;
+    let proposalInFlight = false;
+
+    async function requestAiBuildProposal() {
+      if (proposalInFlight) return;
+      const target = {
+        projectSlug: nodes.projectSlug.value.trim(),
+        ref: nodes.readRef.value.trim(),
+        path: nodes.filePath.value.trim(),
+        goal: nodes.aiGoal.value.trim(),
+      };
+      if (!target.ref || !target.path || target.goal.length < 10) {
+        throw new Error('Choose a source ref, a file, and a specific goal of at least 10 characters.');
+      }
+      pendingBuildProposal = null;
+      nodes.aiProposalPreview.value = '';
+      nodes.aiProposalPreview.hidden = true;
+      document.getElementById('stage-ai-proposal').disabled = true;
+      proposalInFlight = true;
+      const button = document.getElementById('request-ai-proposal');
+      button.disabled = true;
+      nodes.aiProposalStatus.textContent = 'Requesting one review-only AI proposal against the exact source ref.';
+      try {
+        const result = await api('/prompt-workflows/propose', {
+          method: 'POST',
+          body: JSON.stringify(target),
+        });
+        if (nodes.projectSlug.value.trim() !== target.projectSlug ||
+            nodes.readRef.value.trim() !== target.ref ||
+            nodes.filePath.value.trim() !== target.path) {
+          throw new Error('Workspace target changed during generation. Discarded the old proposal.');
+        }
+        if (result.status !== 'proposal_only' || !result.proposal ||
+            result.proposal.projectSlug !== target.projectSlug ||
+            result.proposal.path !== target.path ||
+            result.proposal.ref !== target.ref) {
+          throw new Error('The response was not a valid proposal for this workspace target.');
+        }
+        pendingBuildProposal = result.proposal;
+        nodes.aiProposalPreview.value = result.proposal.content;
+        nodes.aiProposalPreview.hidden = false;
+        document.getElementById('stage-ai-proposal').disabled = false;
+        nodes.aiProposalStatus.textContent = [
+          result.proposal.summary,
+          'Source SHA: ' + result.proposal.exactSha,
+          'Provider: ' + (result.provenance?.provider || 'unverified'),
+          'Not committed. Not tested. No Playwright or deployment proof. Review the replacement before staging.',
+        ].join('\n');
+      } catch (error) {
+        nodes.aiProposalStatus.textContent = error instanceof Error ? error.message : String(error);
+        throw error;
+      } finally {
+        proposalInFlight = false;
+        button.disabled = false;
+      }
+    }
+
+    function stageAiBuildProposal() {
+      const candidate = pendingBuildProposal;
+      if (!candidate || nodes.projectSlug.value.trim() !== candidate.projectSlug ||
+          nodes.readRef.value.trim() !== candidate.ref ||
+          nodes.filePath.value.trim() !== candidate.path) {
+        pendingBuildProposal = null;
+        document.getElementById('stage-ai-proposal').disabled = true;
+        throw new Error('Proposal source changed. Re-read and regenerate before staging.');
+      }
+      nodes.fileContent.value = candidate.content;
+      nodes.aiProposalStatus.textContent = 'Staged in editor only. Review the code. The existing founder mission patch route independently verifies branch authority and source freshness. No commit or tests have run.';
+      pendingBuildProposal = null;
+      document.getElementById('stage-ai-proposal').disabled = true;
     }
 
     // One stable key per proposal. A network retry must never create a second
@@ -343,6 +434,8 @@
     nodes.projectSlug.addEventListener('input', resetTerminalRead);
     if (/^[a-f0-9]{40}$/i.test(nodes.readRef.value)) nodes.terminalHead.value = nodes.readRef.value.toLowerCase();
 
+    document.getElementById('request-ai-proposal').addEventListener('click', () => guarded(requestAiBuildProposal));
+    document.getElementById('stage-ai-proposal').addEventListener('click', () => guarded(stageAiBuildProposal));
     document.getElementById('load-project').addEventListener('click', () => guarded(loadProject));
     document.getElementById('browse-files').addEventListener('click', () => guarded(browseFiles));
     document.getElementById('read-file').addEventListener('click', () => guarded(readFile));
