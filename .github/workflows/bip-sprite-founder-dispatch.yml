@@ -5,6 +5,8 @@ on:
     paths:
       - scripts/bip-sprite-founder-dispatch.mjs
       - scripts/bip-sprite-founder-dispatch.node-test.mjs
+      - scripts/bip-sprite-offline-sync.mjs
+      - scripts/bip-sprite-offline-sync.node-test.mjs
       - .github/workflows/bip-sprite-founder-dispatch.yml
   workflow_dispatch:
     inputs:
@@ -56,6 +58,8 @@ jobs:
         run: |
           node --check scripts/bip-sprite-founder-dispatch.mjs
           node --test scripts/bip-sprite-founder-dispatch.node-test.mjs
+          node --check scripts/bip-sprite-offline-sync.mjs
+          node --test scripts/bip-sprite-offline-sync.node-test.mjs
 
   dispatch:
     name: Founder-authorized exact-head Sprite proof
@@ -88,6 +92,18 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+      - name: Checkout exact approved Bip source for offline import
+        if: inputs.execute == true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: jussray/Sekret-Bip
+          ref: ${{ inputs.bip_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: bip-sync-source
+      - name: Checkpoint and synchronize isolated Sprite without outbound access
+        if: inputs.execute == true
+        run: node scripts/bip-sprite-offline-sync.mjs
       - name: Dispatch founder-approved read-only Sprite proof
         run: node scripts/bip-sprite-founder-dispatch.mjs
       - name: Retain sanitized exact-head Sprite proof receipt
