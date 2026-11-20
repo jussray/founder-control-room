@@ -54,3 +54,15 @@ test('private API routes and unrelated public assets do not use the new inspecto
   assert.equal((await handler.fetch(request('/api/internal'), env)).status, 200);
   assert.equal(inspected, 0);
 });
+
+test('stalled inspector is bounded and does not block the public page', async () => {
+  const calls = [];
+  const start = Date.now();
+  const res = await handler.fetch(request('/work'), {
+    ASSETS: assets(calls),
+    PROTECT_ME_2_SHIELD: { inspect: () => new Promise(() => {}) },
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(calls, ['ASSETS']);
+  assert.ok(Date.now() - start < 1500, 'inspection must be bounded');
+});
