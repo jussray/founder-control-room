@@ -1,0 +1,446 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  escalateToSlack,
+  escalateToPagerDuty,
+  logIncidentToLinear,
+  escalateIncident,
+  type SecurityVerdict,
+  emitReciprocalTelemetryWithEscalation,
+} from '../incidentEscalation.js';
+
+function createMockVerdict(verdict: string = 'REPAIR_REQUIRED'): SecurityVerdict {
+  return {
+    schema: 'juss/reciprocal-ingress@v1',
+    service: 'chief-api',
+    verdict: verdict as any,
+    meaningful: true,
+    unit: {
+      unitVerdict: verdict,
+      findings: [
+        {
+          category: 'scope-escalation',
+          severity: 'critical',
+          title: 'Unauthorized scope elevation attempt',
+        },
+      ],
+    },
+    technicalIdentity: {
+      actorFingerprint: 'abc123def456',
+      asn: 12345,
+      country: 'CN',
+      claimedCrawler: null,
+      verifiedBot: false,
+      botScore: null,
+    },
+    receipt: '0123456789abcdef',
+    hallway: {
+      active: false,
+      baseExpansion: 0,
+    },
+    boundaries: {
+      ownedOrAuthorizedSurfacesOnly: false,
+      externalCompromise: true,
+      externalExploit: false,
+    },
+  };
+}
+
+describe('incident-escalation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends REPAIR_REQUIRED to Slack', async () => {
+    let capturedPayload: unknown;
+    global.fetch = vi.fn(async (url, options) => {
+      if (typeof url === 'string' && new URL(url).hostname === 'hooks.slack.com') {
+        capturedPayload = JSON.parse(options?.body as string);
+        return new Response('ok', { status: 200 });
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
+
+    const result = await escalateToSlack(verdict, env);
+    expect(result).toBe(true);
+    expect(capturedPayload).toBeDefined();
+    const payload = capturedPayload as any;
+    expect(payload.blocks).toBeDefined();
+    expect(payload.text).toMatch(/REPAIR_REQUIRED/);
+  });
+
+  it('escalates CONTAIN_ESCALATE to PagerDuty', async () => {
+    let pdCalled = false;
+    global.fetch = vi.fn(async (url) => {
+      if (typeof url === 'string' && new URL(url).hostname === 'events.pagerduty.com') {
+        pdCalled = true;
+        return new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 });
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const verdict = createMockVerdict('CONTAIN_ESCALATE');
+    const env = { PAGERDUTY_INTEGRATION_KEY: 'test-key' };
+
+    const result = await escalateToPagerDuty(verdict, env);
+    expect(result).toBe(true);
+    expect(pdCalled).toBe(true);
+  });
+
+  it('uses PAGERDUTY_ROUTING_KEY and prefers it over the legacy alias', async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 })) as any;
+
+    const sent = await escalateToPagerDuty(createMockVerdict('CONTAIN_ESCALATE'), {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+      PAGERDUTY_INTEGRATION_KEY: 'legacy-test-key',
+    });
+
+    expect(sent).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://events.pagerduty.com/v2/enqueue');
+    const event = JSON.parse(options.body as string);
+    expect(event.routing_key).toBe('routing-test-key');
+    expect(event.event_action).toBe('trigger');
+    expect(event.payload.severity).toBe('error');
+    expect(options.redirect).toBe('error');
+  });
+
+  it('requires the documented 202 success acknowledgment before reporting PagerDuty acceptance', async () => {
+    const verdict = createMockVerdict('CONTAIN_ESCALATE');
+    const env = { PAGERDUTY_ROUTING_KEY: 'routing-test-key' };
+    const responses = [
+      { code: 200, body: { status: 'success', dedup_key: 'test' } },
+      { code: 202, body: { status: 'error', message: 'Rejected' } },
+      { code: 202, body: null },
+    ];
+
+    for (const candidate of responses) {
+      global.fetch = vi.fn(async () => new Response(
+        candidate.body === null ? 'not-json' : JSON.stringify(candidate.body),
+        { status: candidate.code },
+      )) as any;
+      expect(await escalateToPagerDuty(verdict, env)).toBe(false);
+    }
+  });
+
+  it('does not emit PagerDuty alerts without a configured routing key', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+
+    expect(await escalateToPagerDuty(createMockVerdict('REPAIR_REQUIRED'), {})).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not page on a high-severity but non-meaningful verdict', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    verdict.meaningful = false;
+
+    expect(await escalateToPagerDuty(verdict, {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+    })).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not emit PagerDuty alerts for low-severity verdicts', async () => {
+    global.fetch = vi.fn(async () => new Response('accepted', { status: 202 })) as any;
+
+    expect(await escalateToPagerDuty(createMockVerdict('OBSERVE'), {
+      PAGERDUTY_ROUTING_KEY: 'routing-test-key',
+    })).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('escalates critical Chief unit verdicts even when the perimeter verdict is HALLWAY', async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: 'chief-api:0123456789abcdef' }), { status: 202 })) as any;
+    const verdict = createMockVerdict('HALLWAY');
+    verdict.unit!.unitVerdict = 'REPAIR_REQUIRED';
+
+    await escalateIncident(verdict, {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER',
+      PAGERDUTY_INTEGRATION_KEY: 'test-key',
+    });
+
+    const calls = (global.fetch as any).mock.calls as Array<[string, RequestInit]>;
+    const slack = calls.find(([url]) => new URL(url).hostname === 'hooks.slack.com');
+    const pagerDuty = calls.find(([url]) => new URL(url).hostname === 'events.pagerduty.com');
+    expect(slack).toBeDefined();
+    expect(pagerDuty).toBeDefined();
+    expect(JSON.parse(slack![1].body as string).text).toContain('REPAIR_REQUIRED');
+    expect(JSON.parse(pagerDuty![1].body as string).payload.severity).toBe('critical');
+  });
+
+  it('ignores non-escalatable verdicts', async () => {
+    const verdict = createMockVerdict('OBSERVE');
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
+
+    const result = await escalateToSlack(verdict, env);
+    expect(result).toBe(false);
+  });
+
+  it('handles missing webhooks gracefully', async () => {
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = {}; // No webhook URL
+
+    const result = await escalateToSlack(verdict, env);
+    expect(result).toBe(false);
+  });
+
+  it('uses an explicit channel when SLACK is a bot token', async () => {
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, ts: '123.456' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe('https://slack.com/api/chat.postMessage');
+    expect(options.headers.Authorization).toBe('Bearer xoxb-test-only');
+    expect(JSON.parse(options.body).channel).toBe('C0BQ2Q2S9B4');
+  });
+
+  it('accepts SLACK as a webhook URL without leaking it into headers', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const webhook = 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER';
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: webhook });
+    expect(ok).toBe(true);
+    const [url, options] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe(webhook);
+    expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it('blocks arbitrary legacy webhook hosts before sending incident data', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://collector.example.net/incident',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects lookalike Slack hostnames and prevents HTTP redirects', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+    const rejected = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com.evil.example/services/T/B/FAKE',
+    });
+    expect(rejected).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const accepted = await escalateToSlack(createMockVerdict(), {
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/PLACEHOLDER',
+    });
+    expect(accepted).toBe(true);
+    const [, options] = (global.fetch as any).mock.calls[0];
+    expect(options.redirect).toBe('error');
+  });
+
+  it('does not use SLACK bot credentials without an explicit FCR channel', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), { SLACK: 'xoxb-test-only' });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown SLACK credential shapes without sending', async () => {
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xapp-not-a-bot-token',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an HTTP 200 Slack API error as delivered', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: false, error: 'missing_scope' }), { status: 200 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith('[incident-escalation] Slack API rejected delivery');
+    errorSpy.mockRestore();
+  });
+
+  it('does not log secret-bearing Slack transport error bodies', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response('xoxb-SECRET-DO-NOT-LOG', { status: 403 }),
+    ) as any;
+
+    const ok = await escalateToSlack(createMockVerdict(), {
+      SLACK: 'xoxb-test-only',
+      FCR_SLACK_CHANNEL_ID: 'C0BQ2Q2S9B4',
+    });
+    expect(ok).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SECRET-DO-NOT-LOG');
+    errorSpy.mockRestore();
+  });
+
+  it('emits telemetry with escalation', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    global.fetch = vi.fn(async () => new Response('ok', { status: 200 })) as any;
+
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
+
+    let waitUntilCalled = false;
+    emitReciprocalTelemetryWithEscalation(verdict, env, {
+      waitUntil: (p) => {
+        waitUntilCalled = true;
+        p.catch(() => undefined);
+      },
+    });
+
+    // Let async task settle
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(waitUntilCalled).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  it('does not log PagerDuty provider error bodies', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () =>
+      new Response('secret-looking-pagerduty-detail', { status: 403 }),
+    ) as any;
+
+    const result = await escalateToPagerDuty(createMockVerdict('CONTAIN_ESCALATE'), {
+      PAGERDUTY_INTEGRATION_KEY: 'test-only-key',
+    });
+
+    expect(result).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-looking-pagerduty-detail');
+    errorSpy.mockRestore();
+  });
+
+  it('rejects Linear GraphQL errors without logging provider-controlled text', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async (url) => {
+      if (typeof url === 'string' && new URL(url).hostname === 'api.linear.app') {
+        return new Response(
+          JSON.stringify({ errors: [{ message: 'secret-looking-provider-detail' }], data: null }),
+          { status: 200 },
+        );
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const result = await logIncidentToLinear(createMockVerdict('REPAIR_REQUIRED'), {
+      LINEAR_API_KEY: 'test-only-key',
+    });
+
+    expect(result).toBe(false);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-looking-provider-detail');
+    errorSpy.mockRestore();
+  });
+
+  it('reports a critical failure only when all escalation channels fail', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
+
+    await escalateIncident(createMockVerdict('REPAIR_REQUIRED'), {});
+
+    expect(errorSpy.mock.calls.some((call) =>
+      typeof call[0] === 'string' && call[0].includes('CRITICAL: Escalation failed'),
+    )).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  it('does not expose untrusted security verdict details in logs', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const verdict = createMockVerdict('REPAIR_REQUIRED');
+      verdict.service = 'private-service-LEAK-MARKER';
+      verdict.receipt = 'private-receipt-LEAK-MARKER';
+      verdict.unit!.findings![0]!.title = 'private-title-LEAK-MARKER';
+      verdict.technicalIdentity!.claimedCrawler = 'private-actor-LEAK-MARKER';
+
+      let completion: Promise<unknown> | undefined;
+      emitReciprocalTelemetryWithEscalation(verdict, {}, {
+        waitUntil: (promise) => { completion = promise; },
+      });
+      expect(completion).toBeDefined();
+      await completion;
+
+      const emitted = JSON.stringify([logSpy.mock.calls, errorSpy.mock.calls]);
+      expect(emitted).not.toContain('LEAK-MARKER');
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('ignores non-meaningful verdicts', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const verdict = createMockVerdict('OBSERVE');
+    verdict.meaningful = false;
+
+    const env = { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/TEST/TEST/PLACEHOLDER' };
+    emitReciprocalTelemetryWithEscalation(verdict, env);
+
+    expect(logSpy).not.toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+  it('detects Linear GraphQL permission error (200 OK but errors in body)', async () => {
+    let linearCalled = false;
+    global.fetch = vi.fn(async (url) => {
+      if (typeof url === 'string' && url.includes('linear')) {
+        linearCalled = true;
+        // Simulate Linear returning 200 OK with permission error in body
+        return new Response(
+          JSON.stringify({
+            errors: [{ message: 'Insufficient scope: issues:create' }],
+            data: null,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('error', { status: 404 });
+    }) as any;
+
+    const { logIncidentToLinear } = await import('../incidentEscalation.js');
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = { LINEAR_API_KEY: 'read-only-key' };
+
+    const result = await logIncidentToLinear(verdict, env);
+    expect(linearCalled).toBe(true);
+    expect(result).toBe(false); // Should detect the error and return false
+  });
+
+  // IMPLANT 5 TEST: Critical escalation failure detection
+  it('detects when all escalation channels fail on REPAIR_REQUIRED', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // All channels fail
+    global.fetch = vi.fn(async () => new Response('error', { status: 500 })) as any;
+
+    const { escalateIncident } = await import('../incidentEscalation.js');
+    const verdict = createMockVerdict('REPAIR_REQUIRED');
+    const env = {}; // No webhooks
+
+    await escalateIncident(verdict, env);
+
+    // Check if critical error was logged
+    const criticalErrorCall = errorSpy.mock.calls.find((call) =>
+      typeof call[0] === 'string' && call[0].includes('CRITICAL: Escalation failed'),
+    );
+
+    expect(criticalErrorCall).toBeDefined();
+    errorSpy.mockRestore();
+  });
+});

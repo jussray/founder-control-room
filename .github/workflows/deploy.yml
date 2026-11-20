@@ -39,7 +39,7 @@ jobs:
       DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
     steps:
       - name: Checkout exact approved commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -100,6 +100,15 @@ jobs:
 
           echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
 
+      - name: Verify Cloudflare accepts the deploy credential (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
+          bash scripts/verify-cloudflare-token.sh "$ACCOUNT_ID"
+
       - name: Verify provider-held Worker secret names before mutation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -108,30 +117,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          python3 - <<'PY'
-          import os
-          import re
-          import sys
-
-          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-
-          try:
-              token.encode('ascii')
-          except UnicodeEncodeError:
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
-              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
-              sys.exit(1)
-
-          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
-          PY
+          credential_receipt="$RUNNER_TEMP/fcr-deploy-credential-shape.json"
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id-env CLOUDFLARE_ACCOUNT_ID \
+            --require-account-id true \
+            --purpose fcr-production-deploy-authority \
+            --output "$credential_receipt"
 
           secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
           npx --yes wrangler@4.110.0 secret list \
@@ -158,7 +150,17 @@ jobs:
 
           provider_required = sorted(required - workflow_written)
           with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
-              receipt = json.load(handle)
+              receipt_text = handle.read()
+          # wrangler may write human progress lines to stdout ahead of the JSON
+          # list (seen with env-var token auth); extract the JSON array instead
+          # of assuming the receipt is pure JSON. Fail closed, with evidence.
+          array_start = receipt_text.find('[')
+          array_end = receipt_text.rfind(']')
+          if array_start == -1 or array_end < array_start:
+            print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+            print(f'Receipt begins: {receipt_text[:200]!r}')
+            sys.exit(1)
+          receipt = json.loads(receipt_text[array_start:array_end + 1])
 
           if not isinstance(receipt, list):
               print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
@@ -181,6 +183,17 @@ jobs:
           )
           PY
 
+          # Fail closed when a plain [vars] name already exists as a Worker
+          # secret (or is also in the [secrets] registry): the first canonical
+          # deploy would fail or leave the runtime binding ambiguous. Names only.
+          node scripts/verify-worker-var-secret-collisions.mjs \
+            --config wrangler.worker.toml \
+            --secret-receipt "$secret_receipt"
+
+          # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
+          # Inspect name/type only; no credential values enter logs or artifacts.
+          node scripts/verify-worker-binding-types.mjs
+
       - name: Record authority receipt
         shell: bash
         run: |
@@ -192,6 +205,7 @@ jobs:
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
             echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
+            echo "- [vars]/secret name collisions: none observed in the provider secret-name readback (names only)"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -204,12 +218,12 @@ jobs:
     environment: production
     needs: authority-gate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -338,7 +352,7 @@ jobs:
 
       - name: Upload migration ledger receipts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: supabase-migration-ledger-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -356,12 +370,12 @@ jobs:
     environment: production
     needs: supabase-migrate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
@@ -376,7 +390,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.110.0'
-          command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
+          # --tag records the exact approved commit on the provider Worker version;
+          # --message is short space-free provenance (wrangler-action splits args).
+          command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }} --tag ${{ inputs.expected_head_sha }} --message fcr-deploy-run-${{ github.run_id }}.${{ github.run_attempt }}
           secrets: |
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
         env:
@@ -387,6 +403,26 @@ jobs:
           # publication grant below.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
+
+      - name: Read back active Worker version tag (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Provider readback, names/ids/annotations only: the newest deployment
+          # must route 100% to one version whose workers/tag equals the exact SHA.
+          deployments_receipt="$RUNNER_TEMP/fcr-worker-deployments.json"
+          version_receipt="$RUNNER_TEMP/fcr-worker-active-version.json"
+          npx --yes wrangler@4.110.0 deployments list \
+            --config wrangler.worker.toml --json > "$deployments_receipt"
+          active_version_id="$(node scripts/worker-deployment-version-tag.mjs active-version "$deployments_receipt")"
+          npx --yes wrangler@4.110.0 versions view "$active_version_id" \
+            --config wrangler.worker.toml --json > "$version_receipt"
+          node scripts/worker-deployment-version-tag.mjs verify \
+            "$deployments_receipt" "$version_receipt" "$EXPECTED_HEAD_SHA"
 
   pages-release:
     name: Cloudflare Pages Production Release
@@ -402,7 +438,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: pages-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
@@ -528,7 +564,7 @@ jobs:
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
       - name: Check out the exact deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           fetch-depth: 0
@@ -882,7 +918,7 @@ jobs:
 
       - name: Upload founder-review proof artifact
         if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: proof-of-ship-founder-review-${{ inputs.expected_head_sha }}
           path: proof-review.json
@@ -1117,14 +1153,15 @@ jobs:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
     needs: smoke-test
+    timeout-minutes: 15
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
