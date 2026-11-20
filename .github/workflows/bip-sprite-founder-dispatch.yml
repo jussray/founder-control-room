@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       bip_sha:
-        description: Exact Bip governance-branch commit SHA
+        description: Exact live Se’kret Bip main commit SHA
         type: string
         required: true
       mission:
