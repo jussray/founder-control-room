@@ -68,6 +68,7 @@ import { johnstownAiPilotRouter } from './routes/johnstownAiPilot.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
+import { founderProfilesApiRouter } from './routes/founderProfilesApi.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
@@ -304,6 +305,9 @@ export function createServer(options: CreateServerOptions = {}) {
   // existing founder-cookie/browser-CSRF routes remain unchanged.
   app.use('/mcp/public', express.json({ type: 'application/json', limit: '64kb' }));
   app.use(publicMcpRouter);
+
+  // Authenticated API keys + validated Access JWT; no founder browser-cookie inheritance.
+  app.use('/api/v1', express.json({ type: 'application/json', limit: '4kb' }), founderProfilesApiRouter);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
