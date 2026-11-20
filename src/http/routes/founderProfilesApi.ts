@@ -112,9 +112,9 @@ export async function verifyAccessAssertion(jwt: string, env = process.env): Pro
       typeof claims.exp !== 'number' || claims.exp <= now ||
       (typeof claims.nbf === 'number' && claims.nbf > now + 30) ||
       !email || !EMAIL.test(email)) throw new Error('unauthorized');
-  const jwk = (await accessKeys(issuer)).find(k => k.kid === header.kid);
+  const jwk = (await accessKeys(issuer)).find(k => (k as JsonWebKey & { kid?: string }).kid === header.kid);
   if (!jwk || !verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]),
-    createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(parts[2], 'base64url'))) {
+    createPublicKey({ key: jwk, format: 'jwk' } as unknown as Parameters<typeof createPublicKey>[0]), Buffer.from(parts[2], 'base64url'))) {
     throw new Error('unauthorized');
   }
   return email;
