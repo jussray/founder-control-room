@@ -850,3 +850,7 @@ The source-first publisher now includes an X (Twitter) user-context text adapter
 - **FCR** controls trusted approval readback, durable pending reservation, guarded patch execution, exact ref and immutable commit readback, proof verification, and final receipt persistence.
 
 The candidate rejects protected branch writes, noncanonical repository paths, unbound proposal hashes, failed pending-reservation storage, stale commits, absent browser/documentation/pro-vider proof, and unverified target identity. A trusted adapter must atomically validate/consume live approval and compare-and-swap the branch head immediately before mutation. Merely implementing this interface **does not prove** the actual adapter exists or is secure. Any connection to real execution requires a separate scoped review and real-path evidence. Exact-head tests and PR evidence do not grant a merge or deployment. The full proof must be reacquired when PR/base/head changes.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.

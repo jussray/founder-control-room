@@ -327,3 +327,7 @@ The Deploy workflow file must remain parseable on main at all times. A workflow 
 ## Production credential diagnostic boundary
 
 The diagnostic workflow may inspect the production deployment credential only after a founder dispatch supplies an exact current main SHA. It checks out and re-observes that SHA before invoking the checked-in read-only diagnostic. Pull-request code is excluded from the credential path. Its fingerprint/verdict receipt distinguishes the value GitHub resolves from remembered rotation history without revealing a secret or authorizing deploy, secret mutation, Pages publication, Worker promotion, or production acceptance.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
