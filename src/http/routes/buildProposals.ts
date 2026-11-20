@@ -206,7 +206,7 @@ export function createBuildProposalRouter(dependencies: BuildProposalDependencie
         repository: project.repo_identifier, ref, exactSha, path,
         beforeSha256, afterSha256, proposalFingerprint,
         modelProvider: candidate.provider, model: candidate.model,
-        codeOrPromptPersisted: false, writePerformed: false, testsRun: false,
+        rawCodeOrPromptStoredInFcrAudit: false, writePerformed: false, testsRun: false,
       });
     } catch {
       return res.status(503).json({ code: 'PROPOSAL_AUDIT_UNAVAILABLE', error: 'Proposal audit failed; proposal was not released.' });
