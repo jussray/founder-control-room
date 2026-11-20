@@ -599,6 +599,43 @@ try {
   process.exitCode = 1;
 }
 
+try {
+  if (receipt.providerCredentials.classification === "user-token-active") {
+    const {
+      extractRequiredSecretNames,
+      observeCloudflareWorkerBindings,
+    } = await import("./inspect-cloudflare-worker-bindings.mjs");
+    const wrangler = await readFile("wrangler.worker.toml", "utf8");
+    const requiredNames = extractRequiredSecretNames(wrangler);
+    receipt.workerBindings = await observeCloudflareWorkerBindings({
+      accountId: accountId || "",
+      workerName,
+      apiToken: apiToken.trim(),
+      requiredNames,
+    });
+  } else {
+    receipt.workerBindings = {
+      contract: "fcr/cloudflare-worker-binding-observation@v1",
+      status: "BLOCKED",
+      classification: "core-provider-token-not-verified",
+      relayReady: false,
+      providerValuesRetained: false,
+      undeclaredBindingNamesRetained: false,
+      canAuthorizeProviderMutation: false,
+    };
+  }
+} catch {
+  receipt.workerBindings = {
+    contract: "fcr/cloudflare-worker-binding-observation@v1",
+    status: "BLOCKED",
+    classification: "observer-internal-error",
+    relayReady: false,
+    providerValuesRetained: false,
+    undeclaredBindingNamesRetained: false,
+    canAuthorizeProviderMutation: false,
+  };
+}
+
 await mkdir("test-results", { recursive: true });
 await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
 console.log(`Cloudflare Worker Git authority receipt: ${receiptPath}`);
