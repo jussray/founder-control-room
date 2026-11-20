@@ -409,14 +409,11 @@ export default {
       return mcpRouteNotPublicResponse(request);
     }
 
-    // The canonical FCR domain is a private product entrypoint, not a public
-    // marketing surface. Keep the URL stable while serving the single
-    // invitation-only sign-in door; authenticated routing remains owned by
-    // the existing FCR session flow.
-    if (requestUrl.pathname === '/') {
-      const assetUrl = new URL(request.url);
-      assetUrl.pathname = '/welcome';
-      return env.ASSETS.fetch(new Request(assetUrl, request));
+    // Restore the already-published public home at the canonical root.
+    // /welcome remains the sign-in door, and /control-room/ remains
+    // protected by the existing founder-session and Access controls.
+    if (requestUrl.pathname === '/' && STATIC_METHODS.has(request.method)) {
+      return env.ASSETS.fetch(request);
     }
 
     // The Pages asset layer canonicalizes /work.html -> /work with a 308,
