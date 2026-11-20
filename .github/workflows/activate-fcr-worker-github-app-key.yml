@@ -1,0 +1,65 @@
+name: FCR One-Time GitHub App Worker Activation
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: 'Exact current 40-character main SHA'
+        type: string
+        required: true
+      confirmation:
+        description: 'Type INSTALL_EXISTING_FCR_APP_KEY'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-one-time-github-app-worker-activation
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: github.actor == 'jussray' && github.ref == 'refs/heads/main' && inputs.confirmation == 'INSTALL_EXISTING_FCR_APP_KEY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Check out exact main head without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate one-time transfer contract locally
+        run: |
+          node --check scripts/activate-fcr-worker-github-app-key.mjs
+          node scripts/activate-fcr-worker-github-app-key.mjs --self-test
+          node --test scripts/activate-fcr-worker-github-app-key.test.mjs
+      - name: Verify GitHub App issuer and install key to fixed FCR Worker
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          FCR_INSTALL_CONFIRMATION: ${{ inputs.confirmation }}
+          RECEIPT_PATH: test-results/fcr-app-key-worker-activation.json
+        run: node scripts/activate-fcr-worker-github-app-key.mjs
+      - name: Upload non-secret activation receipt
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-app-key-activation-${{ github.run_id }}
+          path: test-results/fcr-app-key-worker-activation.json
+          if-no-files-found: error
+          retention-days: 30
+
+# Intentionally no push, schedule, or PR event: privileged activation
+# requires an explicit founder workflow dispatch on protected main.
+# Canonical Deploy remains responsible for deployments and preserves Worker secrets.

@@ -1,5 +1,7 @@
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -184,7 +186,7 @@ describe('isolated workflow classifier matches minting across generated keys', (
     // or receipt steps. Only generated private keys enter this sandbox.
     const classifierSource = workflow.slice(start, end);
     const expression =
-      '({ present, recognizedTransport, transportClass, pemBoundary, rsaParse })';
+      '({ present, recognizedTransport, transportClass, pemBoundary, rsaParse, derEnvelope })';
     const program = [classifierSource, expression].join(String.fromCharCode(10));
     const classifyDiagnostic = (secret: string) =>
       runInNewContext(
@@ -194,7 +196,7 @@ describe('isolated workflow classifier matches minting across generated keys', (
       ) as Pick<
           Classification,
           'present' | 'recognizedTransport' | 'transportClass' | 'pemBoundary' | 'rsaParse'
-        >;
+        > & { derEnvelope: boolean };
 
     const lf = String.fromCharCode(10);
     const cr = String.fromCharCode(13);
@@ -234,6 +236,7 @@ describe('isolated workflow classifier matches minting across generated keys', (
           transportClass: diagnostic.transportClass,
           pemBoundary: diagnostic.pemBoundary,
           rsaParse: diagnostic.rsaParse,
+          derEnvelope: diagnostic.derEnvelope,
         },
         'classifier disagreement on ' + label,
       ).toEqual({
@@ -242,7 +245,74 @@ describe('isolated workflow classifier matches minting across generated keys', (
         transportClass: mint.transportClass,
         pemBoundary: mint.pemBoundary,
         rsaParse: mint.rsaParse,
+        derEnvelope: mint.diagnostics.includes('derEnvelope=true'),
       });
     }
+  });
+});
+
+// A rejected secret previously reported only that its characters looked like
+// base64. That cannot separate "a key, misencoded" from "not a key at all",
+// which left the portfolio-sync incident classified UNKNOWN. derEnvelope adds
+// that one structural bit: do the decoded bytes form a well-formed ASN.1
+// SEQUENCE whose declared length matches the payload.
+describe('derEnvelope structural fact', () => {
+  const factOf = (secret: unknown): string | undefined =>
+    classifyPrivateKey(secret)
+      .diagnostics.split(' ')
+      .find((part) => part.startsWith('derEnvelope='));
+
+  it('is true for base64 of a pkcs8 DER key', () => {
+    expect(factOf(derPkcs8.toString('base64'))).toBe('derEnvelope=true');
+  });
+
+  it('is true for base64 of a pkcs1 DER key', () => {
+    expect(factOf(derPkcs1.toString('base64'))).toBe('derEnvelope=true');
+  });
+
+  it('is true for a PEM body with its header lines stripped', () => {
+    expect(factOf(pkcs8.split('\n').slice(1, -1).join('\n'))).toBe('derEnvelope=true');
+  });
+
+  it('is false for a token-shaped value that passes the base64 charset test', () => {
+    // The charset class accepts '_' and '-', so a PAT reports b64charset=true.
+    // This is the production case: base64-looking, but structurally not a key.
+    const classified = classifyPrivateKey('ghp_0123456789abcdefghijklmnopqrstuvwxyzAB');
+    expect(classified.diagnostics).toContain('b64charset=true');
+    expect(classified.diagnostics).toContain('derEnvelope=false');
+    expect(classified.rsaParse).toBe(false);
+  });
+
+  it('is false for base64 of random bytes', () => {
+    expect(factOf(Buffer.from('x'.repeat(200)).toString('base64'))).toBe('derEnvelope=false');
+  });
+
+  it('is false for a truncated DER payload whose declared length overruns', () => {
+    expect(factOf(derPkcs8.subarray(0, 64).toString('base64'))).toBe('derEnvelope=false');
+  });
+
+  it('is false for a non-base64 value', () => {
+    expect(factOf('not a key at all')).toBe('derEnvelope=false');
+  });
+
+  it('still emits no length or other reconstructable metadata', () => {
+    const { diagnostics } = classifyPrivateKey(derPkcs8.toString('base64'));
+    expect(diagnostics).not.toMatch(/len=|lines=\d|bytes=\d/);
+  });
+});
+
+describe('one-time FCR App-key Worker activation', () => {
+  it('executes the credential-safe exact-main and binding guard tests', () => {
+    // This test runs on ordinary PR CI without accessing any GitHub or Cloudflare secret.
+    const testPath = fileURLToPath(
+      new URL('../../../scripts/activate-fcr-worker-github-app-key.test.mjs', import.meta.url),
+    );
+    const output = execFileSync(process.execPath, ['--test', '--test-reporter=tap', testPath], {
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    expect(output).toContain('# tests 3');
+    expect(output).toContain('# pass 3');
+    expect(output).toContain('# fail 0');
   });
 });
