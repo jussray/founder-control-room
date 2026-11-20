@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { readFcrRequiredRuleset, assessRequiredGate, summarizeSkippedEvidence } from './required-gate-evidence.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -71,6 +72,7 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
       id: String(run.id ?? ''),
       name: clean(run.name),
       app: clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app',
+      appId: Number.isSafeInteger(run?.app?.id) ? String(run.app.id) : null,
       state: mapCheckState(run),
       status: clean(run.status) || 'unknown',
       conclusion: clean(run.conclusion) || null,
@@ -105,6 +107,7 @@ export function aggregateTestLedger(checks) {
 }
 
 export function buildTestLedger({runtimeState = null,
+  requiredRule = null,
   repository,
   sha,
   branch,
@@ -135,6 +138,8 @@ export function buildTestLedger({runtimeState = null,
       authoritativeForMerge: false,
     },
     aggregate,
+    requiredGate: assessRequiredGate(requiredRule, checks, normalizeSha(sha)),
+    skippedEvidence: summarizeSkippedEvidence(checks),
     checks,
   };
 }
@@ -264,6 +269,17 @@ export async function observeExactHeadChecks(env = process.env) {
     throw new Error('GITHUB_REPOSITORY, EXPECTED_HEAD_SHA/GITHUB_SHA, and GITHUB_TOKEN are required.');
   }
 
+  // Ruleset evidence is a separate read, not an authority token. A failed
+  // provider lookup produces UNKNOWN coverage rather than a fake green gate.
+  let requiredRule = null;
+  if (repository === 'jussray/founder-control-room') {
+    try {
+      requiredRule = await readFcrRequiredRuleset({ repository, token, getJson: githubJson });
+    } catch {
+      requiredRule = null;
+    }
+  }
+
   const startedAt = Date.now();
   let stableTerminalPolls = 0;
   let previousFingerprint = '';
@@ -273,7 +289,7 @@ export async function observeExactHeadChecks(env = process.env) {
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
-    const ledger = buildTestLedger({runtimeState, repository, sha, branch, runId, checks});
+    const ledger = buildTestLedger({runtimeState, requiredRule, repository, sha, branch, runId, checks});
     writeLedger(outputPath, ledger);
 
     const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
@@ -291,7 +307,7 @@ export async function observeExactHeadChecks(env = process.env) {
     await sleep(pollMs);
   }
 
-  const ledger = buildTestLedger({runtimeState, 
+  const ledger = buildTestLedger({runtimeState, requiredRule,
     repository,
     sha,
     branch,

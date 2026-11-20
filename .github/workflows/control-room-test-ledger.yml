@@ -98,6 +98,9 @@ jobs:
       - name: Verify independent Cloudflare readback contract
         run: node --test test/cloudflare-provider-readback.test.mjs
 
+      - name: Verify exact-main required context and skipped-evidence contract
+        run: node --test test/required-gate-evidence.test.mjs
+
   publish-ledger:
     name: Verify test-ledger contract
     needs: ledger-contract
