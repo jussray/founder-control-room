@@ -56,8 +56,10 @@ beforeEach(() => { vi.clearAllMocks(); });
 describe('first-party AI build proposal seam', () => {
   it('only accepts eligible single-file repository source paths', () => {
     expect(safeBuildProposalPath('src/example.ts')).toBe(true);
-    expect(safeBuildProposalPath('public/control-room/app.js')).toBe(true);
-    for (const bad of ['src/../.env', '.github/workflows/a.yml', 'src/secrets/token.ts', 'src/private-keys/key.ts', '/src/app.ts', 'src//a.ts', 'src/a.pem', 'src/a.png']) {
+    expect(safeBuildProposalPath('docs/FOUNDER_GITHUB_WORKSPACE.md')).toBe(true);
+    // AI proposals must fit the existing exact-source mission receipt validator.
+    expect(safeBuildProposalPath('public/control-room/app.js')).toBe(false);
+    for (const bad of ['src/../.env', '.github/workflows/a.yml', 'src/secrets/token.ts', 'src/private-keys/key.ts', '/src/app.ts', 'src//a.ts', 'src/a.pem', 'src/a.png', 'app/page.tsx', 'src/./a.ts']) {
       expect(safeBuildProposalPath(bad)).toBe(false);
     }
   });
@@ -67,6 +69,17 @@ describe('first-party AI build proposal seam', () => {
     const response = await request(fixture.app).post('/prompt-workflows/propose').send(valid);
     expect(response.status).toBe(401);
     expect(fixture.getRef).not.toHaveBeenCalled();
+    expect(fixture.propose).not.toHaveBeenCalled();
+  });
+
+  it('rejects source paths that cannot pass the existing staged mission validator', async () => {
+    authenticated();
+    const fixture = build();
+    const response = await request(fixture.app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token')
+      .send({ ...valid, path: 'public/control-room/app.js' });
+    expect(response.status).toBe(400);
+    expect(fixture.reader.readFile).not.toHaveBeenCalled();
     expect(fixture.propose).not.toHaveBeenCalled();
   });
 
