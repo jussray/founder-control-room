@@ -45,3 +45,70 @@ test('transfer rejects user-controlled non-SHA and unsafe chunk count',()=>{
  for(const bad of [{sha:'main'},{old:'main'},{hash:'abcd'},{invocation:'x'}, {count:0},{count:65}])
  assert.throws(()=>buildRemoteScript({sha,old,hash,invocation,count:1,...bad}));
 });
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {offlineSync} from './bip-sprite-offline-sync.mjs';
+import {TARGET} from './bip-sprite-founder-dispatch.mjs';
+
+test('real local git bundle with mocked Sprite stays checkpointed and receipt-bound',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'offline-bip-test-'));
+ const run=(...args)=>{
+  const r=spawnSync('git',args,{cwd:dir,encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr);
+  return r.stdout.trim();
+ };
+ try {
+  run('init','-q');run('config','user.email','test@example.invalid');run('config','user.name','test');
+  fs.writeFileSync(path.join(dir,'fixture.txt'),'old\n');run('add','.');run('commit','-qm','base');
+  const previous=run('rev-parse','HEAD');
+  fs.writeFileSync(path.join(dir,'fixture.txt'),'new\n');run('add','.');run('commit','-qm','advance');
+  const target=run('rev-parse','HEAD');
+  const localEnv={...env,BIP_SPRITE_HEAD_SHA:target,BIP_SPRITE_APPROVED_SHA:target};
+  let ranRemote=false,checkpointed=false,uploads=0,uploadBytes=[],invocation=null;
+  const requests=[];
+  function response(value){return {status:200,text:async()=>typeof value==='string'?value:JSON.stringify(value)}}
+  const fetcher=async(url,opt)=>{
+   const u=String(url),a=new URL(u),pathname=a.pathname;
+   requests.push({method:opt.method,path:pathname});
+   if(pathname.endsWith('/founder-control-room/commits/main'))return response({sha:localEnv.GITHUB_SHA});
+   if(pathname.endsWith('/Sekret-Bip/git/ref/heads/main'))return response({object:{sha:target}});
+   if(pathname.endsWith('/sprites/'+TARGET.name))return response({id:TARGET.id,name:TARGET.name,organization:'juss'});
+   if(pathname.endsWith('/policy/network'))return response({rules:[{action:'deny',domain:'*'}]});
+   if(pathname.endsWith('/checkpoint')){checkpointed=true;return response('{"type":"info","data":"Creating checkpoint..."}\n{"type":"complete","data":"Checkpoint v901 created successfully"}\n')}
+   if(pathname.endsWith('/fs/write')){
+    assert.equal(checkpointed,true);assert.equal(opt.method,'PUT');
+    uploadBytes.push(Buffer.from(opt.body));uploads++;
+    invocation=a.searchParams.get('path').match(/source-sync\/([a-f0-9]{32})\//)?.[1];
+    return response({ok:true});
+   }
+   if(pathname.endsWith('/exec')){
+    assert.equal(uploads>0,true);
+    assert.equal(a.searchParams.getAll('cmd')[0],'node');
+    assert.equal(a.searchParams.getAll('cmd')[1],'-e');
+    assert.match(a.searchParams.getAll('cmd')[2],/BUNDLE_HASH_MISMATCH/);
+    ranRemote=true;return response('');
+   }
+   if(pathname.endsWith('/fs/read')){
+    const f=a.searchParams.get('path');
+    if(f.endsWith('/HEAD'))return response((ranRemote?target:previous)+'\n');
+    if(f.endsWith('/source-sync-'+invocation+'.json')){
+     const hash=createHash('sha256').update(Buffer.concat(uploadBytes)).digest('hex');
+     return response({contract:'juss/bip-sprite-offline-sync@v1',status:'synced',
+      sourceSha:target,previousSha:previous,bundleHash:hash,invocation,
+      clean:true,networkPolicy:'deny-all',mergeAuthority:false,deployAuthority:false});
+    }
+   }
+   throw Error('Unexpected request '+pathname);
+  };
+  const result=await offlineSync({env:localEnv,fetcher,source:dir});
+  assert.equal(result.status,'EXACT_SHA_SOURCE_TRANSFER_VERIFIED');
+  assert.equal(result.sha,target);assert.equal(result.old,previous);
+  assert.equal(result.checkpoint,'v901');assert.equal(ranRemote,true);
+  assert.equal(requests.some(x=>x.path.endsWith('/policy/network')&&x.method!=='GET'),false);
+  assert.equal(run('status','--porcelain=v1'),'');
+ }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
