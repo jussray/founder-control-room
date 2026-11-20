@@ -100,9 +100,13 @@ export async function returnCouncilToOrigin(
   const outcome=await runtime.deliver({
     council,court,handoff,origin:handoff.origin,founder:input.founder,signal:input.signal
   });
+  // A trusted transport cannot promote an ACK from a different handoff.
+  // This still does not establish an independently verified origin receipt.
+  const matchingAck=outcome?.status==='ACK_REPORTED_BY_TRUSTED_PORT'
+    && outcome.delivered===true
+    && outcome.idempotencyKey===handoff.idempotencyKey;
   return {
-    status:outcome?.status==='ACK_REPORTED_BY_TRUSTED_PORT' && outcome.delivered===true
-      ?'ADAPTER_ACK_NOT_INDEPENDENTLY_VERIFIED':'NOT_DELIVERED',
+    status:matchingAck?'ADAPTER_ACK_NOT_INDEPENDENTLY_VERIFIED':'NOT_DELIVERED',
     productionVerified:false
   };
 }
