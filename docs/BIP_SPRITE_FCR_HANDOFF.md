@@ -9,7 +9,7 @@ This is **not** a teen or guardian app capability and does not create a public a
 - The Sprite is private to administrators with deny-all network rules, separate from FCR compute.
 - Family records, sessions, messages, provider credentials, and arbitrary commands must not enter it.
 - FCR runs only on a verified `main` workflow_dispatch by `jussray`. Other actors and refs fail closed.
-- FCR validates both current main and the exact live head of Bip's existing governance branch.
+- FCR validates its own current `main` and the exact live `main` HEAD of `jussray/Sekret-Bip`. Superseded governance branches are never authoritative proof targets.
 - Live execution requires Production environment `SPRITES_TOKEN` plus approval variables `BIP_SPRITE_APPROVED_SHA` and `BIP_SPRITE_APPROVED_MISSION` matching the request.
 - The manual `execute` checkbox must be true. Dry run does not invoke Sprites or need its credential.
 - FCR checks Sprite identity and network policy, generates a unique 128-bit invocation identifier, sends a fixed command, reads the matching invocation-specific SHA-256-filename private receipt, and rechecks deny-all network. It does not trust an HTTP 200 or a previous same-SHA receipt as proof.
@@ -21,8 +21,8 @@ This is **not** a teen or guardian app capability and does not create a public a
 Place `SPRITES_TOKEN` only in FCR GitHub Actions Production environment secrets, with an approved organization-scoped Sprites API token. Do not paste it in chat or files.
 Bind each live run to exact `BIP_SPRITE_APPROVED_SHA` and `BIP_SPRITE_APPROVED_MISSION` Production environment variables, and require appropriate environment reviewer authorization.
 Apply this candidate to FCR production only after code review, exact-head Actions and real-path verification.
-The private Sprite clean isolated worktree at `/home/sprite/bip-governed-proof` must first be synchronized to the exact approved GitHub SHA by a separately authorized source-read operation, restoring deny-all network afterward. This worktree is separate from `/home/sprite/bip-source`, which may contain unrelated edits. Otherwise the runner will reject the request.
-Current pull request #1054 is a candidate only: do not claim this dispatch is live or that it fixes Se’kret PR #615, Supabase migration lineage or Cloudflare CI credentials.
+The private Sprite clean isolated worktree at `/home/sprite/bip-governed-proof` must first be synchronized to the exact approved Bip `main` SHA by a separately authorized, integrity-checked source transfer that does **not** relax its deny-all network policy. Checkpoint before transfer, verify the clean worktree and exact commit afterward, and do not mutate `/home/sprite/bip-source`, which may contain unrelated edits. Until that source transfer is proven, the runner must fail closed on `BIP_SPRITE_EXACT_HEAD_MISMATCH`.
+The dispatcher source on FCR `main` is not by itself provider execution proof. Historical PR #1054 is not a current source or approval gate. Do not claim this workflow fixes Se’kret PR #615, Supabase migration lineage, or Cloudflare CI credentials.
 
 ## Rollback
 
