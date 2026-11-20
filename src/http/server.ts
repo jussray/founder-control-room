@@ -307,7 +307,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use(publicMcpRouter);
 
   // Authenticated API keys + validated Access JWT; no founder browser-cookie inheritance.
-  app.use('/api/v1', express.json({ type: 'application/json', limit: '4kb' }), founderProfilesApiRouter);
+  app.use('/api/v1', rateLimitGeneral, express.json({ type: 'application/json', limit: '4kb' }), founderProfilesApiRouter);
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));

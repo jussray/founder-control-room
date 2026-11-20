@@ -124,7 +124,8 @@ function gate(scope: string) {
     res.setHeader('Cache-Control', 'no-store');
     const key = req.get('x-api-key') ?? '';
     const assertion = req.get('cf-access-jwt-assertion') ?? '';
-    if (!process.env.FCR_PROFILES_ACCESS_ISSUER || !process.env.FCR_PROFILES_ACCESS_AUD) {
+    if (!process.env.FCR_PROFILES_ACCESS_ISSUER || !process.env.FCR_PROFILES_ACCESS_AUD ||
+        !['production','preview','development'].includes(process.env.ENVIRONMENT ?? '')) {
       return failure(res, 503, 'founder_api_not_configured');
     }
     if (!/^fcr_[a-z]{3}_[A-Za-z0-9_-]{40,55}$/.test(key) || !assertion) {
@@ -145,7 +146,7 @@ function gate(scope: string) {
         .select('id,project_id,environment,scopes,expires_at,revoked_at')
         .eq('token_hash', hashFcrApiToken(key)).maybeSingle();
       if (tokenError) throw tokenError;
-      if (!token || token.project_id !== project.id || token.environment !== 'production' ||
+      if (!token || token.project_id !== project.id || token.environment !== process.env.ENVIRONMENT ||
           token.revoked_at || Date.parse(token.expires_at) <= Date.now()) {
         return failure(res, 401, 'unauthorized');
       }
@@ -251,7 +252,7 @@ async function sendLead(lead: ReturnType<typeof parseLead>): Promise<boolean> {
   const access = object(await oauth.json());
   if (!text(access.access_token, 4000)) throw new Error('oauth_unverified');
   const append = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' +
-    spreadsheetId + '/values/Leads%21A%3AF:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
+    spreadsheetId + '/values/%27FCR%20API%20Leads%27%21A%3AF:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(8000),
       headers: { Authorization: 'Bearer ' + access.access_token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ majorDimension: 'ROWS', values: [[

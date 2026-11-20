@@ -24,7 +24,7 @@ Usage-attempt evidence must persist before a read or write.
 - FCR_LEADS_SHEET_ID: private Google spreadsheet id
 - FCR_LEADS_GOOGLE_SERVICE_ACCOUNT_JSON: Sheets-only service account credentials
 
-Google sheet tab: \`Leads\` with headers
+Google sheet tab: \`FCR API Leads\` (separate from the pre-existing outreach \`Leads\` tab) with headers
 \`received_at_utc, name, email, interest, source, consent\`.
 Share only that spreadsheet with the service account email.
 Append uses Google Sheets values.append with RAW input; no formula execution,
@@ -44,3 +44,5 @@ No anonymous public lead capture is activated on this Access-protected route.
 Rollback before merge: discard branch. After merge: revert focused commit and
 disable relevant API-key scopes/Access application. Profile schema changes need
 a separately approved data retention plan, never an automatic destructive drop.
+
+Verified sheet destination: existing private workbook 'Inbound Leads', tab 'FCR API Leads', header A1:F1; no contact rows were written during setup. Access and Sheets service-account activation remain separate gates.
