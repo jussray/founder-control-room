@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLOUDFLARE_REASONING_CONTRACT,
+  classifyCloudflareSignalKind,
   reasonAboutCloudflare,
 } from '../reason.js';
 import type { CloudflareSignal } from '../types.js';
@@ -12,7 +13,9 @@ function signal(
   partial: Partial<CloudflareSignal> & Pick<CloudflareSignal, 'id' | 'kind' | 'status'>,
 ): CloudflareSignal {
   return {
-    source: 'test',
+    source: 'provider_observation',
+    environment: 'production',
+    resourceId: `cf-provider-${partial.id}`,
     observedAt: '2026-07-13T11:55:00.000Z',
     ...partial,
   };
@@ -38,6 +41,7 @@ function verifiedSignals(): CloudflareSignal[] {
       id: 'health',
       kind: 'runtime_health',
       status: 'success',
+      commitSha: SHA,
       url: 'https://example.com/health',
     }),
     signal({
@@ -102,7 +106,7 @@ describe('reasonAboutCloudflare', () => {
     expect(report.elonMusk.automateLast).toContain('Automate only the evidence refresh');
   });
 
-  it('uses the freshest Pages proof across deployment checks and release markers', () => {
+  it('rejects a generic release marker even when it is newer than a Pages check', () => {
     const report = reasonAboutCloudflare({
       projectId: 'project-1',
       desired: { commitSha: SHA, deploymentAuthority: 'native_git' },
@@ -128,8 +132,8 @@ describe('reasonAboutCloudflare', () => {
       now: NOW,
     });
 
-    expect(report.outcome).toBe('verified');
-    expect(report.reality).toContain(`Latest Pages evidence is success at ${SHA}.`);
+    expect(report.outcome).toBe('blocked');
+    expect(report.reality).toContain('Latest Pages evidence is pending at bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.');
   });
 
   it('blocks a desired-versus-deployed commit mismatch and prepares rollback without executing it', () => {
@@ -277,3 +281,46 @@ describe('reasonAboutCloudflare', () => {
     expect(report.elonMusk.automateLast).toContain('mutation path is stable');
   });
 });
+
+
+  it('classifies check runs, build triggers, and generic Pages badges as non-deployment evidence', () => {
+    for (const label of ['Workers Builds: exact-match-engine', 'Cloudflare Pages', 'worker_build', 'worker_check_run']) {
+      expect(classifyCloudflareSignalKind(label)).toBe('other');
+    }
+    expect(classifyCloudflareSignalKind('worker_deployment')).toBe('worker_deployment');
+    expect(classifyCloudflareSignalKind('pages_deployment')).toBe('pages_deployment');
+  });
+
+  it('never promotes a cached project event or release ledger to verified production', () => {
+    for (const source of ['project_event', 'release_ledger']) {
+      const report = reasonAboutCloudflare({
+        projectId: 'project-1', desired: { commitSha: SHA },
+        signals: verifiedSignals().map((item) => item.id === 'worker' ? { ...item, source } : item),
+        now: NOW,
+      });
+      expect(report.outcome).not.toBe('verified');
+      expect(report.missingEvidence).toContain('worker_deployment');
+    }
+  });
+
+  it('requires production scope, distinct provider identities, and exact runtime SHA', () => {
+    const variants = [
+      verifiedSignals().map((item) => item.id === 'worker' ? { ...item, environment: 'preview' } : item),
+      verifiedSignals().map((item) => item.id === 'pages' ? { ...item, resourceId: 'cf-provider-worker' } : item),
+      verifiedSignals().map((item) => item.id === 'health' ? { ...item, commitSha: 'b'.repeat(40) } : item),
+      verifiedSignals().map((item) => item.id === 'health' ? { ...item, source: 'project_event' } : item),
+    ];
+    for (const signals of variants) {
+      const report = reasonAboutCloudflare({ projectId: 'project-1', desired: { commitSha: SHA }, signals, now: NOW });
+      expect(report.outcome).not.toBe('verified');
+    }
+  });
+
+  it('rejects malformed commit identifiers as release proof', () => {
+    const report = reasonAboutCloudflare({
+      projectId: 'project-1', desired: { commitSha: 'main' }, signals: verifiedSignals(), now: NOW,
+    });
+    expect(report.outcome).not.toBe('verified');
+    expect(report.missingEvidence).toContain('desired_commit');
+  });
+
