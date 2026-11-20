@@ -27,10 +27,13 @@ test('explicit exact SHA+mission approval and token needed to execute',()=>{
  assert.throws(()=>validateIntent({...request,execute:true},{...x,...bad}));
 });
 test('dry run checks both current source heads without touching Sprite',async()=>{
+ assert.equal(TARGET.branch,'main');
  const urls=[];const r=await dispatch(request,{env,fetcher:async u=>{
  urls.push(String(u));return response(String(u).includes('/commits/main')?{sha:fcr}:{object:{sha}})}});
  assert.equal(r.status,'DRY_RUN_SOURCE_VERIFIED');
- assert.equal(urls.length,2);assert.equal(urls.some(x=>x.includes('sprites.dev')),false);
+ assert.equal(urls.length,2);
+ assert.equal(urls.some(x=>x.endsWith('/git/ref/heads/main')),true);
+ assert.equal(urls.some(x=>x.includes('sprites.dev')),false);
 });
 test('rejects stale FCR or Bip before provider auth',async()=>{
  await assert.rejects(dispatch(request,{env,fetcher:async()=>response({sha:'c'.repeat(40)})}),/FCR_MAIN_MOVED/);
