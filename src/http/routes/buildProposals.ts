@@ -147,7 +147,9 @@ export function createBuildProposalRouter(dependencies: BuildProposalDependencie
     const ref = typeof body.ref === 'string' ? body.ref.trim() : '';
     const path = typeof body.path === 'string' ? body.path.trim() : '';
     const goal = typeof body.goal === 'string' ? body.goal.trim() : '';
-    if (!SLUG.test(projectSlug) || !REF.test(ref) || ref.includes('..') || ref.startsWith('/') || !safeBuildProposalPath(path) || goal.length < 10 || goal.length > 1200 || secretMaterial(goal)) {
+    if (!SLUG.test(projectSlug) || !REF.test(ref) || ref.includes('..') || ref.startsWith('/') ||
+      ref === 'main' || ref === 'master' || ref.startsWith('refs/heads/main') || ref === 'refs/heads/master' ||
+      !safeBuildProposalPath(path) || goal.length < 10 || goal.length > 1200 || secretMaterial(goal)) {
       return res.status(400).json({ code: 'BUILD_PROPOSAL_INVALID_INPUT', error: 'Registered project, safe source path, ref, and 10–1200 character goal are required.' });
     }
 
