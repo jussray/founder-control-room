@@ -23,6 +23,7 @@ import { operatorContinuationRouter } from './routes/operatorContinuation.js';
 import { promptosRouter } from './routes/promptos.js';
 import { createPromptOSCommandIntakeRouter } from './routes/promptOsCommandIntake.js';
 import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
+import { buildProposalRouter } from './routes/buildProposals.js';
 import { agentsRouter } from './routes/agents.js';
 import { capabilitiesRouter } from './routes/capabilities.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
@@ -444,6 +445,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));
   app.use('/promptos', promptosRouter);
   app.use('/prompt-workflows', builderPromptWorkflowRouter);
+  app.use('/prompt-workflows', buildProposalRouter);
   app.use('/agents', agentsRouter);
   app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);
