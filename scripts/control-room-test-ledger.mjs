@@ -85,6 +85,42 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
     .sort((left, right) => left.name.localeCompare(right.name) || left.app.localeCompare(right.app));
 }
 
+
+/**
+ * Preserve every provider-visible attempt for this exact commit by check-run ID,
+ * separately from the latest per-lane status. A green retry never erases red.
+ */
+export function selectCheckAttemptHistory(checkRuns, expectedSha, observerCheckName = '') {
+  const exactSha = normalizeSha(expectedSha);
+  const attempts = new Map();
+  for (const run of Array.isArray(checkRuns) ? checkRuns : []) {
+    if (!run || normalizeSha(run.head_sha) !== exactSha || !clean(run.name)
+      || (observerCheckName && clean(run.name) === observerCheckName)) continue;
+    const id = String(run.id ?? '');
+    if (!/^\d+$/.test(id)) throw new Error('Check attempt missing provider ID.');
+    if (attempts.has(id)) throw new Error('Duplicate check attempt ID; refusing incomplete evidence.');
+    const normalized = selectLatestChecks([run], exactSha)[0];
+    if (!normalized) throw new Error('Provider check attempt could not be normalized.');
+    attempts.set(id, normalized);
+  }
+  return [...attempts.values()].sort((a, b) => {
+    const diff = timestamp(a.startedAt ?? a.completedAt) - timestamp(b.startedAt ?? b.completedAt);
+    return diff || (BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0);
+  });
+}
+
+export function aggregateCheckAttemptHistory(attempts) {
+  const list = Array.isArray(attempts) ? attempts : [];
+  return {
+    total: list.length,
+    passed: list.filter((item) => item.state === 'passed').length,
+    failed: list.filter((item) => item.state === 'failed').length,
+    skipped: list.filter((item) => item.state === 'skipped').length,
+    pending: list.filter((item) => item.state === 'queued' || item.state === 'running').length,
+    unknown: list.filter((item) => item.state === 'unknown').length,
+  };
+}
+
 export function aggregateTestLedger(checks) {
   const list = Array.isArray(checks) ? checks : [];
   const counts = {
@@ -113,6 +149,7 @@ export function buildTestLedger({runtimeState = null,
   branch,
   runId,
   checks,
+  checkAttempts = [],
   observerState = 'observing',
   observedAt = new Date(),
 }) {
@@ -130,6 +167,9 @@ export function buildTestLedger({runtimeState = null,
       dedupe: 'latest-by-app-and-name',
       includesAllDiscoveredChecks: true,
       excludesObserverCheck: true,
+      attemptHistory: 'all-observed-exact-head-provider-check-ids',
+      priorCommitHistoryIncluded: false,
+      providerRetentionMayLimitHistory: true,
     },
     runner: {
       provider: 'github-actions',
@@ -140,6 +180,10 @@ export function buildTestLedger({runtimeState = null,
     aggregate,
     requiredGate: assessRequiredGate(requiredRule, checks, normalizeSha(sha)),
     skippedEvidence: summarizeSkippedEvidence(checks),
+    checkAttemptHistory: {
+      aggregate: aggregateCheckAttemptHistory(checkAttempts),
+      attempts: checkAttempts,
+    },
     checks,
   };
 }
@@ -284,12 +328,22 @@ export async function observeExactHeadChecks(env = process.env) {
   let stableTerminalPolls = 0;
   let previousFingerprint = '';
   let checks = [];
+  const observedAttempts = new Map();
   let reachedStableTerminal = false;
 
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
-    const ledger = buildTestLedger({runtimeState, requiredRule, repository, sha, branch, runId, checks});
+    for (const attempt of selectCheckAttemptHistory(runs, sha, observerCheckName)) {
+      const old = observedAttempts.get(attempt.id);
+      if (old && (old.name !== attempt.name || old.app !== attempt.app || old.headSha !== attempt.headSha)) {
+        throw new Error('Provider check attempt identity changed between observations.');
+      }
+      observedAttempts.set(attempt.id, attempt);
+    }
+    const checkAttempts = [...observedAttempts.values()].sort((a, b) =>
+      BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0);
+    const ledger = buildTestLedger({runtimeState, requiredRule, repository, sha, branch, runId, checks, checkAttempts});
     writeLedger(outputPath, ledger);
 
     const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
@@ -307,12 +361,15 @@ export async function observeExactHeadChecks(env = process.env) {
     await sleep(pollMs);
   }
 
+  const checkAttempts = [...observedAttempts.values()].sort((a, b) =>
+    BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0);
   const ledger = buildTestLedger({runtimeState, requiredRule,
     repository,
     sha,
     branch,
     runId,
     checks,
+    checkAttempts,
     observerState: reachedStableTerminal ? 'stable' : 'window-expired',
   });
   writeLedger(outputPath, ledger);
