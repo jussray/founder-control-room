@@ -53,3 +53,20 @@ A staged receipt is **not approval**. A route invocation must still produce a re
 Use GitHub Workspace for sandbox edits. Use Command Bridge for proof commands. Use the Approval Engine for create-branch and merge execution.
 
 The workspace is a workbench, not a throne. Founder authority stays one layer above every tool.
+
+
+## First-party AI code proposals (review-only slice)
+
+The existing workspace now exposes an **AI build proposal** panel. For a selected registered repository, ref, and safe source file, the founder can describe a bounded change and request a single full-file candidate from the existing OpenAI/Anthropic structured provider runtime. The server resolves the ref to an exact SHA, reads the source at that SHA, checks boundedness and known credential patterns, and rechecks the ref after generation. The candidate includes its original and proposed file hashes plus model provenance; the FCR audit stores only sanitized metadata, not source or prompt text.
+
+The founder can preview the candidate and explicitly **stage it in the editor**. Nothing is committed by generation or staging. The existing `POST /approvals/:missionId/patch` remains the only branch writer. This AI preview **does not yet pass a first-party proposal receipt to the patch route**, so that route does not independently enforce the AI candidate's source-file fingerprint. For a safe manual patch, use the exact current **mission branch** as the read ref, compare the source before committing, and rely on existing mission authority, idempotency, verification and merge gates. Never treat model output as passing CI, Playwright, Council, Court or deploy proof.
+
+Known restrictions: only eligible text/code paths, 12,000 source characters, 16,000 candidate characters, one file, and a 10-1,200 character goal. Provider configuration and model call success remain environment-specific and unverified in production. Source is sent to the chosen external model; use only repository code approved for that transfer. No new credential, merge, deploy, spending or execution authority is created.
+
+Repeatable focused proof:
+```sh
+npx vitest run src/http/routes/__tests__/buildProposals.integration.test.ts
+node e2e/first-party-builder-workspace-proof.mjs
+```
+
+The browser proof uses the actual workspace HTML with **synthetic local HTTP** for a proposal and confirms that preview and staging do not call the patch route. It is not live-model or live-GitHub evidence.
