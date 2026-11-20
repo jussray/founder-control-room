@@ -1,3 +1,4 @@
+import * as requireVm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authority, checkpointReceipt, isTransferReceipt, buildRemoteScript} from './bip-sprite-offline-sync.mjs';
@@ -40,6 +41,7 @@ test('remote command is fixed to existing isolated checkout and exact bundle',()
  assert.match(code,/BUNDLE_HASH_MISMATCH/);
  assert.doesNotMatch(code,/dummy-test-token/);
  assert.doesNotMatch(code,/curl |git push|git merge|network\/policy\/update/);
+ assert.doesNotThrow(()=>new (requireVm.Script)(code));
 });
 test('transfer rejects user-controlled non-SHA and unsafe chunk count',()=>{
  for(const bad of [{sha:'main'},{old:'main'},{hash:'abcd'},{invocation:'x'}, {count:0},{count:65}])
