@@ -192,6 +192,11 @@ function setLocation(screen, view = null) {
   applyShell();
 }
 
+window.__FCR_FIVE_SCREEN_NAVIGATE__ = ({ screen, view = null, context = null } = {}) => {
+  if (context && typeof context === 'object' && !Array.isArray(context)) writeContext(context);
+  setLocation(screen, view);
+};
+
 function makeButton(label, current, onClick) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -324,7 +329,16 @@ async function apiJson(path) {
   return unwrapApiData(await response.json());
 }
 
-async function renderHome(home) {
+function mountFounderChat(home, content) {
+  const chatPanel = content.querySelector('[data-home-founder-chat]');
+  if (!(chatPanel instanceof HTMLElement)) return false;
+  const intro = home.querySelector('.founder-screen-intro');
+  if (intro instanceof HTMLElement) intro.insertAdjacentElement('afterend', chatPanel);
+  else home.prepend(chatPanel);
+  return true;
+}
+
+async function renderHome(home, content) {
   const token = ++homeLoadToken;
   home.innerHTML = `<div class="founder-screen-intro"><p class="eyebrow">Home</p><h2>What needs you now?</h2><p>Portfolio reality, the current blocker, and one next gate. Tools stay subordinate to the decision.</p></div><p class="muted">Loading current founder reality…</p>`;
 
@@ -366,9 +380,11 @@ async function renderHome(home) {
     home.querySelectorAll('[data-home-target]').forEach((button) => {
       button.addEventListener('click', () => setLocation(button.dataset.homeTarget));
     });
+    mountFounderChat(home, content);
   } catch (error) {
     if (token !== homeLoadToken || locationState.screen !== 'home') return;
     home.innerHTML += `<p class="error">Home reality could not be established: ${escapeText(error instanceof Error ? error.message : String(error))}</p>`;
+    mountFounderChat(home, content);
   }
 }
 
@@ -383,7 +399,7 @@ function showHome(shell, content) {
   home.hidden = false;
   if (home.dataset.loadState === 'loading' || home.dataset.loadState === 'loaded') return;
   home.dataset.loadState = 'loading';
-  void renderHome(home).finally(() => {
+  void renderHome(home, content).finally(() => {
     if (locationState.screen === 'home') home.dataset.loadState = 'loaded';
   });
 }
@@ -419,7 +435,8 @@ function maybeRestoreContext() {
     if (restoreAttempts.has(key)) return;
     const card = [...document.querySelectorAll('#mission-lanes .card[data-id]')]
       .find((candidate) => candidate.dataset.id === context.missionId);
-    if (card instanceof HTMLElement && !document.querySelector('#mission-detail h2')) {
+    const displayedMissionId = document.querySelector('#mission-detail')?.dataset?.missionId ?? null;
+    if (card instanceof HTMLElement && displayedMissionId !== context.missionId) {
       restoreAttempts.add(key);
       card.click();
     }
@@ -471,8 +488,11 @@ function applyShell() {
     installStyles();
 
     if (locationState.screen === 'home') {
-      ensurePrimaryNav(initial.shell, initial.legacyTabs);
-      showHome(initial.shell, initial.content);
+      if (activeLegacyTab() !== 'home') activateLegacy('home');
+      const final = shellParts();
+      if (!final) return;
+      ensurePrimaryNav(final.shell, final.legacyTabs);
+      showHome(final.shell, final.content);
       return;
     }
 
