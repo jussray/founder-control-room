@@ -72,6 +72,19 @@ describe('first-party AI build proposal seam', () => {
     expect(fixture.propose).not.toHaveBeenCalled();
   });
 
+  it('rejects protected base refs without calling a paid model', async () => {
+    authenticated();
+    for (const ref of ['main', 'master', 'refs/heads/main']) {
+      const fixture = build();
+      const response = await request(fixture.app).post('/prompt-workflows/propose')
+        .set('Authorization', 'Bearer test-token')
+        .send({ ...valid, ref });
+      expect(response.status).toBe(400);
+      expect(fixture.reader.readFile).not.toHaveBeenCalled();
+      expect(fixture.propose).not.toHaveBeenCalled();
+    }
+  });
+
   it('rejects source paths that cannot pass the existing staged mission validator', async () => {
     authenticated();
     const fixture = build();
