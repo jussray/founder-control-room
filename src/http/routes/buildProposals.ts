@@ -66,7 +66,12 @@ async function defaultLookupProject(slug: string): Promise<Project | null> {
 }
 
 function defaultRepository(project: Project): Reader {
-  return providerForProject(project);
+  if (!project.repo_identifier) throw new Error('REPOSITORY_NOT_CONFIGURED');
+  return providerForProject({
+    repo_provider: project.repo_provider,
+    slug: project.slug,
+    repo_identifier: project.repo_identifier,
+  });
 }
 
 async function defaultRecordAudit(projectId: string, metadata: Record<string, unknown>): Promise<void> {
