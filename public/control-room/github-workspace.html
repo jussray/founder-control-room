@@ -243,6 +243,10 @@
 
 
     let pendingBuildProposal = null;
+    // The receipt is an in-memory staging claim only. The existing mission
+    // patch endpoint independently reads the live branch, pinned SHA, and both
+    // file hashes before reserving a provider write.
+    let stagedAiContext = null;
     let proposalInFlight = false;
 
     async function requestAiBuildProposal() {
@@ -257,6 +261,9 @@
         throw new Error('Choose a source ref, a file, and a specific goal of at least 10 characters.');
       }
       pendingBuildProposal = null;
+      // An earlier AI staging must not silently become an unbound manual patch
+      // if the founder requests another generation before committing.
+      if (stagedAiContext) stagedAiContext.invalidated = true;
       nodes.aiProposalPreview.value = '';
       nodes.aiProposalPreview.hidden = true;
       document.getElementById('stage-ai-proposal').disabled = true;
@@ -279,6 +286,14 @@
             result.proposal.path !== target.path ||
             result.proposal.ref !== target.ref) {
           throw new Error('The response was not a valid proposal for this workspace target.');
+        }
+        if (!/^[0-9a-f]{40}$/i.test(result.proposal.exactSha) ||
+            !/^[0-9a-f]{64}$/i.test(result.proposal.beforeSha256) ||
+            !/^[0-9a-f]{64}$/i.test(result.proposal.afterSha256) ||
+            typeof result.proposal.content !== 'string' ||
+            result.proposal.ref === 'main' || result.proposal.ref === 'master' ||
+            result.proposal.ref.startsWith('refs/heads/main')) {
+          throw new Error('A valid, isolated mission-branch source and file hashes are required for an AI handoff.');
         }
         pendingBuildProposal = result.proposal;
         nodes.aiProposalPreview.value = result.proposal.content;
@@ -309,7 +324,36 @@
         throw new Error('Proposal source changed. Re-read and regenerate before staging.');
       }
       nodes.fileContent.value = candidate.content;
-      nodes.aiProposalStatus.textContent = 'Staged in editor only. Review the code. The mission patch route separately checks mission and branch authority, but does not bind this AI proposal fingerprint. Re-read the mission branch and compare changes before committing. No commit or tests have run.';
+      // This is the same bounded staged-workspace receipt already consumed by
+      // POST /approvals/:missionId/patch, not a new authority or write endpoint.
+      // providerCalls:false describes this in-memory stage action only; the
+      // proposal endpoint separately performed authenticated source reads.
+      stagedAiContext = {
+        projectSlug: candidate.projectSlug,
+        ref: candidate.ref,
+        path: candidate.path,
+        content: candidate.content,
+        invalidated: false,
+        receipt: {
+          version: 'founder-os-virtual-workspace-edit-v1',
+          status: 'staged',
+          mode: 'in-memory-only',
+          sourceClassification: 'repository-source',
+          repository: candidate.repository,
+          branch: candidate.ref,
+          sourceSha: candidate.exactSha,
+          changes: [{
+            path: candidate.path,
+            beforeSha256: candidate.beforeSha256,
+            afterSha256: candidate.afterSha256,
+          }],
+          providerCalls: false,
+          filesystemWrites: false,
+          sourceBranchWrites: false,
+          externalExecutionAllowed: false,
+        },
+      };
+      nodes.aiProposalStatus.textContent = 'Staged in editor only. At commit, the existing mission-patch validator independently checks the exact branch SHA and both file hashes. Changes to this staged candidate require regeneration. No commit, CI, or Playwright proof has run.';
       pendingBuildProposal = null;
       document.getElementById('stage-ai-proposal').disabled = true;
     }
@@ -327,7 +371,16 @@
       const message = nodes.commitMessage.value.trim();
       if (!missionId || !path || !message) throw new Error('missionId, file path, and commit message are required.');
       const changes = [{ path, content: nodes.fileContent.value }];
-      const signature = JSON.stringify({ projectSlug: nodes.projectSlug.value.trim(), missionId, message, changes });
+      const staged = stagedAiContext;
+      if (staged && (staged.invalidated ||
+          staged.projectSlug !== nodes.projectSlug.value.trim() ||
+          staged.ref !== nodes.readRef.value.trim() ||
+          staged.path !== path ||
+          staged.content !== nodes.fileContent.value)) {
+        throw new Error('The staged AI candidate or repository target changed. Regenerate and stage again before committing.');
+      }
+      const stagedWorkspaceReceipt = staged?.receipt;
+      const signature = JSON.stringify({ projectSlug: nodes.projectSlug.value.trim(), missionId, message, changes, stagedWorkspaceReceipt });
       if (pendingPatch?.signature !== signature) {
         if (!globalThis.crypto?.randomUUID) throw new Error('Secure browser UUID generation is unavailable. No patch was submitted.');
         pendingPatch = { signature, idempotencyKey: crypto.randomUUID() };
@@ -340,7 +393,10 @@
       try {
         const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
           method: 'POST',
-          body: JSON.stringify({ idempotencyKey, message, changes }),
+          body: JSON.stringify({
+            idempotencyKey, message, changes,
+            ...(stagedWorkspaceReceipt ? { stagedWorkspaceReceipt } : {}),
+          }),
         });
         nodes.result.textContent = JSON.stringify(data, null, 2);
         const receipt = data.result && typeof data.result === 'object' ? data.result : data;
