@@ -80,6 +80,17 @@ describe('first-party AI build proposal seam', () => {
     expect(fixture.reader.readFile).not.toHaveBeenCalled();
   });
 
+  it('rejects credential-bearing founder goals before reading repository source', async () => {
+    authenticated();
+    const fixture = build();
+    const response = await request(fixture.app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token')
+      .send({ ...valid, goal: 'Change ready; secret: -----BEGIN PRIVATE KEY----- do not share.' });
+    expect(response.status).toBe(400);
+    expect(fixture.reader.readFile).not.toHaveBeenCalled();
+    expect(fixture.propose).not.toHaveBeenCalled();
+  });
+
   it('returns a bounded, fingerprinted review-only proposal without any write authority', async () => {
     authenticated();
     const fixture = build();
