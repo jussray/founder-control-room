@@ -7,7 +7,7 @@ import path from 'node:path';
 export const MISSIONS = Object.freeze(['repo-truth','agent-contract','companion-contract']);
 export const TARGET = Object.freeze({
   repository:'jussray/Sekret-Bip',
-  branch:'governance/repo-reality-v10-20261025',
+  branch:'main',
   name:'sekret-bip-governed-proof',
   id:'sprite-4709ae6f-3a4c-4e45-8c47-e73a7ee54f1f',
   checkoutDir:'/home/sprite/bip-governed-proof',
