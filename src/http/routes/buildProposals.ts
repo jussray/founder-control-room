@@ -5,6 +5,7 @@
  * Only /approvals/:missionId/patch can write a reviewed proposal.
  */
 import { createHash } from 'node:crypto';
+import { isSafeFounderOsStagedPatchPath } from '../../founder-os-lab/missionPatchHandoff.js';
 import { Router } from 'express';
 import { runStructuredJson, StructuredProviderError, type StructuredProviderConfig } from '../../aiRuntime/structuredProvider.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -18,7 +19,6 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const REF = /^[a-zA-Z0-9_./-]{1,160}$/;
 const PATH = /^[a-zA-Z0-9_./-]{1,200}$/;
 const CODE_EXT = /\.(?:tsx?|jsx?|mjs|cjs|css|html|json|md|vue|svelte)$/i;
-const SAFE_ROOTS = new Set(['src', 'app', 'apps', 'public', 'tests', 'test', 'e2e', 'components', 'pages', 'lib', 'scripts', 'docs', 'worker', 'packages', 'web', 'frontend', 'backend']);
 const MAX_SOURCE = 12_000;
 const MAX_OUTPUT = 16_000;
 const MODEL_SCHEMA: Record<string, unknown> = {
@@ -43,7 +43,7 @@ export interface BuildProposalDependencies {
 export function safeBuildProposalPath(value: string): boolean {
   if (!PATH.test(value) || !CODE_EXT.test(value)) return false;
   const segments = value.split('/');
-  if (segments.length < 2 || !SAFE_ROOTS.has(segments[0]!)) return false;
+  if (segments.length < 2 || !isSafeFounderOsStagedPatchPath(value)) return false;
   if (segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.startsWith('.'))) return false;
   if (/\/(?:secrets?|credentials?|certificates?|private-keys?)\//i.test('/' + value + '/')) return false;
   return !/(?:\.env|\.pem|\.key|\.p12|\.pfx)$/i.test(value);
@@ -170,7 +170,7 @@ export function createBuildProposalRouter(dependencies: BuildProposalDependencie
     } catch {
       return res.status(502).json({ code: 'SOURCE_READ_UNVERIFIED', error: 'Could not verify exact source ref and file.' });
     }
-    if (source.length > MAX_SOURCE || source.includes('\0') || secretMaterial(source)) {
+    if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE || source.includes('\0') || secretMaterial(source)) {
       return res.status(422).json({ code: 'SOURCE_NOT_ELIGIBLE', error: 'Source is too large, binary, or may contain credentials. No model was called.' });
     }
 
@@ -182,7 +182,7 @@ export function createBuildProposalRouter(dependencies: BuildProposalDependencie
       const code = error instanceof StructuredProviderError ? error.code : configurationMissing ? 'MODEL_PROVIDER_NOT_CONFIGURED' : 'BUILD_PROPOSAL_MODEL_FAILED';
       return res.status(configurationMissing ? 503 : 502).json({ code, error: 'AI proposal unavailable. No repository changes were made.' });
     }
-    if (typeof candidate.content !== 'string' || !candidate.content.length || candidate.content.length > MAX_OUTPUT
+    if (typeof candidate.content !== 'string' || !candidate.content.length || Buffer.byteLength(candidate.content, 'utf8') > MAX_OUTPUT
       || typeof candidate.summary !== 'string' || candidate.summary.length < 1 || candidate.summary.length > 500
       || secretMaterial(candidate.content) || candidate.content.includes('\0')) {
       return res.status(422).json({ code: 'MODEL_OUTPUT_REJECTED', error: 'Model proposal violates bounded source or safety policy.' });
