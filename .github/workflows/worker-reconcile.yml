@@ -328,7 +328,9 @@ jobs:
 
           health_body=''
           version_body=''
-          for attempt in 1 2 3 4 5 6; do
+          # Custom-domain edges can serve the previous version for a few minutes
+          # after deploy; two observed runs exceeded the old ~60s window.
+          for attempt in $(seq 1 24); do
             : > "$headers"
             : > "$version_headers"
             candidate_health="$(curl --silent --show-error --fail \
