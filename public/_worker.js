@@ -360,7 +360,10 @@ async function inspectPublicWorkRequest(request, env) {
   try {
     const cf = request.cf ?? {};
     const bot = cf.botManagement ?? {};
-    const result = await inspector.inspect({
+    // An unavailable peer must not stall the public page indefinitely.
+    // This is observation-only; a timeout never grants or revokes authority.
+    const result = await Promise.race([
+      inspector.inspect({
       method: request.method,
       pathname,
       userAgent: request.headers.get('user-agent') ?? '',
@@ -368,7 +371,9 @@ async function inspectPublicWorkRequest(request, env) {
       botScore: typeof bot.score === 'number' && Number.isFinite(bot.score) ? bot.score : null,
       country: typeof cf.country === 'string' ? cf.country : null,
       asn: Number.isSafeInteger(cf.asn) ? cf.asn : null,
-    });
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('SHIELD_INSPECTION_TIMEOUT')), 250)),
+    ]);
     if (result?.schema !== SHIELD_INSPECTION_SCHEMA ||
         result.receiptKind !== 'hmac-sha256' ||
         !/^[0-9a-f]{64}$/.test(result.receipt ?? '') ||
