@@ -132,6 +132,25 @@ describe('FCR pinned canonical Council Bus bridge',()=>{
     await expect(returnCouncilToOrigin(x.input,x.runtime)).rejects.toThrow(/aborted/);
     expect(x.calls).toHaveLength(0);
   });
+  it('rejects an ACK reported for a different handoff key',async()=>{
+    const f=fixture();
+    f.runtime.deliver=async()=>({
+      status:'ACK_REPORTED_BY_TRUSTED_PORT',delivered:true,
+      idempotencyKey:'0'.repeat(64)
+    });
+    expect(await returnCouncilToOrigin(f.input,f.runtime)).toEqual({
+      status:'NOT_DELIVERED',productionVerified:false
+    });
+  });
+  it('rejects an ACK without a handoff idempotency key',async()=>{
+    const f=fixture();
+    f.runtime.deliver=async()=>({
+      status:'ACK_REPORTED_BY_TRUSTED_PORT',delivered:true
+    });
+    expect(await returnCouncilToOrigin(f.input,f.runtime)).toEqual({
+      status:'NOT_DELIVERED',productionVerified:false
+    });
+  });
   it('missing remote ACK cannot upgrade metadata to verified',async()=>{
     const f=fixture();f.runtime.deliver=async()=>({status:'DUPLICATE_NOT_SENT',delivered:false});
     expect(await returnCouncilToOrigin(f.input,f.runtime)).toEqual({status:'NOT_DELIVERED',productionVerified:false});
