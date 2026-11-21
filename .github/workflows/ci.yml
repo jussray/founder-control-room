@@ -21,17 +21,8 @@ jobs:
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -56,17 +47,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -89,17 +71,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -131,17 +104,8 @@ jobs:
     name: Playwright e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -186,17 +150,8 @@ jobs:
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -222,17 +177,8 @@ jobs:
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -263,17 +209,8 @@ jobs:
   documentation-truth:
     name: Documentation truth
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -336,17 +273,8 @@ jobs:
     name: Cloudflare bridge authority contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -376,17 +304,8 @@ jobs:
   test-discovery:
     name: Test discovery ratchet
     runs-on: ubuntu-latest
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -447,17 +366,8 @@ jobs:
     name: Migration lint
     runs-on: ubuntu-latest
     timeout-minutes: 35
-       - name: Refresh runner Git security updates before checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --only-upgrade --yes git
-          printf 'git executable: '
-          command -v git
-          git --version
-          dpkg-query -W -f='${Package} ${Version}\n' git
-          apt-cache policy git
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact candidate with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
