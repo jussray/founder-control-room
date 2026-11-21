@@ -294,6 +294,7 @@ describe('Founder Control Room paired remote MCP', () => {
       'fcr_get_current_truth',
       'fcr_list_task_checkpoints',
       'fcr_get_task_checkpoint',
+      'fcr_save_task_checkpoint',
       'fcr_audit_change_genealogy',
       'fcr_preview_skill_route',
       'fcr_relay_operator',
