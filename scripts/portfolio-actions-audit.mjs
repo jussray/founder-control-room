@@ -109,7 +109,69 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
   if (age > STALE_DAYS) return 'STALE_SOURCE_30D';
   return 'OBSERVED_CHECKS_ONLY';
 }
+const PARALLEL_AUDIT_CONTRACT = 'juss/portfolio-parallel-audit@v1';
+const EVIDENCE_RUN_NAME = /(?:^|\\b)(?:CI|Playwright|E2E|Security|Quality Gate|Test Ledger|ProofMode)(?:\\b|$)/i;
+const MAX_ARTIFACT_PROBES = 2;
+
+// A reusable Juss-owned portfolio receipt, not an agent approval or release gate.
+// Each evidence plane is evaluated independently; unknown is never promoted to pass.
+export function classifyParallelEvidence({ head, runs = [], artifactProbes = [] }) {
+  const hasHead = typeof head === 'string' && /^[a-f0-9]{40}$/.test(head);
+  const exact = hasHead && Array.isArray(runs) ? runs.filter((run) => run.head_sha === head) : [];
+  const artifactReads = artifactProbes.filter((probe) => probe?.head === head);
+  const verifiedArtifacts = artifactReads.filter((probe) => probe.status === 'READ');
+  const artifactCount = verifiedArtifacts.reduce((sum, probe) => sum + probe.count, 0);
+  let artifactState = 'UNKNOWN_NOT_SAMPLED';
+  if (verifiedArtifacts.some((probe) => probe.truncated)) artifactState = 'UNKNOWN_TRUNCATED';
+  else if (artifactCount > 0) artifactState = 'RETAINED_IN_SAMPLED_RUN';
+  else if (artifactReads.some((probe) => probe.status !== 'READ')) artifactState = 'UNKNOWN_READ_BLOCKED';
+  else if (verifiedArtifacts.length) artifactState = 'NONE_IN_SAMPLED_RUNS';
+  const ciState = !hasHead || !exact.length ? 'UNKNOWN'
+    : exact.some((run) => TERMINAL_FAILURES.has(run.conclusion)) ? 'FAILED'
+    : exact.some((run) => run.status !== 'completed') ? 'PENDING'
+    : exact.some((run) => run.conclusion === 'success') ? 'OBSERVED_SUCCESS' : 'UNKNOWN';
+  return {
+    contract: PARALLEL_AUDIT_CONTRACT,
+    source: hasHead ? 'EXACT_HEAD_OBSERVED' : 'UNKNOWN',
+    ci: { state: ciState, exactHeadRunsSampled: exact.length },
+    artifacts: { state: artifactState, runsSampled: artifactReads.length,
+      retainedArtifactCount: artifactCount },
+    prMergeBase: 'UNKNOWN_NOT_OBSERVED',
+    deployment: 'UNKNOWN_NOT_OBSERVED',
+    productionPlaywright: 'UNKNOWN_NOT_OBSERVED',
+    releaseAuthorized: false,
+    mutationAuthorized: false,
+    note: 'Independent source, CI and artifact observations; no PR, deployed runtime or production-browser claim',
+  };
+}
+
 function selfTest() {
+  const head = 'a'.repeat(40);
+  const sampleRun = { id: 10, name: 'Protect Me CI', head_sha: head,
+    status: 'completed', conclusion: 'success' };
+  const proof = classifyParallelEvidence({ head, runs: [sampleRun],
+    artifactProbes: [{ head, status: 'READ', count: 1, truncated: false }] });
+  assert.equal(proof.source, 'EXACT_HEAD_OBSERVED');
+  assert.equal(proof.ci.state, 'OBSERVED_SUCCESS');
+  assert.equal(proof.artifacts.state, 'RETAINED_IN_SAMPLED_RUN');
+  assert.equal(proof.deployment, 'UNKNOWN_NOT_OBSERVED');
+  assert.equal(proof.prMergeBase, 'UNKNOWN_NOT_OBSERVED');
+  assert.equal(proof.productionPlaywright, 'UNKNOWN_NOT_OBSERVED');
+  assert.equal(proof.releaseAuthorized, false);
+  assert.equal(proof.mutationAuthorized, false);
+  assert.equal(classifyParallelEvidence({ head, runs: [sampleRun],
+    artifactProbes: [{ head, status: 'READ', count: 0 }] }).artifacts.state, 'NONE_IN_SAMPLED_RUNS');
+  assert.equal(classifyParallelEvidence({ head, runs: [sampleRun],
+    artifactProbes: [{ head, status: 'UNAVAILABLE' }] }).artifacts.state, 'UNKNOWN_READ_BLOCKED');
+  assert.equal(classifyParallelEvidence({ head, runs: [sampleRun],
+    artifactProbes: [{ head, status: 'READ', count: 0, truncated: true }] }).artifacts.state, 'UNKNOWN_TRUNCATED');
+  assert.equal(classifyParallelEvidence({ head, runs: [sampleRun],
+    artifactProbes: [{ head: 'b'.repeat(40), status: 'READ', count: 1 }] }).artifacts.state, 'UNKNOWN_NOT_SAMPLED');
+  assert.equal(classifyParallelEvidence({ head: null, runs: [sampleRun] }).ci.state, 'UNKNOWN');
+  assert.equal(classifyParallelEvidence({ head, runs: [{ ...sampleRun, head_sha: 'b'.repeat(40) }] }).ci.state, 'UNKNOWN');
+  assert.equal(classifyParallelEvidence({ head, runs: [{ ...sampleRun, conclusion: 'failure' }] }).ci.state, 'FAILED');
+  assert.ok(EVIDENCE_RUN_NAME.test(sampleRun.name));
+  assert.ok(!EVIDENCE_RUN_NAME.test('Repo Reality Evidence'));
   const base = { archived: false, workflowCount: 1, runs: [], head: 'a'.repeat(40),
     headCommittedAt: new Date().toISOString(), now: Date.now(), truncated: false };
   assert.equal(assess(base), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
@@ -200,7 +262,7 @@ function selfTest() {
   assert.equal(trustStep.slice(trustStep.indexOf('\n')).includes('\n      - '), false,
     'no intervening action may separate trusted-main verification from credential minting');
   assert.match(trustStep, /set -euo pipefail/);
-  console.log('Portfolio classification regression: 16 assertions passed; this does NOT verify any external repository');
+  console.log('Portfolio classification and parallel-evidence self-tests passed; this does NOT verify any external repository');
   console.log('PORTFOLIO_HANDOFF_REGRESSION_PASSED');
 }
 
@@ -262,7 +324,8 @@ async function main() {
         sampledExactHeadRuns: 0,
         sampledFailures: 0,
         state: 'UNKNOWN',
-        limitation: 'No production actions or end-user operations are verified by GitHub checks'
+        limitation: 'No production actions or end-user operations are verified by GitHub checks',
+        parallelAudit: classifyParallelEvidence({ head: null })
       };
       if (result.archived) {
         result.state = 'ARCHIVED';
@@ -295,6 +358,24 @@ async function main() {
           runs, head: validHead, headCommittedAt, now,
           truncated: !Number.isInteger(actionResponse.total_count) ||
             actionResponse.total_count > runs.length });
+        // Two bounded independent Actions-artifact reads per repository. GitHub
+        // cannot prove deployment or PR merge-base from this read-only token.
+        const candidates = matching.filter((run) => Number.isSafeInteger(run.id)
+          && run.status === 'completed' && EVIDENCE_RUN_NAME.test(run.name || ''))
+          .slice(0, MAX_ARTIFACT_PROBES);
+        const artifactProbes = await Promise.all(candidates.map(async (run) => {
+          try {
+            const data = await api('/repos/' + key + '/actions/runs/' + run.id + '/artifacts?per_page=100');
+            if (!Array.isArray(data.artifacts) || !Number.isSafeInteger(data.total_count)) {
+              return { head: validHead, status: 'UNAVAILABLE' };
+            }
+            return { head: validHead, status: 'READ', count: data.artifacts.length,
+              truncated: data.total_count > data.artifacts.length };
+          } catch {
+            return { head: validHead, status: 'UNAVAILABLE' };
+          }
+        }));
+        result.parallelAudit = classifyParallelEvidence({ head: validHead, runs, artifactProbes });
       } catch (error) {
         result.state = 'UNKNOWN_READ_BLOCKED';
         result.blocker = error instanceof Error && /^GITHUB_READ_STATUS_\d+$/.test(error.message)
@@ -322,6 +403,7 @@ async function main() {
     schema: 'fcr/portfolio-actions-audit@v1',
     observedAt,
     subject: 'GitHub App installation repositories only',
+    parallelAuditContract: PARALLEL_AUDIT_CONTRACT,
     expectedMinimum,
     installationRepositories: accessible,
     discoveryComplete,
@@ -337,6 +419,8 @@ async function main() {
       'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
+      'Parallel project evidence lanes inspect sampled exact-head Actions artifacts but not PR merge-base, production runtime or browser proof',
+      'No artifact found in sampled runs does not prove the repository requires an artifact or that no other run has one',
       'Private names use per-run pseudonyms; private branch names and head SHAs are omitted'
     ]
   };
