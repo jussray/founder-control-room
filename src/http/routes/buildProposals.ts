@@ -10,6 +10,7 @@ import { Router } from 'express';
 import { runStructuredJson, StructuredProviderError, type StructuredProviderConfig } from '../../aiRuntime/structuredProvider.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { providerConfigurationError, providerForProject } from '../../providers/providerFactory.js';
+import { createGitHubAppJwt } from '../../providers/githubAppAuth.js';
 import type { RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { rateLimitFounderPermissions } from '../middleware/security.js';
@@ -71,11 +72,23 @@ export function builderRepositoryConfigurationError(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
   if (!project.repo_identifier) return 'Registered repository identifier is missing';
-  return providerConfigurationError({
+  const configurationError = providerConfigurationError({
     slug: project.slug,
     repo_provider: project.repo_provider,
     repo_identifier: project.repo_identifier,
   }, env);
+  if (configurationError) return configurationError;
+  // The provider factory checks presence; a present but malformed PEM is still
+  // unusable. Verify the same RSA parser/JWT signer the actual GitHub App
+  // adapter uses, without persisting, logging, or returning a signed token.
+  if (project.repo_provider === 'github' && env.GITHUB_APP_ID?.trim() && env.GITHUB_PRIVATE_KEY?.trim()) {
+    try {
+      createGitHubAppJwt(env.GITHUB_APP_ID, env.GITHUB_PRIVATE_KEY);
+    } catch {
+      return 'GitHub App private key is not a valid RSA credential in a supported transport format';
+    }
+  }
+  return null;
 }
 
 function defaultRepository(project: Project): Reader {
