@@ -56,6 +56,35 @@ test('rejects a voiceover with fewer than seven seconds of recorded audio',async
  }finally{await rm(d,{recursive:true,force:true})}
 });
 
+function makeClipWithShortVideo(path, videoSeconds, audioSeconds) {
+  const args=['-hide_banner','-loglevel','error','-y',
+    '-f','lavfi','-i','testsrc2=size=320x568:rate=30',
+    '-f','lavfi','-i','sine=frequency=220:sample_rate=48000',
+    '-filter_complex',`[0:v]trim=duration=${videoSeconds}[shortv]`,
+    '-map','[shortv]','-map','1:a','-t',String(audioSeconds),
+    '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-c:a','aac',path];
+  assert.equal(cmd('ffmpeg',args).status,0);
+}
+test('rejects shortened intro and screen video streams padded by full-length audio',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4');
+  const shortIntro=join(d,'intro-short-video.mp4'),shortScreen=join(d,'screen-short-video.mp4');
+  makeClip(intro,3.5,true);makeClip(screen,7.5,true);
+  makeClipWithShortVideo(shortIntro,0.8,3.5);
+  makeClipWithShortVideo(shortScreen,1,7.5);
+  for(const [name,clipIntro,clipScreen] of [
+    ['intro',shortIntro,screen],['screen',intro,shortScreen],
+  ]){
+   const output=join(d,name+'-out.mp4');
+   const r=cmd('node',[script,'--intro',clipIntro,'--screen',clipScreen,
+      '--output',output,'--width','270','--height','480']);
+   assert.notEqual(r.status,0,`Truncated ${name} video must not pass on the audio container duration`);
+   assert.match(r.stderr,new RegExp(name,'i'));
+   await assert.rejects(access(output));
+  }
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+
 test('no source footage fails closed with no fabricated reel',async()=>{
   const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
     const r=cmd('node',[script,'--intro',join(d,'missing.mp4'),'--screen',join(d,'missing2.mp4'),'--output',join(d,'out.mp4')]);
