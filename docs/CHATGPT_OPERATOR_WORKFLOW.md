@@ -132,6 +132,11 @@ The source references must resolve in an existing authorized persistence
 service. The candidate founder-authenticated API provides:
 
 - `POST /operator/continuity` with `{ "continuation": <validated packet> }`;
+- `GET /operator/continuity?projectSlug=...&repositoryFullName=...&limit=10` for
+  bounded founder-only task discovery, returning reference-only metadata;
+  the newest row per task wins, and an invalidated newest row is returned as
+  `status: INVALIDATED` with `invalidatedAt`, `nextActionRef: null` and no
+  remaining steps (an older row for that task is never resurrected);
 - `GET /operator/continuity/:taskId?projectSlug=...&repositoryFullName=...`;
 - server-only storage in existing `public.continuity_records`, using a
   reviewed additive migration for `task_id`, `execution_state`, and
@@ -156,6 +161,10 @@ through their ordinary independent gates. An expired snapshot can preserve
 discussion momentum but cannot resurrect an expired approval or green check.
 
 Repeatable local Playwright proof: `npm run verify:operator-continuation-auth`.
-It checks anonymous access using Chromium, the real Express route, and a synthetic
-unreachable local Supabase URL. Passing this check is not authenticated live
-persistence, ChatGPT platform mode-switch integration, or production readiness.
+It runs two Chromium checks: anonymous requests must fail closed on the real FCR
+Express server, and an isolated synthetic Supabase Auth/PostgREST fixture must
+pass founder-bound save, list, read, duplicate, stale-write, and non-founder
+rejection through the real HTTP client. The synthetic fixture uses no real
+accounts, production database writes, Cloudflare preview or browser login.
+Passing it is not real founder authentication, live persistence, native ChatGPT
+mode-switch integration, deployment evidence, or production approval.
