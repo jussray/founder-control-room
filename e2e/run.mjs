@@ -390,8 +390,10 @@ async function runGuardedTerminalProof(page) {
 
   // Exercise the *shipped* Control Room terminal tab with this same real
   // browser session and server, not an uninvoked standalone test fixture.
-  await page.goto(`${BASE_URL}/control-room/`);
-  await page.click('.tabs button[data-tab="terminal"]');
+  // The five-screen shell hides legacy .tabs; use its public deep link,
+  // which maps ?tab=terminal to the visible Control > Execution view.
+  await page.goto(`${BASE_URL}/control-room/?tab=terminal`);
+  await page.waitForSelector('.founder-subnav button[data-control-view="execution"][aria-current="page"]');
   await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
   await page.click('#terminal-load-commands');
   await page.waitForSelector('#terminal-commands .card[data-id="git.head"]');
@@ -408,9 +410,10 @@ async function runGuardedTerminalProof(page) {
     new URL(req.url()).pathname === `/terminal/${TERMINAL_PROOF_REPO}/run`);
   await page.click('#terminal-run-form button[type="submit"]');
   const submitted = (await terminalPost).postDataJSON();
-  assert.deepEqual(Object.keys(submitted).sort(),
-    ['commandId', 'missionId', 'expectedCommitSha'].sort(),
-    'legacy confirmWrite is absent from the actual browser request payload');
+  assert(
+    Object.keys(submitted).sort().join(',') === ['commandId', 'missionId', 'expectedCommitSha'].sort().join(','),
+    'legacy confirmWrite is absent from the actual browser request payload',
+  );
   assert(submitted.commandId === 'git.head' && submitted.expectedCommitSha === REAL_REPO_HEAD_SHA,
     'shipped browser request remains bound to the selected read-only command and exact head');
   const actualTerminalResult = await waitForText(page, '#terminal-run-result', '"status": "passed"');
