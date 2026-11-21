@@ -28,9 +28,13 @@ const requireNativeDetail = (label, actual, factor) => {
 };
 const probe = p => {
   const data = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries',
-    'format=duration:stream=codec_type,codec_name,width,height', '-of', 'json', p]));
+    'format=duration:stream=codec_type,codec_name,width,height,duration', '-of', 'json', p]));
   const video = (data.streams || []).find(s => s.codec_type === 'video');
-  return { duration: Number(data.format?.duration), video, audio: (data.streams || []).some(s => s.codec_type === 'audio') };
+  const audio = (data.streams || []).find(s => s.codec_type === 'audio');
+  // A container may be 7s long even when its recorded audio ends at 0.5s.
+  // Require the actual selected audio stream duration, never the format duration.
+  return { duration: Number(data.format?.duration), video, audio: Boolean(audio),
+    audioDuration: audio ? Number(audio.duration) : null };
 };
 const file = (flag) => {
   const p = args[flag];
@@ -66,10 +70,19 @@ const main = async () => {
     throw Error('must be a portrait output with even dimensions');
   }
   const a = probe(intro), b = probe(screen);
-  if (!a.video || !a.audio || a.duration < 3) throw Error('intro must have >=3s camera footage with genuine recorded audio');
+  const audioCovers = (clip, seconds) => clip.audio && Number.isFinite(clip.audioDuration) && clip.audioDuration >= seconds;
+  if (!a.video || a.duration < 3 || !audioCovers(a, 3)) {
+    throw Error('intro must have >=3s camera footage with >=3s genuine recorded audio');
+  }
   if (!b.video || b.duration < 7) throw Error('screen must have >=7s authentic UI footage');
-  if (!b.audio && !voiceover) throw Error('screen without audio requires genuine 7s --voiceover (no fake narration)');
-  if (voiceover && probe(voiceover).duration < 7) throw Error('voiceover must be at least 7 seconds');
+  // Even with a longer video/container duration, a short recorded audio stream
+  // cannot be silently padded into a claim of seven seconds of real audio.
+  if (!voiceover && !audioCovers(b, 7)) {
+    throw Error('screen requires >=7s recorded audio or genuine 7s --voiceover (no fake narration)');
+  }
+  if (voiceover && !audioCovers(probe(voiceover), 7)) {
+    throw Error('voiceover must contain at least 7 seconds of actual audio');
+  }
   requireNativeDetail('intro', a.video, Math.max(w/a.video.width, h/a.video.height));
   requireNativeDetail('screen', b.video, Math.min((w*0.92)/b.video.width, (h*0.78)/b.video.height));
   if (world) {
