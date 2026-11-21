@@ -8,6 +8,10 @@ import type {
 import { createAppAwareRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
 import { supabase } from '../lib/supabaseClient.js';
 import {
+  listRecentOperatorExecutionContinuations,
+  readOperatorExecutionContinuation,
+} from '../lib/operatorExecutionContinuationStore.js';
+import {
   routeFcrSkills,
   type FcrSkillRouterAction,
 } from '../lib/fcrSkillRouter.js';
@@ -29,6 +33,8 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_preview_capability_plan',
   'fcr_list_projects',
   'fcr_get_current_truth',
+  'fcr_list_task_checkpoints',
+  'fcr_get_task_checkpoint',
   'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
   'fcr_relay_operator',
@@ -88,6 +94,8 @@ export interface ExternalMcpToolDependencies {
   listProjects?: (allowedProjects: ReadonlySet<string>) => Promise<unknown>;
   listCapabilities?: (projectSlug: string) => Promise<unknown>;
   getCurrentTruth?: (projectSlug: string) => Promise<unknown>;
+  listTaskCheckpoints?: (input: { projectSlug: string; limit: number }) => Promise<unknown>;
+  getTaskCheckpoint?: (input: { projectSlug: string; taskId: string }) => Promise<unknown>;
   auditChangeGenealogy?: (input: {
     projectSlug: string;
     limit: number;
@@ -292,6 +300,26 @@ async function projectRow(slug: string) {
     status: string;
     risk_level: string;
     updated_at: string;
+  };
+}
+
+async function defaultListTaskCheckpoints(input: { projectSlug: string; limit: number }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier) throw new Error('Project has no registered repository');
+  return listRecentOperatorExecutionContinuations(project.slug, project.repo_identifier, input.limit);
+}
+
+async function defaultGetTaskCheckpoint(input: { projectSlug: string; taskId: string }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier) throw new Error('Project has no registered repository');
+  const continuation = await readOperatorExecutionContinuation(
+    project.slug, project.repo_identifier, input.taskId,
+  );
+  return {
+    found: continuation !== null,
+    continuation,
+    currentEvidenceVerified: false,
+    executionAuthorityFromHandoff: false,
   };
 }
 
@@ -703,6 +731,32 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       annotations: readAnnotations,
     },
     {
+      name: 'fcr_list_task_checkpoints',
+      title: 'Find recent shared FCR work checkpoints',
+      description: 'Discover only recent reference-only task checkpoints for a granted project, using the existing founder-only continuity ledger. A bounded historical scan is not proof of current progress or complete coverage.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+        },
+      },
+      annotations: readAnnotations,
+    },
+    {
+      name: 'fcr_get_task_checkpoint',
+      title: 'Resume an existing FCR task checkpoint',
+      description: 'Read one reference-only saved task continuation from an authorized project. Historical context never grants execution, current evidence, or a founder approval.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId', 'taskId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          taskId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$' },
+        },
+      },
+      annotations: readAnnotations,
+    },
+    {
       name: 'fcr_audit_change_genealogy',
       title: 'Audit recent GitHub change genealogy',
       description:
@@ -789,6 +843,8 @@ export function createExternalMcpToolExecutor(
   const listProjects = overrides.listProjects ?? defaultListProjects;
   const listCapabilities = overrides.listCapabilities ?? defaultListCapabilities;
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
+  const listTaskCheckpoints = overrides.listTaskCheckpoints ?? defaultListTaskCheckpoints;
+  const getTaskCheckpoint = overrides.getTaskCheckpoint ?? defaultGetTaskCheckpoint;
   const auditChangeGenealogy = overrides.auditChangeGenealogy
     ?? ((input) => defaultAuditChangeGenealogy(input, env));
   const previewCapabilityPlan = overrides.previewCapabilityPlan
@@ -856,6 +912,21 @@ export function createExternalMcpToolExecutor(
       noUnexpectedKeys(input.arguments, ['projectId'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       result = await getCurrentTruth(receiptProject);
+    } else if (input.name === 'fcr_list_task_checkpoints') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'limit'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      result = await listTaskCheckpoints({
+        projectSlug: receiptProject,
+        limit: boundedInteger(input.arguments.limit, 'limit', 1, 20, 10),
+      });
+    } else if (input.name === 'fcr_get_task_checkpoint') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'taskId'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      const taskId = text(input.arguments.taskId, 'taskId', 128);
+      if (!/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(taskId)) {
+        throw new Error('taskId must be a bounded task identifier');
+      }
+      result = await getTaskCheckpoint({ projectSlug: receiptProject, taskId });
     } else if (input.name === 'fcr_audit_change_genealogy') {
       noUnexpectedKeys(input.arguments, ['projectId', 'limit', 'includeComments', 'includeDiff'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
