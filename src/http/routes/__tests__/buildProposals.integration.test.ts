@@ -9,7 +9,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
-import { createBuildProposalRouter, safeBuildProposalPath } from '../buildProposals.js';
+import { builderRepositoryConfigurationError, createBuildProposalRouter, safeBuildProposalPath } from '../buildProposals.js';
 
 const SHA = 'a'.repeat(40);
 const project = { id: 'project-1', slug: 'founder-control-room', repo_provider: 'github', repo_identifier: 'jussray/founder-control-room' };
@@ -63,6 +63,43 @@ describe('first-party AI build proposal seam', () => {
     for (const bad of ['src/../.env', '.github/workflows/a.yml', 'src/secrets/token.ts', 'src/private-keys/key.ts', '/src/app.ts', 'src//a.ts', 'src/a.pem', 'src/a.png', 'app/page.tsx', 'src/./a.ts']) {
       expect(safeBuildProposalPath(bad)).toBe(false);
     }
+  });
+
+  it('separates GitHub App authentication readiness from the mere presence of an App ID', () => {
+    expect(builderRepositoryConfigurationError(project, { GITHUB_APP_ID: '12345' }))
+      .toContain('GitHub App authentication is incomplete');
+    expect(builderRepositoryConfigurationError(project, {}))
+      .toContain('GitHub authentication is not configured');
+    expect(builderRepositoryConfigurationError(project, { GITHUB_APP_ID: '12345', GITHUB_PRIVATE_KEY: 'synthetic-not-a-real-key' }))
+      .toBeNull();
+    expect(builderRepositoryConfigurationError(project, { GITHUB_TOKEN: 'synthetic-development-token' }))
+      .toBeNull();
+  });
+
+  it('blocks the live provider path before model cost when the Worker lacks its GitHub App key', async () => {
+    authenticated();
+    vi.stubEnv('GITHUB_APP_ID', '12345');
+    vi.stubEnv('GITHUB_PRIVATE_KEY', '');
+    vi.stubEnv('GITHUB_TOKEN', '');
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-provider-key');
+    const app = express();
+    app.use(express.json());
+    const propose = vi.fn();
+    app.use('/prompt-workflows', createBuildProposalRouter({
+      lookupProject: async () => project,
+      propose,
+    }));
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await request(app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token').send(valid);
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('REPOSITORY_CREDENTIAL_NOT_CONFIGURED');
+    expect(response.body.proposal).toBeUndefined();
+    expect(propose).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+    expect(JSON.stringify(response.body)).not.toContain('12345');
   });
 
   it('rejects anonymous requests before repository or model access', async () => {
