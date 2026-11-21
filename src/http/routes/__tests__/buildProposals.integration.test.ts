@@ -137,7 +137,7 @@ describe('first-party AI build proposal seam', () => {
     vi.stubEnv('OPENAI_API_KEY', 'synthetic-test-key-not-a-credential');
     vi.stubEnv('ANTHROPIC_API_KEY', '');
     vi.stubEnv('FCR_BUILDER_OPENAI_MODEL', 'test-builder-model');
-    const upstream = vi.fn(async () => new Response(JSON.stringify({
+    const upstream = vi.fn(async (_url: string | URL, _options?: RequestInit) => new Response(JSON.stringify({
       id: 'synthetic_response_id',
       output_text: JSON.stringify({
         content: 'export const ready = true;\n',
@@ -168,6 +168,7 @@ describe('first-party AI build proposal seam', () => {
     expect(upstream).toHaveBeenCalledTimes(1);
     const [url, options] = upstream.mock.calls[0]!;
     expect(url).toBe('https://api.openai.com/v1/responses');
+    if (!options) throw new Error('Structured provider request options were not passed');
     const body = JSON.parse(String(options.body)) as {
       store: boolean;
       model: string;
