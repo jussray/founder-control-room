@@ -383,12 +383,18 @@ export function validateFirstPartySocialPost(
     characterLimit,
   };
   const contentHash = stableHash(normalized);
+  // The delivery identity must survive changes in workflow mode or approval
+  // receipt. Those fields belong to authorization/contentHash, not to the
+  // destination-visible post. Otherwise a draft promoted to publish, or an
+  // identical post reapproved, can bypass the duplicate-post reservation.
   const idempotencyKey = stableHash({
     platform: input.platform,
     accountId,
     sourceRepository,
     sourceCommitSha,
-    contentHash,
+    text,
+    media,
+    proofUrls,
   });
 
   return {
