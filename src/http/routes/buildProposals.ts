@@ -9,7 +9,7 @@ import { isSafeFounderOsStagedPatchPath } from '../../founder-os-lab/missionPatc
 import { Router } from 'express';
 import { runStructuredJson, StructuredProviderError, type StructuredProviderConfig } from '../../aiRuntime/structuredProvider.js';
 import { supabase } from '../../lib/supabaseClient.js';
-import { providerForProject } from '../../providers/providerFactory.js';
+import { providerConfigurationError, providerForProject } from '../../providers/providerFactory.js';
 import type { RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { rateLimitFounderPermissions } from '../middleware/security.js';
@@ -63,6 +63,19 @@ async function defaultLookupProject(slug: string): Promise<Project | null> {
     .eq('slug', slug).maybeSingle();
   if (error) throw new Error('PROJECT_LOOKUP_FAILED');
   return data as Project | null;
+}
+
+/** Avoid paying for a model request when the repository writer/read adapter is not configured. */
+export function builderRepositoryConfigurationError(
+  project: Pick<Project, 'slug' | 'repo_provider' | 'repo_identifier'>,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  if (!project.repo_identifier) return 'Registered repository identifier is missing';
+  return providerConfigurationError({
+    slug: project.slug,
+    repo_provider: project.repo_provider,
+    repo_identifier: project.repo_identifier,
+  }, env);
 }
 
 function defaultRepository(project: Project): Reader {
@@ -158,6 +171,14 @@ export function createBuildProposalRouter(dependencies: BuildProposalDependencie
     catch { return res.status(503).json({ code: 'PROJECT_LOOKUP_UNAVAILABLE', error: 'Project registry unavailable.' }); }
     if (!project) return res.status(404).json({ code: 'PROJECT_NOT_FOUND', error: 'Project is not registered.' });
     if (!project.repo_identifier) return res.status(503).json({ code: 'REPOSITORY_NOT_CONFIGURED', error: 'Repository is not configured.' });
+    // Production uses real provider credentials. Injected repository readers
+    // are exclusively for isolated harnesses and must not mask live readiness.
+    if (!dependencies.repository && builderRepositoryConfigurationError(project)) {
+      return res.status(503).json({
+        code: 'REPOSITORY_CREDENTIAL_NOT_CONFIGURED',
+        error: 'Repository authentication is incomplete. Configure the approved provider credentials before generating a proposal; no model was called.',
+      });
+    }
 
     let reader: Reader;
     try { reader = repository(project); }
