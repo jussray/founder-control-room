@@ -110,7 +110,7 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
   return 'OBSERVED_CHECKS_ONLY';
 }
 const PARALLEL_AUDIT_CONTRACT = 'juss/portfolio-parallel-audit@v1';
-const EVIDENCE_RUN_NAME = /(?:^|\\b)(?:CI|Playwright|E2E|Security|Quality Gate|Test Ledger|ProofMode)(?:\\b|$)/i;
+const EVIDENCE_RUN_NAME = /(?:^|\b)(?:CI|Playwright|E2E|Security|Quality Gate|Test Ledger|ProofMode)(?:\b|$)/i;
 const MAX_ARTIFACT_PROBES = 2;
 
 // A reusable Juss-owned portfolio receipt, not an agent approval or release gate.
