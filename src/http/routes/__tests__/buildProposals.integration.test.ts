@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -71,6 +72,17 @@ describe('first-party AI build proposal seam', () => {
     expect(builderRepositoryConfigurationError(project, {}))
       .toContain('GitHub authentication is not configured');
     expect(builderRepositoryConfigurationError(project, { GITHUB_APP_ID: '12345', GITHUB_PRIVATE_KEY: 'synthetic-not-a-real-key' }))
+      .toContain('not a valid RSA credential');
+    // Generate an ephemeral test-only RSA key, never copy a provider credential
+    // into a fixture, repository, log, or cross-provider secret plane.
+    const testKey = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { format: 'pem', type: 'spki' },
+      privateKeyEncoding: { format: 'pem', type: 'pkcs8' },
+    }).privateKey;
+    expect(builderRepositoryConfigurationError(project, { GITHUB_APP_ID: '12345', GITHUB_PRIVATE_KEY: testKey }))
+      .toBeNull();
+    expect(builderRepositoryConfigurationError(project, { GITHUB_APP_ID: '12345', GITHUB_PRIVATE_KEY: JSON.stringify(testKey) }))
       .toBeNull();
     expect(builderRepositoryConfigurationError(project, { GITHUB_TOKEN: 'synthetic-development-token' }))
       .toBeNull();
@@ -100,6 +112,32 @@ describe('first-party AI build proposal seam', () => {
     expect(propose).not.toHaveBeenCalled();
     expect(upstream).not.toHaveBeenCalled();
     expect(JSON.stringify(response.body)).not.toContain('12345');
+  });
+
+  it('rejects a present but malformed GitHub App key before any model call or repository read', async () => {
+    authenticated();
+    vi.stubEnv('GITHUB_APP_ID', '12345');
+    vi.stubEnv('GITHUB_PRIVATE_KEY', 'synthetic-malformed-key');
+    vi.stubEnv('GITHUB_TOKEN', '');
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-provider-key');
+    const app = express();
+    app.use(express.json());
+    const propose = vi.fn();
+    app.use('/prompt-workflows', createBuildProposalRouter({
+      lookupProject: async () => project,
+      propose,
+    }));
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await request(app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token').send(valid);
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('REPOSITORY_CREDENTIAL_NOT_CONFIGURED');
+    expect(response.body.proposal).toBeUndefined();
+    expect(propose).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+    expect(JSON.stringify(response.body)).not.toContain('synthetic-malformed-key');
   });
 
   it('rejects anonymous requests before repository or model access', async () => {
