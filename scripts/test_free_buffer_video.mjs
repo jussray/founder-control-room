@@ -15,6 +15,47 @@ function makeClip(path,secs,withAudio=true){
   args.push(path);
   assert.equal(cmd('ffmpeg',args).status,0);
 }
+function makeClipWithShortAudio(path, videoSeconds, audioSeconds) {
+  const args=['-hide_banner','-loglevel','error','-y',
+    '-f','lavfi','-i','testsrc2=size=320x568:rate=30',
+    '-f','lavfi','-i','sine=frequency=220:sample_rate=48000',
+    '-filter_complex',`[1:a]atrim=duration=${audioSeconds}[short]`,
+    '-map','0:v','-map','[short]','-t',String(videoSeconds),
+    '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-c:a','aac',path];
+  assert.equal(cmd('ffmpeg',args).status,0);
+}
+
+test('rejects intro and screen audio that ends before the authentic footage segment',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const fullIntro=join(d,'intro.mp4'),fullScreen=join(d,'screen.mp4');
+  const shortIntro=join(d,'intro-short-audio.mp4'),shortScreen=join(d,'screen-short-audio.mp4');
+  makeClip(fullIntro,3.5,true);makeClip(fullScreen,7.5,true);
+  makeClipWithShortAudio(shortIntro,3.5,0.6);
+  makeClipWithShortAudio(shortScreen,7.5,0.8);
+  for(const [name,intro,screen] of [
+    ['intro',shortIntro,fullScreen],
+    ['screen',fullIntro,shortScreen],
+  ]){
+   const output=join(d,name+'.mp4');
+   const r=cmd('node',[script,'--intro',intro,'--screen',screen,'--output',output,'--width','270','--height','480']);
+   assert.notEqual(r.status,0,`A full-length video with truncated ${name} audio must be rejected`);
+   assert.match(r.stderr,new RegExp(name+'.*audio','i'));
+   await assert.rejects(access(output));
+  }
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+test('rejects a voiceover with fewer than seven seconds of recorded audio',async()=>{
+ const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
+  const intro=join(d,'intro.mp4'),screen=join(d,'screen.mp4'),voice=join(d,'short.m4a'),output=join(d,'out.mp4');
+  makeClip(intro,3.5,true);makeClip(screen,7.5,false);
+  assert.equal(cmd('ffmpeg',['-v','error','-y','-f','lavfi','-i','sine=frequency=250:sample_rate=48000','-t','1','-c:a','aac',voice]).status,0);
+  const r=cmd('node',[script,'--intro',intro,'--screen',screen,'--voiceover',voice,'--output',output,'--width','270','--height','480']);
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/voiceover.*7 seconds/i);
+  await assert.rejects(access(output));
+ }finally{await rm(d,{recursive:true,force:true})}
+});
+
 test('no source footage fails closed with no fabricated reel',async()=>{
   const d=await mkdtemp(join(tmpdir(),'free-video-'));try{
     const r=cmd('node',[script,'--intro',join(d,'missing.mp4'),'--screen',join(d,'missing2.mp4'),'--output',join(d,'out.mp4')]);
