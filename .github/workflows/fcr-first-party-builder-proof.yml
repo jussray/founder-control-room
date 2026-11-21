@@ -1,0 +1,88 @@
+name: First-party FCR Builder Exact-Head Proof
+
+on:
+  push:
+    branches:
+      - feat/fcr-build-proposal-first-party-20261120
+    paths:
+      - 'src/http/routes/buildProposals.ts'
+      - 'src/http/routes/__tests__/buildProposals.integration.test.ts'
+      - 'src/http/routes/approvals.ts'
+      - 'src/founder-os-lab/missionPatchHandoff.ts'
+      - 'src/http/server.ts'
+      - 'public/control-room/github-workspace.html'
+      - 'e2e/first-party-builder-workspace-proof.mjs'
+      - 'scripts/verify-guarded-terminal-contract.mjs'
+      - '.github/workflows/fcr-first-party-builder-proof.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/http/routes/buildProposals.ts'
+      - 'src/http/routes/__tests__/buildProposals.integration.test.ts'
+      - 'src/http/routes/approvals.ts'
+      - 'src/founder-os-lab/missionPatchHandoff.ts'
+      - 'src/http/server.ts'
+      - 'public/control-room/github-workspace.html'
+      - 'e2e/first-party-builder-workspace-proof.mjs'
+      - 'scripts/verify-guarded-terminal-contract.mjs'
+      - '.github/workflows/fcr-first-party-builder-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-first-party-builder-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-proof:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact proposed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify checked out SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          echo "Candidate head: $actual"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify authenticated builder and mission patch boundary
+        run: npx vitest run src/http/routes/__tests__/buildProposals.integration.test.ts src/http/routes/__tests__/approvals.integration.test.ts src/founder-os-lab/__tests__/missionPatchHandoff.test.ts
+
+      - name: Verify actual GitHub Workspace mobile and desktop UI
+        run: node e2e/first-party-builder-workspace-proof.mjs
+
+      - name: Verify original guarded terminal contract
+        run: node scripts/verify-guarded-terminal-contract.mjs
+
+      - name: Lint touched TypeScript
+        run: npx eslint src/http/routes/buildProposals.ts src/http/routes/__tests__/buildProposals.integration.test.ts
+
+      - name: State actual verification scope
+        run: |
+          echo "VERIFIED: exact candidate SHA, bounded adapter tests, synthetic Playwright UI, and guarded terminal." >> "$GITHUB_STEP_SUMMARY"
+          echo "NOT VERIFIED: live model call, production GitHub App credentials, mission-branch commit, deployment, or founder approval." >> "$GITHUB_STEP_SUMMARY"
