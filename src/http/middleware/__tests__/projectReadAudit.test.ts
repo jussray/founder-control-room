@@ -56,10 +56,6 @@ function createProbeApp() {
     res.status(404).json({ error: 'Not found' });
   });
 
-  app.post('/projects/:slug/connections', (req, res) => {
-    res.status(201).json({ config: req.body?.config ?? {}, secretRef: req.body?.secretRef ?? null });
-  });
-
   app.post('/projects', (_req, res) => {
     res.status(201).json({ project: { id: 'project-created' } });
   });
@@ -194,7 +190,7 @@ describe('requireProjectReadAudit', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('does not audit unrelated non-GET methods', async () => {
+  it('does not audit non-GET methods', async () => {
     const response = await request(createProbeApp())
       .post('/projects')
       .send({ slug: 'new-project' });
@@ -203,35 +199,40 @@ describe('requireProjectReadAudit', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('allows non-secret nested connection config and keeps secretRef as reference-only metadata', async () => {
-    const response = await request(createProbeApp())
-      .post('/projects/one/connections')
-      .send({
-        config: { region: 'us-east', nested: { mode: 'read-only' } },
-        secretRef: 'env:FCR_PROVIDER_TOKEN',
+  it('flags credential-shaped stored connection rows by count only in the read audit', async () => {
+    const rawValue = `ghp_${'z'.repeat(36)}`;
+    const app = express();
+    app.use('/projects', (req: FounderRequest, _res, next) => {
+      req.founder = { email: 'founder@example.com', userId: 'founder-user-123' };
+      next();
+    }, requireProjectReadAudit);
+    app.get('/projects/:slug/connections', (_req, res) => {
+      res.json({
+        connections: [
+          { id: 'c1', config: { region: 'us-east' }, secret_ref: 'GITHUB_TOKEN' },
+          { id: 'c2', config: { auth: { apiKey: ['legacy', 'raw', 'value'].join('-') } }, secret_ref: null },
+          { id: 'c3', config: {}, secret_ref: rawValue },
+        ],
       });
+    });
 
-    expect(response.status).toBe(201);
-    expect(response.body.secretRef).toBe('env:FCR_PROVIDER_TOKEN');
-    expect(response.body.config.nested.mode).toBe('read-only');
+    const response = await request(app).get('/projects/one/connections');
+
+    expect(response.status).toBe(200);
+    expect(mockInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        event_type: 'project_connections_read',
+        metadata: expect.objectContaining({ credential_shaped_connection_count: 2 }),
+      }),
+    ]);
+    const audited = JSON.stringify(mockInsert.mock.calls[0][0]);
+    expect(audited).not.toContain('legacy-raw-value');
+    expect(audited).not.toContain(rawValue);
   });
 
-  it.each([
-    [{ nested: { api_key: 'not-even-needed' } }, 'config.nested.api_key'],
-    [{ nested: [{ clientSecret: 'value' }] }, 'config.nested[0].clientSecret'],
-    [{ endpoint: 'Bearer pretend-token' }, 'config.endpoint'],
-    [{ pem: '-----BEGIN PRIVATE KEY-----' }, 'config.pem'],
-    [{ tokenish: 'github_pat_example' }, 'config.tokenish'],
-  ])('rejects credential-shaped nested connection config before persistence', async (config, field) => {
-    const response = await request(createProbeApp())
-      .post('/projects/one/connections')
-      .send({ config, secretRef: 'env:SAFE_REFERENCE' });
-
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual(expect.objectContaining({
-      code: 'CONNECTION_CONFIG_SECRET_REJECTED',
-      field,
-    }));
-    expect(mockInsert).not.toHaveBeenCalled();
+  it('does not add the connection flag to other read surfaces', async () => {
+    await request(createProbeApp()).get('/projects/one/releases');
+    const metadata = mockInsert.mock.calls[0][0][0].metadata;
+    expect(metadata).not.toHaveProperty('credential_shaped_connection_count');
   });
 });

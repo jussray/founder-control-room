@@ -1,0 +1,185 @@
+name: FCR Remote Video Render
+run-name: FCR video render ${{ inputs.request_id || github.run_id }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/mediaFfmpegRender.ts'
+      - 'scripts/render-video.mts'
+      - 'scripts/verify-video-playback.mjs'
+      - '.github/workflows/video-remote-render.yml'
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: 'Caller-generated request identifier used only for correlation.'
+        required: false
+        type: string
+      expected_head_sha:
+        description: 'Exact current main SHA observed before dispatch.'
+        required: false
+        type: string
+      input_sha256:
+        description: 'SHA-256 of the canonical timeline_json payload.'
+        required: false
+        type: string
+      timeline_json:
+        description: 'Validated graphic-only FCR timeline JSON. Local paths are rejected. Leave blank for the proof render.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-video-render-queue
+  cancel-in-progress: false
+
+env:
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.sha }}
+  REQUEST_ID: ${{ inputs.request_id || '' }}
+  EXPECTED_INPUT_SHA: ${{ inputs.input_sha256 || '' }}
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact render subject
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_SHA" = "$EXPECTED_HEAD_SHA"
+          fi
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Materialize bounded render request
+        env:
+          TIMELINE_JSON: ${{ inputs.timeline_json }}
+        run: |
+          mkdir -p .tmp/remote-video
+          node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
+          import fs from 'node:fs';
+
+          function canonicalJson(value) {
+            if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
+            if (typeof value === 'number') {
+              if (!Number.isFinite(value)) throw new TypeError('canonical JSON rejects non-finite numbers');
+              return JSON.stringify(Object.is(value, -0) ? 0 : value);
+            }
+            if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+            if (value && typeof value === 'object') {
+              const entries = Object.entries(value)
+                .filter(([, child]) => child !== undefined)
+                .sort(([left], [right]) => left.localeCompare(right));
+              return `{${entries.map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`).join(',')}}`;
+            }
+            throw new TypeError(`canonical JSON does not support ${typeof value}`);
+          }
+
+          const supplied = process.env.TIMELINE_JSON?.trim();
+          const fallback = {
+            width: 320,
+            height: 180,
+            fps: 24,
+            segments: [{
+              durationSec: 2,
+              background: '#101018',
+              lines: [{ text: 'FCR remote render', sizeFrac: 0.08, yFrac: 0.5, color: '#FFFFFF', bold: true }]
+            }]
+          };
+          const value = supplied ? JSON.parse(supplied) : fallback;
+
+          if (value?.fontFile !== undefined || value?.fontFileBold !== undefined) {
+            throw new Error('External render requests may not supply local font paths.');
+          }
+          if (Array.isArray(value?.segments) && value.segments.some((segment) => segment?.imagePath !== undefined)) {
+            throw new Error('External render requests may not supply local image paths.');
+          }
+
+          const canonical = canonicalJson(value);
+          const actualInputSha = crypto.createHash('sha256').update(canonical).digest('hex');
+          const expectedInputSha = process.env.EXPECTED_INPUT_SHA?.trim();
+          const requestId = process.env.REQUEST_ID?.trim();
+          const externallySupplied = Boolean(supplied);
+
+          if (externallySupplied && process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+            if (!requestId || !process.env.EXPECTED_HEAD_SHA?.trim() || !expectedInputSha) {
+              throw new Error('External dispatch requires request_id, expected_head_sha, and input_sha256.');
+            }
+          }
+          if (expectedInputSha && expectedInputSha !== actualInputSha) {
+            throw new Error(`Input fingerprint mismatch: expected ${expectedInputSha}, observed ${actualInputSha}`);
+          }
+
+          fs.writeFileSync('.tmp/remote-video/input.json', canonical);
+          fs.writeFileSync('.tmp/remote-video/admission-receipt.json', `${JSON.stringify({
+            schema: 'founder-control-room/remote-video-admission@v1',
+            requestId: requestId || null,
+            expectedHeadSha: process.env.EXPECTED_HEAD_SHA,
+            inputSha256: actualInputSha,
+            externalInput: externallySupplied,
+            localPathInputsAllowed: false,
+            renderAuthority: true,
+            publishAuthority: false
+          }, null, 2)}\n`);
+          NODE
+      - name: Render through FCR-owned CLI
+        run: |
+          npx tsx scripts/render-video.mts --input .tmp/remote-video/input.json --output .tmp/remote-video/output.mp4 | tee .tmp/remote-video/render-receipt.json
+          grep -q '"kind": "RENDERED"' .tmp/remote-video/render-receipt.json
+          test -s .tmp/remote-video/output.mp4
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright playback proof
+        run: node scripts/verify-video-playback.mjs --media .tmp/remote-video/output.mp4 | tee .tmp/remote-video/playback-receipt.json
+      - name: Bind remote execution receipt
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const media = fs.readFileSync('.tmp/remote-video/output.mp4');
+          const input = fs.readFileSync('.tmp/remote-video/input.json');
+          const admission = JSON.parse(fs.readFileSync('.tmp/remote-video/admission-receipt.json', 'utf8'));
+          const receipt = {
+            schema: 'founder-control-room/remote-video-render@v1',
+            project: 'founder-control-room',
+            requestId: admission.requestId,
+            gitSha: process.env.GITHUB_SHA,
+            expectedHeadSha: admission.expectedHeadSha,
+            runId: process.env.RUN_ID,
+            runAttempt: process.env.RUN_ATTEMPT,
+            inputSha256: crypto.createHash('sha256').update(input).digest('hex'),
+            outputSha256: crypto.createHash('sha256').update(media).digest('hex'),
+            renderAuthority: true,
+            publishAuthority: false,
+            verifiedBy: ['ffprobe', 'playwright'],
+          };
+          if (receipt.inputSha256 !== admission.inputSha256) throw new Error('Admission/render input fingerprint drifted.');
+          fs.writeFileSync('.tmp/remote-video/remote-execution-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+      - name: Retain rendered artifact and receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-video-render-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tmp/remote-video/
+          if-no-files-found: error
+          retention-days: 7

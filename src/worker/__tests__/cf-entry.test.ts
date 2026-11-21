@@ -27,6 +27,10 @@ const VALID_ENV: ControlRoomWorkerEnv = {
     send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
   },
   FCR_EMAIL_FROM,
+  CHIEF_AI: {
+    version: vi.fn().mockResolvedValue({ ok: true }),
+    ingestBipEvidence: vi.fn().mockResolvedValue({ ok: true }),
+  },
   FCR_V10_CAPABILITY_PLAN_CONTRACT: 'juss-v10/capability-plan@v1',
   FCR_V10_CONVEYOR_CONTRACT: 'founder-control-room/n8n-conveyor@v3',
   FCR_V10_MAX_RUNTIME_AUTHORITY: 'draft',
@@ -70,6 +74,13 @@ describe('Cloudflare Worker binding validation', () => {
       .toThrow('Missing required Worker binding: FCR_EMAIL');
   });
 
+  it('rejects a missing or malformed Chief evidence RPC binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: undefined }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: { version: vi.fn() } }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
+  });
+
   it('rejects a sender identity that drifts away from the checked-in FCR identity', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
@@ -77,23 +88,21 @@ describe('Cloudflare Worker binding validation', () => {
     })).toThrow('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
   });
 
-  it('rejects a Worker with no GitHub authentication path', () => {
+  it('boots core HTTP without any GitHub provider credentials', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
       GITHUB_APP_ID: undefined,
       GITHUB_PRIVATE_KEY: undefined,
       GITHUB_TOKEN: undefined,
-    })).toThrow(
-      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
-    );
+    })).not.toThrow();
   });
 
-  it('rejects partial GitHub App credentials instead of silently falling back', () => {
+  it('boots core HTTP with a partial GitHub App pair while the GitHub provider remains unavailable', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
       GITHUB_PRIVATE_KEY: undefined,
-      GITHUB_TOKEN: 'github-token-test-value',
-    })).toThrow('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+      GITHUB_TOKEN: undefined,
+    })).not.toThrow();
   });
 
   it('rejects malformed service and callback URLs', () => {

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   aggregateTestLedger,
+  fetchAllCheckRuns,
+  githubJson,
   buildTestLedger,
   mapCheckState,
   selectLatestChecks,
@@ -96,4 +98,134 @@ test('reports failed native checks without becoming a duplicate merge authority'
   assert.equal(ledger.aggregate.state, 'failed');
   assert.equal(ledger.aggregate.counts.failed, 1);
   assert.equal(ledger.runner.authoritativeForMerge, false);
+});
+
+test('newer queued check attempt supersedes an older completed check on the same exact head', () => {
+  const checks = selectLatestChecks([
+    check({ id: 101, name: 'Required Gate', completed_at: '2026-08-04T20:10:00Z' }),
+    check({ id: 102, name: 'Required Gate', status: 'queued', conclusion: null, started_at: null, completed_at: null }),
+  ], SHA);
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].state, 'queued');
+  assert.equal(checks[0].id, '102');
+});
+
+test('paginates complete check-run snapshots and preserves all provider IDs', async () => {
+  const runs = Array.from({ length: 101 }, (_, i) => check({ id: i + 1 }));
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => ({
+      total_count: runs.length,
+      check_runs: url.searchParams.get('page') === '1' ? runs.slice(0, 100) : runs.slice(100),
+    }),
+  });
+  assert.equal(fetched.length, 101);
+  assert.equal(new Set(fetched.map(({ id }) => id)).size, 101);
+});
+
+test('refuses partial, duplicate, malformed, and saturated check-run snapshots', async () => {
+  const base = { repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token', sleepImpl: async () => {} };
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({ total_count: 3, check_runs: [check({ id: 1 })] }),
+  }), /incomplete/u);
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({ check_runs: [check({ id: 1 })] }),
+  }), /invalid or incomplete shape/u);
+  const first = Array.from({ length: 100 }, (_, i) => check({ id: i + 1 }));
+  await assert.rejects(fetchAllCheckRuns({
+    ...base,
+    getJson: async (url) => ({
+      total_count: 101,
+      check_runs: url.searchParams.get('page') === '1' ? first : [check({ id: 1 })],
+    }),
+  }), /duplicate IDs/u);
+  await assert.rejects(fetchAllCheckRuns({
+    ...base, getJson: async () => ({
+      total_count: 1000, check_runs: first,
+    }),
+  }), /1000-record limit/u);
+});
+
+test('re-enumerates all pages after a transient duplicate from a moving GitHub check set', async () => {
+  const first = Array.from({length: 100}, (_, i) => check({id: i + 1}));
+  let snapshot = 0;
+  const delays = [];
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => {
+      if (url.searchParams.get('page') === '1') {
+        snapshot += 1;
+        return {total_count: 101, check_runs: first};
+      }
+      return {total_count: 101, check_runs: [check({id: snapshot === 1 ? 100 : 101})]};
+    },
+    sleepImpl: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(snapshot, 2);
+  assert.deepEqual(delays, [250]);
+  assert.equal(fetched.length, 101);
+  assert.equal(new Set(fetched.map(({id}) => id)).size, 101);
+});
+
+test('does not accept changing provider totals across pages as an exact-head snapshot', async () => {
+  const first = Array.from({length: 100}, (_, i) => check({id: i + 1}));
+  let snapshot = 0;
+  const delays = [];
+  const fetched = await fetchAllCheckRuns({
+    repository: 'jussray/founder-control-room', sha: SHA, token: 'test-token',
+    getJson: async (url) => {
+      if (url.searchParams.get('page') === '1') {
+        snapshot += 1;
+        return {total_count: 101, check_runs: first};
+      }
+      return {total_count: snapshot === 1 ? 102 : 101, check_runs: [check({id: 101})]};
+    },
+    sleepImpl: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(snapshot, 2);
+  assert.deepEqual(delays, [250]);
+  assert.equal(fetched.length, 101);
+});
+
+function fakeResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+
+test('retries transient GitHub 5xx and network faults, then returns the observed page', async () => {
+  const replies = [
+    () => fakeResponse(502, {message: 'Server Error'}),
+    () => { throw new Error('socket hang up'); },
+    () => fakeResponse(503, {message: 'Unavailable'}),
+    () => fakeResponse(200, {total_count: 0, check_runs: []}),
+  ];
+  const delays = [];
+  const payload = await githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => replies.shift()(),
+    sleepImpl: async (ms) => { delays.push(ms); },
+    baseDelayMs: 10,
+  });
+  assert.deepEqual(payload, {total_count: 0, check_runs: []});
+  assert.deepEqual(delays, [10, 20, 40]);
+  assert.equal(replies.length, 0);
+});
+
+test('fails closed after the transient retry budget and never retries a 4xx', async () => {
+  let calls = 0;
+  await assert.rejects(githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => { calls += 1; return fakeResponse(502, {message: 'Server Error'}); },
+    sleepImpl: async () => {},
+  }), /GitHub check lookup failed \(502\)/);
+  assert.equal(calls, 4);
+
+  calls = 0;
+  await assert.rejects(githubJson('https://api.github.com/x', 'token', {
+    fetchImpl: async () => { calls += 1; return fakeResponse(404, {message: 'Not Found'}); },
+    sleepImpl: async () => {},
+  }), /GitHub check lookup failed \(404\)/);
+  assert.equal(calls, 1);
 });
