@@ -333,6 +333,21 @@ async function defaultGetTaskCheckpoint(input: { projectSlug: string; taskId: st
   };
 }
 
+async function defaultSaveTaskCheckpoint(input: { projectSlug: string; continuation: OperatorExecutionContinuation }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier || project.repo_identifier.toLowerCase() !== input.continuation.observation.repositoryFullName.toLowerCase()) {
+    throw new Error('Checkpoint repository does not match registered project');
+  }
+  const { disposition, stored } = await storeOperatorExecutionContinuation(input.continuation);
+  return {
+    disposition, recordId: stored.id, taskId: stored.record.taskId,
+    observedAt: stored.record.observation.observedAt,
+    status: 'PERSISTED_NOT_REVALIDATED' as const,
+    currentEvidenceVerified: false as const,
+    executionAuthorityFromHandoff: false as const,
+  };
+}
+
 async function defaultAuditChangeGenealogy(
   input: {
     projectSlug: string;
@@ -664,6 +679,12 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
     idempotentHint: true,
     openWorldHint: false,
   };
+  const checkpointAnnotations = {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  };
   const relayAnnotations = {
     readOnlyHint: false,
     destructiveHint: false,
@@ -765,6 +786,33 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
         },
       },
       annotations: readAnnotations,
+    },
+    {
+      name: 'fcr_save_task_checkpoint',
+      title: 'Save reference-only FCR task progress',
+      description: 'Persist a non-authorizing historical checkpoint in the existing founder-only continuity ledger. Requires founder-bound OAuth and a granted project. No merge, deploy, execution or approval authority.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId', 'continuationInput'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          continuationInput: {
+            type: 'object', additionalProperties: false,
+            required: ['sourceMode', 'taskId', 'intentRef', 'contextRefs', 'completedSteps', 'remainingStepIds', 'nextActionRef', 'pendingDecisionRefs', 'observation'],
+            properties: {
+              sourceMode: { type: 'string', enum: ['chat', 'work'] },
+              taskId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$' },
+              intentRef: { type: 'string' },
+              contextRefs: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              completedSteps: { type: 'array', maxItems: 40, items: { type: 'object' } },
+              remainingStepIds: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              nextActionRef: { type: ['string', 'null'] },
+              pendingDecisionRefs: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              observation: { type: 'object', description: 'OperatorContinuityInputV2; the server computes fingerprints and validates opaque source references.' },
+            },
+          },
+        },
+      },
+      annotations: checkpointAnnotations,
     },
     {
       name: 'fcr_audit_change_genealogy',
