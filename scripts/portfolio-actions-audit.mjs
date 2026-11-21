@@ -15,6 +15,7 @@ const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(v
 const FOLLOW_UP = Object.freeze({
   FAILED_EXACT_HEAD: [1, 'INSPECT_EXACT_HEAD_FAILURE', 'Read failed jobs and classify the first causal failure before proposing a focused fix.'],
   UNKNOWN_READ_BLOCKED: [2, 'RESTORE_AUDIT_READ_ACCESS', 'Resolve read access through the authorized owner, then repeat the read-only audit.'],
+  UNKNOWN_RATE_LIMITED: [2, 'RETRY_AFTER_PROVIDER_RESET', 'Wait for GitHub capacity, then reobserve the exact-head read-only evidence.'],
   UNKNOWN_HEAD: [3, 'RESOLVE_CURRENT_HEAD', 'Resolve the current default-branch head before reusing any check evidence.'],
   UNKNOWN_WORKFLOW_COVERAGE: [3, 'RESOLVE_WORKFLOW_COVERAGE', 'Read the workflow inventory before making a coverage claim.'],
   NO_WORKFLOWS: [3, 'REVIEW_WORKFLOW_COVERAGE', 'Review the missing workflow coverage without claiming repository or runtime verification.'],
@@ -56,9 +57,11 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
   }
   if (state === 'BLOCKED') {
     const accessBlocked = /^(PORTFOLIO_INSTALLATION_READ_TOKEN_REQUIRED|GITHUB_READ_STATUS_(401|403))$/.test(reason || '');
-    propose({ scope: 'installation' }, 'BLOCKED', accessBlocked
-      ? [0, 'RESTORE_AUDIT_READ_ACCESS', 'Restore the approved read-only audit connection without exposing or inventing credentials, then rerun the audit.']
-      : [0, 'INSPECT_BLOCKED_AUDIT', 'Inspect the bound workflow failure and restore a complete read-only audit receipt.']);
+    propose({ scope: 'installation' }, 'BLOCKED', reason === 'GITHUB_RATE_LIMITED'
+      ? [0, 'RETRY_AFTER_PROVIDER_RESET', 'Wait for GitHub capacity before repeating the read-only audit; keep unavailable evidence unknown.']
+      : accessBlocked
+        ? [0, 'RESTORE_AUDIT_READ_ACCESS', 'Restore the approved read-only audit connection without exposing or inventing credentials, then rerun the audit.']
+        : [0, 'INSPECT_BLOCKED_AUDIT', 'Inspect the bound workflow failure and restore a complete read-only audit receipt.']);
   } else if (state === 'INCOMPLETE_COVERAGE') {
     propose({ scope: 'installation' }, state,
       [0, 'RECONCILE_INSTALLATION_COVERAGE', 'Reconcile the installation repository inventory before claiming portfolio coverage.']);
@@ -112,6 +115,28 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
 const PARALLEL_AUDIT_CONTRACT = 'juss/portfolio-parallel-audit@v1';
 const EVIDENCE_RUN_NAME = /(?:^|\b)(?:CI|Playwright|E2E|Security|Quality Gate|Test Ledger|ProofMode)(?:\b|$)/i;
 const MAX_ARTIFACT_PROBES = 2;
+const MAX_RATE_BACKOFF_MS = 30_000;
+
+// Rate limiting is provider backpressure, never evidence of a passing check.
+export function githubRateLimitWaitMs(status, headers, nowMs = Date.now()) {
+  const remaining = headers.get('x-ratelimit-remaining');
+  const retryAfter = headers.get('retry-after');
+  if (status !== 429 && !(status === 403 && (remaining === '0' || retryAfter !== null))) return null;
+  let wait = null;
+  if (retryAfter !== null && retryAfter.trim() !== '') {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) wait = seconds * 1000;
+    else {
+      const at = Date.parse(retryAfter);
+      if (Number.isFinite(at)) wait = at - nowMs;
+    }
+  }
+  if (wait === null && remaining === '0') {
+    const reset = Number(headers.get('x-ratelimit-reset'));
+    if (Number.isFinite(reset) && reset > 0) wait = reset * 1000 - nowMs;
+  }
+  return Math.max(1000, Math.ceil(wait ?? 60_000));
+}
 
 // A reusable Juss-owned portfolio receipt, not an agent approval or release gate.
 // Each evidence plane is evaluated independently; unknown is never promoted to pass.
@@ -146,6 +171,13 @@ export function classifyParallelEvidence({ head, runs = [], artifactProbes = [] 
 }
 
 function selfTest() {
+  assert.equal(githubRateLimitWaitMs(200, new Headers({ 'retry-after': '2' }), 0), null);
+  assert.equal(githubRateLimitWaitMs(403, new Headers(), 0), null);
+  assert.equal(githubRateLimitWaitMs(429, new Headers({ 'retry-after': '2' }), 0), 2000);
+  assert.equal(githubRateLimitWaitMs(403, new Headers({
+    'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '10'
+  }), 0), 10000);
+  assert.equal(githubRateLimitWaitMs(429, new Headers(), 0), 60000);
   const head = 'a'.repeat(40);
   const sampleRun = { id: 10, name: 'Protect Me CI', head_sha: head,
     status: 'completed', conclusion: 'success' };
@@ -210,6 +242,10 @@ function selfTest() {
   const blocked = buildAuditHandoff({ state: 'BLOCKED', reason: 'PORTFOLIO_INSTALLATION_READ_TOKEN_REQUIRED' }, identity);
   assert.equal(blocked.nextAction.action, 'RESTORE_AUDIT_READ_ACCESS');
   assert.equal(blocked.nextAction.owner, 'AUTHORIZED_ACCESS_OWNER');
+  const limitedRead = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'UNKNOWN_RATE_LIMITED' }] }, identity);
+  assert.equal(limitedRead.nextAction.action, 'RETRY_AFTER_PROVIDER_RESET');
+  const limitedInstallation = buildAuditHandoff({ state: 'BLOCKED', reason: 'GITHUB_RATE_LIMITED' }, identity);
+  assert.equal(limitedInstallation.nextAction.action, 'RETRY_AFTER_PROVIDER_RESET');
   const fallback = buildAuditHandoff({ state: 'BLOCKED', reason: 'AUDIT_DID_NOT_PRODUCE_RECEIPT' }, identity);
   assert.equal(fallback.nextAction.action, 'INSPECT_BLOCKED_AUDIT');
   const observed = buildAuditHandoff({ state: 'OBSERVED_CHECKS_ONLY', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY' }] }, identity);
@@ -284,23 +320,49 @@ async function main() {
     if (!token) throw new Error('PORTFOLIO_INSTALLATION_READ_TOKEN_REQUIRED');
     if (!Number.isInteger(expectedMinimum) || expectedMinimum < 1 || expectedMinimum > 2000) throw new Error('INVALID_EXPECTED_MINIMUM');
     const root = 'https://api.github.com';
+    let providerRateCircuitOpen = false;
     async function api(path) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12_000);
-      try {
-        const response = await fetch(root + path, {
-          signal: controller.signal,
-          headers: {
-            Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'User-Agent': 'fcr-portfolio-actions-truth'
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (providerRateCircuitOpen) throw new Error('GITHUB_RATE_LIMITED');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12_000);
+        let response;
+        try {
+          response = await fetch(root + path, {
+            signal: controller.signal,
+            headers: {
+              Authorization: 'Bearer ' + token,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'fcr-portfolio-actions-truth'
+            }
+          });
+          if (response.ok) {
+            const remaining = response.headers.get('x-ratelimit-remaining');
+            if (remaining !== null && /^[0-9]+$/.test(remaining) && Number(remaining) <= 5) {
+              providerRateCircuitOpen = true;
+            }
+            return await response.json();
           }
-        });
-        if (!response.ok) throw new Error('GITHUB_READ_STATUS_' + response.status);
-        return await response.json();
-      } finally { clearTimeout(timer); }
+        } finally { clearTimeout(timer); }
+        const waitMs = githubRateLimitWaitMs(response.status, response.headers);
+        if (waitMs !== null) {
+          if (attempt === 0 && waitMs <= MAX_RATE_BACKOFF_MS && !providerRateCircuitOpen) {
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            continue;
+          }
+          providerRateCircuitOpen = true;
+          throw new Error('GITHUB_RATE_LIMITED');
+        }
+        if (attempt === 0 && [502, 503, 504].includes(response.status)) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw new Error('GITHUB_READ_STATUS_' + response.status);
+      }
+      throw new Error('READ_OR_VALIDATION_UNAVAILABLE');
     }
+
     const repos = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const data = await api('/installation/repositories?per_page=100&page=' + page);
@@ -377,14 +439,17 @@ async function main() {
         }));
         result.parallelAudit = classifyParallelEvidence({ head: validHead, runs, artifactProbes });
       } catch (error) {
-        result.state = 'UNKNOWN_READ_BLOCKED';
-        result.blocker = error instanceof Error && /^GITHUB_READ_STATUS_\d+$/.test(error.message)
-          ? error.message : 'READ_OR_VALIDATION_UNAVAILABLE';
+        const rateLimited = error instanceof Error && error.message === 'GITHUB_RATE_LIMITED';
+        result.state = rateLimited ? 'UNKNOWN_RATE_LIMITED' : 'UNKNOWN_READ_BLOCKED';
+        result.blocker = rateLimited ? 'GITHUB_RATE_LIMITED'
+          : error instanceof Error && /^GITHUB_READ_STATUS_\\d+$/.test(error.message)
+            ? error.message : 'READ_OR_VALIDATION_UNAVAILABLE';
       }
       return result;
     }
-    for (let i = 0; i < repos.length; i += 6) {
-      items.push(...await Promise.all(repos.slice(i, i + 6).map(observe)));
+    // Bound bursts across the GitHub App installation quota and secondary rate limits.
+    for (let i = 0; i < repos.length; i += 2) {
+      items.push(...await Promise.all(repos.slice(i, i + 2).map(observe)));
     }
     items.sort((a, b) => a.repository.localeCompare(b.repository));
     const nonArchived = items.filter((r) => !r.archived);
@@ -393,7 +458,7 @@ async function main() {
       : needsAttention.length > 0 ? 'ATTENTION' : 'OBSERVED_CHECKS_ONLY';
     reason = accessible < expectedMinimum ? 'INSTALLATION_ACCESS_BELOW_ACCOUNT_INVENTORY' : '';
   } catch (error) {
-    reason = error instanceof Error && /^(AUDIT_DID_NOT_PRODUCE_RECEIPT$|PORTFOLIO_|INVALID_|INSTALLATION_|GITHUB_READ_STATUS_)/.test(error.message)
+    reason = error instanceof Error && /^(AUDIT_DID_NOT_PRODUCE_RECEIPT$|PORTFOLIO_|INVALID_|INSTALLATION_|GITHUB_RATE_LIMITED|GITHUB_READ_STATUS_)/.test(error.message)
       ? error.message : 'PORTFOLIO_AUDIT_UNAVAILABLE';
   }
   const counts = Object.fromEntries([...new Set(items.map((i) => i.state))].sort().map((s) => [
@@ -417,6 +482,7 @@ async function main() {
     limitations: [
       'Accessible installation repositories can be fewer than the authenticated user portfolio',
       'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
+      'Rate limits open a read-only circuit after bounded recovery; impacted observations remain UNKNOWN_RATE_LIMITED',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
       'Parallel project evidence lanes inspect sampled exact-head Actions artifacts but not PR merge-base, production runtime or browser proof',
