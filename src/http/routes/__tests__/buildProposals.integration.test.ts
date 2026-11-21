@@ -140,7 +140,7 @@ describe('first-party AI build proposal seam', () => {
     const upstream = vi.fn(async () => new Response(JSON.stringify({
       id: 'synthetic_response_id',
       output_text: JSON.stringify({
-        content: 'export const ready = true;\\n',
+        content: 'export const ready = true;\n',
         summary: 'Changed only the ready flag.',
       }),
     }), {
@@ -160,6 +160,7 @@ describe('first-party AI build proposal seam', () => {
     const response = await request(app).post('/prompt-workflows/propose')
       .set('Authorization', 'Bearer test-token').send(valid);
     expect(response.status).toBe(200);
+    expect(response.body.proposal.content).toBe('export const ready = true;\n');
     expect(response.body.provenance).toMatchObject({
       provider: 'openai', model: 'test-builder-model',
       responseId: 'synthetic_response_id', testsRun: false, browserProof: false,
@@ -174,7 +175,7 @@ describe('first-party AI build proposal seam', () => {
     const payload = JSON.parse(body.input[1].content[0].text);
     expect(payload.exactSha).toBe(SHA);
     expect(payload.path).toBe(valid.path);
-    expect(payload.fileContentUntrusted).toBe('export const ready = false;\\n');
+    expect(payload.fileContentUntrusted).toBe('export const ready = false;\n');
     expect(fixture.reader.readFile).toHaveBeenCalledWith(project.slug, SHA, valid.path);
     expect(fixture.recordAudit).toHaveBeenCalledTimes(1);
   });
