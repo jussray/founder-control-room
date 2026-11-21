@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
@@ -52,6 +52,7 @@ function build(options: { source?: string; result?: string; head?: string } = {}
 }
 
 beforeEach(() => { vi.clearAllMocks(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('first-party AI build proposal seam', () => {
   it('only accepts eligible single-file repository source paths', () => {
@@ -104,6 +105,103 @@ describe('first-party AI build proposal seam', () => {
       .send({ ...valid, path: 'src/../.env', goal: 'do it' });
     expect(response.status).toBe(400);
     expect(fixture.reader.readFile).not.toHaveBeenCalled();
+  });
+
+
+  it('fails closed when the real provider adapter has no configured provider', async () => {
+    authenticated();
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+    const fixture = build();
+    const app = express();
+    app.use(express.json());
+    app.use('/prompt-workflows', createBuildProposalRouter({
+      lookupProject: async () => project,
+      repository: () => fixture.reader,
+      recordAudit: fixture.recordAudit,
+    }));
+    const fetchUpstream = vi.fn();
+    vi.stubGlobal('fetch', fetchUpstream);
+
+    const response = await request(app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token').send(valid);
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('MODEL_PROVIDER_NOT_CONFIGURED');
+    expect(response.body.proposal).toBeUndefined();
+    expect(fetchUpstream).not.toHaveBeenCalled();
+    expect(fixture.recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('routes the real structured model adapter with source and SHA without claiming live proof', async () => {
+    authenticated();
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-test-key-not-a-credential');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+    vi.stubEnv('FCR_BUILDER_OPENAI_MODEL', 'test-builder-model');
+    const upstream = vi.fn(async () => new Response(JSON.stringify({
+      id: 'synthetic_response_id',
+      output_text: JSON.stringify({
+        content: 'export const ready = true;\\n',
+        summary: 'Changed only the ready flag.',
+      }),
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', upstream);
+    const fixture = build();
+    const app = express();
+    app.use(express.json());
+    app.use('/prompt-workflows', createBuildProposalRouter({
+      lookupProject: async () => project,
+      repository: () => fixture.reader,
+      recordAudit: fixture.recordAudit,
+    }));
+
+    const response = await request(app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token').send(valid);
+    expect(response.status).toBe(200);
+    expect(response.body.provenance).toMatchObject({
+      provider: 'openai', model: 'test-builder-model',
+      responseId: 'synthetic_response_id', testsRun: false, browserProof: false,
+    });
+    expect(upstream).toHaveBeenCalledTimes(1);
+    const [url, options] = upstream.mock.calls[0]!;
+    expect(url).toBe('https://api.openai.com/v1/responses');
+    const body = JSON.parse(String(options.body)) as Record<string, any>;
+    expect(body.store).toBe(false);
+    expect(body.model).toBe('test-builder-model');
+    expect(body.text.format.strict).toBe(true);
+    const payload = JSON.parse(body.input[1].content[0].text);
+    expect(payload.exactSha).toBe(SHA);
+    expect(payload.path).toBe(valid.path);
+    expect(payload.fileContentUntrusted).toBe('export const ready = false;\\n');
+    expect(fixture.reader.readFile).toHaveBeenCalledWith(project.slug, SHA, valid.path);
+    expect(fixture.recordAudit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not release a candidate when the configured model fails upstream', async () => {
+    authenticated();
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-test-key-not-a-credential');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+    const upstream = vi.fn(async () => new Response(JSON.stringify({
+      error: { message: 'secret details from the simulated model upstream' },
+    }), { status: 503, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', upstream);
+    const fixture = build();
+    const app = express();
+    app.use(express.json());
+    app.use('/prompt-workflows', createBuildProposalRouter({
+      lookupProject: async () => project,
+      repository: () => fixture.reader,
+      recordAudit: fixture.recordAudit,
+    }));
+    const response = await request(app).post('/prompt-workflows/propose')
+      .set('Authorization', 'Bearer test-token').send(valid);
+    expect(response.status).toBe(502);
+    expect(response.body.code).toBe('OPENAI_HTTP_ERROR');
+    expect(JSON.stringify(response.body)).not.toContain('secret details');
+    expect(response.body.proposal).toBeUndefined();
+    expect(fixture.recordAudit).not.toHaveBeenCalled();
   });
 
   it('rejects credential-bearing founder goals before reading repository source', async () => {
