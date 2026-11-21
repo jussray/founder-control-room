@@ -1104,7 +1104,8 @@
     {
       "path": "src/lib/founderSignalCampaignPlanner.ts",
       "claims": [
-        "`src/lib/founderSignalCampaignPlanner.ts` uses existing platform/capability registry to create distinct proposed copy, relevant hashtags, media directions, 5W1H, documented founder style, and non-authorizing continuity markers. Media remains NOT_RENDERED, recent posting style requires provenance-linked provider history, and outcome/performance claims require independent live proof; reputational heuristics do not certify safety."
+        "`src/lib/founderSignalCampaignPlanner.ts` uses existing platform/capability registry to create distinct proposed copy, relevant hashtags, media directions, 5W1H, documented founder style, and non-authorizing continuity markers. Media remains NOT_RENDERED, recent posting style requires provenance-linked provider history, and outcome/performance claims require independent live proof; reputational heuristics do not certify safety.",
+        "`src/lib/founderSignalCampaignPlanner.ts` must reject campaign proposals without a pinned public GitHub source and must withhold distribution permission when the proposed copy depends on unverified outcomes or account claims."
       ]
     },
     {
@@ -1139,13 +1140,15 @@
     {
       "path": "src/lib/founderSignalAuthenticatedMediaReader.ts",
       "claims": [
-        "`src/lib/founderSignalAuthenticatedMediaReader.ts` supplies an isolated dependency-injected, read-only media reader bridge. It requires a server-owned principal/workspace/project, promoted same-project FCR asset registry record, asserted commercial-use permission and domain authority receipt, immutable object version, matching metadata SHA and exact streamed byte count/hash. It never grants media uploads, Buffer draft writes, scheduling, publication or account authority; no live storage adapter is implemented."
+        "`src/lib/founderSignalAuthenticatedMediaReader.ts` supplies an isolated dependency-injected, read-only media reader bridge. It requires a server-owned principal/workspace/project, promoted same-project FCR asset registry record, asserted commercial-use permission and domain authority receipt, immutable object version, matching metadata SHA and exact streamed byte count/hash. It never grants media uploads, Buffer draft writes, scheduling, publication or account authority; no live storage adapter is implemented.",
+        "`src/lib/founderSignalAuthenticatedMediaReader.ts` must reject media snapshots unless a server-owned reader has authorized the exact principal and project scope plus promoted registry rights and immutable version-bound byte integrity; this local result never authorizes Buffer drafts or publishing."
       ]
     },
     {
       "path": "src/lib/founderSignalLocalRenderInspection.ts",
       "claims": [
-        "`src/lib/founderSignalLocalRenderInspection.ts` verifies local FFmpeg MP4 output bytes against its renderer receipt and explicit server-owned output directory, rejects traversal, symlinks, modified files and digest/size mismatches, and returns only LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF without any rights, publication, media upload or provider authority."
+        "`src/lib/founderSignalLocalRenderInspection.ts` verifies local FFmpeg MP4 output bytes against its renderer receipt and explicit server-owned output directory, rejects traversal, symlinks, modified files and digest/size mismatches, and returns only LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF without any rights, publication, media upload or provider authority.",
+        "`src/lib/founderSignalLocalRenderInspection.ts` must reject local MP4 readback when the trusted root is missing or the target is an alias or symlink and must verify the versioned receipt byte count and SHA-256 without granting publication authority."
       ]
     },
     {
