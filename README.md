@@ -1,5 +1,20 @@
 # Founder Control Room
 
+<!-- public-summary:start -->
+## Product overview
+
+**Founder Control Room is a founder-operated workspace for turning decisions into accountable work.** It connects project visibility, bounded handoffs, evidence, and explicit human approvals while preserving each connected product's independent identity and authority.
+
+**What to present today:** the system architecture, founder-in-control operating model, evidence and verification design, and source-backed demonstrations whose exact runtime is identified. A capability in source code is not automatically a live production capability.
+
+**Evidence boundary (21 November 2026):** the reviewed `main` commit `30494e4` includes successful checks alongside failed Cloudflare Worker and governance/adapter-related checks. Its complete production path is **not verified**, so do not describe the whole platform as deployed, autonomous, or ready to operate unattended.
+
+**External-sharing boundary:** this repository contains extensive engineering notes below. For a partner presentation, use a separately curated high-level product walkthrough rather than forwarding the full README as an operating manual. Never include tokens, personal/customer information, private decisions, or unverified partnership claims.
+
+---
+<!-- public-summary:end -->
+
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
