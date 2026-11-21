@@ -21,13 +21,21 @@ jobs:
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -48,13 +56,21 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -73,13 +89,21 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -107,13 +131,21 @@ jobs:
     name: Playwright e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -154,13 +186,21 @@ jobs:
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -182,13 +222,21 @@ jobs:
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -215,14 +263,22 @@ jobs:
   documentation-truth:
     name: Documentation truth
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -280,14 +336,22 @@ jobs:
     name: Cloudflare bridge authority contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -312,14 +376,22 @@ jobs:
   test-discovery:
     name: Test discovery ratchet
     runs-on: ubuntu-latest
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
-      - name: Refresh runner Git security updates
-        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -375,7 +447,17 @@ jobs:
     name: Migration lint
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    steps:
+       - name: Refresh runner Git security updates before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --only-upgrade --yes git
+          printf 'git executable: '
+          command -v git
+          git --version
+          dpkg-query -W -f='${Package} ${Version}\n' git
+          apt-cache policy git
       - name: Check out exact candidate with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
