@@ -222,3 +222,7 @@ Workflow YAML syntax belongs to the same exact-head source contract: `.github/wo
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+### Git client security is a pre-checkout gate
+
+For covered FCR Ubuntu CI and Playwright jobs, the proposed Git security bootstrap must run before the first repository checkout. It builds upstream Git 2.56.1 from the official kernel.org tarball, verifies the pinned SHA-256, and checks the active executable version. A package refresh alone is not proof of the six November 2026 Git fixes; do not infer coverage for workflows or environments not explicitly inventoried. PR #1161 remains a candidate until its exact-head CI and browser proof are green.
