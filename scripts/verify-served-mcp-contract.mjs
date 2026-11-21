@@ -19,12 +19,12 @@
  *      can keep every internal invariant intact while a mount edit silently
  *      drops the auth middleware in front of it; nothing else checks that.
  *   3. The served discovery/initialize description stays truthful about the
- *      nine read/preview tools plus the one bounded peer relay.
+ *      nine read/preview tools, one checkpoint writer, plus one bounded peer relay.
  *
  * Scope is deliberately narrow otherwise: it does not assert OAuth claim
  * handling or protocol-version literals. The external tool catalog is pinned
  * only where authority semantics matter: nine read/preview tools stay read-only,
- * while the one peer-operator relay is a bounded external side effect with no
+ * while the checkpoint writer is a bounded internal persistence action and the peer relay is an external side effect with no
  * repository/provider mutation authority.
  */
 
@@ -69,15 +69,15 @@ assert(
 );
 const falseReadOnlyCount = (toolDefsBody.match(/readOnlyHint:\s*false/g) ?? []).length;
 assert(
-  falseReadOnlyCount === 1,
-  `exactly one external MCP tool annotation may advertise readOnlyHint: false (found ${falseReadOnlyCount})`,
+  falseReadOnlyCount === 2,
+  `exactly two external MCP tool annotations must advertise readOnlyHint: false (found ${falseReadOnlyCount})`,
 );
 const toolCount = (toolDefsBody.match(/^\s{6}name:\s*'/gm) ?? []).length;
 const readAnnotationUses = (
   toolDefsBody.match(/annotations:\s*(?:readAnnotations|\{\s*\.\.\.readAnnotations)/g) ?? []
 ).length;
 const relayAnnotationUses = (toolDefsBody.match(/annotations:\s*relayAnnotations/g) ?? []).length;
-assert(toolCount === 10, `external MCP catalog must contain the nine read/preview tools plus one relay tool (found ${toolCount})`);
+assert(toolCount === 11, `external MCP catalog must contain nine reads, one checkpoint writer and one relay (found ${toolCount})`);
 assert(
   readAnnotationUses === 9,
   `exactly nine declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
@@ -86,6 +86,12 @@ assert(
   ['fcr_list_task_checkpoints', 'fcr_get_task_checkpoint'].every(name =>
     toolDefsBody.includes(`name: '${name}'`)),
   "both shared-task discovery tools must remain in the guarded read-only MCP catalog",
+);
+assert(
+  toolDefsBody.includes("name: 'fcr_save_task_checkpoint'") &&
+    /annotations:\s*checkpointAnnotations/.test(toolDefsBody) &&
+    /const checkpointAnnotations = \{[\s\S]{0,160}?readOnlyHint:\s*false/.test(toolDefsBody),
+  "checkpoint persistence must remain a distinct non-read-only, non-destructive tool",
 );
 assert(
   relayAnnotationUses === 1 && /name:\s*'fcr_relay_operator'[\s\S]{0,1600}?annotations:\s*relayAnnotations/.test(toolDefsBody),
@@ -109,11 +115,11 @@ assert(
 /* ---------- remoteReadMcp.ts: served description must match the actual catalog ---------- */
 
 assert(
-  remoteReadMcp.includes('nine read/preview tools plus one bounded peer-operator relay tool'),
+  remoteReadMcp.includes('nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool'),
   "modern server/discover must describe nine read/preview tools plus the bounded peer relay",
 );
 assert(
-  remoteReadMcp.includes('Nine read/preview tools plus one bounded peer-operator relay'),
+  remoteReadMcp.includes('Nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay'),
   "legacy initialize must describe nine read/preview tools plus the bounded peer relay",
 );
 assert(
@@ -238,6 +244,6 @@ assert(
 );
 
 console.log(
-  "[verify:served-mcp] Nine read/preview MCP tools, one bounded peer relay, truthful served discovery, secret-argument guard, "
+  "[verify:served-mcp] Nine read/preview MCP tools, one reference-only checkpoint writer, one bounded peer relay, truthful served discovery, secret-argument guard, "
     + "Founder Signal endpoints, and every served mount point's middleware wiring are pinned.",
 );
