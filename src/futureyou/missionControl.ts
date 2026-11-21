@@ -264,6 +264,12 @@ function eventIsActionable(event: MissionControlEventInput, now: Date): boolean 
   return /fail|drift|block|risk|rollback|payment|delivery/i.test(event.event_type);
 }
 
+function isAgedOutCriticalEvent(event: MissionControlEventInput, now: Date): boolean {
+  const observation = observeTime(event.created_at, now);
+  const agedOut = observation.state === 'stale' && (observation.ageDays ?? 0) > 14;
+  return agedOut && (event.severity === 'critical' || event.severity === 'error');
+}
+
 function eventPriority(event: MissionControlEventInput, now: Date): MissionControlPriority {
   const observation = observeTime(event.created_at, now);
   const severityScore = event.severity === 'critical' ? 98 : event.severity === 'error' ? 88 : 68;
@@ -327,6 +333,7 @@ export function buildMissionControlBrief(input: {
   const eventPriorities = input.activity
     .filter((event) => eventIsActionable(event, now))
     .map((event) => eventPriority(event, now));
+  const agedOutCriticalEvents = input.activity.filter((event) => isAgedOutCriticalEvent(event, now)).length;
 
   const priorities = [...missionPriorities, ...eventPriorities]
     .sort((a, b) => b.score - a.score || safeTime(b.observedAt) - safeTime(a.observedAt))
@@ -351,6 +358,9 @@ export function buildMissionControlBrief(input: {
     return observation.state === 'fresh' && observation.ageDays !== null && observation.ageDays <= 1;
   });
   if (!hasRecentActivity) blindSpots.push('No trusted sanitized operational event was observed in the last 24 hours.');
+  if (agedOutCriticalEvents > 0) {
+    blindSpots.push(`${agedOutCriticalEvents} critical or error event${agedOutCriticalEvents === 1 ? '' : 's'} older than 14 days ${agedOutCriticalEvents === 1 ? 'was' : 'were'} excluded from this brief; an unresolved issue does not stop being unresolved because it aged out of the activity window.`);
+  }
   if ([...input.missions, ...input.activity].some((item) => !item.project)) blindSpots.push('Some records are missing project labels, lowering prioritization confidence.');
   if (staleObservations > 0) blindSpots.push(`${staleObservations} observation${staleObservations === 1 ? ' is' : 's are'} at least ${FRESH_OBSERVATION_DAYS} days old and cannot count as fresh decision evidence.`);
   if (invalidObservationTimes > 0) blindSpots.push(`${invalidObservationTimes} record${invalidObservationTimes === 1 ? ' has' : 's have'} an invalid observation time; machine confidence is forced low.`);
