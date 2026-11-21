@@ -903,6 +903,7 @@ export function createExternalMcpToolExecutor(
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
   const listTaskCheckpoints = overrides.listTaskCheckpoints ?? defaultListTaskCheckpoints;
   const getTaskCheckpoint = overrides.getTaskCheckpoint ?? defaultGetTaskCheckpoint;
+  const saveTaskCheckpoint = overrides.saveTaskCheckpoint ?? defaultSaveTaskCheckpoint;
   const auditChangeGenealogy = overrides.auditChangeGenealogy
     ?? ((input) => defaultAuditChangeGenealogy(input, env));
   const previewCapabilityPlan = overrides.previewCapabilityPlan
@@ -985,6 +986,18 @@ export function createExternalMcpToolExecutor(
         throw new Error('taskId must be a bounded task identifier');
       }
       result = await getTaskCheckpoint({ projectSlug: receiptProject, taskId });
+    } else if (input.name === 'fcr_save_task_checkpoint') {
+      if (input.identity.authMode !== 'oauth') throw new Error('Saving a task checkpoint requires founder-bound OAuth');
+      noUnexpectedKeys(input.arguments, ['projectId', 'continuationInput'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      if (!isRecord(input.arguments.continuationInput)) throw new Error('continuationInput must be an object');
+      const checkpoint = input.arguments.continuationInput as unknown as OperatorExecutionContinuationInput;
+      if (!isRecord(checkpoint.observation)) throw new Error('checkpoint observation must be an object');
+      const observation = createOperatorContinuityReceiptV2(checkpoint.observation as OperatorContinuityInputV2);
+      const continuation = createOperatorExecutionContinuation({ ...checkpoint, observation });
+      if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');
+      evidenceRisk = 'external_side_effect';
+      result = await saveTaskCheckpoint({ projectSlug: receiptProject, continuation });
     } else if (input.name === 'fcr_audit_change_genealogy') {
       noUnexpectedKeys(input.arguments, ['projectId', 'limit', 'includeComments', 'includeDiff'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
@@ -1097,11 +1110,13 @@ export function createExternalMcpToolExecutor(
     });
 
     const relay = input.name === 'fcr_relay_operator';
+    const checkpointWrite = input.name === 'fcr_save_task_checkpoint';
     return {
       data: result,
       receipt,
       governanceBoundary: {
-        readOrPreviewOnly: !relay,
+        readOrPreviewOnly: !relay && !checkpointWrite,
+        internalCheckpointPersistenceOnly: checkpointWrite,
         externalProviderCall: relay ? relayExternalProviderCall : false,
         mutationAuthority: false,
         executionAllowed: false,
