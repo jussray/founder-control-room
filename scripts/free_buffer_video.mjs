@@ -33,8 +33,9 @@ const probe = p => {
   const audio = (data.streams || []).find(s => s.codec_type === 'audio');
   // A container may be 7s long even when its recorded audio ends at 0.5s.
   // Require the actual selected audio stream duration, never the format duration.
-  return { duration: Number(data.format?.duration), video, audio: Boolean(audio),
-    audioDuration: audio ? Number(audio.duration) : null };
+  return { duration: Number(data.format?.duration), video,
+    videoDuration: video ? Number(video.duration) : null,
+    audio: Boolean(audio), audioDuration: audio ? Number(audio.duration) : null };
 };
 const file = (flag) => {
   const p = args[flag];
@@ -71,10 +72,13 @@ const main = async () => {
   }
   const a = probe(intro), b = probe(screen);
   const audioCovers = (clip, seconds) => clip.audio && Number.isFinite(clip.audioDuration) && clip.audioDuration >= seconds;
-  if (!a.video || a.duration < 3 || !audioCovers(a, 3)) {
+  const videoCovers = (clip, seconds) => clip.video && Number.isFinite(clip.videoDuration) && clip.videoDuration >= seconds;
+  // The format duration can be set by a long audio track even if real footage
+  // ends early. Require both native streams to cover the selected segment.
+  if (!videoCovers(a, 3) || !audioCovers(a, 3)) {
     throw Error('intro must have >=3s camera footage with >=3s genuine recorded audio');
   }
-  if (!b.video || b.duration < 7) throw Error('screen must have >=7s authentic UI footage');
+  if (!videoCovers(b, 7)) throw Error('screen must have >=7s authentic UI footage');
   // Even with a longer video/container duration, a short recorded audio stream
   // cannot be silently padded into a claim of seven seconds of real audio.
   if (!voiceover && !audioCovers(b, 7)) {
