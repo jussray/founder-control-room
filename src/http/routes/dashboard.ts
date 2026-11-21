@@ -159,7 +159,9 @@ dashboardRouter.get('/proof-engine', async (req: FounderRequest, res) => {
     if (!signal) continue;
     const key = `${signal.provider}:${signal.label}`;
     if (!newest.has(key)) {
-      newest.set(key, { ...signal, checkedAt: signal.checkedAt ?? event.created_at ?? null });
+      // An event's ingestion timestamp is not a verifier readback timestamp.
+      // Preserve missing verification time so the proof engine fails closed.
+      newest.set(key, signal);
     }
   }
 
