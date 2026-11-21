@@ -38,7 +38,7 @@ const input = (name: 'fcr_list_task_checkpoints' | 'fcr_get_task_checkpoint',
 describe('founder-only shared-task MCP discovery', () => {
   it('advertises read-only tools using the existing MCP surface, not a new endpoint', () => {
     for (const name of ['fcr_list_task_checkpoints', 'fcr_get_task_checkpoint']) {
-      const definition = externalMcpToolDefinitions().find(tool => tool.name === name);
+      const definition = externalMcpToolDefinitions().find(tool => tool.name === name) as Record<string, any> | undefined;
       expect(definition?.annotations).toMatchObject({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true,
       });
