@@ -134,6 +134,9 @@ service. The candidate founder-authenticated API provides:
 - `POST /operator/continuity` with `{ "continuation": <validated packet> }`;
 - `GET /operator/continuity?projectSlug=...&repositoryFullName=...&limit=10` for
   bounded founder-only task discovery, returning reference-only metadata;
+  the newest row per task wins, and an invalidated newest row is returned as
+  `status: INVALIDATED` with `invalidatedAt`, `nextActionRef: null` and no
+  remaining steps (an older row for that task is never resurrected);
 - `GET /operator/continuity/:taskId?projectSlug=...&repositoryFullName=...`;
 - server-only storage in existing `public.continuity_records`, using a
   reviewed additive migration for `task_id`, `execution_state`, and

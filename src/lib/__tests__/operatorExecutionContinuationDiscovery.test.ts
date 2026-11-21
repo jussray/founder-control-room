@@ -113,6 +113,28 @@ describe('real store task discovery over canonical continuity_records', () => {
     expect(JSON.stringify(result)).not.toContain('contextRefs');
   });
 
+  it('flags an invalidated newest checkpoint without resurrecting an older row or exposing its action', async () => {
+    rows.push(
+      { ...row(record('task-a', '2026-11-21T09:08:00.000Z', 'deploy')), invalidated_at: '2026-11-21T10:00:00.000Z' },
+      row(record('task-a', '2026-11-21T09:05:00.000Z', 'patch')),
+      row(record('task-b', '2026-11-21T09:02:00.000Z', 'review')),
+    );
+    const result = await listRecentOperatorExecutionContinuations(projectSlug, repo, 5);
+    expect(result.items.map(item => item.taskId)).toEqual(['task-a', 'task-b']);
+    expect(result.items[0]).toMatchObject({
+      status: 'INVALIDATED',
+      invalidatedAt: '2026-11-21T10:00:00.000Z',
+      nextActionRef: null,
+      remainingStepIds: [],
+    });
+    expect(JSON.stringify(result.items[0])).not.toContain('fcr:actions/patch');
+    expect(result.items[1]).toMatchObject({
+      status: 'PERSISTED_NOT_REVALIDATED',
+      invalidatedAt: null,
+      nextActionRef: 'fcr:actions/review',
+    });
+  });
+
   it('rejects cross-project persisted records rather than disclosing them', async () => {
     rows.push(row(record('task-a', '2026-11-21T09:08:00.000Z', 'verify', 'other-project')));
     await expect(listRecentOperatorExecutionContinuations(projectSlug, repo))

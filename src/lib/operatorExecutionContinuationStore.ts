@@ -191,7 +191,8 @@ export async function listRecentOperatorExecutionContinuations(
     remainingStepIds: readonly string[];
     nextActionRef: string | null;
     fingerprint: string;
-    status: 'PERSISTED_NOT_REVALIDATED';
+    invalidatedAt: string | null;
+    status: 'PERSISTED_NOT_REVALIDATED' | 'INVALIDATED';
   }>;
   scanned: number;
   boundedWindow: true;
@@ -220,7 +221,8 @@ export async function listRecentOperatorExecutionContinuations(
     remainingStepIds: readonly string[];
     nextActionRef: string | null;
     fingerprint: string;
-    status: 'PERSISTED_NOT_REVALIDATED';
+    invalidatedAt: string | null;
+    status: 'PERSISTED_NOT_REVALIDATED' | 'INVALIDATED';
   }> = [];
   for (const raw of data) {
     const stored = parsedStoredRow(raw as Record<string, unknown>);
@@ -235,10 +237,14 @@ export async function listRecentOperatorExecutionContinuations(
       taskId: stored.record.taskId,
       observedAt: observation.observedAt,
       sourceMode: stored.record.sourceMode,
-      remainingStepIds: stored.record.remainingStepIds,
-      nextActionRef: stored.record.nextActionRef,
+      // The newest row per task stays authoritative even when invalidated,
+      // so an older superseded row is never resurrected. An invalidated
+      // checkpoint is flagged and exposes no actionable next step.
+      remainingStepIds: stored.invalidatedAt ? [] : stored.record.remainingStepIds,
+      nextActionRef: stored.invalidatedAt ? null : stored.record.nextActionRef,
       fingerprint: stored.record.fingerprint,
-      status: 'PERSISTED_NOT_REVALIDATED',
+      invalidatedAt: stored.invalidatedAt,
+      status: stored.invalidatedAt ? 'INVALIDATED' : 'PERSISTED_NOT_REVALIDATED',
     });
     if (items.length === limit) break;
   }
