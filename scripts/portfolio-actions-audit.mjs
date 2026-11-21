@@ -442,7 +442,7 @@ async function main() {
         const rateLimited = error instanceof Error && error.message === 'GITHUB_RATE_LIMITED';
         result.state = rateLimited ? 'UNKNOWN_RATE_LIMITED' : 'UNKNOWN_READ_BLOCKED';
         result.blocker = rateLimited ? 'GITHUB_RATE_LIMITED'
-          : error instanceof Error && /^GITHUB_READ_STATUS_\\d+$/.test(error.message)
+          : error instanceof Error && /^GITHUB_READ_STATUS_\d+$/.test(error.message)
             ? error.message : 'READ_OR_VALIDATION_UNAVAILABLE';
       }
       return result;
