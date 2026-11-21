@@ -172,3 +172,78 @@ export async function readOperatorExecutionContinuation(
   const projectId = await projectFor(projectSlug, repositoryFullName);
   return latestFor(projectId, taskId);
 }
+
+
+/**
+ * Discovery over the existing founder-only continuity ledger.
+ * The returned items are bounded metadata, never raw transcripts or current
+ * source/CI/deployment proof. Newer rows for one task win within this window.
+ */
+export async function listRecentOperatorExecutionContinuations(
+  projectSlug: string,
+  repositoryFullName: string,
+  limit = 10,
+): Promise<{
+  items: Array<{
+    taskId: string;
+    observedAt: string;
+    sourceMode: 'chat' | 'work';
+    remainingStepIds: readonly string[];
+    nextActionRef: string | null;
+    fingerprint: string;
+    status: 'PERSISTED_NOT_REVALIDATED';
+  }>;
+  scanned: number;
+  boundedWindow: true;
+  currentEvidenceVerified: false;
+  authorizesExecution: false;
+}> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+    throw new OperatorContinuationStoreError('invalid_continuation');
+  }
+  const projectId = await projectFor(projectSlug, repositoryFullName);
+  const { supabase } = await import('./supabaseClient.js');
+  // Bounded scan avoids a new table/index and never claims exhaustive coverage.
+  const { data, error } = await supabase.from('continuity_records')
+    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,checkpoint_observed_at,invalidated_at,created_at')
+    .eq('project_id', projectId)
+    .not('task_id', 'is', null)
+    .order('checkpoint_observed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error || !Array.isArray(data)) throw new OperatorContinuationStoreError('storage_unavailable');
+  const seen = new Set<string>();
+  const items: Array<{
+    taskId: string;
+    observedAt: string;
+    sourceMode: 'chat' | 'work';
+    remainingStepIds: readonly string[];
+    nextActionRef: string | null;
+    fingerprint: string;
+    status: 'PERSISTED_NOT_REVALIDATED';
+  }> = [];
+  for (const raw of data) {
+    const stored = parsedStoredRow(raw as Record<string, unknown>);
+    if (!stored) throw new OperatorContinuationStoreError('storage_unavailable');
+    const observation = stored.record.observation;
+    if (observation.projectSlug !== projectSlug
+      || observation.repositoryFullName.toLowerCase() !== repositoryFullName.toLowerCase()
+    ) throw new OperatorContinuationStoreError('storage_unavailable');
+    if (seen.has(stored.record.taskId)) continue;
+    seen.add(stored.record.taskId);
+    items.push({
+      taskId: stored.record.taskId,
+      observedAt: observation.observedAt,
+      sourceMode: stored.record.sourceMode,
+      remainingStepIds: stored.record.remainingStepIds,
+      nextActionRef: stored.record.nextActionRef,
+      fingerprint: stored.record.fingerprint,
+      status: 'PERSISTED_NOT_REVALIDATED',
+    });
+    if (items.length === limit) break;
+  }
+  return {
+    items, scanned: data.length, boundedWindow: true,
+    currentEvidenceVerified: false, authorizesExecution: false,
+  };
+}
