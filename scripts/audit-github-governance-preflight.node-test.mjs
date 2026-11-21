@@ -104,7 +104,7 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical FCR governance preserves founder-only review and zero-bypass freshness membranes', () => {
+test('canonical FCR founder-selected review policy preserves zero-bypass freshness membranes', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const review = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
@@ -168,7 +168,7 @@ test('canonical review membrane permits only the known preservable provider rule
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(leakedStatus, 'main', 'main'), expectedBypass), false);
 });
 
-test('future-team phase is representable without weakening any machine or provider floor', () => {
+test('independent-review phase preserves every machine and provider floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const future = rulesetSnapshot(futureTeamRuleset(), 'main', 'main');
   assert.equal(future.requiredApprovingReviewCount, 1);
@@ -238,11 +238,12 @@ test('collaborator readiness remains observable and excludes owner and bots', ()
   assert.equal(collaboratorCanReview({ login: 'reviewer', permissions: { push: true } }, 'jussray'), true);
 });
 
-test('founder-only report is READY for exact topology even before a future reviewer exists', () => {
+test('founder-only native phase is READY with no outside native reviewer when other gates pass', () => {
   const ready = readyReport({
     collaborators: [{ login: 'jussray', permissions: { admin: true } }],
   });
   assert.equal(ready.status, 'READY');
+  assert.equal(ready.blocker, null);
   assert.equal(ready.humanReviewPhase, 'founder-only');
   assert.equal(ready.requiredNativeApprovalCount, 0);
   assert.equal(ready.observationComplete, true);
@@ -268,6 +269,31 @@ test('founder-only report is READY for exact topology even before a future revie
   });
   assert.equal(duplicate.status, 'NOT_READY');
   assert.equal(duplicate.activeRulesetCountTargetingRef, 3);
+});
+
+test('optional eligible outside reviewer remains observable but is not a native gate', () => {
+  const ready = readyReport();
+  assert.equal(ready.status, 'READY');
+  assert.equal(ready.blocker, null);
+  assert.equal(ready.humanReviewPhase, 'founder-only');
+  assert.equal(ready.requiredNativeApprovalCount, 0);
+  assert.equal(ready.independentReviewerReady, true);
+  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
+  assert.equal(ready.canonicalFloorSatisfied, true);
+  assert.equal(ready.freshnessFloorSatisfied, true);
+});
+
+test('owner-only and bot-only collaborators do not create an extra native review gate', () => {
+  for (const collaborators of [
+    [{ login: 'jussray', permissions: { admin: true } }],
+    [{ login: 'audit[bot]', type: 'Bot', permissions: { push: true } }],
+    [{ login: 'reader', permissions: { pull: true } }],
+  ]) {
+    const result = readyReport({ collaborators });
+    assert.equal(result.status, 'READY');
+    assert.equal(result.blocker, null);
+    assert.equal(result.independentReviewerReady, false);
+  }
 });
 
 test('legacy monolithic ruleset is NOT_READY and cannot impersonate canonical two-component governance', () => {
