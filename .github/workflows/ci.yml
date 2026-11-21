@@ -26,6 +26,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -51,6 +53,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -74,6 +78,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -106,6 +112,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -151,6 +159,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -177,6 +187,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -209,6 +221,8 @@ jobs:
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -272,6 +286,8 @@ jobs:
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
@@ -302,6 +318,8 @@ jobs:
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
+      - name: Refresh runner Git security updates
+        uses: ./.github/actions/refresh-git-security
       - name: Record and verify exact head
         shell: bash
         run: |
