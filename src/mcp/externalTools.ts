@@ -10,7 +10,15 @@ import { supabase } from '../lib/supabaseClient.js';
 import {
   listRecentOperatorExecutionContinuations,
   readOperatorExecutionContinuation,
+  storeOperatorExecutionContinuation,
 } from '../lib/operatorExecutionContinuationStore.js';
+import {
+  createOperatorContinuityReceiptV2,
+  createOperatorExecutionContinuation,
+  type OperatorContinuityInputV2,
+  type OperatorExecutionContinuation,
+  type OperatorExecutionContinuationInput,
+} from '../lib/operatorContinuity.js';
 import {
   routeFcrSkills,
   type FcrSkillRouterAction,
@@ -35,6 +43,7 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'fcr_get_current_truth',
   'fcr_list_task_checkpoints',
   'fcr_get_task_checkpoint',
+  'fcr_save_task_checkpoint',
   'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
   'fcr_relay_operator',
@@ -96,6 +105,7 @@ export interface ExternalMcpToolDependencies {
   getCurrentTruth?: (projectSlug: string) => Promise<unknown>;
   listTaskCheckpoints?: (input: { projectSlug: string; limit: number }) => Promise<unknown>;
   getTaskCheckpoint?: (input: { projectSlug: string; taskId: string }) => Promise<unknown>;
+  saveTaskCheckpoint?: (input: { projectSlug: string; continuation: OperatorExecutionContinuation }) => Promise<unknown>;
   auditChangeGenealogy?: (input: {
     projectSlug: string;
     limit: number;
