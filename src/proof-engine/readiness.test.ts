@@ -38,7 +38,7 @@ describe('buildProofEngineSnapshot', () => {
     const snapshot = buildProofEngineSnapshot('sekret-bip', [
       signal('verified', 'github'),
       signal('blocked', 'playwright'),
-    ]);
+    ], new Date('2026-08-01T01:00:00.000Z'));
 
     expect(snapshot.status).toBe('blocked');
     expect(snapshot.blockers).toEqual(['playwright: playwright blocked']);
