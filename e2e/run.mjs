@@ -387,6 +387,35 @@ async function runGuardedTerminalProof(page) {
     'same browser proposal reused its idempotency key and returned the first commit receipt');
   assert(repoAfterPatch?.branches.get('terminal-proof')?.sha === patchedHead,
     'replayed patch did not create another Git commit');
+
+  // Exercise the *shipped* Control Room terminal tab with this same real
+  // browser session and server, not an uninvoked standalone test fixture.
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.click('.tabs button[data-tab="terminal"]');
+  await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
+  await page.click('#terminal-load-commands');
+  await page.waitForSelector('#terminal-commands .card[data-id="git.head"]');
+  await page.click('#terminal-commands .card[data-id="git.head"]');
+  assert(await page.locator('#terminal-run-form input[name="confirmWrite"]').count() === 0,
+    'shipped terminal UI does not render the legacy write confirmation');
+  assert((await page.locator('#terminal-run-panel').innerText()).includes('Read-only commands only'),
+    'shipped terminal UI explains that verify/write needs separate L99 authority');
+
+  await page.fill('#terminal-run-form input[name="missionId"]', terminalMissionId);
+  await page.fill('#terminal-run-form input[name="expectedCommitSha"]', REAL_REPO_HEAD_SHA);
+  const terminalPost = page.waitForRequest((req) =>
+    req.method() === 'POST' &&
+    new URL(req.url()).pathname === `/terminal/${TERMINAL_PROOF_REPO}/run`);
+  await page.click('#terminal-run-form button[type="submit"]');
+  const submitted = (await terminalPost).postDataJSON();
+  assert.deepEqual(Object.keys(submitted).sort(),
+    ['commandId', 'missionId', 'expectedCommitSha'].sort(),
+    'legacy confirmWrite is absent from the actual browser request payload');
+  assert(submitted.commandId === 'git.head' && submitted.expectedCommitSha === REAL_REPO_HEAD_SHA,
+    'shipped browser request remains bound to the selected read-only command and exact head');
+  const actualTerminalResult = await waitForText(page, '#terminal-run-result', '"status": "passed"');
+  assert(actualTerminalResult.includes('"status": "passed"'),
+    'shipped terminal tab executes the real read-only route and shows its persisted result');
 }
 
 async function verifyLogoutAndProtectedBoundary(page, priorSessionCookie) {
