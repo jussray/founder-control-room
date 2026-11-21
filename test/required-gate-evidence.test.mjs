@@ -14,6 +14,7 @@ const validRule = {
     required_status_checks: [
       { context: 'Required Gate', integration_id: 34548 },
       { context: 'Delete Neon Branch', integration_id: 15368 },
+      ...Array.from({ length: 17 }, (_, i) => ({ context: 'Historical check ' + i, integration_id: 15368 })),
     ],
   } }],
 };
@@ -29,7 +30,9 @@ test('reads active founder main ruleset from GitHub rather than a fabricated 19-
     repository: 'jussray/founder-control-room', token: 'test-only',
     getJson: async (url) => { requests.push(String(url)); return validRule; },
   });
-  assert.deepEqual(result.requiredChecks, [
+  assert.equal(result.topology, 'legacy_single');
+  assert.equal(result.expectedCount, 19);
+  assert.deepEqual(result.requiredChecks.slice(0, 2), [
     { context: 'Required Gate', integrationId: '34548' },
     { context: 'Delete Neon Branch', integrationId: '15368' },
   ]);
@@ -90,4 +93,54 @@ test('skipped jobs remain individually visible but cannot count as proof', () =>
   assert.equal(skips[0].evidenceOfPassingCheck, false);
   assert.equal(skips[0].reasonVerified, false);
   assert.equal(assessRequiredGate(null, checks, SHA).counts, null);
+});
+
+test('reconciled zero-bypass two-membrane policy remains observable after the 19-check rule is fixed', async () => {
+  const strictId = 987654;
+  const review = { ...validRule, rules: [{ type: 'pull_request' }] };
+  const strict = {
+    id: strictId, name: 'Founder Control Room main exact-head gate [strict freshness]',
+    enforcement: 'active', target: 'branch',
+    conditions: { ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] } },
+    bypass_actors: [],
+    rules: [{ type: 'required_status_checks', parameters: {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [
+        { context: 'Required Gate', integration_id: 15368 },
+        { context: 'Verify test-ledger contract', integration_id: 15368 },
+      ],
+    } }],
+  };
+  const source = async (url) => {
+    if (url.pathname.endsWith('/20819094')) return review;
+    if (url.pathname.endsWith('/' + strictId)) return strict;
+    if (url.pathname.endsWith('/rulesets')) return [
+      { id: 20819094, name: 'Founder Control Room main exact-head gate' },
+      { id: strictId, name: strict.name },
+    ];
+    throw Error('Unexpected provider read ' + url.pathname);
+  };
+  const actual = await readFcrRequiredRuleset({
+    repository: 'jussray/founder-control-room', token: 'test-only', getJson: source,
+  });
+  assert.equal(actual.topology, 'canonical_split');
+  assert.equal(actual.expectedCount, 2);
+  const successful = [row('Required Gate', 'passed', '15368'),
+    row('Verify test-ledger contract', 'passed', '15368')];
+  assert.equal(assessRequiredGate(actual, successful, SHA).status, 'covered');
+  assert.equal(assessRequiredGate(actual, successful.slice(0, 1), SHA).status, 'blocked');
+  const legacy = { topology: 'legacy_single', expectedCount: 19,
+    requiredChecks: Array.from({length: 19}, (_, i) => ({ context: 'Check ' + i, integrationId: '15368' })) };
+  assert.equal(assessRequiredGate(legacy, legacy.requiredChecks.map(x => row(x.context, 'passed')), SHA).status,
+    'legacy_covered_not_canonical');
+  await assert.rejects(readFcrRequiredRuleset({
+    repository: 'jussray/founder-control-room', token: 'test-only',
+    getJson: async (url) => url.pathname.endsWith('/20819094') ? review : [],
+  }), /STRICT_MEMBRANE_MISSING/);
+  await assert.rejects(readFcrRequiredRuleset({
+    repository: 'jussray/founder-control-room', token: 'test-only',
+    getJson: async (url) => url.pathname.endsWith('/20819094') ? review
+      : url.pathname.endsWith('/rulesets') ? [{ id: strictId, name: strict.name }]
+        : { ...strict, bypass_actors: [{ actor_id: 1 }] },
+  }), /STRICT_MEMBRANE_INVALID/);
 });
