@@ -10,6 +10,7 @@
 // The router owns its founder gate; upstream mount order is not authority.
 
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 import { requireFounder } from "../middleware/requireFounder.js";
 import { Octokit } from "@octokit/rest";
 import {
@@ -46,7 +47,12 @@ function octokit(env: GhEnv): Octokit {
 }
 
 export const portableConsoleRouter = Router();
-portableConsoleRouter.use(requireFounder);
+// A bounded per-IP pre-authentication budget is independent of upstream mounts.
+portableConsoleRouter.use(
+  rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Portable console rate limited' } }),
+  requireFounder,
+);
 
 // ---------------------------------------------------------------------------
 // repo_* tools — trigger and poll the real repo-cycle.yml workflow. This is

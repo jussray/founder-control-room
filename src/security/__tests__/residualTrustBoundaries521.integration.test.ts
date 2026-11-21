@@ -39,6 +39,7 @@ describe('residual trust boundaries from #521', () => {
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: 'Founder session required' });
+    expect(response.headers['ratelimit'] ?? response.headers['ratelimit-limit']).toBeDefined();
     expect(response.body).not.toHaveProperty('provider');
     expect(response.body).not.toHaveProperty('openaiKeyPresent');
     expect(response.body).not.toHaveProperty('nodeEnv');
@@ -54,5 +55,6 @@ describe('residual trust boundaries from #521', () => {
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: 'Founder session required' });
+    expect(response.headers['ratelimit'] ?? response.headers['ratelimit-limit']).toBeDefined();
   });
 });
