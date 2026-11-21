@@ -21,6 +21,7 @@ jobs:
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -47,6 +48,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -71,6 +73,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -104,6 +107,7 @@ jobs:
     name: Playwright e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -150,6 +154,7 @@ jobs:
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -177,6 +182,7 @@ jobs:
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -209,6 +215,7 @@ jobs:
   documentation-truth:
     name: Documentation truth
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head with history
@@ -273,6 +280,7 @@ jobs:
     name: Cloudflare bridge authority contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -304,6 +312,7 @@ jobs:
   test-discovery:
     name: Test discovery ratchet
     runs-on: ubuntu-latest
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
@@ -366,6 +375,7 @@ jobs:
     name: Migration lint
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    steps:
       - name: Install upstream Git security release before checkout
         uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact candidate with history
