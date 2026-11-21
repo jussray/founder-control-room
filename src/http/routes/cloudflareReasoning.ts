@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
   CLOUDFLARE_REASONING_CONTRACT,
+  classifyCloudflareSignalKind,
   reasonAboutCloudflare,
 } from '../../reasoning/cloudflare/reason.js';
 import type {
@@ -54,20 +55,6 @@ function normalizeStatus(value: unknown): CloudflareSignalStatus {
   return 'unknown';
 }
 
-function normalizeKind(value: unknown): CloudflareSignalKind {
-  const resource = asString(value)?.toLowerCase() ?? '';
-  if (resource.includes('worker')) return 'worker_deployment';
-  if (resource.includes('page')) return 'pages_deployment';
-  if (resource.includes('health') || resource.includes('smoke')) return 'runtime_health';
-  if (resource.includes('authority') || resource.includes('deployment_path')) return 'deployment_authority';
-  if (resource.includes('credential') || resource.includes('token') || resource.includes('auth')) return 'credential';
-  if (resource.includes('dns')) return 'dns';
-  if (resource.includes('route')) return 'route';
-  if (resource.includes('secret') || resource.includes('binding')) return 'secret_binding';
-  if (resource.includes('release') || resource.includes('marker')) return 'release_marker';
-  return 'other';
-}
-
 function normalizeAuthority(value: unknown): CloudflareSignal['authority'] {
   const authority = asString(value)?.toLowerCase();
   if (authority === 'native_git' || authority === 'git_integration' || authority === 'workers_builds') {
@@ -84,7 +71,7 @@ function observationToSignal(row: Row): CloudflareSignal {
   const state = asObject(row['observed_state']);
   return {
     id: asString(row['id']) ?? randomUUID(),
-    kind: normalizeKind(row['resource_type']),
+    kind: classifyCloudflareSignalKind(row['resource_type']),
     status: normalizeStatus(
       state['status']
       ?? state['state']
@@ -105,12 +92,11 @@ function observationToSignal(row: Row): CloudflareSignal {
 function releaseToSignal(row: Row): CloudflareSignal {
   const environment = firstString(row, ['environment']);
   const deployUrl = firstString(row, ['deploy_url', 'url']);
-  const resourceText = `${firstString(row, ['resource_type']) ?? ''} ${deployUrl ?? ''} ${environment ?? ''}`.toLowerCase();
-  const kind: CloudflareSignalKind = resourceText.includes('page')
-    ? 'pages_deployment'
-    : resourceText.includes('worker')
-      ? 'worker_deployment'
-      : 'release_marker';
+  // A URL, preview link, or generic ledger marker cannot assert deployment identity.
+  const classified = classifyCloudflareSignalKind(row['resource_type']);
+  const kind: CloudflareSignalKind = classified === 'pages_deployment' || classified === 'worker_deployment'
+    ? classified
+    : 'release_marker';
 
   return {
     id: asString(row['id']) ?? randomUUID(),
@@ -131,7 +117,7 @@ function eventToSignal(row: Row): CloudflareSignal {
   const eventType = firstString(row, ['event_type']) ?? 'other';
   return {
     id: asString(row['id']) ?? randomUUID(),
-    kind: normalizeKind(metadata['resource_type'] ?? eventType),
+    kind: classifyCloudflareSignalKind(metadata['resource_type'] ?? eventType),
     status: normalizeStatus(
       metadata['status']
       ?? metadata['state']
