@@ -22,6 +22,65 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  slack-agent-readiness:
+    name: Slack agent secret readiness (no message sent)
+    # Secrets are unavailable to PRs and blocked in Actions until provisioned.
+    # Manual-only probe avoids repeatedly redlining main on an absent Actions secret.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SLACK: ${{ secrets.SLACK }}
+    steps:
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify Slack agent credential without posting
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const credential = process.env.SLACK?.trim() ?? '';
+          if (!credential) {
+            console.error('::error::Missing Actions secret SLACK. A GitHub Copilot Agents secret alone is not available to Actions.');
+            process.exit(1);
+          }
+          if (credential.startsWith('xoxb-')) {
+            try {
+              const response = await fetch('https://slack.com/api/auth.test', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${credential}` },
+                redirect: 'error',
+                signal: AbortSignal.timeout(15000),
+              });
+              const body = response.ok ? await response.json() : null;
+              if (!response.ok || body?.ok !== true) throw new Error('Provider rejected token');
+              console.log('Slack bot provider auth: VERIFIED (read-only auth.test; no message posted)');
+            } catch {
+              console.error('::error::Slack bot provider auth failed. No message posted. Credential details intentionally withheld.');
+              process.exit(1);
+            }
+          } else {
+            let validWebhook = false;
+            try {
+              const u = new URL(credential);
+              const segments = u.pathname.split('/').filter(Boolean);
+              validWebhook = u.protocol === 'https:' && u.hostname === 'hooks.slack.com' &&
+                !u.username && !u.password && !u.port && !u.search && !u.hash &&
+                segments.length === 4 && segments[0] === 'services' &&
+                segments.slice(1).every((part) => part.length > 0);
+            } catch {
+              // No parsing details or credential material in log output.
+            }
+            if (!validWebhook) {
+              console.error('::error::SLACK is neither an xoxb bot token nor an approved Slack incoming webhook URL.');
+              process.exit(1);
+            }
+            console.log('Slack incoming webhook shape: VERIFIED. Provider delivery: UNVERIFIED (no message posted)');
+          }
+          NODE
+
   verify-sauce-source-guard:
     name: Verify Sauce Guard + Source Guard source contract
     runs-on: ubuntu-latest
