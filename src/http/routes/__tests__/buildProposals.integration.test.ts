@@ -168,7 +168,12 @@ describe('first-party AI build proposal seam', () => {
     expect(upstream).toHaveBeenCalledTimes(1);
     const [url, options] = upstream.mock.calls[0]!;
     expect(url).toBe('https://api.openai.com/v1/responses');
-    const body = JSON.parse(String(options.body)) as Record<string, any>;
+    const body = JSON.parse(String(options.body)) as {
+      store: boolean;
+      model: string;
+      text: { format: { strict: boolean } };
+      input: Array<{ content: Array<{ text: string }> }>;
+    };
     expect(body.store).toBe(false);
     expect(body.model).toBe('test-builder-model');
     expect(body.text.format.strict).toBe(true);
