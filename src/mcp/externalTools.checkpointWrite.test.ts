@@ -9,6 +9,7 @@ import {
   externalMcpToolDefinitions,
   type ExternalMcpReceipt,
   type ExternalMcpToolName,
+  type ExternalMcpIdentity,
 } from './externalTools.js';
 import type { OperatorExecutionContinuation } from '../lib/operatorContinuity.js';
 
@@ -51,7 +52,7 @@ const checkpointInput = {
   },
 };
 const invoke = (name: ExternalMcpToolName, args: Record<string, unknown>,
-  auth = identity, allowed = [projectId]) => ({
+  auth: ExternalMcpIdentity = identity, allowed = [projectId]) => ({
   name, arguments: args, allowedProjects: new Set(allowed),
   identity: auth, requestId: 'test-rpc',
 });
