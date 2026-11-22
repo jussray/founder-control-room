@@ -61,6 +61,20 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(preflightStep).not.toContain('wrangler secret put');
   });
 
+  it('explains exhausted live proof safely without weakening exact-head validation', () => {
+    expect(workflow).toContain('for attempt in $(seq 1 24); do');
+    expect(workflow).toContain('Runtime proof diagnostics (last attempt): health_http=');
+    expect(workflow).toContain('version_http=$version_http');
+    expect(workflow).toContain('health_service_header=$health_service_header');
+    expect(workflow).toContain('version_service_header=$version_service_header');
+    expect(workflow).toContain('live_sha=$live_sha expected_sha=$EXPECTED_HEAD_SHA');
+    expect(workflow).toContain('grant_contract=$grant_contract');
+    expect(workflow).toContain('if [[ ! "$live_sha" =~ ^[0-9a-f]{40}$ ]]');
+    expect(workflow).not.toContain('echo "$candidate_version"');
+    expect(workflow).not.toContain('echo "$candidate_health"');
+    expect(workflow).toContain('api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA');
+  });
+
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
     expect(workflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
     expect(workflow).toContain('needs: authority-gate');
