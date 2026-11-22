@@ -3,6 +3,7 @@ name: Neon Closed PR Branch Reconciliation
 on:
   schedule:
     # Hourly, offset from the top of the hour to reduce schedule contention.
+    # This is a catch-up lane; the PR-close workflow remains the fast path.
     - cron: '17 * * * *'
   workflow_dispatch:
 
