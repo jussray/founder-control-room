@@ -85,7 +85,7 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
       return { disposition: 'stored', taskId: continuation.taskId, currentEvidenceVerified: false };
     });
     const getTaskCheckpoint = vi.fn(async ({ taskId }: { taskId: string }) => ({
-      found: saved?.taskId === taskId,
+      found: latest()?.taskId === taskId,
       continuation: saved === null ? null : { record: saved, status: 'PERSISTED_NOT_REVALIDATED' },
       currentEvidenceVerified: false,
       executionAuthorityFromHandoff: false,
@@ -128,9 +128,10 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
       saved = continuation;
       return { disposition: 'stored', taskId: continuation.taskId };
     });
+    const latest = (): OperatorExecutionContinuation | null => saved;
     const getTaskCheckpoint = vi.fn(async () => ({
-      found: saved !== null,
-      continuation: saved === null ? null : { record: saved, status: 'PERSISTED_NOT_REVALIDATED' },
+      found: latest() !== null,
+      continuation: latest() === null ? null : { record: latest(), status: 'PERSISTED_NOT_REVALIDATED' },
     }));
     const adapters = { saveTaskCheckpoint, getTaskCheckpoint, recordEvidence };
     const sessionA = createExternalMcpToolExecutor({
@@ -145,35 +146,35 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
     await sessionA(invoke('fcr_save_task_checkpoint', {
       projectId, destinationOperator: 'codex', continuationInput: { ...checkpointInput, taskState: 'ACTIVE' },
     }));
-    expect(saved?.sourceOperator).toBe('chatgpt');
-    expect(saved?.destinationOperator).toBe('codex');
-    expect(saved?.taskState).toBe('ACTIVE');
+    expect(latest()?.sourceOperator).toBe('chatgpt');
+    expect(latest()?.destinationOperator).toBe('codex');
+    expect(latest()?.taskState).toBe('ACTIVE');
 
     await sessionB(invoke('fcr_save_task_checkpoint', {
       projectId, destinationOperator: 'chatgpt',
       continuationInput: { ...checkpointInput, taskState: 'RESULT_SUBMITTED', resultRef: 'artifact:result-1' },
     }, { ...identity, clientId: 'codex-client' }));
-    expect(saved?.sourceOperator).toBe('codex');
-    expect(saved?.resultSubmittedByOperator).toBe('codex');
-    expect(saved?.taskState).toBe('RESULT_SUBMITTED');
+    expect(latest()?.sourceOperator).toBe('codex');
+    expect(latest()?.resultSubmittedByOperator).toBe('codex');
+    expect(latest()?.taskState).toBe('RESULT_SUBMITTED');
 
     await sessionA(invoke('fcr_save_task_checkpoint', {
       projectId, destinationOperator: 'chatgpt',
       continuationInput: { ...checkpointInput, taskState: 'VERIFIED', verificationRefs: ['github:verify-1'] },
     }));
-    expect(saved?.verifiedByOperator).toBe('chatgpt');
-    expect(saved?.verifiedByOperator).not.toBe(saved?.resultSubmittedByOperator);
-    expect(saved?.taskState).toBe('VERIFIED');
+    expect(latest()?.verifiedByOperator).toBe('chatgpt');
+    expect(latest()?.verifiedByOperator).not.toBe(latest()?.resultSubmittedByOperator);
+    expect(latest()?.taskState).toBe('VERIFIED');
 
     await sessionA(invoke('fcr_save_task_checkpoint', {
       projectId, destinationOperator: 'chatgpt',
       continuationInput: { ...checkpointInput, taskState: 'CLOSED' },
     }));
-    expect(saved?.taskState).toBe('CLOSED');
-    expect(saved?.closedAt).toMatch(/^\\d{4}-\\d{2}-\\d{2}T/);
-    expect(saved?.authorizing).toBe(false);
-    expect(saved?.approvalCarryForward).toBe(false);
-    expect(saved?.browserCookie).toBe(false);
+    expect(latest()?.taskState).toBe('CLOSED');
+    expect(latest()?.closedAt).toMatch(/^\\d{4}-\\d{2}-\\d{2}T/);
+    expect(latest()?.authorizing).toBe(false);
+    expect(latest()?.approvalCarryForward).toBe(false);
+    expect(latest()?.browserCookie).toBe(false);
     expect(saveTaskCheckpoint).toHaveBeenCalledTimes(4);
   });
 
