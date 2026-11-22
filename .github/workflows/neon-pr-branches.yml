@@ -330,3 +330,45 @@ jobs:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: ${{ steps.neon_branch.outputs.branch_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
+
+      
+      - name: Verify Neon preview is absent after deletion
+        if: steps.neon_branch.outputs.branch_found == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          target_name="preview/pr-${PR_NUMBER}"
+          for attempt in 1 2 3 4 5 6; do
+            response="$(curl --fail-with-body --silent --show-error --get \
+              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" \
+              -H "Authorization: Bearer ${NEON_API_KEY}" \
+              --data-urlencode "search=${target_name}" \
+              --data "limit=100")"
+
+            matches="$(jq -c --arg target_name "${target_name}" \
+              '[.branches[] | select(.name == $target_name)]' <<<"${response}")"
+            match_count="$(jq 'length' <<<"${matches}")"
+
+            if [ "${match_count}" = "0" ]; then
+              echo "Neon provider readback confirms exact preview ${target_name} is no longer active."
+              exit 0
+            fi
+
+            if [ "${match_count}" != "1" ]; then
+              echo "::error title=Ambiguous Neon post-delete readback::Expected at most one active ${target_name} branch, found ${match_count}."
+              exit 1
+            fi
+
+            echo "Neon still reports exact preview ${target_name} as active (verification attempt ${attempt}/6)."
+            if [ "${attempt}" != "6" ]; then
+              sleep 5
+            fi
+          done
+
+          echo "::error title=Neon preview deletion not confirmed::The exact preview ${target_name} remained active after six provider readbacks."
+          exit 1
