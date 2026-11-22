@@ -745,3 +745,9 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
 - Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
 - Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+## 2026-11-22 — Se'kret Bip adapter re-pin after consent-gate and site-map drift
+
+- Previously current: Se'kret Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` with `app/index.tsx` `e3430ef2` and `screens/WebWelcomeScreen.tsx` `9d3a1128`. It became stale when Bip main moved to `568d8c4f3bb2c01faf8f369857774d1bdde88205` and both blobs changed (`13201b51`, `41fcf511`).
+- Now (candidate): the Bip pin moves to `568d8c4f` after semantic review. The `app/index.tsx` change adds a re-consent redirect (tightens the gate); the welcome-screen change adds a public site-map link. The other five Bip blobs were re-read at `568d8c4f` and are unchanged. Chief stays at `20d34e25` (blobs still match).
+- Not proven: Bip deployment, runtime behavior, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
