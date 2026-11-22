@@ -172,8 +172,8 @@ assert(
 );
 assert(
   runtimeProof.includes("Validate trusted FCR production targets before exposing credentials") &&
-    runtimeProof.includes("https://api.foundercontrolroom.org") &&
-    runtimeProof.includes("https://foundercontrolroom.org") &&
+    runtimeProofLines.some((line) => line.trim() === 'if (runtime.origin !== "https://api.foundercontrolroom.org" || runtime.pathname !== "/" || runtime.search || runtime.hash) {') &&
+    runtimeProofLines.some((line) => line.trim() === 'if (publicSite.origin !== "https://foundercontrolroom.org" || publicSite.pathname !== "/" || publicSite.search || publicSite.hash) {') &&
     runtimeProof.includes("FCR production witness targets validated."),
   "live proof must validate fixed FCR production origins before loading credentials",
 );
