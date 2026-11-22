@@ -116,15 +116,65 @@ export async function storeOperatorExecutionContinuation(
   }
   const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
   const existing = await latestFor(projectId, safeRecord.taskId);
+  const incomingState = safeRecord.taskState ?? 'ACTIVE';
+  if (!existing && incomingState !== 'ACTIVE') {
+    throw new OperatorContinuationStoreError('invalid_continuation');
+  }
   if (existing) {
-    const priorObservedAt = Date.parse(existing.record.observation.observedAt);
+    const prior = existing.record;
+    const priorObservedAt = Date.parse(prior.observation.observedAt);
     const incomingObservedAt = Date.parse(safeRecord.observation.observedAt);
     if (priorObservedAt > incomingObservedAt
-      || (priorObservedAt === incomingObservedAt && existing.record.fingerprint !== safeRecord.fingerprint)) {
+      || (priorObservedAt === incomingObservedAt && prior.fingerprint !== safeRecord.fingerprint)) {
       throw new OperatorContinuationStoreError('stale_continuation');
     }
-    if (priorObservedAt === incomingObservedAt && existing.record.fingerprint === safeRecord.fingerprint) {
+    if (existing.invalidatedAt) {
+      const priorRefs = [...prior.observation.evidenceRefs].sort().join('|');
+      const nextRefs = [...safeRecord.observation.evidenceRefs].sort().join('|');
+      if (incomingObservedAt <= priorObservedAt || priorRefs === nextRefs) {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
+    }
+    if (prior.fingerprint === safeRecord.fingerprint && priorObservedAt === incomingObservedAt) {
+      if (existing.invalidatedAt) throw new OperatorContinuationStoreError('stale_continuation');
       return { disposition: 'duplicate', stored: existing };
+    }
+    const priorState = prior.taskState ?? 'ACTIVE';
+    const allowed: Record<string, readonly string[]> = {
+      ACTIVE: ['ACTIVE', 'RESULT_SUBMITTED'],
+      RESULT_SUBMITTED: ['RESULT_SUBMITTED', 'VERIFIED'],
+      VERIFIED: ['VERIFIED', 'CLOSED'],
+      CLOSED: [],
+    };
+    if (!allowed[priorState]?.includes(incomingState)) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (prior.destinationOperator && safeRecord.sourceOperator !== prior.destinationOperator) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (incomingState === 'RESULT_SUBMITTED'
+      && safeRecord.resultSubmittedByOperator !== safeRecord.sourceOperator) {
+      throw new OperatorContinuationStoreError('invalid_continuation');
+    }
+    if (incomingState === 'VERIFIED') {
+      if (priorState !== 'RESULT_SUBMITTED' && priorState !== 'VERIFIED') {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
+      if (safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator
+        || safeRecord.verifiedByOperator !== safeRecord.sourceOperator
+        || safeRecord.verifiedByOperator === safeRecord.resultSubmittedByOperator) {
+        throw new OperatorContinuationStoreError('invalid_continuation');
+      }
+    }
+    if (incomingState === 'CLOSED') {
+      if (priorState !== 'VERIFIED'
+        || safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator
+        || safeRecord.verifiedByOperator !== prior.verifiedByOperator
+        || JSON.stringify(safeRecord.verificationRefs ?? []) !== JSON.stringify(prior.verificationRefs ?? [])) {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
     }
   }
 
