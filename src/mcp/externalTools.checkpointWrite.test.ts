@@ -171,7 +171,7 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
       continuationInput: { ...checkpointInput, taskState: 'CLOSED' },
     }));
     expect(latest()?.taskState).toBe('CLOSED');
-    expect(latest()?.closedAt).toMatch(/^\\d{4}-\\d{2}-\\d{2}T/);
+    expect(latest()?.closedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(latest()?.authorizing).toBe(false);
     expect(latest()?.approvalCarryForward).toBe(false);
     expect(latest()?.browserCookie).toBe(false);
