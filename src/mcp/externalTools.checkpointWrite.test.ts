@@ -142,6 +142,7 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
     const saveTaskCheckpoint = vi.fn();
     const client = createExternalMcpToolExecutor({
       env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ [identity.clientId]: 'chatgpt' }) },
+      getTaskCheckpoint: vi.fn(async () => ({ found: false, continuation: null })),
       saveTaskCheckpoint, recordEvidence,
     });
     await expect(client(invoke('fcr_save_task_checkpoint', {
