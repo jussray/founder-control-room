@@ -86,7 +86,8 @@ beforeEach(() => {
     if (table === 'continuity_records') {
       const filters: Record<string, unknown> = {};
       let discovery = false;
-      const query: Record<string, any> = {
+      const query: Record<string, unknown> = {};
+      Object.assign(query, {
         select: () => query,
         eq: (key: string, value: unknown) => { filters[key] = value; return query; },
         not: () => { discovery = true; return query; },
@@ -113,7 +114,7 @@ beforeEach(() => {
           rows.push(inserted);
           return { select: () => ({ single: async () => ({ data: inserted, error: null }) }) };
         },
-      };
+      });
       return query;
     }
     throw new Error('unexpected table');
