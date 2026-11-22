@@ -168,12 +168,18 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
     expect(latest()?.verifiedByOperator).not.toBe(latest()?.resultSubmittedByOperator);
     expect(latest()?.taskState).toBe('VERIFIED');
 
-    await sessionA(invoke('fcr_save_task_checkpoint', {
+    const closeInput = {
       projectId, destinationOperator: 'chatgpt',
       continuationInput: { ...checkpointInput, taskState: 'CLOSED' },
-    }));
+    };
+    await sessionA(invoke('fcr_save_task_checkpoint', closeInput));
+    const firstClosedFingerprint = latest()?.fingerprint;
+    const firstClosedAt = latest()?.closedAt;
     expect(latest()?.taskState).toBe('CLOSED');
-    expect(latest()?.closedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(firstClosedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    await sessionA(invoke('fcr_save_task_checkpoint', closeInput));
+    expect(latest()?.closedAt).toBe(firstClosedAt);
+    expect(latest()?.fingerprint).toBe(firstClosedFingerprint);
     expect(latest()?.authorizing).toBe(false);
     expect(latest()?.approvalCarryForward).toBe(false);
     expect(latest()?.browserCookie).toBe(false);
