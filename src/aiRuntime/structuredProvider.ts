@@ -221,7 +221,12 @@ function requestShape(config: StructuredProviderConfig, request: StructuredJsonR
     body: {
       model: config.model,
       max_tokens: request.maxOutputTokens,
-      system: request.systemPrompt,
+      // The system prompt is a static per-caller constant, so mark it as the
+      // cache breakpoint; the varying user prompt stays after it. Below the
+      // model's minimum cacheable length the API silently skips caching.
+      system: [
+        { type: 'text', text: request.systemPrompt, cache_control: { type: 'ephemeral' } },
+      ],
       messages: [{ role: 'user', content: request.userPrompt }],
       output_config: {
         format: {

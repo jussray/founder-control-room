@@ -84,6 +84,10 @@ describe('runStructuredJson', () => {
     expect(headers['anthropic-version']).toBe('2023-06-01');
     const body = JSON.parse(init!.body as string);
     expect(body.output_config.format).toEqual({ type: 'json_schema', schema: SCHEMA });
+    expect(body.system).toEqual([
+      { type: 'text', text: REQUEST.systemPrompt, cache_control: { type: 'ephemeral' } },
+    ]);
+    expect(body.messages).toEqual([{ role: 'user', content: REQUEST.userPrompt }]);
   });
 
   it('fails over only after a retryable provider failure', async () => {
