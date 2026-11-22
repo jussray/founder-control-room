@@ -90,11 +90,14 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
       currentEvidenceVerified: false,
       executionAuthorityFromHandoff: false,
     }));
-    const adapters = { saveTaskCheckpoint, getTaskCheckpoint, recordEvidence };
+    const adapters = {
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ [identity.clientId]: 'chatgpt' }) },
+      saveTaskCheckpoint, getTaskCheckpoint, recordEvidence,
+    };
     const writer = createExternalMcpToolExecutor(adapters);
     const reader = createExternalMcpToolExecutor(adapters);
     const written = await writer(invoke('fcr_save_task_checkpoint', {
-      projectId, continuationInput: checkpointInput,
+      projectId, destinationOperator: 'codex', continuationInput: checkpointInput,
     }));
     const resumed = await reader(invoke('fcr_get_task_checkpoint', {
       projectId, taskId: checkpointInput.taskId,
@@ -108,6 +111,8 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
     });
     const returned = resumed.data as { continuation: { record: OperatorExecutionContinuation } };
     expect(returned.continuation.record.taskId).toBe(checkpointInput.taskId);
+    expect(returned.continuation.record.sourceOperator).toBe('chatgpt');
+    expect(returned.continuation.record.destinationOperator).toBe('codex');
     expect(returned.continuation.record.authorizing).toBe(false);
     expect(returned.continuation.record.approvalCarryForward).toBe(false);
     expect(returned.continuation.record.fingerprint).toMatch(/^[a-f0-9]{64}$/);
@@ -119,24 +124,30 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
 
   it('refuses non-OAuth identities and cross-project grants before saving', async () => {
     const saveTaskCheckpoint = vi.fn();
-    const client = createExternalMcpToolExecutor({ saveTaskCheckpoint, recordEvidence });
+    const client = createExternalMcpToolExecutor({
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ [identity.clientId]: 'chatgpt' }) },
+      saveTaskCheckpoint, recordEvidence,
+    });
     await expect(client(invoke('fcr_save_task_checkpoint', {
-      projectId, continuationInput: checkpointInput,
+      projectId, destinationOperator: 'codex', continuationInput: checkpointInput,
     }, { ...identity, authMode: 'static' as const }))).rejects.toThrow('founder-bound OAuth');
     await expect(client(invoke('fcr_save_task_checkpoint', {
-      projectId, continuationInput: checkpointInput,
+      projectId, destinationOperator: 'codex', continuationInput: checkpointInput,
     }, identity, ['chief-ai-machine']))).rejects.toThrow('outside this remote MCP grant');
     expect(saveTaskCheckpoint).not.toHaveBeenCalled();
   });
 
   it('rejects raw conversation text and mismatched checkpoint project', async () => {
     const saveTaskCheckpoint = vi.fn();
-    const client = createExternalMcpToolExecutor({ saveTaskCheckpoint, recordEvidence });
+    const client = createExternalMcpToolExecutor({
+      env: { FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP: JSON.stringify({ [identity.clientId]: 'chatgpt' }) },
+      saveTaskCheckpoint, recordEvidence,
+    });
     await expect(client(invoke('fcr_save_task_checkpoint', {
-      projectId, continuationInput: { ...checkpointInput, contextRefs: ['private chat transcript'] },
+      projectId, destinationOperator: 'codex', continuationInput: { ...checkpointInput, contextRefs: ['private chat transcript'] },
     }))).rejects.toThrow('source reference');
     await expect(client(invoke('fcr_save_task_checkpoint', {
-      projectId, continuationInput: {
+      projectId, destinationOperator: 'codex', continuationInput: {
         ...checkpointInput, observation: { ...checkpointInput.observation, projectSlug: 'other-project' },
       },
     }))).rejects.toThrow('project does not match caller grant');
