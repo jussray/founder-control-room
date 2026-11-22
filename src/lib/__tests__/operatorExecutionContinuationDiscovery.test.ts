@@ -102,7 +102,7 @@ beforeEach(() => {
         },
         insert: (payload: Record<string, unknown>) => {
           const inserted = {
-            id: 'row-' + (rows.length + 1), task_id: payload.task_id,
+            id: 'row-' + (rows.length + 1), project_id: payload.project_id, task_id: payload.task_id,
             execution_state: payload.execution_state,
             subject_fingerprint: payload.subject_fingerprint,
             proof_cookie: payload.proof_cookie,
