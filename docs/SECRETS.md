@@ -232,6 +232,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
+| `FCR_REMOTE_MCP_OAUTH_CLIENT_IDS` | non-secret variable | Comma-separated exact Supabase Auth OAuth client IDs approved to call canonical FCR `/mcp`. Populate only from verified OAuth Apps; an empty value fails closed. |
+| `FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP` | non-secret variable | JSON object mapping each exact allowlisted OAuth client ID to one approved peer operator (`gemini`, `codex`, `claude-code`, `perplexity`, `deepseek`, or `muse`). A client must be both allowlisted and mapped before it can invoke `fcr_relay_operator`; this grants no mutation, merge, deploy, or publication authority. |
 | `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
 | `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
