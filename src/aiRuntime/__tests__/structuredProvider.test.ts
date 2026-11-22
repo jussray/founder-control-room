@@ -90,6 +90,65 @@ describe('runStructuredJson', () => {
     expect(body.messages).toEqual([{ role: 'user', content: REQUEST.userPrompt }]);
   });
 
+  it('reports Anthropic usage including prompt-cache reads and writes', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => fakeResponse({
+      id: 'msg_cached',
+      content: [{ type: 'text', text: JSON.stringify({ answer: 'ok' }) }],
+      usage: {
+        input_tokens: 42,
+        output_tokens: 17,
+        cache_read_input_tokens: 900,
+        cache_creation_input_tokens: 0,
+      },
+    }));
+
+    const result = await runStructuredJson([anthropicConfig()], REQUEST, { fetchFn });
+
+    expect(result.usage).toEqual({
+      inputTokens: 42,
+      outputTokens: 17,
+      cacheReadInputTokens: 900,
+      cacheCreationInputTokens: 0,
+    });
+  });
+
+  it('reports OpenAI usage with cached input tokens and no cache-write field', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => fakeResponse({
+      id: 'resp_cached',
+      output_text: JSON.stringify({ answer: 'ok' }),
+      usage: { input_tokens: 1000, output_tokens: 20, input_tokens_details: { cached_tokens: 768 } },
+    }));
+
+    const result = await runStructuredJson([openAiConfig()], REQUEST, { fetchFn });
+
+    expect(result.usage).toEqual({
+      inputTokens: 1000,
+      outputTokens: 20,
+      cacheReadInputTokens: 768,
+      cacheCreationInputTokens: null,
+    });
+  });
+
+  it('omits usage when the provider reports none and nulls malformed counts', async () => {
+    const none = vi.fn<typeof fetch>(async () => fakeResponse({
+      id: 'msg_plain',
+      content: [{ type: 'text', text: JSON.stringify({ answer: 'ok' }) }],
+    }));
+    expect((await runStructuredJson([anthropicConfig()], REQUEST, { fetchFn: none })).usage).toBeUndefined();
+
+    const malformed = vi.fn<typeof fetch>(async () => fakeResponse({
+      id: 'msg_bad',
+      content: [{ type: 'text', text: JSON.stringify({ answer: 'ok' }) }],
+      usage: { input_tokens: '42', output_tokens: -1 },
+    }));
+    expect((await runStructuredJson([anthropicConfig()], REQUEST, { fetchFn: malformed })).usage).toEqual({
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadInputTokens: null,
+      cacheCreationInputTokens: null,
+    });
+  });
+
   it('fails over only after a retryable provider failure', async () => {
     const fetchFn = vi.fn()
       .mockResolvedValueOnce(fakeResponse({ error: { message: 'temporary outage' } }, 503))
