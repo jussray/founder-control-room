@@ -1038,7 +1038,7 @@ export function createExternalMcpToolExecutor(
           : taskState === 'CLOSED' ? priorRecord?.verificationRefs ?? [] : [],
         verifiedByOperator: taskState === 'VERIFIED' ? sourceOperator
           : taskState === 'CLOSED' ? priorRecord?.verifiedByOperator ?? null : null,
-        closedAt: taskState === 'CLOSED' ? new Date().toISOString() : null,
+        closedAt,
         observation,
       });
       if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');
