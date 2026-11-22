@@ -2,7 +2,7 @@
 
 This record is append-only in meaning: a successor's green checks do not rewrite a predecessor's failed or cancelled checks. Entries distinguish observed CI from claimed remediation. Never mark a historical failure resolved solely because a later head is green.
 
-Base-bound: `90edb6267f6e5692df2de9e097703a4aab79ae35`
+Base-bound: `30494e464b4c25c4a1454350edf92b3a95fa1123`
 
 Rows below were reconciled against this main SHA. The live base comparison (`auditBase` in `scripts/ci-history-audit.mjs`) runs only when the checked PR is this ledger's owner, PR #1071. PR #1071 is merged, so no open PR is compared against this line; other PRs get recorded-row structure checks only (`auditScope: OTHER_PR`, status `NOT_APPLICABLE`). Do not re-bind this line when main moves; doing so changes no check result.
 
