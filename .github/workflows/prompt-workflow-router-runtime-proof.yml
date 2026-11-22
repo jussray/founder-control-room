@@ -51,9 +51,9 @@ jobs:
       - name: Validate trusted FCR production targets before exposing credentials
         shell: bash
         env:
-          FCR_RUNTIME_BASE_URL: ${{ env.FCR_RUNTIME_BASE_URL }}
-          PUBLIC_URL: ${{ env.PUBLIC_URL }}
-          FCR_OPERATOR_RELAY_TARGET: ${{ env.FCR_OPERATOR_RELAY_TARGET }}
+          FCR_RUNTIME_BASE_URL: ${{ inputs.runtime_base_url }}
+          PUBLIC_URL: ${{ inputs.public_url || 'https://foundercontrolroom.org' }}
+          FCR_OPERATOR_RELAY_TARGET: ${{ inputs.operator_target }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
