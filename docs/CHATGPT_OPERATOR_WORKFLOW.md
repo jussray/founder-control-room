@@ -161,6 +161,32 @@ Execution, provider writes, CI, Playwright, approval and release still pass
 through their ordinary independent gates. An expired snapshot can preserve
 discussion momentum but cannot resurrect an expired approval or green check.
 
+### Cross-session task lifecycle through authenticated `/mcp`
+
+The MCP task lifecycle uses the existing `fcr_save_task_checkpoint`,
+`fcr_list_task_checkpoints`, and `fcr_get_task_checkpoint` tools; it does not
+create a second relay or persistence system:
+
+| Operation | Contract action |
+| --- | --- |
+| `CREATE_TASK` / `SAVE_CHECKPOINT` | Save `taskState: ACTIVE` with a unique task ID and exact observation |
+| `DISCOVER_TASK` | List bounded task metadata with `fcr_list_task_checkpoints` |
+| `READ_CHECKPOINT` / `RESUME_TASK` | Read with `fcr_get_task_checkpoint`; resume state is always `REVALIDATE` unless invalidated, and never grants execution |
+| `SUBMIT_RESULT` | Append `taskState: RESULT_SUBMITTED` with an opaque `resultRef` |
+| `VERIFY_RESULT` | Append `taskState: VERIFIED` with independent `verificationRefs`; verifier identity must differ from the result submitter |
+| `CLOSE_TASK` | Append `taskState: CLOSED` only after verification |
+
+The allowed state progression is `ACTIVE -> RESULT_SUBMITTED -> VERIFIED -> CLOSED`.
+A checkpoint's source operator is derived from the authenticated OAuth client map;
+its destination is validated against the canonical source/peer registry. The
+next checkpoint must be written by the previously named destination operator.
+Invalidated checkpoints cannot be resumed or overwritten by stale evidence; a
+new observation must be later and carry new evidence references. The ledger
+remains append-only, RLS-protected, and non-authorizing. A recorded `VERIFIED`
+state means an independently identified operator submitted verification
+references; it is not a server assertion that those external sources are true.
+
+
 Repeatable local Playwright proof: `npm run verify:operator-continuation-auth`.
 It runs two Chromium checks: anonymous requests must fail closed on the real FCR
 Express server, and an isolated synthetic Supabase Auth/PostgREST fixture must
