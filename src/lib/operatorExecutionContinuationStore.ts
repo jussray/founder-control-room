@@ -156,6 +156,11 @@ export async function storeOperatorExecutionContinuation(
       && safeRecord.resultSubmittedByOperator !== safeRecord.sourceOperator) {
       throw new OperatorContinuationStoreError('invalid_continuation');
     }
+    if (priorState === 'RESULT_SUBMITTED' && incomingState === 'RESULT_SUBMITTED'
+      && (safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator)) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
     if (incomingState === 'VERIFIED') {
       if (priorState !== 'RESULT_SUBMITTED' && priorState !== 'VERIFIED') {
         throw new OperatorContinuationStoreError('stale_continuation');
@@ -163,7 +168,9 @@ export async function storeOperatorExecutionContinuation(
       if (safeRecord.resultRef !== prior.resultRef
         || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator
         || safeRecord.verifiedByOperator !== safeRecord.sourceOperator
-        || safeRecord.verifiedByOperator === safeRecord.resultSubmittedByOperator) {
+        || safeRecord.verifiedByOperator === safeRecord.resultSubmittedByOperator
+        || (priorState === 'VERIFIED' && (safeRecord.verifiedByOperator !== prior.verifiedByOperator
+          || JSON.stringify(safeRecord.verificationRefs ?? []) !== JSON.stringify(prior.verificationRefs ?? [])))) {
         throw new OperatorContinuationStoreError('invalid_continuation');
       }
     }
