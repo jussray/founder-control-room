@@ -539,12 +539,20 @@ export const OPERATOR_EXECUTION_CONTINUATION_CONTRACT =
   'juss-v10/operator-execution-continuation@v1' as const;
 
 export type OperatorInteractionMode = 'chat' | 'work';
+export type OperatorExecutionTaskState = 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
 
 export interface OperatorExecutionContinuationInput {
   sourceMode: OperatorInteractionMode;
   /** Authenticated source and intended destination peer identities; metadata only. */
   sourceOperator?: string;
   destinationOperator?: string;
+  /** Append-only lifecycle markers. These describe work state, never grant authority. */
+  taskState?: OperatorExecutionTaskState;
+  resultRef?: string | null;
+  resultSubmittedByOperator?: string | null;
+  verificationRefs?: readonly string[];
+  verifiedByOperator?: string | null;
+  closedAt?: string | null;
   taskId: string;
   intentRef: string;
   contextRefs: readonly string[];
@@ -663,10 +671,50 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   if (remainingStepIds.some((id) => completedIds.includes(id))) {
     throw new Error('a completed step cannot also be remaining');
   }
+  if (input.taskState !== undefined) {
+    if (!['ACTIVE', 'RESULT_SUBMITTED', 'VERIFIED', 'CLOSED'].includes(input.taskState)) {
+      throw new Error('taskState must be ACTIVE, RESULT_SUBMITTED, VERIFIED, or CLOSED');
+    }
+    const state = input.taskState;
+    const resultRef = input.resultRef ?? null;
+    const submittedBy = input.resultSubmittedByOperator ?? null;
+    const verificationRefs = input.verificationRefs ?? [];
+    const verifiedBy = input.verifiedByOperator ?? null;
+    const closedAt = input.closedAt ?? null;
+    if (!input.sourceOperator || !input.destinationOperator) {
+      throw new Error('lifecycle checkpoints require sourceOperator and destinationOperator');
+    }
+    if (state === 'ACTIVE' && (resultRef || submittedBy || verificationRefs.length || verifiedBy || closedAt)) {
+      throw new Error('ACTIVE checkpoints cannot contain result, verification, or closure fields');
+    }
+    if (state !== 'ACTIVE' && (!resultRef || !submittedBy)) {
+      throw new Error('submitted and later checkpoints require resultRef and resultSubmittedByOperator');
+    }
+    if (state === 'RESULT_SUBMITTED' && (verificationRefs.length || verifiedBy || closedAt)) {
+      throw new Error('RESULT_SUBMITTED checkpoints cannot contain verification or closure fields');
+    }
+    if (state === 'VERIFIED' || state === 'CLOSED') {
+      if (!verificationRefs.length || !verifiedBy || verifiedBy === submittedBy) {
+        throw new Error('verification requires independent operator identity and evidence references');
+      }
+    }
+    if (state === 'VERIFIED' && closedAt) throw new Error('VERIFIED checkpoints cannot contain closedAt');
+    if (state === 'CLOSED') {
+      const strictClosedAt = typeof closedAt === 'string' && /^\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,3})?Z$/.test(closedAt);
+      if (!strictClosedAt || !Number.isFinite(Date.parse(closedAt))) throw new Error('CLOSED checkpoints require a strict ISO UTC closedAt');
+    }
+  }
+
   return {
     sourceMode: input.sourceMode,
     ...(input.sourceOperator === undefined ? {} : { sourceOperator: continuationOperator(input.sourceOperator, 'sourceOperator') }),
     ...(input.destinationOperator === undefined ? {} : { destinationOperator: continuationOperator(input.destinationOperator, 'destinationOperator') }),
+    ...(input.taskState === undefined ? {} : { taskState: input.taskState }),
+    ...(input.resultRef === undefined ? {} : { resultRef: input.resultRef === null ? null : continuationRef(input.resultRef, 'resultRef') }),
+    ...(input.resultSubmittedByOperator === undefined ? {} : { resultSubmittedByOperator: input.resultSubmittedByOperator === null ? null : continuationOperator(input.resultSubmittedByOperator, 'resultSubmittedByOperator') }),
+    ...(input.verificationRefs === undefined ? {} : { verificationRefs: continuationRefs(input.verificationRefs, 'verificationRefs') }),
+    ...(input.verifiedByOperator === undefined ? {} : { verifiedByOperator: input.verifiedByOperator === null ? null : continuationOperator(input.verifiedByOperator, 'verifiedByOperator') }),
+    ...(input.closedAt === undefined ? {} : { closedAt: input.closedAt }),
     taskId: continuationIdentifier(input.taskId, 'taskId'),
     intentRef: continuationRef(input.intentRef, 'intentRef'),
     contextRefs: continuationRefs(input.contextRefs, 'contextRefs', true),
@@ -683,9 +731,18 @@ export function operatorExecutionContinuationFingerprint(input: OperatorExecutio
   // The presentation mode is deliberately excluded: Chat and Work share task identity.
   return createHash('sha256').update(JSON.stringify([
     OPERATOR_EXECUTION_CONTINUATION_CONTRACT,
-    ...(normalized.sourceOperator === undefined && normalized.destinationOperator === undefined
+    ...(normalized.sourceOperator === undefined && normalized.destinationOperator === undefined && normalized.taskState === undefined
       ? []
-      : [normalized.sourceOperator ?? null, normalized.destinationOperator ?? null]),
+      : [
+        normalized.sourceOperator ?? null,
+        normalized.destinationOperator ?? null,
+        normalized.taskState ?? null,
+        normalized.resultRef ?? null,
+        normalized.resultSubmittedByOperator ?? null,
+        normalized.verificationRefs ?? [],
+        normalized.verifiedByOperator ?? null,
+        normalized.closedAt ?? null,
+      ]),
     normalized.taskId,
     normalized.intentRef,
     normalized.contextRefs,
