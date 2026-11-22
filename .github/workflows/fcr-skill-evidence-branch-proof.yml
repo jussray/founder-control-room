@@ -1,0 +1,52 @@
+name: FCR Stage 1 skill evidence branch proof
+
+on:
+  push:
+    branches:
+      - fix/skills-stage1-validation-20261121
+    paths:
+      - '.github/workflows/fcr-skill-evidence-branch-proof.yml'
+      - 'skills/validation-map/SKILL.md'
+      - 'skills/premise-strike/SKILL.md'
+      - 'test/skill-evidence-contract.test.mjs'
+      - 'src/lib/__tests__/workerBuildAuthority.contract.test.ts'
+      - 'scripts/verify-worker-build-authority.mjs'
+      - 'wrangler.worker.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-skill-evidence-branch-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  evidence-and-authority:
+    name: Evidence and Worker authority exact-head contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify decision-skill contracts with negative fixtures
+        run: node --test test/skill-evidence-contract.test.mjs
+      - name: Install locked test dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify Worker authority membrane remains fail-closed
+        run: npx vitest run src/lib/__tests__/workerBuildAuthority.contract.test.ts
