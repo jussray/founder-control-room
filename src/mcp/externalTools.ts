@@ -803,12 +803,15 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
         type: 'object', additionalProperties: false, required: ['projectId', 'destinationOperator', 'continuationInput'],
         properties: {
           projectId: { type: 'string', minLength: 1, maxLength: 120 },
-          destinationOperator: { type: 'string', enum: [...OPERATOR_RELAY_PEERS] },
+          destinationOperator: { type: 'string', enum: [...OPERATOR_RELAY_SOURCES] },
           continuationInput: {
             type: 'object', additionalProperties: false,
             required: ['sourceMode', 'taskId', 'intentRef', 'contextRefs', 'completedSteps', 'remainingStepIds', 'nextActionRef', 'pendingDecisionRefs', 'observation'],
             properties: {
               sourceMode: { type: 'string', enum: ['chat', 'work'] },
+              taskState: { type: 'string', enum: ['ACTIVE', 'RESULT_SUBMITTED', 'VERIFIED', 'CLOSED'] },
+              resultRef: { type: ['string', 'null'], maxLength: 256 },
+              verificationRefs: { type: 'array', maxItems: 40, items: { type: 'string', maxLength: 256 } },
               taskId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$' },
               intentRef: { type: 'string' },
               contextRefs: { type: 'array', maxItems: 40, items: { type: 'string' } },
@@ -1004,10 +1007,27 @@ export function createExternalMcpToolExecutor(
       if (!isRecord(checkpoint.observation)) throw new Error('checkpoint observation must be an object');
       const observation = createOperatorContinuityReceiptV2(checkpoint.observation as OperatorContinuityInputV2);
       const sourceOperator = sourceOperatorForIdentity(input.identity, env);
-      const destinationOperator = relayOperator(input.arguments.destinationOperator, 'destinationOperator');
-      if (sourceOperator === destinationOperator) throw new Error('task handoff requires a distinct destination operator');
+      const destinationOperator = relaySourceOperator(input.arguments.destinationOperator, 'destinationOperator');
+      const taskState = checkpoint.taskState ?? 'ACTIVE';
+      const prior = await getTaskCheckpoint({ projectSlug: receiptProject, taskId: text(checkpoint.taskId, 'taskId', 128) });
+      const priorRecord = isRecord(prior) && isRecord(prior.continuation) && isRecord(prior.continuation.record)
+        ? prior.continuation.record as unknown as OperatorExecutionContinuation
+        : null;
       const continuation = createOperatorExecutionContinuation({
-        ...checkpoint, sourceOperator, destinationOperator, observation,
+        ...checkpoint,
+        sourceOperator,
+        destinationOperator,
+        taskState,
+        resultRef: taskState === 'ACTIVE' ? null : checkpoint.resultRef ?? priorRecord?.resultRef ?? null,
+        resultSubmittedByOperator: taskState === 'ACTIVE' ? null
+          : taskState === 'RESULT_SUBMITTED' ? sourceOperator
+            : priorRecord?.resultSubmittedByOperator ?? null,
+        verificationRefs: taskState === 'VERIFIED' ? checkpoint.verificationRefs ?? []
+          : taskState === 'CLOSED' ? priorRecord?.verificationRefs ?? [] : [],
+        verifiedByOperator: taskState === 'VERIFIED' ? sourceOperator
+          : taskState === 'CLOSED' ? priorRecord?.verifiedByOperator ?? null : null,
+        closedAt: taskState === 'CLOSED' ? new Date().toISOString() : null,
+        observation,
       });
       if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');
       evidenceRisk = 'external_side_effect';
