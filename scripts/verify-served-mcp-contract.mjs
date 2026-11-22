@@ -138,25 +138,36 @@ assert(
   !runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}'),
   "operator relay runtime proof must not relabel the founder browser bearer as MCP OAuth authority",
 );
-const runtimeProofJobStart = runtimeProof.indexOf("  playwright-runtime-proof:\\n");
-const runtimeProofJobEnd = runtimeProof.indexOf("\\n  ", runtimeProofJobStart + 4);
+const runtimeProofLines = runtimeProof.split("\n");
+const runtimeProofJobStart = runtimeProofLines.indexOf("  playwright-runtime-proof:");
+const runtimeProofJobEnd = runtimeProofLines.findIndex((line, index) =>
+  index > runtimeProofJobStart && /^  [a-z0-9-]+:$/.test(line),
+);
 const runtimeProofJob = runtimeProofJobStart >= 0
-  ? runtimeProof.slice(runtimeProofJobStart, runtimeProofJobEnd >= 0 ? runtimeProofJobEnd : undefined)
-  : "";
-assert(runtimeProofJob, "operator relay runtime proof job must exist");
+  ? runtimeProofLines.slice(runtimeProofJobStart, runtimeProofJobEnd >= 0 ? runtimeProofJobEnd : undefined)
+  : [];
+assert(runtimeProofJob.length > 0, "operator relay runtime proof job must exist");
 assert(
   runtimeProofJob.includes("    if: github.ref == 'refs/heads/main'") &&
     runtimeProofJob.includes("    environment: production"),
   "live OAuth proof must be restricted to trusted main and the protected production environment",
 );
-const runtimeProofJobEnvStart = runtimeProofJob.indexOf("    env:\\n");
+const runtimeProofJobEnvStart = runtimeProofJob.indexOf("    env:");
 const runtimeProofJobStepsStart = runtimeProofJob.indexOf("    steps:");
 const runtimeProofJobEnv = runtimeProofJob.slice(runtimeProofJobEnvStart, runtimeProofJobStepsStart);
-assert(runtimeProofJobEnvStart >= 0 && runtimeProofJobStepsStart > runtimeProofJobEnvStart && !runtimeProofJobEnv.includes("secrets."),
+assert(runtimeProofJobEnvStart >= 0 && runtimeProofJobStepsStart > runtimeProofJobEnvStart && !runtimeProofJobEnv.join("\n").includes("secrets."),
   "production credentials must not be exposed at job scope");
 assert(
-  runtimeProof.includes("      - name: Prove deployed prompt workflow router\\n        env:\\n          FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}") &&
-    runtimeProof.includes("      - name: Prove exact deployed operator relay and provider receipt\\n        env:\\n          FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}"),
+  runtimeProofLines.join("\n").includes([
+    "      - name: Prove deployed prompt workflow router",
+    "        env:",
+    "          FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}",
+  ].join("\n")) &&
+    runtimeProofLines.join("\n").includes([
+      "      - name: Prove exact deployed operator relay and provider receipt",
+      "        env:",
+      "          FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}",
+    ].join("\n")),
   "founder and OAuth credentials must be scoped only to their respective Playwright steps",
 );
 assert(
