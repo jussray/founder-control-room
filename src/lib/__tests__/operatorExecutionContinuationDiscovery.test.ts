@@ -15,12 +15,13 @@ import {
 } from '../operatorContinuity.js';
 import {
   listRecentOperatorExecutionContinuations,
+  storeOperatorExecutionContinuation,
 } from '../operatorExecutionContinuationStore.js';
 
 const repo = 'jussray/founder-control-room';
 const projectSlug = 'founder-control-room';
 
-function record(taskId: string, observedAt: string, action: string, project = projectSlug) {
+function record(taskId: string, observedAt: string, action: string, project = projectSlug, evidenceRefs = ['github:sha']) {
   return createOperatorExecutionContinuation({
     sourceMode: 'chat',
     taskId,
@@ -45,7 +46,7 @@ function record(taskId: string, observedAt: string, action: string, project = pr
       providerFingerprint: null,
       runtimeFingerprint: null,
       authorityFingerprint: null,
-      evidenceRefs: ['github:sha'],
+      evidenceRefs,
       observedAt,
       expiresAt: '2026-11-22T00:00:00.000Z',
       predecessorFingerprint: null,
@@ -83,12 +84,35 @@ beforeEach(() => {
       };
     }
     if (table === 'continuity_records') {
-      const query = {
+      const filters: Record<string, unknown> = {};
+      let discovery = false;
+      const query: Record<string, any> = {
         select: () => query,
-        eq: () => query,
-        not: () => query,
+        eq: (key: string, value: unknown) => { filters[key] = value; return query; },
+        not: () => { discovery = true; return query; },
         order: () => query,
-        limit: async () => ({ data: rows.slice(0, 200), error: null }),
+        limit: (count: number) => discovery
+          ? Promise.resolve({ data: rows.slice(0, Math.min(count, 200)), error: null })
+          : query,
+        maybeSingle: async () => {
+          const matches = rows.filter(row => Object.entries(filters).every(([key, value]) => row[key] === value));
+          matches.sort((a, b) => String(b.checkpoint_observed_at).localeCompare(String(a.checkpoint_observed_at))
+            || String(b.created_at).localeCompare(String(a.created_at)));
+          return { data: matches[0] ?? null, error: null };
+        },
+        insert: (payload: Record<string, unknown>) => {
+          const inserted = {
+            id: 'row-' + (rows.length + 1), task_id: payload.task_id,
+            execution_state: payload.execution_state,
+            subject_fingerprint: payload.subject_fingerprint,
+            proof_cookie: payload.proof_cookie,
+            checkpoint_observed_at: payload.checkpoint_observed_at,
+            invalidated_at: null,
+            created_at: payload.checkpoint_observed_at,
+          };
+          rows.push(inserted);
+          return { select: () => ({ single: async () => ({ data: inserted, error: null }) }) };
+        },
       };
       return query;
     }
@@ -139,6 +163,62 @@ describe('real store task discovery over canonical continuity_records', () => {
     rows.push(row(record('task-a', '2026-11-21T09:08:00.000Z', 'verify', 'other-project')));
     await expect(listRecentOperatorExecutionContinuations(projectSlug, repo))
       .rejects.toThrow('storage_unavailable');
+  });
+
+  it('enforces A-to-B submit, independent verification, close, and invalidation revalidation', async () => {
+    const packet = (taskId: string, observedAt: string, sourceOperator: string, destinationOperator: string,
+      taskState: 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED', evidenceRef: string,
+      extras: Record<string, unknown> = {}) => {
+      const base = record(taskId, observedAt, 'verify', projectSlug, [evidenceRef]);
+      return createOperatorExecutionContinuation({
+        sourceMode: base.sourceMode,
+        sourceOperator,
+        destinationOperator,
+        taskState,
+        resultRef: taskState === 'ACTIVE' ? null : (extras.resultRef as string | null),
+        resultSubmittedByOperator: taskState === 'ACTIVE' ? null : (extras.resultSubmittedByOperator as string | null),
+        verificationRefs: (extras.verificationRefs as string[] | undefined) ?? [],
+        verifiedByOperator: (extras.verifiedByOperator as string | null | undefined) ?? null,
+        closedAt: (extras.closedAt as string | null | undefined) ?? null,
+        taskId: base.taskId,
+        intentRef: base.intentRef,
+        contextRefs: base.contextRefs,
+        completedSteps: base.completedSteps,
+        remainingStepIds: base.remainingStepIds,
+        nextActionRef: base.nextActionRef,
+        pendingDecisionRefs: base.pendingDecisionRefs,
+        observation: base.observation,
+      });
+    };
+
+    const active = packet('task-lifecycle', '2026-11-21T09:00:00.000Z', 'chatgpt', 'codex', 'ACTIVE', 'github:source');
+    await storeOperatorExecutionContinuation(active);
+    const submitted = packet('task-lifecycle', '2026-11-21T09:01:00.000Z', 'codex', 'chatgpt', 'RESULT_SUBMITTED', 'github:submit', {
+      resultRef: 'artifact:result-1', resultSubmittedByOperator: 'codex',
+    });
+    await storeOperatorExecutionContinuation(submitted);
+    const verified = packet('task-lifecycle', '2026-11-21T09:02:00.000Z', 'chatgpt', 'chatgpt', 'VERIFIED', 'github:verify', {
+      resultRef: 'artifact:result-1', resultSubmittedByOperator: 'codex',
+      verificationRefs: ['github:verify'], verifiedByOperator: 'chatgpt',
+    });
+    await storeOperatorExecutionContinuation(verified);
+    const closed = packet('task-lifecycle', '2026-11-21T09:03:00.000Z', 'chatgpt', 'chatgpt', 'CLOSED', 'github:close', {
+      resultRef: 'artifact:result-1', resultSubmittedByOperator: 'codex',
+      verificationRefs: ['github:verify'], verifiedByOperator: 'chatgpt', closedAt: '2026-11-21T09:03:00.000Z',
+    });
+    await storeOperatorExecutionContinuation(closed);
+    await expect(storeOperatorExecutionContinuation(packet(
+      'task-lifecycle', '2026-11-21T09:04:00.000Z', 'chatgpt', 'chatgpt', 'ACTIVE', 'github:late',
+    ))).rejects.toThrow('stale_continuation');
+
+    const invalidatable = packet('task-invalidated', '2026-11-21T09:05:00.000Z', 'chatgpt', 'codex', 'ACTIVE', 'github:old');
+    await storeOperatorExecutionContinuation(invalidatable);
+    rows.find(row => row.task_id === 'task-invalidated')!.invalidated_at = '2026-11-21T09:06:00.000Z';
+    await expect(storeOperatorExecutionContinuation(packet(
+      'task-invalidated', '2026-11-21T09:07:00.000Z', 'codex', 'chatgpt', 'ACTIVE', 'github:old',
+    ))).rejects.toThrow('stale_continuation');
+    const revalidated = packet('task-invalidated', '2026-11-21T09:08:00.000Z', 'codex', 'chatgpt', 'ACTIVE', 'github:fresh');
+    await expect(storeOperatorExecutionContinuation(revalidated)).resolves.toMatchObject({ disposition: 'stored' });
   });
 
   it('bounds requested discovery to 20 task summaries', async () => {
