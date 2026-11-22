@@ -226,6 +226,7 @@ describe('real store task discovery over canonical continuity_records', () => {
       verificationRefs: ['github:verify'], verifiedByOperator: 'chatgpt', closedAt: '2026-11-21T09:03:00.000Z',
     });
     await storeOperatorExecutionContinuation(closed);
+    await expect(storeOperatorExecutionContinuation(closed)).resolves.toMatchObject({ disposition: 'duplicate' });
     await expect(storeOperatorExecutionContinuation(packet(
       'task-lifecycle', '2026-11-21T09:04:00.000Z', 'chatgpt', 'chatgpt', 'ACTIVE', 'github:late',
     ))).rejects.toThrow('stale_continuation');
