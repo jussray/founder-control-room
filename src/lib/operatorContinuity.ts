@@ -542,6 +542,9 @@ export type OperatorInteractionMode = 'chat' | 'work';
 
 export interface OperatorExecutionContinuationInput {
   sourceMode: OperatorInteractionMode;
+  /** Authenticated source and intended destination peer identities; metadata only. */
+  sourceOperator?: string;
+  destinationOperator?: string;
   taskId: string;
   intentRef: string;
   contextRefs: readonly string[];
@@ -574,6 +577,14 @@ function continuationIdentifier(value: string, field: string): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(normalized)) {
     throw new Error(field + ' must be a bounded identifier');
+  }
+  return normalized;
+}
+
+function continuationOperator(value: string, field: string): string {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!/^[a-z][a-z0-9-]{0,39}$/.test(normalized)) {
+    throw new Error(field + ' must be a canonical bounded operator identifier');
   }
   return normalized;
 }
@@ -654,6 +665,8 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   }
   return {
     sourceMode: input.sourceMode,
+    ...(input.sourceOperator === undefined ? {} : { sourceOperator: continuationOperator(input.sourceOperator, 'sourceOperator') }),
+    ...(input.destinationOperator === undefined ? {} : { destinationOperator: continuationOperator(input.destinationOperator, 'destinationOperator') }),
     taskId: continuationIdentifier(input.taskId, 'taskId'),
     intentRef: continuationRef(input.intentRef, 'intentRef'),
     contextRefs: continuationRefs(input.contextRefs, 'contextRefs', true),
@@ -670,6 +683,9 @@ export function operatorExecutionContinuationFingerprint(input: OperatorExecutio
   // The presentation mode is deliberately excluded: Chat and Work share task identity.
   return createHash('sha256').update(JSON.stringify([
     OPERATOR_EXECUTION_CONTINUATION_CONTRACT,
+    ...(normalized.sourceOperator === undefined && normalized.destinationOperator === undefined
+      ? []
+      : [normalized.sourceOperator ?? null, normalized.destinationOperator ?? null]),
     normalized.taskId,
     normalized.intentRef,
     normalized.contextRefs,
