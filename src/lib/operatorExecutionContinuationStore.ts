@@ -238,6 +238,9 @@ export async function listRecentOperatorExecutionContinuations(
     taskId: string;
     observedAt: string;
     sourceMode: 'chat' | 'work';
+    sourceOperator: string | null;
+    destinationOperator: string | null;
+    taskState: 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
     remainingStepIds: readonly string[];
     nextActionRef: string | null;
     fingerprint: string;
@@ -268,6 +271,9 @@ export async function listRecentOperatorExecutionContinuations(
     taskId: string;
     observedAt: string;
     sourceMode: 'chat' | 'work';
+    sourceOperator: string | null;
+    destinationOperator: string | null;
+    taskState: 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
     remainingStepIds: readonly string[];
     nextActionRef: string | null;
     fingerprint: string;
@@ -287,6 +293,9 @@ export async function listRecentOperatorExecutionContinuations(
       taskId: stored.record.taskId,
       observedAt: observation.observedAt,
       sourceMode: stored.record.sourceMode,
+      sourceOperator: stored.record.sourceOperator ?? null,
+      destinationOperator: stored.record.destinationOperator ?? null,
+      taskState: stored.record.taskState ?? 'ACTIVE',
       // The newest row per task stays authoritative even when invalidated,
       // so an older superseded row is never resurrected. An invalidated
       // checkpoint is flagged and exposes no actionable next step.
