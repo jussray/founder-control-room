@@ -792,9 +792,10 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       title: 'Save reference-only FCR task progress',
       description: 'Persist a non-authorizing historical checkpoint in the existing founder-only continuity ledger. Requires founder-bound OAuth and a granted project. No merge, deploy, execution or approval authority.',
       inputSchema: {
-        type: 'object', additionalProperties: false, required: ['projectId', 'continuationInput'],
+        type: 'object', additionalProperties: false, required: ['projectId', 'destinationOperator', 'continuationInput'],
         properties: {
           projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          destinationOperator: { type: 'string', enum: [...OPERATOR_RELAY_PEERS] },
           continuationInput: {
             type: 'object', additionalProperties: false,
             required: ['sourceMode', 'taskId', 'intentRef', 'contextRefs', 'completedSteps', 'remainingStepIds', 'nextActionRef', 'pendingDecisionRefs', 'observation'],
@@ -988,13 +989,18 @@ export function createExternalMcpToolExecutor(
       result = await getTaskCheckpoint({ projectSlug: receiptProject, taskId });
     } else if (input.name === 'fcr_save_task_checkpoint') {
       if (input.identity.authMode !== 'oauth') throw new Error('Saving a task checkpoint requires founder-bound OAuth');
-      noUnexpectedKeys(input.arguments, ['projectId', 'continuationInput'], input.name);
+      noUnexpectedKeys(input.arguments, ['projectId', 'destinationOperator', 'continuationInput'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       if (!isRecord(input.arguments.continuationInput)) throw new Error('continuationInput must be an object');
       const checkpoint = input.arguments.continuationInput as unknown as OperatorExecutionContinuationInput;
       if (!isRecord(checkpoint.observation)) throw new Error('checkpoint observation must be an object');
       const observation = createOperatorContinuityReceiptV2(checkpoint.observation as OperatorContinuityInputV2);
-      const continuation = createOperatorExecutionContinuation({ ...checkpoint, observation });
+      const sourceOperator = sourceOperatorForIdentity(input.identity, env);
+      const destinationOperator = relayOperator(input.arguments.destinationOperator, 'destinationOperator');
+      if (sourceOperator === destinationOperator) throw new Error('task handoff requires a distinct destination operator');
+      const continuation = createOperatorExecutionContinuation({
+        ...checkpoint, sourceOperator, destinationOperator, observation,
+      });
       if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');
       evidenceRisk = 'external_side_effect';
       result = await saveTaskCheckpoint({ projectSlug: receiptProject, continuation });
