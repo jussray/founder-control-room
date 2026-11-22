@@ -1,0 +1,140 @@
+name: Neon Closed PR Branch Reconciliation
+
+on:
+  schedule:
+    # Hourly, offset from the top of the hour to reduce schedule contention.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: neon-closed-pr-branch-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile closed PR preview branches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Validate Neon configuration
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_PROJECT_ID" || { echo 'NEON_PROJECT_ID is not configured' >&2; exit 1; }
+          test -n "$NEON_API_KEY" || { echo 'NEON_API_KEY is not configured' >&2; exit 1; }
+          test -n "$GH_TOKEN" || { echo 'GITHUB_TOKEN is not available' >&2; exit 1; }
+
+      - name: Reconcile exact closed-PR Neon branches
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          neon_api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches"
+          github_api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          auth_neon="Authorization: Bearer $NEON_API_KEY"
+          auth_github="Authorization: Bearer $GH_TOKEN"
+
+          # Read the complete active branch inventory once. Pagination is
+          # followed explicitly so a large project cannot hide a target.
+          cursor=""
+          all_branches='[]'
+          while :; do
+            if [ -n "$cursor" ]; then
+              page="$(curl --fail-with-body --silent --show-error --retry 3 --get "$neon_api" \
+                -H "$auth_neon" --data 'limit=100' --data-urlencode "cursor=$cursor")"
+            else
+              page="$(curl --fail-with-body --silent --show-error --retry 3 --get "$neon_api" \
+                -H "$auth_neon" --data 'limit=100')"
+            fi
+            page_branches="$(jq -ce '.branches // error("Neon response omitted branches")' <<<"$page")"
+            all_branches="$(jq -cn --argjson current "$all_branches" --argjson next "$page_branches" '$current + $next')"
+            cursor="$(jq -r '.pagination.cursor // empty' <<<"$page")"
+            [ -n "$cursor" ] || break
+          done
+
+          checked=0
+          deleted=0
+          skipped_open=0
+
+          while IFS= read -r branch; do
+            [ -n "$branch" ] || continue
+            name="$(jq -r '.name' <<<"$branch")"
+            branch_id="$(jq -r '.id' <<<"$branch")"
+
+            # Only branches created by the existing PR workflow are eligible.
+            if [[ ! "$name" =~ ^preview/pr-([0-9]+)$ ]]; then
+              continue
+            fi
+            pr_number="${BASH_REMATCH[1]}"
+            checked=$((checked + 1))
+
+            [[ "$branch_id" =~ ^br-[a-z0-9-]+$ ]] || {
+              echo "::error title=Malformed Neon branch identity::Refusing to act on $name."
+              exit 1
+            }
+
+            # Confirm the exact PR still exists and is closed in this repository.
+            pr="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "$auth_github" -H 'Accept: application/vnd.github+json' \
+              "$github_api/pulls/$pr_number")"
+            pr_state="$(jq -r '.state // empty' <<<"$pr")"
+            returned_number="$(jq -r '.number // empty' <<<"$pr")"
+            base_repo="$(jq -r '.base.repo.full_name // empty' <<<"$pr")"
+            head_repo="$(jq -r '.head.repo.full_name // empty' <<<"$pr")"
+
+            if [ "$returned_number" != "$pr_number" ] || [ "$base_repo" != "$GITHUB_REPOSITORY" ] || [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+              echo "::error title=PR and Neon branch identity mismatch::Refusing to act on $name."
+              exit 1
+            fi
+            if [ "$pr_state" != "closed" ]; then
+              skipped_open=$((skipped_open + 1))
+              echo "Keeping $name because PR #$pr_number is not closed."
+              continue
+            fi
+
+            matches="$(jq -c --arg name "$name" '[.[] | select(.name == $name)]' <<<"$all_branches")"
+            count="$(jq 'length' <<<"$matches")"
+            if [ "$count" != "1" ]; then
+              echo "::error title=Ambiguous Neon branch identity::Expected one active $name branch, found $count."
+              exit 1
+            fi
+
+            is_default="$(jq -r '.[0].default' <<<"$matches")"
+            is_primary="$(jq -r '.[0].primary' <<<"$matches")"
+            is_protected="$(jq -r '.[0].protected' <<<"$matches")"
+            if [ "$is_default" = "true" ] || [ "$is_primary" = "true" ] || [ "$is_protected" = "true" ]; then
+              echo "::error title=Unsafe Neon cleanup target::Refusing to delete default, primary, or protected branch $name."
+              exit 1
+            fi
+
+            echo "Deleting verified stale preview branch $name for closed PR #$pr_number."
+            curl --fail-with-body --silent --show-error --retry 3 -X DELETE \
+              -H "$auth_neon" "$neon_api/$branch_id" >/dev/null
+
+            # Provider readback is the acceptance gate, not the DELETE response.
+            after="$(curl --fail-with-body --silent --show-error --retry 3 --get "$neon_api" \
+              -H "$auth_neon" --data-urlencode "search=$name" --data 'limit=100')"
+            remaining="$(jq -c --arg name "$name" '[.branches[]? | select(.name == $name)]' <<<"$after")"
+            if [ "$(jq 'length' <<<"$remaining")" != "0" ]; then
+              echo "::error title=Neon deletion not verified::$name remains in the provider readback."
+              exit 1
+            fi
+
+            deleted=$((deleted + 1))
+            echo "Verified provider-side absence for $name (PR #$pr_number)."
+          done < <(jq -c '.[] | select((.name // "") | test("^preview/pr-[0-9]+$"))' <<<"$all_branches")
+
+          echo "Reconciliation complete: inspected $checked PR preview branches, deleted and verified $deleted, retained $skipped_open open-PR branches."
