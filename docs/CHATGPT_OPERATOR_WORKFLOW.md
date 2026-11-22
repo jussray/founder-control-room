@@ -116,6 +116,7 @@ surface so the same project evidence can be checked across modes. The additive
 `juss-v10/operator-execution-continuation@v1` contract in
 `src/lib/operatorContinuity.ts` links that receipt to an active task:
 
+- `sourceOperator` and `destinationOperator` bind each handoff hop to canonical peer identities. The MCP writer derives `sourceOperator` from the OAuth client-to-operator map and validates `destinationOperator` against the canonical peer set; callers cannot self-assert the source identity;
 - `taskId` and `intentRef` identify the ongoing goal without embedding raw chat;
 - `contextRefs` point to previously authorized, access-controlled conversation
   history and artifacts;
