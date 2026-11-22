@@ -80,6 +80,8 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
 
   it('lets two independent OAuth-bound clients exchange only historical task references', async () => {
     let saved: OperatorExecutionContinuation | null = null;
+    // Read through a function so TypeScript does not narrow the closure-assigned value to null.
+    const latest = (): OperatorExecutionContinuation | null => saved;
     const saveTaskCheckpoint = vi.fn(async ({ continuation }: { continuation: OperatorExecutionContinuation }) => {
       saved = continuation;
       return { disposition: 'stored', taskId: continuation.taskId, currentEvidenceVerified: false };
