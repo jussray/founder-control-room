@@ -20,17 +20,40 @@ export async function claimEligibleWatchDelivery(
   store: WatchEventStore, record: WatchRecord, now: Date,
 ): Promise<{ claimed: boolean; reason: string }> {
   const localDate = easternDate(now);
-  const lastWorldBriefLocalDate = record.lane === "world" && !record.urgent
+  const recordClaimId = watchDeliveryId(record.id);
+
+  // Record identity is independent of the daily briefing window and urgency.
+  // This prevents the same story being admitted again on a later day or through
+  // the urgent path after it was already claimed for a routine briefing.
+  if (await store.hasDelivered(recordClaimId)) {
+    return { claimed: false, reason: "ineligible_or_duplicate" };
+  }
+
+  const isRoutineWorldBrief = record.lane === "world" && !record.urgent;
+  const lastWorldBriefLocalDate = isRoutineWorldBrief
     ? await store.lastWorldBriefDate() : undefined;
-  const claimId = watchDeliveryId(record.lane === "world" && !record.urgent
-    ? `world-brief:${localDate}` : record.id);
-  const alreadyDelivered = await store.hasDelivered(claimId);
-  const state: WatchDeliveryState = {
-    alertedIds: alreadyDelivered ? [record.id] : [],
-    lastWorldBriefLocalDate,
-  };
-  if (!eligibleForDelivery(record, state, now)) return { claimed: false, reason: "ineligible_or_duplicate" };
-  const claimed = await store.claimDelivery(claimId, record,
-    record.lane === "world" && !record.urgent ? localDate : undefined);
+  const state: WatchDeliveryState = { alertedIds: [], lastWorldBriefLocalDate };
+  if (!eligibleForDelivery(record, state, now)) {
+    return { claimed: false, reason: "ineligible_or_duplicate" };
+  }
+
+  if (isRoutineWorldBrief) {
+    // The date-scoped claim remains the atomic one-briefing-per-day gate.
+    const dailyClaimId = watchDeliveryId(`world-brief:${localDate}`);
+    const dailyClaimed = await store.claimDelivery(dailyClaimId, record, localDate);
+    if (!dailyClaimed) return { claimed: false, reason: "concurrent_duplicate" };
+
+    // A second, stable identity claim preserves story-level deduplication
+    // across dates and across routine/urgent world-news admission paths.
+    // If concurrent cross-date attempts race, the record claim still fails
+    // closed; at worst a daily slot is conservatively consumed.
+    const recordClaimed = await store.claimDelivery(recordClaimId, record);
+    return {
+      claimed: recordClaimed,
+      reason: recordClaimed ? "claimed_for_review" : "ineligible_or_duplicate",
+    };
+  }
+
+  const claimed = await store.claimDelivery(recordClaimId, record);
   return { claimed, reason: claimed ? "claimed_for_review" : "concurrent_duplicate" };
 }
