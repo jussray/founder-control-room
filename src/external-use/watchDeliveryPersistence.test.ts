@@ -4,15 +4,47 @@ import type { WatchRecord } from "./watchDeliveryBoundary.js";
 const record: WatchRecord = { id:"advisory-1", lane:"security", title:"Advisory", sourceUrl:"https://example.org/a",
   publishedAt:"2026-11-14T12:00:00Z", evidence:"VERIFIED", independentlyCorroborated:true,
   consequential:true, projectIds:["founder-control-room"], nextStep:"Review" };
+function memoryStore() {
+  const ids = new Set<string>();
+  const claims: string[] = [];
+  const store: WatchEventStore = {
+    hasDelivered: async id => ids.has(id),
+    lastWorldBriefDate: async () => {
+      const dates = claims.map(id => id);
+      const latest = dates.find(id => id.startsWith("daily:"));
+      return latest?.slice("daily:".length);
+    },
+    claimDelivery: async (id, _record, localDate) => {
+      if (ids.has(id)) return false;
+      ids.add(id);
+      claims.push(localDate ? `daily:${localDate}` : id);
+      return true;
+    },
+  };
+  return { store, ids, claims };
+}
 describe("durable watch admission", () => {
   it("claims only once and never sends a notification", async () => {
-    const ids = new Set<string>();
-    const store: WatchEventStore = { hasDelivered: async id => ids.has(id), lastWorldBriefDate: async () => undefined,
-      claimDelivery: async id => { if(ids.has(id)) return false; ids.add(id); return true; } };
+    const { store } = memoryStore();
     const now = new Date("2026-11-14T14:00:00Z");
     expect((await claimEligibleWatchDelivery(store, record, now)).claimed).toBe(true);
     expect((await claimEligibleWatchDelivery(store, record, now)).claimed).toBe(false);
     expect(watchDeliveryId(record.id)).toMatch(/^[a-f0-9-]{36}$/);
+  });
+  it("preserves story-level deduplication across later daily briefings", async () => {
+    const { store, claims } = memoryStore();
+    const worldRecord = { ...record, lane: "world" as const };
+    expect((await claimEligibleWatchDelivery(store, worldRecord, new Date("2026-11-14T15:00:00Z"))).claimed).toBe(true);
+    expect((await claimEligibleWatchDelivery(store, { ...worldRecord, urgent: true }, new Date("2026-11-15T15:00:00Z"))).claimed).toBe(false);
+    expect(claims.filter(value => value.startsWith("daily:"))).toHaveLength(1);
+  });
+  it("keeps the one-routine-briefing-per-Eastern-day limit", async () => {
+    const { store, claims } = memoryStore();
+    const first = { ...record, id: "world-story-1", lane: "world" as const };
+    const second = { ...record, id: "world-story-2", lane: "world" as const };
+    expect((await claimEligibleWatchDelivery(store, first, new Date("2026-11-14T15:00:00Z"))).claimed).toBe(true);
+    expect((await claimEligibleWatchDelivery(store, second, new Date("2026-11-14T16:00:00Z"))).claimed).toBe(false);
+    expect(claims.filter(value => value.startsWith("daily:"))).toHaveLength(1);
   });
   it("rejects an already delivered world briefing for the Eastern date", async () => {
     const store: WatchEventStore = { hasDelivered: async () => false,
