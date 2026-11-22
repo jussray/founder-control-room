@@ -28,10 +28,11 @@ import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
 import { OperatorRelayDispatchError } from '../lib/operatorRelayDispatch.js';
 import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
 import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
-import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
+import { OPERATOR_RELAY_PEERS, OPERATOR_RELAY_SOURCES } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
   RelayOperatorId,
+  RelaySourceId,
   RelaySensitivity,
 } from '../lib/operatorRelay.js';
 
@@ -123,7 +124,7 @@ export interface ExternalMcpToolDependencies {
     provider: string;
   }) => Promise<unknown> | unknown;
   relayOperator?: (input: {
-    fromOperator: RelayOperatorId;
+    fromOperator: RelaySourceId;
     toOperator: RelayOperatorId;
     capability: RelayCapability;
     goal: string;
@@ -144,6 +145,7 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'draft',
 ]);
 const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
+const RELAY_SOURCES = new Set<RelaySourceId>(OPERATOR_RELAY_SOURCES);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -236,6 +238,12 @@ function relayOperator(value: unknown, field: string): RelayOperatorId {
   return operator;
 }
 
+function relaySourceOperator(value: unknown, field: string): RelaySourceId {
+  const operator = text(value, field, 40) as RelaySourceId;
+  if (!RELAY_SOURCES.has(operator)) throw new Error(`${field} is not an allowed relay source identity`);
+  return operator;
+}
+
 function relayCapability(value: unknown): RelayCapability {
   const capability = text(value, 'capability', 40) as RelayCapability;
   if (!RELAY_CAPABILITIES.has(capability)) {
@@ -252,7 +260,7 @@ function relaySensitivity(value: unknown): RelaySensitivity {
   return sensitivity;
 }
 
-function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelayOperatorId> {
+function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelaySourceId> {
   const raw = env.FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP?.trim();
   if (!raw) return new Map();
   let parsed: unknown;
@@ -262,15 +270,15 @@ function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelayO
     throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be valid JSON');
   }
   if (!isRecord(parsed)) throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be an object');
-  const entries: Array<[string, RelayOperatorId]> = [];
+  const entries: Array<[string, RelaySourceId]> = [];
   for (const [clientId, value] of Object.entries(parsed)) {
     if (!clientId.trim()) throw new Error('operator client mapping contains an empty client id');
-    entries.push([clientId.trim(), relayOperator(value, 'mapped operator')]);
+    entries.push([clientId.trim(), relaySourceOperator(value, 'mapped operator')]);
   }
   return new Map(entries);
 }
 
-function sourceOperatorForIdentity(identity: ExternalMcpIdentity, env: NodeJS.ProcessEnv): RelayOperatorId {
+function sourceOperatorForIdentity(identity: ExternalMcpIdentity, env: NodeJS.ProcessEnv): RelaySourceId {
   if (identity.authMode !== 'oauth') {
     throw new Error('operator relay requires OAuth-bound client identity');
   }
