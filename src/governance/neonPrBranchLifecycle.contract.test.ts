@@ -78,6 +78,20 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).not.toContain('pulls/${PR_NUMBER}/files?per_page=100');
   });
 
+  it('requires provider readback to confirm the exact preview is absent after the real delete action', () => {
+    const deleteAction = workflow.indexOf('- name: Delete Neon Branch');
+    const providerReadback = workflow.indexOf('- name: Verify Neon preview is absent after deletion');
+    expect(deleteAction).toBeGreaterThan(-1);
+    expect(providerReadback).toBeGreaterThan(deleteAction);
+    expect(workflow).toContain("if: steps.neon_branch.outputs.branch_found == 'true'");
+    expect(workflow).toContain('target_name="preview/pr-${PR_NUMBER}"');
+    expect(workflow).toContain('--data-urlencode "search=${target_name}"');
+    expect(workflow).toContain('Neon provider readback confirms exact preview ${target_name} is no longer active.');
+    expect(workflow).toContain('for attempt in 1 2 3 4 5 6; do');
+    expect(workflow).toContain('Neon preview deletion not confirmed');
+    expect(workflow).toContain('Ambiguous Neon post-delete readback');
+  });
+
   it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
     expect(workflow).not.toContain('db_url_pooled');
