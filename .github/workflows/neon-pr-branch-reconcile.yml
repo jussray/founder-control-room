@@ -19,6 +19,7 @@ jobs:
     name: Reconcile closed PR preview branches
     runs-on: ubuntu-24.04
     timeout-minutes: 8
+    # Any API ambiguity or unverified deletion fails the run and surfaces an Actions alert.
     steps:
       - name: Validate Neon configuration
         shell: bash
