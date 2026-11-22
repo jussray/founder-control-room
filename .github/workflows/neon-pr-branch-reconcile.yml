@@ -120,9 +120,36 @@ jobs:
               exit 1
             fi
 
+            # Re-read the exact target immediately before mutation to reduce
+            # stale-inventory and protection-state race windows.
+            fresh="$(curl --fail-with-body --silent --show-error --retry 3 --get "$neon_api" \
+              -H "$auth_neon" --data-urlencode "search=$name" --data 'limit=100')"
+            fresh_matches="$(jq -c --arg name "$name" '[.branches[]? | select(.name == $name)]' <<<"$fresh")"
+            if [ "$(jq 'length' <<<"$fresh_matches")" != "1" ]; then
+              echo "::error title=Neon target changed before cleanup::Expected one current $name branch."
+              exit 1
+            fi
+            fresh_id="$(jq -r '.[0].id' <<<"$fresh_matches")"
+            fresh_default="$(jq -r '.[0].default' <<<"$fresh_matches")"
+            fresh_primary="$(jq -r '.[0].primary' <<<"$fresh_matches")"
+            fresh_protected="$(jq -r '.[0].protected' <<<"$fresh_matches")"
+            if [ "$fresh_id" != "$branch_id" ] || [ "$fresh_default" = "true" ] || [ "$fresh_primary" = "true" ] || [ "$fresh_protected" = "true" ]; then
+              echo "::error title=Neon target changed before cleanup::Refusing to delete changed, default, primary, or protected target $name."
+              exit 1
+            fi
+
+            # Reconfirm closure at the last responsible moment.
+            pr_now="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "$auth_github" -H 'Accept: application/vnd.github+json' \
+              "$github_api/pulls/$pr_number")"
+            if [ "$(jq -r '.state // empty' <<<"$pr_now")" != "closed" ]; then
+              echo "::error title=PR reopened during reconciliation::Keeping $name because PR #$pr_number is no longer closed."
+              exit 1
+            fi
+
             echo "Deleting verified stale preview branch $name for closed PR #$pr_number."
             curl --fail-with-body --silent --show-error --retry 3 -X DELETE \
-              -H "$auth_neon" "$neon_api/$branch_id" >/dev/null
+              -H "$auth_neon" "$fresh_id" >/dev/null
 
             # Provider readback is the acceptance gate, not the DELETE response.
             after="$(curl --fail-with-body --silent --show-error --retry 3 --get "$neon_api" \
