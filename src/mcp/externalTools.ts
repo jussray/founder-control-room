@@ -333,9 +333,13 @@ async function defaultGetTaskCheckpoint(input: { projectSlug: string; taskId: st
   const continuation = await readOperatorExecutionContinuation(
     project.slug, project.repo_identifier, input.taskId,
   );
+  const invalidated = continuation?.invalidatedAt !== null && continuation !== null;
   return {
     found: continuation !== null,
     continuation,
+    resumeState: continuation === null ? 'NOT_FOUND' : invalidated ? 'INVALID' : 'REVALIDATE',
+    resumeAllowed: false,
+    revalidationRequired: continuation !== null,
     currentEvidenceVerified: false,
     executionAuthorityFromHandoff: false,
   };
@@ -351,6 +355,9 @@ async function defaultSaveTaskCheckpoint(input: { projectSlug: string; continuat
     disposition, recordId: stored.id, taskId: stored.record.taskId,
     observedAt: stored.record.observation.observedAt,
     status: 'PERSISTED_NOT_REVALIDATED' as const,
+    taskState: stored.record.taskState ?? 'ACTIVE',
+    sourceOperator: stored.record.sourceOperator ?? null,
+    destinationOperator: stored.record.destinationOperator ?? null,
     currentEvidenceVerified: false as const,
     executionAuthorityFromHandoff: false as const,
   };
