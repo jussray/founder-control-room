@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { OPERATOR_RELAY_PEERS } from '../lib/operatorRelayConstants.js';
-import type { RelayOperatorId } from '../lib/operatorRelay.js';
+import type { RelayOperatorId, RelaySourceId } from '../lib/operatorRelay.js';
 import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
 import type { RecordExternalMcpEvidenceInput } from './externalTools.js';
 
@@ -13,7 +13,7 @@ vi.mock('../lib/supabaseClient.js', () => ({
 
 type ExternalToolsModule = typeof import('./externalTools.js');
 type RelayCall = {
-  fromOperator: RelayOperatorId;
+  fromOperator: RelaySourceId;
   toOperator: RelayOperatorId;
   capability: 'research' | 'propose' | 'review' | 'implement';
   goal: string;
