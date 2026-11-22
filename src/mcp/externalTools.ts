@@ -1020,6 +1020,11 @@ export function createExternalMcpToolExecutor(
       const priorRecord = isRecord(prior) && isRecord(prior.continuation) && isRecord(prior.continuation.record)
         ? prior.continuation.record as unknown as OperatorExecutionContinuation
         : null;
+      const closedAt = taskState === 'CLOSED'
+        ? priorRecord?.taskState === 'CLOSED' && priorRecord.closedAt
+          ? priorRecord.closedAt
+          : new Date().toISOString()
+        : null;
       const continuation = createOperatorExecutionContinuation({
         ...checkpoint,
         sourceOperator,
