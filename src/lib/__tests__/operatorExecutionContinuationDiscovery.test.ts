@@ -121,6 +121,24 @@ beforeEach(() => {
   });
 });
 
+describe('continuation lifecycle payload validation', () => {
+  it('rejects legacy lifecycle fields when taskState is absent', () => {
+    const base = record('legacy-closed-at', '2026-11-21T08:00:00.000Z', 'verify');
+    expect(() => createOperatorExecutionContinuation({
+      sourceMode: base.sourceMode,
+      taskId: base.taskId,
+      intentRef: base.intentRef,
+      contextRefs: base.contextRefs,
+      completedSteps: base.completedSteps,
+      remainingStepIds: base.remainingStepIds,
+      nextActionRef: base.nextActionRef,
+      pendingDecisionRefs: base.pendingDecisionRefs,
+      observation: base.observation,
+      closedAt: 'x'.repeat(39_000),
+    })).toThrow('lifecycle fields require taskState');
+  });
+});
+
 describe('real store task discovery over canonical continuity_records', () => {
   it('retains newest task metadata once per task and never promotes persisted data to proof', async () => {
     rows.push(
