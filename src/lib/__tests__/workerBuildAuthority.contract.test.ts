@@ -134,6 +134,27 @@ describe('Worker build authority membrane', () => {
     });
   });
 
+  it('blocks Worker preview commands from claiming Cloudflare build authority', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: HEAD,
+      WORKERS_CI_BRANCH: 'feature/preview',
+      WORKERS_CI_BUILD_UUID: 'preview-guard-check',
+      WRANGLER_COMMAND: 'preview',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('NATIVE_WORKER_GIT_PROMOTION_BLOCKED');
+    expect(receipt).toMatchObject({
+      ok: false,
+      wranglerCommand: 'preview',
+      executionContext: 'cloudflare-workers-builds',
+      authorityDecision: 'block',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+  });
+
   it('blocks a native Workers Builds production deploy before Wrangler can promote it', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
