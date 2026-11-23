@@ -854,3 +854,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+## PR #1094 reconciliation disposition
+
+The Pennsylvania funding workspace was already integrated through its separate source slice and has newer queued-save browser coverage on main. This reconciliation preserves that implementation. The older proposal for an extra native human review is superseded by the current founder-only native policy: zero additional human approvals, with all existing checks, freshness, deterministic in-app review and authenticated Founder Final boundaries preserved. No provider ruleset, database, merge or deployment action is performed.
