@@ -244,6 +244,14 @@ describe('Founder Control Room paired remote MCP', () => {
     expect(response.body.error.message).toBe('Unauthorized');
   });
 
+  it('supports a dedicated static service lane without advertising OAuth fallback', async () => {
+    const app = buildApp({ challengeUnauthenticated: false });
+    const response = await request(app).post(ENDPOINT).send(rpc('tools/list'));
+    expect(response.status).toBe(401);
+    expect(response.headers['www-authenticate']).toBeUndefined();
+    expect(response.body.error.message).toBe('Unauthorized');
+  });
+
   it('fails closed when the static compatibility token is not configured', async () => {
     const response = await legacyPost(buildApp({
       env: {
