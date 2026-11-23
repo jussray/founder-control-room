@@ -75,7 +75,6 @@ const TRUTH_COMPASS_READ_TOOLS = [
   "fcr_list_task_checkpoints",
   "fcr_get_task_checkpoint",
   "fcr_audit_change_genealogy",
-  "fcr_preview_skill_route",
 ] as const satisfies readonly ExternalMcpToolName[];
 
 const truthCompassRemoteMcpEnv: NodeJS.ProcessEnv = {
@@ -91,7 +90,7 @@ const handleTruthCompassRemoteMcp = createRemoteReadMcpHandler({
   env: truthCompassRemoteMcpEnv,
   challengeUnauthenticated: false,
   allowedToolNames: TRUTH_COMPASS_READ_TOOLS,
-  instructions: "Truth Compass external read-only bridge. Five server-allowlisted read/preview tools are available for the single granted project truth-compass. Checkpoint writes and peer-operator relay are not exposed. All results remain evidence, not FCR authority; no merge, deploy, provider mutation, publication, billing, or execution authority is granted.",
+  instructions: "Truth Compass external read-only bridge. Four server-allowlisted read/preview tools are available for the single granted project truth-compass. Checkpoint writes and peer-operator relay are not exposed. All results remain evidence, not FCR authority; no merge, deploy, provider mutation, publication, billing, or execution authority is granted.",
 });
 
 const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler({
