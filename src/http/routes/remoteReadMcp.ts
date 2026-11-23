@@ -543,8 +543,12 @@ export function createRemoteReadMcpHandler(
     const params = isRecord(body.params) ? body.params : null;
     const name = boundedString(params?.name, 160);
     const args = params?.arguments === undefined ? {} : params.arguments;
-    if (!name || !toolIsAllowed(name) || !isRecord(args)) {
+    if (!name || !isExternalMcpToolName(name) || !isRecord(args)) {
       res.status(400).json(rpcError(id, -32602, 'Unknown tool or invalid arguments object'));
+      return;
+    }
+    if (!toolIsAllowed(name)) {
+      res.status(403).json(rpcError(id, -32000, 'Tool is outside this remote MCP grant'));
       return;
     }
 
