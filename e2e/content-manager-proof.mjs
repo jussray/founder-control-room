@@ -188,6 +188,7 @@ try {
   assert.equal(await founderLane.getAttribute('data-founder-authority'), 'current-you');
   assert.equal(await founderLane.getAttribute('data-provider-write-state'), 'capability-implemented');
   assert.equal(await founderLane.getAttribute('data-first-party-linkedin-capability'), 'implemented');
+  assert.equal(await founderLane.getAttribute('data-first-party-facebook-capability'), 'implemented');
   assert.equal(await founderLane.getAttribute('data-temporal-truth-state'), 'unknown');
   assert.equal(await founderLane.getAttribute('data-analytics-authority'), 'observation-only');
   assert.equal(await founderLane.getAttribute('data-public-proof-state'), 'optional-off');
@@ -203,7 +204,7 @@ try {
   assert.match(founderLaneText, /Missing metrics stay UNKNOWN/i);
   assert.match(founderLaneText, /analytics can improve later drafts, never authorize them/i);
   assert.match(founderLaneText, /Exact-copy \+ temporal approval required/i);
-  assert.match(founderLaneText, /first-party LinkedIn execution capability is implemented/i);
+  assert.match(founderLaneText, /first-party LinkedIn, X, and Facebook Page text execution capabilities are implemented/i);
   assert.match(founderLaneText, /capability is not publication proof/i);
   assert.match(founderLaneText, /canonical temporal revalidation/i);
   assert.match(founderLaneText, /durable one-shot reservation/i);
@@ -277,6 +278,7 @@ try {
   const status = page.locator('[aria-label="Content authority status"]');
   assert.equal(await status.locator('[data-founder-engine-state]').getAttribute('data-founder-engine-state'), 'contract-ready');
   assert.equal(await status.locator('[data-first-party-linkedin-capability]').getAttribute('data-first-party-linkedin-capability'), 'implemented');
+  assert.equal(await status.locator('[data-first-party-facebook-capability]').getAttribute('data-first-party-facebook-capability'), 'implemented');
   assert.equal(await status.locator('[data-founder-evidence-state]').getAttribute('data-founder-evidence-state'), 'unknown');
   assert.equal(await status.locator('[data-founder-sauce-state]').getAttribute('data-founder-sauce-state'), 'unknown');
   assert.equal(await status.locator('[data-temporal-truth-state]').getAttribute('data-temporal-truth-state'), 'unknown');
@@ -341,7 +343,7 @@ try {
   assert.equal(mutationRequests[0].body.confirmation.public_payload_hash, approvedPost.contentHash);
 
   const publishText = await page.locator('[data-content-stage="publish"]').innerText();
-  assert.match(publishText, /First-party founder content can dispatch to LinkedIn/i);
+  assert.match(publishText, /First-party founder content can dispatch to LinkedIn, X, and Facebook Page text/i);
   assert.match(publishText, /exact Current You confirmation/i);
   assert.match(publishText, /temporal truth revalidation/i);
   assert.match(publishText, /provider readback/i);
