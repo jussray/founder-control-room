@@ -142,6 +142,23 @@ describe('Facebook Page publish-now lifecycle route', () => {
     expect(publishNow).not.toHaveBeenCalled();
   });
 
+  it('blocks Facebook drafts with media because the native Page adapter is text-only', async () => {
+    vi.stubEnv('META_FACEBOOK_PAGE_ID', PAGE_ID);
+    const { app, publishNow } = appFor(storedPost({ mediaCount: 1 }));
+
+    const response = await request(app)
+      .post(`/lifecycle/posts/${POST_ID}/publish-now`)
+      .send(requestBody());
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      ok: false,
+      code: 'FACEBOOK_PAGE_TEXT_ONLY',
+      published: false,
+    });
+    expect(publishNow).not.toHaveBeenCalled();
+  });
+
   it('does not route a Facebook Page record through another provider lane', async () => {
     vi.stubEnv('META_FACEBOOK_PAGE_ID', PAGE_ID);
     const { app, publishNow } = appFor(storedPost({ provider: 'linkedin' }));
