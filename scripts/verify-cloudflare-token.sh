@@ -22,6 +22,15 @@ if [[ ! "$ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
   exit 1
 fi
 
+# Non-reversible identity of the credential this job resolved, recorded on every
+# run (pass or fail) so each Deploy/Reconcile receipt names which value it used.
+# The token reaches sha256sum through a pipe from the printf builtin, never argv.
+FINGERPRINT="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | sha256sum | cut -c1-12)"
+echo "Credential fingerprint: sha256_12=${FINGERPRINT} length=${#CLOUDFLARE_API_TOKEN}"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  printf -- '- Cloudflare credential fingerprint: `sha256_12=%s` length=%s\n' "$FINGERPRINT" "${#CLOUDFLARE_API_TOKEN}" >> "$GITHUB_STEP_SUMMARY"
+fi
+
 verify() {
   # $1 = endpoint path; prints "active" when Cloudflare accepts the token.
   local body
@@ -44,15 +53,15 @@ else:
 
 user_result="$(verify /user/tokens/verify)"
 if [[ "$user_result" == active ]]; then
-  echo 'Cloudflare accepted CLOUDFLARE_API_TOKEN as an active user API token. The token value was not printed.'
+  echo "Cloudflare accepted CLOUDFLARE_API_TOKEN as an active user API token (sha256_12=${FINGERPRINT}). The token value was not printed."
   exit 0
 fi
 
 account_result="$(verify "/accounts/$ACCOUNT_ID/tokens/verify")"
 if [[ "$account_result" == active ]]; then
-  echo 'Cloudflare accepted CLOUDFLARE_API_TOKEN as an active account API token for the declared account. The token value was not printed.'
+  echo "Cloudflare accepted CLOUDFLARE_API_TOKEN as an active account API token for the declared account (sha256_12=${FINGERPRINT}). The token value was not printed."
   exit 0
 fi
 
-echo "::error title=Cloudflare rejected the deploy credential::user-token verify: ${user_result}; account-token verify: ${account_result}. The job resolved a CLOUDFLARE_API_TOKEN that Cloudflare does not accept. This job runs in the production environment, so a production environment secret named CLOUDFLARE_API_TOKEN overrides the repository secret. Replace the value at the level that wins, verify it first, and do not print or paste it."
+echo "::error title=Cloudflare rejected the deploy credential::sha256_12=${FINGERPRINT}; user-token verify: ${user_result}; account-token verify: ${account_result}. The job resolved a CLOUDFLARE_API_TOKEN that Cloudflare does not accept. This job runs in the production environment, so a production environment secret named CLOUDFLARE_API_TOKEN overrides the repository secret. Replace the value at the level that wins, verify it first, and do not print or paste it."
 exit 1

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PORTFOLIO_MCP_BRIDGE_PROJECTS } from '../../mcp/portfolioRegistry.js';
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const SERVICE_HEADER = 'x-founder-control-room-service';
@@ -38,6 +39,27 @@ afterEach(() => {
 });
 
 describe('Cloudflare Pages edge proxy', () => {
+  it('serves the invitation-only welcome door at the canonical root without exposing public content', async () => {
+    const handler = await loadHandler();
+    let requestedAsset: Request | undefined;
+    const assets = vi.fn(async (request: Request) => {
+      requestedAsset = request;
+      return new Response('private welcome', { status: 200 });
+    });
+    const api = vi.fn(async () => identifiedResponse('wrong API'));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('private welcome');
+    expect(api).not.toHaveBeenCalled();
+    expect(requestedAsset).toBeInstanceOf(Request);
+    expect(new URL(requestedAsset!.url).pathname).toBe('/welcome');
+  });
+
   it('serves an existing browser asset without calling the API Worker', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('asset', { status: 200 }));
@@ -99,6 +121,40 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.headers.get('cookie')).toBe('__Host-fcr_session=synthetic-session');
     expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
     expect(await forwarded?.text()).toBe(JSON.stringify({ action: 'approve' }));
+  });
+
+  it('normalizes www welcome and member navigation to the apex browser-session origin', async () => {
+    const handler = await loadHandler();
+    const assets = vi.fn(async () => new Response('asset'));
+    const api = vi.fn(async () => identifiedResponse('API'));
+    const cases: Array<[string, string]> = [
+      ['/welcome', '/welcome'],
+      ['/welcome/?ref=home', '/welcome?ref=home'],
+      ['/member', '/member/'],
+      ['/member/?ref=welcome', '/member/?ref=welcome'],
+    ];
+    for (const [requestPath, expectedPath] of cases) {
+      const response = await handler.fetch(
+        new Request('https://www.foundercontrolroom.org' + requestPath),
+        { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+      );
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('https://foundercontrolroom.org' + expectedPath);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+      expect(response.headers.get('set-cookie')).toBeNull();
+    }
+    expect(assets).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+
+    const apex = await handler.fetch(
+      new Request('https://foundercontrolroom.org/member/'),
+      { ASSETS: { fetch: assets }, FCR_API: { fetch: api } },
+    );
+    expect(apex.status).toBe(200);
+    expect(assets).toHaveBeenCalledOnce();
+    expect(api).not.toHaveBeenCalled();
   });
 
   it('normalizes www consent navigation to the apex founder session origin', async () => {
@@ -277,6 +333,99 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.redirect).toBe('manual');
     expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
     expect(forwarded?.headers.get('x-forwarded-proto')).toBe('https');
+  });
+
+  it('forwards every allowlisted MCP protocol route through the FCR_API binding', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('{"ok":true}', { status: 200 }));
+    const env = { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } };
+
+    const allowed: Array<[string, string]> = [
+      ['POST', '/mcp'],
+      ['POST', '/mcp/'],
+      ['POST', '/mcp/read'],
+      ['POST', '/mcp/public'],
+      ['POST', '/mcp/founder-signal-x-engagement'],
+      ['GET', '/mcp/registry/v0.1/servers?search=promptos'],
+      // Derived from the API's mounted bridge set so a new bridge project
+      // cannot silently fail closed at the public Pages edge.
+      ...PORTFOLIO_MCP_BRIDGE_PROJECTS.map((slug): [string, string] => ['POST', `/mcp/portfolio/${slug}`]),
+    ];
+    for (const [method, path] of allowed) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`, {
+          method,
+          ...(method === 'POST' ? { headers: { 'content-type': 'application/json' }, body: '{}' } : {}),
+        }),
+        env,
+      );
+      expect(response.status, path).toBe(200);
+      const forwarded = fcrApiFetch.mock.calls.at(-1)?.[0];
+      expect(forwarded?.url, path).toBe(`https://api.foundercontrolroom.org${path}`);
+      expect(forwarded?.method, path).toBe(method);
+    }
+    expect(fcrApiFetch).toHaveBeenCalledTimes(allowed.length);
+    expect(assetFetch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on unlisted, administrative, and encoded MCP paths without calling the API', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected Pages asset'));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse('unsafe API execution'));
+    const env = { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } };
+
+    for (const path of [
+      '/mcp/founder-signal-engine',
+      '/MCP/FOUNDER-SIGNAL-ENGINE/',
+      '/mcp/vault',
+      '/mcp/vault/resolve?projectId=x',
+      '/mcp/vault/tokens',
+      '/mcp/founder-permissions/requests',
+      '/mcp/servers',
+      '/mcp/servers/test/tools/read/invoke',
+      '/MCP/VAULT/',
+      '/mcp%2fvault',
+      '/%6dcp/servers',
+      '/mcp//vault',
+      '/mcp/unknown',
+      '/mcp/portfolio/not-a-project',
+      '/mcp/vault/config.json',
+      '/mcp/%E0%A4%A',
+    ]) {
+      const response = await handler.fetch(
+        new Request(`https://foundercontrolroom.org${path}`, { method: 'POST', body: '{}' }),
+        env,
+      );
+      expect(response.status, path).toBe(404);
+      expect(response.headers.get('cache-control'), path).toBe('no-store');
+      await expect(response.json()).resolves.toMatchObject({ ok: false, code: 'MCP_ROUTE_NOT_PUBLIC' });
+    }
+
+    const head = await handler.fetch(
+      new Request('https://foundercontrolroom.org/mcp/servers', { method: 'HEAD' }),
+      env,
+    );
+    expect(head.status).toBe(404);
+    expect(await head.text()).toBe('');
+
+    expect(assetFetch).not.toHaveBeenCalled();
+    expect(fcrApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('leaves non-MCP routes that merely share the prefix on the existing API path', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const fcrApiFetch = vi.fn(async (_request: Request) => identifiedResponse(null, { status: 404 }));
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/mcpx/status'),
+      { ASSETS: { fetch: assetFetch }, FCR_API: { fetch: fcrApiFetch } },
+    );
+
+    expect(response.status).toBe(404);
+    expect(fcrApiFetch).toHaveBeenCalledOnce();
+    expect(assetFetch).not.toHaveBeenCalled();
   });
 
   it('forwards auth callbacks through the FCR_API binding rather than serving Pages', async () => {

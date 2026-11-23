@@ -15,7 +15,7 @@ let baseURL;
 
 function seed() {
   resetVaultFake({
-    founder_users: [{ email: 'founder@example.com' }],
+    founder_users: [{ email: 'founder@example.com', user_id: 'founder-e2e-user' }],
     projects: [{
       id: PROJECT_ID,
       slug: PROJECT_SLUG,
