@@ -630,7 +630,8 @@
     {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
-        "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+        "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof.",
+        "`src/providers/githubAppAuth.ts` must accept base64 DER and headerless private-key bodies only after Node parses their PKCS8 or PKCS1 structure, rewrap collapsed PEM before the existing RSA validation, and reject malformed transport without returning key bytes. Parser parity is local credential-shape evidence, never App issuer authentication or authorization to replace secrets."
       ]
     },
     {
