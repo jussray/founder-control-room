@@ -42,6 +42,7 @@ export interface RemoteReadMcpDependencies extends ExternalMcpToolDependencies {
   ) => Promise<RemoteMcpOauthIdentity>;
   /** Optional server-enforced catalog and invocation allowlist for a dedicated client lane. */
   allowedToolNames?: readonly ExternalMcpToolName[];
+  instructions?: string;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -362,6 +363,8 @@ export function createRemoteReadMcpHandler(
     : null;
   const toolIsAllowed = (name: string): name is ExternalMcpToolName =>
     isExternalMcpToolName(name) && (!allowedToolNames || allowedToolNames.has(name));
+  const instructions = overrides.instructions ??
+    'Paired Chief AI + Founder Control Room connector. Read and preview tools only; execution authority is not granted.';
 
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     applyMcpHeaders(res);
@@ -497,8 +500,7 @@ export function createRemoteReadMcpHandler(
       res.json(rpcResult(id, modernResult({
         supportedVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
         capabilities: { tools: {} },
-        instructions:
-          'Paired Chief AI + Founder Control Room connector. It exposes nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review, carries no mutation authority, fails closed on auth/scope/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
+        instructions,
       }, { ttlMs: 300_000, cacheScope: 'private' })));
       return;
     }
@@ -513,8 +515,7 @@ export function createRemoteReadMcpHandler(
         protocolVersion: supportedLegacyVersion(params?.protocolVersion),
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions:
-          'Paired Chief AI + Founder Control Room connector. Nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay; relay is research/propose/review only, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
+        instructions,
       }));
       return;
     }
