@@ -44,8 +44,12 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(landing).not.toContain('data-fcr-visual="founder-os-v2"');
     expect(landing).toContain('Back Founders');
     expect(landing).toContain('Same truth. Higher outcomes');
-    expect(landing).toContain('href="/control-room/"');
-    expect(landing).toContain('Founder access still passes through FCR authentication');
+    expect(landing).toContain('href="/welcome"');
+    expect(landing).not.toContain('href="/control-room/"');
+    expect(landing).toContain('Only verified founders can open private project controls');
+    expect(landing).toContain('Private projects are not listed on this public page');
+    expect(landing).not.toContain('<strong>Chief AI Prompt Machine</strong>');
+    expect(landing).not.toContain('<strong>StoryEngine</strong>');
     expect(landing).toContain('Sign in to view');
     expect(landing).toContain('Live reads only');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
