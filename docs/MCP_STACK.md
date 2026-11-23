@@ -6,6 +6,12 @@ This file governs which MCP servers an AI agent may use while **developing this 
 
 The Control Room is a private, repository-agnostic governance service. Its standing repository MCP stack supports repository inspection, current implementation documentation, browser proof, design context, its own database schema, and Cloudflare provider/deployment evidence.
 
+## Dedicated Truth Compass read-only bridge
+
+Truth Compass is an external evidence/reconciliation module, not an active FCR portfolio project. It receives a separate, single-project OAuth grant at `POST /mcp/portfolio/truth-compass`. The route is server-bound to `truth-compass` and advertises only nine read/preview tools: repository audit, capability listing/preview, project listing/current truth, checkpoint reads, change genealogy, and skill-route preview. It does not advertise or permit `fcr_save_task_checkpoint` or `fcr_relay_operator`. This is a server-side allowlist enforced for both `tools/list` and `tools/call`, not a UI convention.
+
+The bridge uses the existing Supabase OAuth issuer, client allowlist, audience, scope, current-user validation, founder allowlist, and evidence receipt path. The OAuth token must carry an explicit `mcp_projects: ["truth-compass"]` claim or be issued under this single-project server scope. The project must also exist in FCR's project registry before project-specific evidence tools can return records. No addition to `PORTFOLIO_PROJECTS` is permitted. No merge, deploy, provider mutation, publication, billing, or execution authority is granted.
+
 ## External governed MCP for eligible AI clients
 
 The Control Room source defines one provider-neutral external connector boundary for eligible OAuth/static clients, including governed ChatGPT/Codex, Claude, Gemini, Muse, Perplexity, and other clients admitted by the current server policy. Client/model identity never grants mutation authority by itself.
