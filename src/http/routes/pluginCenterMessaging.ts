@@ -2,11 +2,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import {
   growthInboxReplyStatus,
+  gmailInboxReadStatus,
+  readGmailInbox,
+  probeGmailInbox,
   sendGmailReply,
   sendWhatsAppReply,
   type GrowthInboxReplyChannel,
 } from '../../lib/growthInboxReply.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import { deduplicateAiInboxMessages } from '../../lib/aiInboxRouting.js';
 import {
   isDispatchAllowed,
   type CommunicationPurpose,
@@ -261,6 +265,78 @@ pluginCenterMessagingRouter.get('/status', (_req: FounderRequest, res) => {
   return res.json(growthInboxReplyStatus());
 });
 
+pluginCenterMessagingRouter.get('/ai-inbox/status', (_req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(gmailInboxReadStatus());
+});
+
+/** On-demand read, not a background monitor or provider mutation. */
+pluginCenterMessagingRouter.get('/ai-inbox/probe', async (req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  const status = gmailInboxReadStatus();
+  if (!status.configured) {
+    return res.status(503).json({ error: 'GMAIL_INBOX_NOT_CONFIGURED', missing: status.missing });
+  }
+  if (text(req.query.projectSlug) !== status.projectSlug) {
+    return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
+  }
+  try {
+    const probe = await probeGmailInbox();
+    if (probe.accountId !== status.expectedAccount || probe.projectSlug !== status.projectSlug
+      || probe.labelId !== status.labelId) {
+      return res.status(502).json({ error: 'GMAIL_INBOX_PROVIDER_SCOPE_MISMATCH' });
+    }
+    return res.json(probe);
+  } catch (error) {
+    return res.status(502).json({ error: safeErrorCode(error) });
+  }
+});
+
+pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) => {
+  res.set('Cache-Control', 'no-store');
+  const status = gmailInboxReadStatus();
+  if (!status.configured) {
+    return res.status(503).json({ error: 'GMAIL_INBOX_NOT_CONFIGURED', missing: status.missing });
+  }
+  const projectSlug = text(req.query.projectSlug);
+  if (!projectSlug || projectSlug !== status.projectSlug) {
+    return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
+  }
+  const requestedLimit = req.query.maxResults;
+  const maxResults = requestedLimit === undefined ? 15
+    : typeof requestedLimit === 'string' && /^\d+$/.test(requestedLimit)
+      ? Number(requestedLimit)
+      : Number.NaN;
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 25) {
+    return res.status(400).json({ error: 'GMAIL_INBOX_LIMIT_INVALID' });
+  }
+  const pageToken = req.query.pageToken;
+  if (pageToken !== undefined && (typeof pageToken !== 'string' || !/^[A-Za-z0-9_+=/-]{1,512}$/.test(pageToken))) {
+    return res.status(400).json({ error: 'GMAIL_INBOX_PAGE_TOKEN_INVALID' });
+  }
+  try {
+    const inbox = await readGmailInbox({
+      maxResults,
+      ...(typeof pageToken === 'string' ? { pageToken } : {}),
+    });
+    if (inbox.projectSlug !== projectSlug || inbox.accountId !== status.expectedAccount) {
+      return res.status(502).json({ error: 'GMAIL_INBOX_PROVIDER_SCOPE_MISMATCH' });
+    }
+    return res.json({
+      contract: 'fcr/ai-inbox-observe@v1',
+      mode: 'observe_only',
+      readOnly: true,
+      accountId: inbox.accountId,
+      projectSlug: inbox.projectSlug,
+      nextPageToken: inbox.nextPageToken,
+      messages: inbox.messages,
+      decisions: deduplicateAiInboxMessages(inbox.messages),
+    });
+  } catch (error) {
+    return res.status(502).json({ error: safeErrorCode(error) });
+  }
+});
+
 pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
   res.set('Cache-Control', 'no-store');
   const body = (record(req.body) ?? {}) as ReplyRequest;
@@ -303,6 +379,11 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
     });
   }
 
+  const gmailRead = gmailInboxReadStatus();
+  if (requestedChannel === 'email' && gmailRead.labelId && (!gmailRead.configured || gmailRead.projectSlug !== projectSlug)) {
+    return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
+  }
+
   const fingerprint = requestFingerprint({
     channel: requestedChannel,
     projectSlug,
@@ -314,8 +395,25 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
     whatsappReplyToMessageId,
   });
 
+  // An inbound message admits at most one approved reply operation. The
+  // provider-target reservation is stable across changed client keys or body
+  // revisions, preventing an unknown Gmail outcome from being resent by
+  // choosing a new idempotency key.
+  const senderScope = requestedChannel === 'email'
+    ? (gmailRead.expectedAccount ?? '')
+    : (growthInboxReplyStatus().channels.whatsapp.phoneNumberId ?? '');
+  const originalReplyTarget = requestedChannel === 'email'
+    ? gmailMessageId
+    : whatsappReplyToMessageId;
+  const durableIdempotencyKey = 'growth-reply:v1:' + sha256(JSON.stringify({
+    channel: requestedChannel,
+    projectSlug,
+    senderScope,
+    originalReplyTarget,
+  }));
+
   try {
-    const existing = await existingExecution(idempotencyKey);
+    const existing = await existingExecution(durableIdempotencyKey);
     if (existing) {
       const existingRequest = record(existing.request);
       if (text(existing.action_type) !== ACTION_TYPE || text(existingRequest?.requestFingerprint) !== fingerprint) {
@@ -343,7 +441,7 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
       : `whatsapp-message:${whatsappReplyToMessageId}`;
     const reservation = await reserveExecution({
       projectId: project.id,
-      idempotencyKey,
+      idempotencyKey: durableIdempotencyKey,
       founderEmail,
       channel: requestedChannel,
       projectSlug: project.slug,
@@ -440,6 +538,21 @@ pluginCenterMessagingRouter.post('/reply', async (req: FounderRequest, res) => {
       });
     } catch (providerError) {
       const code = safeErrorCode(providerError);
+      // Gmail may have accepted the send, even if its response or readback
+      // was lost. Database status remains pending (valid ledger state) so the
+      // exact idempotency key cannot be retried as a fresh message.
+      if (requestedChannel === 'email'
+        && (code === 'GMAIL_SEND_OUTCOME_UNKNOWN'
+          || code === 'GMAIL_SEND_RECEIPT_INVALID'
+          || code === 'GMAIL_SENDER_FINGERPRINT_MISMATCH')) {
+        return res.status(502).json({
+          error: 'GMAIL_SEND_OUTCOME_UNKNOWN',
+          status: 'unknown',
+          executionId,
+          replayBlocked: true,
+          reconciliationRequired: true,
+        });
+      }
       const audited = await finishExecution(executionId, 'failed', {
         contract: CONTRACT,
         channel: requestedChannel,
