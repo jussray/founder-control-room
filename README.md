@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 21, 2026 — Merge-queue CI event support (source only)
+
+The load-bearing `.github/workflows/ci.yml` now listens for `merge_group` `checks_requested` events and verifies the exact candidate from `github.event.merge_group.head_sha`, not a prior pull-request head. Documentation Truth, Test Discovery, and Migration Lint each use the event-bound `github.event.merge_group.base_sha` on merge-group runs and retain SHA validation and ancestry checks. Pull-request runs still resolve the live target branch; push runs still use their exact push-before SHA. The existing Required Gate and Playwright jobs remain mandatory. This is committed source compatibility, not proof that GitHub's provider-side merge queue is enabled or that a real merge-group candidate passed its required check names. Neither branch protection nor merge/deployment authority changes here.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.

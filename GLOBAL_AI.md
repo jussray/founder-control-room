@@ -1,5 +1,9 @@
 # Founder Control Room Global AI Contract
 
+## Merge-group exact-candidate proof boundary
+
+For a GitHub `merge_group` `checks_requested` run, the canonical `.github/workflows/ci.yml` must check out and verify `github.event.merge_group.head_sha`, not reuse the ordinary pull-request head as queue proof. Its Documentation Truth, Test Discovery, and Migration Lint jobs must use `github.event.merge_group.base_sha` for the reviewed range and keep their SHA/ancestry fail-closed checks; ordinary PR events continue to resolve the live target and push events continue to use push-before. Agents must require live provider evidence that Required Gate and Playwright ran on the combined queue candidate with the correct required-check identities before claiming merge readiness. Workflow source, an auto-merge selection, or a green predecessor cannot authorize merge, deployment, or production status.
+
 ## Simulator editing boundary
 
 A Founder OS stage can describe a bounded edit, but must never carry founder session credentials, a raw GitHub token, inherited approval, or authority to merge and deploy. The existing FCR founder-authenticated mission patch route must reread current repository and mission state, branch SHA, original provider files, staged SHA-256 hashes and the idempotency ledger before a write. Local test results and an exported request are not provider commit or production proof.

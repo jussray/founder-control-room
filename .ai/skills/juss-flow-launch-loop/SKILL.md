@@ -12,6 +12,10 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+## Merge-queue CI source and runtime gate
+
+The existing `.github/workflows/ci.yml` must accept `merge_group` `checks_requested`, verify the queue candidate's exact `github.event.merge_group.head_sha`, and use `github.event.merge_group.base_sha` as the comparison base only for merge-group events in Documentation Truth, Test Discovery, and Migration Lint. The full-SHA and ancestor validations remain mandatory; PR runs retain live-target resolution and pushes retain exact before-SHA scope. Never transfer green PR-head proof into a merge-group result. Before native queue integration is described as ready, observe the actual provider queue event, complete Required Gate and Playwright on that exact combined head, and compare required status names character-for-character against branch rules. No source-only edit grants founder approval, deployment permission, or provider mutation.
+
 ## FAST versus guarded simulator write gate
 
 FAST may stage exact text edits and SHA-256 receipts in memory without provider access. A `repository-source` patch must be handed to the existing authenticated FCR mission route, which rereads exact live GitHub branch, mission policy pin and original content before an idempotent branch commit. The exported request must not execute itself or carry credentials. A local focused test is not GitHub Actions, independent review or Playwright proof. Keep full guarded checks on a stable exact head, with separate founder-final merge and release gates.
