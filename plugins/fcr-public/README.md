@@ -17,13 +17,13 @@ This is an additive package candidate for `jussray/founder-control-room`. It doe
 3. Build a new public MCP tool catalog, starting with safe user-owned project listing, sanitized project evidence reads, and proposal-only work. **Never reuse all eight founder tool definitions** or expose `fcr_relay_operator` in this launch phase.
 4. Preserve the founder-only `/mcp`, `/mcp/read`, and the existing governance, approval, and provider authorization routes untouched. Founder tools stay behind current allowlist and proof gates.
 5. Enforce rate limits, abuse monitoring, privacy controls, bounded responses, input validation, output redaction, revocation, and audit/receipt persistence without retaining raw inputs/results or credentials.
-6. Create two independent demo tenants (A, B) plus an existing founder identity, and prove the 8 review cases in `review/test-cases.json`, including no cross-tenant access and no authority elevation.
+6. Create two independent demo tenants (A, B) plus an existing founder identity, and prove the 9 review cases in `review/test-cases.json`, including no cross-tenant access and no authority elevation.
 7. Run exact-commit `npm run verify:mcp`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, integration tests, Playwright where a UI changes, and live authenticated MCP client discovery against the deployed Cloudflare Worker. Record full results and runtime identity.
 8. Provide verified HTTPS website, support, privacy, and terms URLs, a demo recording, a dedicated review account, and accurate production tool metadata. Perform the required domain verification, OAuth login and tool scan. **Only then** prepare a submission.
 
 ## Submission-case contract
 
-The five positive and three negative proposed review cases are declared under `plugin.json` → `extensions.com.openai.review.test_cases` (the submission-imported field) and mirrored in `review/test-cases.json` for development review. All positive cases target **only** the two currently implemented read-only public tools. These cases remain **unexecuted** until a real demo tenant and deployed OAuth connection are independently verified.
+The six positive and three negative proposed review cases are declared under `plugin.json` → `extensions.com.openai.review.test_cases` (the submission-imported field) and mirrored in `review/test-cases.json` for development review. All positive cases target **only** the three currently implemented read-only public tools. These cases remain **unexecuted** until a real demo tenant and deployed OAuth connection are independently verified.
 
 ## Configuration caveat
 
@@ -31,7 +31,7 @@ The plugin `mcp.json` deliberately declares OAuth without a fabricated `clientId
 
 ## Authority gate
 
-The maintainer alone decides whether to commit, open a PR, merge, deploy, give reviewer access, submit, or publish. This artifact is a local proposal; no provider or account state was changed.
+The maintainer alone decides whether to commit, open a PR, merge, deploy, give reviewer access, submit, or publish. Branch implementation is a proposed change. No provider or account state is changed by this documentation.
 
 ## Verification
 
@@ -39,4 +39,4 @@ Run `node scripts/verify-fcr-public-plugin.mjs` from the repository root after c
 
 ## Public route candidate (new in patch)
 
-The patch adds a disabled-by-default `/mcp/public` endpoint with a two-tool read-only catalog, server-verified Supabase OAuth user identity, client-ID allowlisting, and tenant-scoped membership/project reads. It does **not** supply public account creation, the production OAuth consent UI, a live database migration, persisted external read receipts, or production runtime proof. It uses the OIDC `openid` scope and enforces database read permissions independently through memberships. The proposed schema is a design file, not an applied migration. Never enable `FCR_PUBLIC_MCP_ENABLED` until the remaining gates are verified.
+The patch adds a disabled-by-default `/mcp/public` endpoint with a three-tool read-only catalog, server-verified Supabase OAuth user identity, client-ID allowlisting, and tenant-scoped membership/project reads. It does **not** supply public account creation, the production OAuth consent UI, a live database migration, persisted external read receipts, or production runtime proof. It uses the OIDC `openid` scope and enforces database read permissions independently through memberships. The proposed schema is a design file, not an applied migration. Never enable `FCR_PUBLIC_MCP_ENABLED` until the remaining gates are verified.

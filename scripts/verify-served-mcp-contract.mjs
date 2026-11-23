@@ -19,12 +19,12 @@
  *      can keep every internal invariant intact while a mount edit silently
  *      drops the auth middleware in front of it; nothing else checks that.
  *   3. The served discovery/initialize description stays truthful about the
- *      seven read/preview tools plus the one bounded peer relay.
+ *      nine read/preview tools, one checkpoint writer, plus one bounded peer relay.
  *
  * Scope is deliberately narrow otherwise: it does not assert OAuth claim
  * handling or protocol-version literals. The external tool catalog is pinned
- * only where authority semantics matter: seven read/preview tools stay read-only,
- * while the one peer-operator relay is a bounded external side effect with no
+ * only where authority semantics matter: nine read/preview tools stay read-only,
+ * while the checkpoint writer is a bounded internal persistence action and the peer relay is an external side effect with no
  * repository/provider mutation authority.
  */
 
@@ -47,6 +47,7 @@ const remoteReadMcp = read("src/http/routes/remoteReadMcp.ts");
 const signalEngineMcp = read("src/http/routes/founderSignalEngineMcp.ts");
 const xEngagementMcp = read("src/http/routes/xEngagementSignalMcp.ts");
 const mcpRouter = read("src/http/routes/mcp.ts");
+const mcpRateLimit = read("src/http/middleware/mcpRateLimit.ts");
 const server = read("src/http/server.ts");
 const runtimeProof = read(".github/workflows/prompt-workflow-router-runtime-proof.yml");
 const secretsDoc = read("docs/SECRETS.md");
@@ -68,18 +69,29 @@ assert(
 );
 const falseReadOnlyCount = (toolDefsBody.match(/readOnlyHint:\s*false/g) ?? []).length;
 assert(
-  falseReadOnlyCount === 1,
-  `exactly one external MCP tool annotation may advertise readOnlyHint: false (found ${falseReadOnlyCount})`,
+  falseReadOnlyCount === 2,
+  `exactly two external MCP tool annotations must advertise readOnlyHint: false (found ${falseReadOnlyCount})`,
 );
 const toolCount = (toolDefsBody.match(/^\s{6}name:\s*'/gm) ?? []).length;
 const readAnnotationUses = (
   toolDefsBody.match(/annotations:\s*(?:readAnnotations|\{\s*\.\.\.readAnnotations)/g) ?? []
 ).length;
 const relayAnnotationUses = (toolDefsBody.match(/annotations:\s*relayAnnotations/g) ?? []).length;
-assert(toolCount === 8, `external MCP catalog must contain the seven read/preview tools plus one relay tool (found ${toolCount})`);
+assert(toolCount === 11, `external MCP catalog must contain nine reads, one checkpoint writer and one relay (found ${toolCount})`);
 assert(
-  readAnnotationUses === 7,
-  `exactly seven declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
+  readAnnotationUses === 9,
+  `exactly nine declared external MCP tools must derive from readAnnotations (found ${readAnnotationUses})`,
+);
+assert(
+  ['fcr_list_task_checkpoints', 'fcr_get_task_checkpoint'].every(name =>
+    toolDefsBody.includes(`name: '${name}'`)),
+  "both shared-task discovery tools must remain in the guarded read-only MCP catalog",
+);
+assert(
+  toolDefsBody.includes("name: 'fcr_save_task_checkpoint'") &&
+    /annotations:\s*checkpointAnnotations/.test(toolDefsBody) &&
+    /const checkpointAnnotations = \{[\s\S]{0,160}?readOnlyHint:\s*false/.test(toolDefsBody),
+  "checkpoint persistence must remain a distinct non-read-only, non-destructive tool",
 );
 assert(
   relayAnnotationUses === 1 && /name:\s*'fcr_relay_operator'[\s\S]{0,1600}?annotations:\s*relayAnnotations/.test(toolDefsBody),
@@ -103,12 +115,12 @@ assert(
 /* ---------- remoteReadMcp.ts: served description must match the actual catalog ---------- */
 
 assert(
-  remoteReadMcp.includes('seven read/preview tools plus one bounded peer-operator relay tool'),
-  "modern server/discover must describe seven read/preview tools plus the bounded peer relay",
+  remoteReadMcp.includes('nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool'),
+  "modern server/discover must describe nine read/preview tools plus the bounded peer relay",
 );
 assert(
-  remoteReadMcp.includes('Seven read/preview tools plus one bounded peer-operator relay'),
-  "legacy initialize must describe seven read/preview tools plus the bounded peer relay",
+  remoteReadMcp.includes('Nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay'),
+  "legacy initialize must describe nine read/preview tools plus the bounded peer relay",
 );
 assert(
   !remoteReadMcp.includes('six read/preview-only tools') &&
@@ -167,15 +179,43 @@ assert(
   "x-engagement signal MCP must compare its bearer token with timingSafeEqual, not a fast-exit equality",
 );
 
+// A shared route-local limiter is required in addition to the server's global
+// request baseline: /mcp and /mcp/read must not offer separate auth budgets.
+assert(
+  mcpRouter.includes('import { rateLimitExternalMcp } from "../middleware/mcpRateLimit.js";') &&
+    mcpRateLimit.includes("export const rateLimitExternalMcp = rateLimit({") &&
+    mcpRateLimit.includes("windowMs: 60 * 1_000,") &&
+    mcpRateLimit.includes("limit: 60,"),
+  "external MCP OAuth and compatibility routes must have a shared 60/minute local rate limiter",
+);
+
 /* ---------- every served mount point still carries its middleware ---------- */
 
 assert(
-  /mcpRouter\.post\("\/", handlePairedRemoteMcp\)/.test(mcpRouter),
+  /mcpRouter\.post\("\/", rateLimitExternalMcp, handlePairedRemoteMcp\)/.test(mcpRouter),
   "the canonical OAuth lane must remain mounted at POST /mcp",
 );
+// This compatibility route must retain both security paths. Static access
+// requires an exact token match; every other credential stays on OAuth.
+const compatibilityHandler = mcpRouter.match(
+  /const handleAutoDynamicRemoteReadMcp: RequestHandler = [\s\S]*?\n};/,
+);
 assert(
-  /mcpRouter\.post\("\/read", handleRemoteReadMcp\)/.test(mcpRouter),
-  "the compatibility static-token lane must remain mounted at POST /mcp/read",
+  /mcpRouter\.post\("\/read", rateLimitExternalMcp, handleAutoDynamicRemoteReadMcp\)/.test(mcpRouter) &&
+    /const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler\(\{\s*authMode: "static"/.test(mcpRouter) &&
+    /const handlePairedRemoteMcp = pairedOAuthMetadata\(createRemoteReadMcpHandler\(\{\s*authMode: "oauth"/.test(mcpRouter) &&
+    compatibilityHandler &&
+    compatibilityHandler[0].includes("if (usesLegacyStaticMcpToken(") &&
+    compatibilityHandler[0].includes("return handleLegacyStaticRemoteReadMcp(req, res, next);") &&
+    compatibilityHandler[0].includes("return res.redirect(307, CANONICAL_MCP_RESOURCE);") &&
+    mcpRouter.includes('const CANONICAL_MCP_RESOURCE = "https://api.foundercontrolroom.org/mcp";'),
+  "/mcp/read must retain exact-token legacy auth and redirect all other clients to canonical OAuth /mcp",
+);
+const pairedOauth = read("src/mcp/pairedSupabaseOAuth.ts");
+assert(
+  /return timingSafeEqual\(actualBuffer, expectedBuffer\);/.test(pairedOauth) &&
+    /if \(!expected \|\| !authorizationHeader\?\.startsWith\('Bearer '\)\) return false;/.test(pairedOauth),
+  "legacy token selection must reject missing credentials and use timing-safe comparison",
 );
 assert(
   /app\.use\('\/mcp', mcpRouter\)/.test(server),
@@ -204,6 +244,6 @@ assert(
 );
 
 console.log(
-  "[verify:served-mcp] Seven read/preview MCP tools, one bounded peer relay, truthful served discovery, secret-argument guard, "
+  "[verify:served-mcp] Nine read/preview MCP tools, one reference-only checkpoint writer, one bounded peer relay, truthful served discovery, secret-argument guard, "
     + "Founder Signal endpoints, and every served mount point's middleware wiring are pinned.",
 );
