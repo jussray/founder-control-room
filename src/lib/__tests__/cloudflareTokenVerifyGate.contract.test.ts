@@ -32,4 +32,14 @@ describe('fail-closed Cloudflare credential verification gate', () => {
     expect(script).not.toMatch(/-H\s+"Authorization/);
     expect(script).toContain('production environment secret named CLOUDFLARE_API_TOKEN overrides the repository secret');
   });
+
+  it('records a non-reversible credential fingerprint on every run without argv exposure', () => {
+    expect(script).toContain(`FINGERPRINT="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | sha256sum | cut -c1-12)"`);
+    expect(script).toContain('Credential fingerprint: sha256_12=${FINGERPRINT}');
+    expect(script).toContain('GITHUB_STEP_SUMMARY');
+    expect(script).toContain('rejected the deploy credential::sha256_12=${FINGERPRINT}');
+    const ledger = read('docs/CLOUDFLARE_CREDENTIAL_FINGERPRINT_LEDGER.md');
+    expect(ledger).toContain('Append-only provenance');
+    expect(ledger).toContain('none is a\npresent-tense claim');
+  });
 });
