@@ -302,3 +302,7 @@ For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing ow
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+## Git security baseline
+
+When changing GitHub Actions workflows, inventory the Git client used before the first checkout. For the six November 2026 Git CVEs, use a verified upstream fixed release or vendor package with explicit advisory evidence; a routine package upgrade is not sufficient proof. FCR PR #1161 proposes checksum-verified upstream Git 2.56.1 for its main CI and Playwright workflows only. Treat all other workflows, repositories, self-hosted runners, containers, local devices, and bundled Git copies as unknown until separately verified.

@@ -436,3 +436,7 @@ For workflow-authority source changes, `.github/workflows/ci.yml` must also keep
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+### Git security before checkout
+
+For Git client vulnerabilities, the bootstrap must execute before the first actions/checkout step, not after checkout. Prefer a pinned upstream fixed release with checksum verification when the operating-system tracker has not confirmed a backport. Assert the actual executable and version used by subsequent checkout steps. Scope claims to the workflows and runner classes actually verified; do not extend one CI result to other workflows, repositories, containers, self-hosted runners, or bundled Git copies.
