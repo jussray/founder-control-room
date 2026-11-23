@@ -5,6 +5,7 @@ import test from 'node:test';
 const workflow = readFileSync('.github/workflows/fcr-access-front-door-recovery.yml', 'utf8');
 const browserProof = readFileSync('scripts/verify-fcr-front-door-playwright.mjs', 'utf8');
 const authRoute = readFileSync('src/http/routes/auth.ts', 'utf8');
+const founderMiddleware = readFileSync('src/http/middleware/requireFounder.ts', 'utf8');
 
 test('stranger proof tests reachability and founder containment rather than public membership', () => {
   assert.match(browserProof, /audience:\s*'random-stranger'/);
@@ -32,7 +33,9 @@ test('founder auth contract remains allowlist-first and founder-gated', () => {
     'allowlist check must precede Supabase magic-link creation',
   );
   assert.match(authRoute, /authRouter\.get\('\/me', requireFounder/);
-  assert.match(authRoute, /if \(!\(await isAllowlisted\(email\)\)\) return respondError\(res, 403, 'FORBIDDEN'/);
+  assert.match(authRoute, /if \(!\(await isAuthorizedFounder\(verifiedUser\)\)\) return respondError\(res, 403, 'FORBIDDEN'/);
+  assert.match(authRoute, /shouldCreateUser:\s*false/);
+  assert.doesNotMatch(authRoute, /shouldCreateUser:\s*true/);
   assert.doesNotMatch(authRoute, /authRouter\.(?:post|get)\('\/signup'/);
 });
 
@@ -69,4 +72,13 @@ test('sanitized stranger receipt publishes only bounded containment evidence', (
   assert.match(workflow, /Browser proof receipt/);
   assert.doesNotMatch(workflow, /\n\s*error,\s*\n/);
   assert.doesNotMatch(workflow, /cat "\$browser_receipt"/);
+});
+
+test('founder identity requires verified and immutably bound Supabase user ID', () => {
+  assert.match(founderMiddleware, /email_confirmed_at/);
+  assert.match(founderMiddleware, /\.eq\('user_id', identity\.userId\)/);
+  assert.match(founderMiddleware, /allowRow\?\.user_id === identity\.userId/);
+  assert.match(authRoute, /founderAllowlisted\(identity\)/);
+  assert.match(authRoute, /isAuthorizedFounder\(verifiedUser\)/);
+  assert.doesNotMatch(authRoute, /select\('email'\)\.eq\('email', email\)/);
 });

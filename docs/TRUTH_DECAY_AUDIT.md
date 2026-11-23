@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## November 17, 2026: silent exclusion is its own truth-decay failure mode
+
+An excluded fact is not the same as a false one, but a founder-facing read model that drops a load-bearing signal without saying so produces the same practical harm as stale evidence: the founder believes the brief is complete when it is not. `buildMissionControlBrief` (`src/futureyou/missionControl.ts`) already names every other reason evidence is withheld from `priorities` — stale, invalid, or future-dated observation times all surface in `blindSpots` — but a `critical`/`error` activity event aging past 14 days was dropped with no trace. A 20-day-old unresolved critical failure and a never-happened one were indistinguishable in the brief. The fix adds the missing `blindSpots` line; it does not change what counts as stale, does not resurface the event into `priorities`, and does not imply the underlying issue was ever resolved — only that its continued absence from the dashboard is now disclosed rather than silent.
+
 ## Paired hostile-PR repair guidance
 
 The existing ULTRATHINK / ATTACK / GODMODE companion now specifies completed 5W1H, precise evidence-scoped claims, 80/20 cause selection and paired pre/post Red Team/Devil, L99, OODA, Bill Gates, Elon Musk and Lindy passes. Open PRs and drafts are untrusted candidates; draft containment, exact-head tests, Playwright where a user-facing browser path changed, independent review and founder merge approval are separate gates. The AI-skill verifier checks mandatory source instructions only. Neither a paired checklist nor its receipt proves model compliance, runtime adoption, execution, production restoration or independent review. Activation is limited to `/godmode` and `attack/godmode`; the unrouted phrases `implant fixes` and `fix merge review` were removed from the companion, while merge review remains owned by `repair-to-proof`.
@@ -611,6 +615,12 @@ FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` completed
 That failure is dependency-freshness evidence, not a failed FCR browser journey and not evidence that the README repair regressed runtime behavior. Rebinding the peer to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the next evidence subject only. The successor FCR head remains `UNKNOWN` for federation until the complete live-ref check, immutable checkout, exact peer runtime identity, directive/receipt binding, replay protections, and Playwright browser witness succeed. No predecessor green, founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers through this pin refresh.
 
 
+## 2026-10-14 StoryEngine dependency freshness during FCR Slack repair PR #975
+
+FCR draft PR #975 at exact head `e8a1acdd165124ac51c2c02e0289178b209b4e03` passed its local/direct browser harness but failed the separate live peer-ref freshness check: `.github/workflows/playwright.yml` expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`, while the independently observed `jussray/StoryEngine` protected `refs/heads/main` resolved to `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. Comparison establishes a strictly forward 19-commit successor, not a tag or inferred branch. The successor StoryEngine commit's five GitHub Actions workflows (L99 Story Engine CI, Guardrails Playwright, Control Room Test Ledger, L99 Promotion Gates, Agent Contract v1) all completed successfully; a separate `Supabase Preview` check failed and is **not** covered by those greens. The update selects a federation candidate, not proof that the external preview, product production deployment, or live FCR/Chief/Slack runtime works.
+
+The Playwright workflow's immutable `STORYENGINE_PEER_SHA` is now refreshed to the observed successor, retaining the live-ref equality gate, immutable peer checkout, runtime identity check, directive/receipt/replay proofs, and browser tests. FCR browser-federation state for the new pair stays `UNKNOWN` until the full new exact-head witness completes successfully. The earlier 16 workflow successes and any previous FCR/StoryEngine federation receipt are historical after this candidate's head moves. No founder approval, merge, deploy, publishing, billing, provider mutation, or credential authority transfers through the peer-pin update. This change is carried by the existing draft PR #975, not a parallel recovery PR.
+
 ## 2026-10-06 StoryEngine runtime-head-binding peer transition
 
 FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` completed its local/direct browser harness, then failed closed at the separate StoryEngine peer freshness gate because the workflow still expected `91af998c2c7adad0792dd394735ca738b92ab26d` while independently observed StoryEngine `refs/heads/main` resolved to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`.
@@ -744,3 +754,15 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: URLFIX's destination guard relied on a literal-only URL check, which did not stop DNS names resolving to private addresses or redirects into private space.
 - Now: the snapshot script resolves DNS and checks every request, and the URLFIX contract forbids persisting authenticated state or private artifacts. Routing ignores URL text when reading intent.
 - Historical evidence from earlier heads is superseded for this surface. Re-observe provider CI on the new exact head before any present-tense claim.
+
+## 2026-11-15 — Documentation Truth receipt claims must be fresh for the reviewed range
+
+- Previously current: a changed truth-sensitive path passed Documentation Truth if the receipt contained any meaningful claim naming it, including a claim written for an older change and carried forward unchanged. Once-true receipt text could therefore stand in for a range it never described.
+- Now (candidate): the verifier compares against the receipt at the reviewed base and requires at least one fresh meaningful path-bound invariant per changed truth-sensitive path. Inherited claims remain as provenance; they are classified historical for the new range, not deleted.
+- Not proven: claim truth, provider state, or any merge, deploy, or publication authority. Re-run Documentation Truth on the exact PR head and again on merged `main`.
+
+## 2026-11-17 — Project adapter re-pin after Chief and Se'kret Bip drift
+
+- Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
+- Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
+- Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
