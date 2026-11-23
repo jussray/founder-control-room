@@ -750,6 +750,10 @@ Provider configuration, site wiring, observed clicks, and commercial outcomes re
 
 **Truth boundary:** checked-in policy and tests are source evidence only. A passing workflow does **not** establish that public content was approved or published, that the collector receives real site traffic, or that live security/runtime controls operate correctly. No new deploy, merge, publication, provider-mutation or deletion authority is granted.
 
+## Sauce Guard agent and logging egress (candidate governance)
+
+Founder Control Room owns the canonical `.agents/skills/sauce-guard/SKILL.md` for all founder-product outward communication. The skill requires verified, temporally current public-safe claims, exact Current You approval, FCR execution-time revalidation and destination-provider readback. CI's `scripts/verify-sauce-guard-egress.mjs` is a separate, changed-line source check that rejects newly introduced dynamic logger sinks and unsafe logging of raw provider/user content in covered code areas. It cannot certify older logs, external agents, security scanning, or publication. The PR must pass exact-head checks, independent review and founder-final merge authorization before this policy is integrated.
+
 ## October 24 StoryEngine relay-proof peer refresh
 
 StoryEngine `refs/heads/main` was independently re-observed at `87501be2da31d12f421b0ed2da49df357fc9fcb1`, so FCR's Playwright federation witness now pins that exact peer identity. This pin movement expires every predecessor FCR↔StoryEngine browser/federation witness; it selects the successor evidence subject only.
@@ -854,3 +858,5 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+The changed-line Sauce Guard audit covers deployed browser JavaScript under `public/` as well as server sources and rejects logger methods passed directly as callbacks. It preserves inherited logs as historical scope and never treats a clean changed-line scan as a complete privacy audit.

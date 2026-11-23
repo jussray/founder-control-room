@@ -1,5 +1,14 @@
 # Codex Operator Entry Point
 
+## Mandatory founder Sauce Guard (all contributors and agents)
+
+**Always read and apply the canonical founder-owned skill** `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md` before any externally visible update, publication, outreach, progress claim, shared screenshot, link, evidence summary, or outgoing content derived from internal product work. This repository owns the skill; keep its source canonical. All humans, coding agents, reviewers, and automated contributors inherit this rule, including delegated subagents.
+
+**Public egress:** verify proof for CURRENT claims; mark historical evidence accurately; hold STALE / UNKNOWN assertions; omit proprietary prompts, internal mechanics, unapproved metrics, private user/teen/customer data, secrets, raw diffs, and provider payloads. **Current You** must approve the exact executable copy; FCR revalidates and **provider readback** is required before claiming it was published. Missing skill, approval, or evidence means HOLD.
+
+**Log egress:** use fixed uppercase event codes rather than untrusted exception messages, user IDs, credentials, raw response bodies or payloads at logger sinks. `scripts/verify-sauce-guard-egress.mjs` rejects newly added dynamic logs in CI. This changed-line scanner does not certify all inherited logs or replace Sauce Guard publication approval; do not bypass either gate to turn CI green.
+
+
 Codex / ChatGPT is a first-class governed Founder AI Council operator. This entry point supplements `AGENTS.md`, `GLOBAL_AI.md`, and `CHATGPT.md`; it does not create merge, deploy, publication, provider-mutation, credential, billing, database, or founder authority.
 
 Before material repository or control-room work, read and inherit:
