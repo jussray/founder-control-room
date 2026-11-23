@@ -304,6 +304,29 @@ describe('Founder Control Room paired remote MCP', () => {
     );
   });
 
+  it('filters both discovery and invocation to a dedicated read-only tool allowlist', async () => {
+    const allowedToolNames = ['fcr_list_projects', 'fcr_get_current_truth'] as const;
+    const invokeReadTool = vi.fn(async () => ({
+      policy: { decision: 'allow', risk: 'read' },
+      evidenceId: 'proofmode-evidence-1',
+      result: { ok: true },
+    }));
+    const app = buildApp({ allowedToolNames, invokeReadTool });
+    const listed = await legacyPost(app, rpc('tools/list'));
+    const names = listed.body.result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toEqual([...allowedToolNames]);
+    expect(names).not.toContain('fcr_save_task_checkpoint');
+    expect(names).not.toContain('fcr_relay_operator');
+
+    const blocked = await legacyPost(app, rpc('tools/call', {
+      name: 'fcr_save_task_checkpoint',
+      arguments: {},
+    }));
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.error.message).toContain('Unknown tool or invalid arguments');
+    expect(invokeReadTool).not.toHaveBeenCalled();
+  });
+
   it('implements modern stateless discovery with private cache hints', async () => {
     const body = modernRpc('server/discover');
     const response = await modernPost(buildApp(), body);
