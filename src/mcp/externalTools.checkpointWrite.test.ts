@@ -183,7 +183,7 @@ describe('OAuth-only FCR MCP task checkpoint save/resume', () => {
     expect(latest()?.authorizing).toBe(false);
     expect(latest()?.approvalCarryForward).toBe(false);
     expect(latest()?.browserCookie).toBe(false);
-    expect(saveTaskCheckpoint).toHaveBeenCalledTimes(4);
+    expect(saveTaskCheckpoint).toHaveBeenCalledTimes(5);
   });
 
   it('refuses non-OAuth identities and cross-project grants before saving', async () => {
