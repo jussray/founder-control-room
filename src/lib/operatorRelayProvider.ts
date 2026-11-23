@@ -2,6 +2,26 @@ import type { OperatorRelayAdapter } from './operatorRelayDispatch.js';
 import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import { buildOperatorRelayResponse } from './operatorRelayProviderResult.js';
 
+export type OperatorRelayExternalProvider =
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'perplexity'
+  | 'deepseek'
+  | 'muse';
+
+export class OperatorRelayProviderBoundaryError extends Error {
+  readonly externalProviderCall = true as const;
+
+  constructor(
+    public readonly provider: OperatorRelayExternalProvider,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'OperatorRelayProviderBoundaryError';
+  }
+}
+
 export interface TextOperatorProvider {
   invoke(input: {
     request: OperatorRelayRequestV1;
