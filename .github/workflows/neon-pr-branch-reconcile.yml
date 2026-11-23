@@ -63,7 +63,7 @@ jobs:
             fi
             page_branches="$(jq -ce '.branches // error("Neon response omitted branches")' <<<"$page")"
             all_branches="$(jq -cn --argjson current "$all_branches" --argjson next "$page_branches" '$current + $next')"
-            cursor="$(jq -r '.pagination.cursor // empty' <<<"$page")"
+            cursor="$(jq -r '.pagination.next // empty' <<<"$page")"
             [ -n "$cursor" ] || break
           done
 
