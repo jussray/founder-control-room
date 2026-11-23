@@ -30,19 +30,24 @@ function buildApp() {
 
 function authSuccess() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
+    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
+  let requestedUserId = '';
+  const chain = {
+    eq: (field: string, value: unknown) => {
+      if (field === 'user_id') requestedUserId = String(value);
+      return chain;
+    },
+    maybeSingle: () => Promise.resolve({
+      data: requestedUserId === FOUNDER_USER_ID ? { user_id: FOUNDER_USER_ID } : null,
+      error: null,
     }),
   };
+  return { select: () => chain };
 }
 
 function projectRow() {
@@ -162,6 +167,24 @@ describe('GET /plugin-center', () => {
     expect(openai.label).toBe('OpenAI Platform / Developers');
     expect(openai.description).toContain('OpenAI Developers');
     expect(openai.blockedByDefault).toContain('create_or_rotate_key_without_gate');
+
+    const heygen = res.body.catalog.find((plugin: { type: string }) => plugin.type === 'heygen');
+    expect(heygen).toMatchObject({
+      label: 'HeyGen',
+      defaultAuthorityLevel: 'L6',
+    });
+    expect(heygen.secretsPolicy).toContain('backend secret store');
+    expect(heygen.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'generate_paid_avatar_video',
+        authorityLevel: 'L6',
+        requiresEvidence: true,
+        separateFounderGate: true,
+      }),
+    ]));
+    expect(heygen.blockedByDefault).toContain('automatic_paid_retry');
+    expect(heygen.blockedByDefault).toContain('publish_without_separate_release_approval');
+    expect(res.body.connections.some((connection: { type: string }) => connection.type === 'heygen')).toBe(false);
 
     expect(res.body.summary).toMatchObject({
       installedConnections: 1,

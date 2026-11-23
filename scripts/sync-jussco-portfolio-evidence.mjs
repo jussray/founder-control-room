@@ -50,6 +50,14 @@ function evidenceEqual(a, b) {
   return JSON.stringify(semanticEvidence(a)) === JSON.stringify(semanticEvidence(b));
 }
 
+function publishedCardCounts(worlds, systems) {
+  const worldCount = Array.isArray(worlds?.worlds) ? worlds.worlds.length : 0;
+  const publicSystems = Array.isArray(systems?.systems)
+    ? systems.systems.filter((item) => item.public !== false && item.kind === 'standalone_os')
+    : [];
+  return { worldCount, systemCount: publicSystems.length, publicSystems };
+}
+
 function evidenceIsFresh(evidence, nowMs) {
   const observed = Date.parse(evidence?.observedAt || '');
   return Number.isFinite(observed) && nowMs - observed < MAX_STABLE_AGE_MS;
@@ -404,6 +412,9 @@ async function runSelfTest() {
     ['jussray/git-os', observation('jussray/git-os', 'b'.repeat(40))],
   ]);
   const first = applyEvidence({ worldsRegistry: baseWorlds, systemsRegistry: baseSystems, observations, now });
+  const counts = publishedCardCounts(first.worlds, first.systems);
+  assert.deepEqual({ worlds: counts.worldCount, publicSystems: counts.systemCount }, { worlds: 1, publicSystems: 2 });
+  assert.equal(publishedCardCounts({ worlds: [] }, { systems: [] }).worldCount, 0);
   assert.equal(first.changedWorlds.length, 1);
   assert.equal(first.changedSystems.length, 2);
   assert.equal(first.worlds.worlds[0].label, 'Founder label');
@@ -462,17 +473,21 @@ async function runLiveProof() {
         if (attempt === 24) throw new Error(`${baseUrl}: deployed registries did not reach expected evidence generation timestamps`);
         await page.waitForTimeout(10000);
       }
-      await page.waitForFunction(() => document.querySelectorAll('.card').length === 15 && document.querySelectorAll('.os-card').length === 5, null, { timeout: 20000 });
-      const publicSystems = (registries.systems.systems || []).filter((item) => item.public !== false && item.kind === 'standalone_os');
-      const worldEvidenceReady = (registries.worlds.worlds || []).length === 15 && registries.worlds.worlds.every((item) => item.evidence?.contract === CONTRACT);
-      const systemEvidenceReady = publicSystems.length === 5 && publicSystems.every((item) => item.evidence?.contract === CONTRACT);
+      const { worldCount, systemCount, publicSystems } = publishedCardCounts(registries.worlds, registries.systems);
+      if (worldCount < 1 || systemCount < 1) throw new Error(`${baseUrl}: no public registry cards to prove`);
+      await page.waitForFunction(({ worldCount, systemCount }) =>
+        document.querySelectorAll('.card').length === worldCount &&
+        document.querySelectorAll('.os-card').length === systemCount,
+      { worldCount, systemCount }, { timeout: 20000 });
+      const worldEvidenceReady = registries.worlds.worlds.every((item) => item.evidence?.contract === CONTRACT);
+      const systemEvidenceReady = publicSystems.every((item) => item.evidence?.contract === CONTRACT);
       const fcrCard = page.locator('.card', { hasText: 'Founder Control Room' });
       await fcrCard.click();
       await page.waitForTimeout(150);
       const drawerText = await page.innerText('#dFacts');
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       const ok = worldEvidenceReady && systemEvidenceReady && /Main\s+[0-9a-f]{7}/i.test(drawerText) && /CI on main/i.test(drawerText) && overflow === 0 && errors.length === 0;
-      console.log(`${baseUrl}: evidence-live ${ok ? 'verified' : 'FAILED'} · 15 worlds + 5 systems`);
+      console.log(`${baseUrl}: evidence-live ${ok ? 'verified' : 'FAILED'} · ${worldCount} worlds + ${systemCount} systems`);
       if (!ok) failed = true;
       const label = new URL(baseUrl).hostname.replace(/[^a-z0-9.-]/gi, '_');
       await page.screenshot({ path: `${outputDir}/${label}.png`, fullPage: true });

@@ -34,6 +34,13 @@ const state = {
   costs: null,
   agents: [],
   authorityLevels: [],
+  founderChat: {
+    projectSlug: null,
+    missionId: null,
+    messages: [],
+    error: null,
+    sending: false,
+  },
   banner: null, // { kind: 'error'|'notice', text }
   // Per-read truth for the Home KPIs: 'pending' until a load settles, then
   // 'ok' or 'failed'. An empty array is only "0" once its read succeeded.
@@ -114,7 +121,9 @@ async function api(path, opts = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
+    const err = new Error(body?.error ?? `Request failed (${res.status})`);
+    err.code = body?.code;
+    throw err;
   }
 
   return body;
@@ -135,6 +144,29 @@ async function guarded(action) {
 }
 
 // ─── small utilities ─────────────────────────────────────────────────────────
+
+// Pending patch-commit intents, one per mission: the payload the key was minted
+// for. The key is a random UUID per payload — no hash, so two different payloads
+// can never share a key and collide on the server's ledger.
+const patchCommitIntents = new Map();
+
+function patchIntentFor(missionId, payload) {
+  const current = patchCommitIntents.get(missionId);
+  if (current && current.payload === payload) return current;
+  const next = { payload, key: `${missionId}-patch-${crypto.randomUUID()}` };
+  patchCommitIntents.set(missionId, next);
+  return next;
+}
+
+// Server rejection codes that permanently poison an idempotency key. A retry
+// must mint a fresh key instead of looping on the dead one.
+// ACTION_ALREADY_PENDING is deliberately absent: the reservation exists, and a
+// new key would double-commit.
+const POISONED_KEY_CODES = new Set([
+  'ACTION_PREVIOUSLY_FAILED',
+  'IDEMPOTENCY_SCOPE_MISMATCH',
+  'PATCH_COMMIT_FAILED',
+]);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => (
@@ -229,12 +261,14 @@ const TABS = [
 // they are deliberately not `.tabs button[data-tab]` so the tab router never
 // treats them as in-app tabs.
 const SURFACE_LINKS = [
+  ['Build · GitHub', '/control-room/github-workspace.html'],
   ['Content', '/control-room/content-manager.html'],
   ['Automation', '/control-room/command-bridge.html'],
   ['Integrations', '/control-room/plugin-center.html'],
   ['Security', '/control-room/security.html'],
   ['QuickScan', '/control-room/quickscan.html'],
   ['Evidence trust', '/control-room/evidence-trust.html'],
+  ['Johnstown pilot', '/control-room/johnstown-ai-pilot.html'],
 ];
 
 function renderShell() {
@@ -397,6 +431,196 @@ function routeMarkup(label, sub, kind, target, className) {
     : `<a class="${className}" href="${escapeHtml(target)}">${inner}</a>`;
 }
 
+function founderChatProjectSlug() {
+  const current = state.founderChat.projectSlug;
+  if (current && state.projects.some((project) => project.slug === current)) return current;
+  const selected = state.selectedProjectSlug && state.projects.some((project) => project.slug === state.selectedProjectSlug)
+    ? state.selectedProjectSlug
+    : null;
+  const fallback = selected
+    ?? state.projects.find((project) => project.status === 'active')?.slug
+    ?? state.projects[0]?.slug
+    ?? null;
+  state.founderChat.projectSlug = fallback;
+  return fallback;
+}
+
+function founderChatMarkup() {
+  const projectSlug = founderChatProjectSlug();
+  const projectOptions = state.projects.map((project) => `
+    <option value="${escapeHtml(project.slug)}" ${project.slug === projectSlug ? 'selected' : ''}>
+      ${escapeHtml(project.name)} · ${escapeHtml(project.status)}
+    </option>
+  `).join('');
+  const messages = state.founderChat.messages.map((message) => `
+    <div class="founder-chat-message" data-founder-chat-message data-role="${escapeHtml(message.role)}">
+      <span>${message.role === 'founder' ? 'You' : message.role === 'council' ? 'Council' : 'System'}</span>
+      <p>${escapeHtml(message.text)}</p>
+    </div>
+  `).join('');
+
+  return `
+    <div class="founder-chat" data-founder-chat>
+      <div class="founder-chat-toolbar">
+        <label>
+          <span>Project</span>
+          <select data-founder-chat-project ${state.projects.length === 0 || state.founderChat.sending ? 'disabled' : ''}>
+            ${projectOptions || '<option selected disabled>No projects registered</option>'}
+          </select>
+        </label>
+        <button type="button" class="link-button" data-founder-chat-new ${state.founderChat.sending || (!state.founderChat.missionId && state.founderChat.messages.length === 0) ? 'disabled' : ''}>
+          New thread
+        </button>
+      </div>
+      <div class="founder-chat-thread" data-founder-chat-thread aria-live="polite">
+        ${messages || '<p class="founder-chat-empty">Say what you want to move forward. FCR keeps the cockpit around the conversation instead of replacing it.</p>'}
+        ${state.founderChat.sending ? '<div class="founder-chat-message" data-role="council"><span>Council</span><p>Thinking across the existing Council lane…</p></div>' : ''}
+      </div>
+      <form id="founder-chat-form" class="founder-chat-form">
+        <textarea name="message" data-founder-chat-input rows="3" maxlength="3000" placeholder="Tell FCR what you want to build, fix, decide, verify, or understand…" required ${projectSlug && !state.founderChat.sending ? '' : 'disabled'}></textarea>
+        <button type="submit" class="primary" data-founder-chat-send ${projectSlug && !state.founderChat.sending ? '' : 'disabled'}>
+          ${state.founderChat.sending ? 'Thinking…' : 'Send'}
+        </button>
+      </form>
+      ${state.founderChat.error ? `<p class="error founder-chat-error" data-founder-chat-feedback>${escapeHtml(state.founderChat.error)}</p>` : ''}
+      <p class="founder-chat-boundary" data-founder-chat-boundary>
+        First send opens one proposed mission for this thread. Council may reason and propose; chat never grants merge, deploy, provider-write, spend, publish, or other execution authority.
+      </p>
+      ${state.founderChat.missionId ? `<button type="button" class="founder-chat-mission" data-founder-chat-mission="${escapeHtml(state.founderChat.missionId)}">Open thread mission →</button>` : ''}
+    </div>
+  `;
+}
+
+function founderChatReply(result) {
+  const outcome = result?.conversation?.outcome;
+  if (typeof outcome === 'string' && outcome.trim()) return outcome.trim();
+  const hops = result?.relay?.transcript?.hops;
+  const lastAnswer = Array.isArray(hops) ? hops[hops.length - 1]?.answer : null;
+  if (typeof lastAnswer === 'string' && lastAnswer.trim()) return lastAnswer.trim();
+  throw new Error('Council completed without a readable response.');
+}
+
+async function sendFounderChatTurn(rawMessage) {
+  const message = String(rawMessage ?? '').trim();
+  const chat = state.founderChat;
+  if (!message || chat.sending) return;
+
+  const projectSlug = founderChatProjectSlug();
+  if (!projectSlug) throw new Error('Register a project before starting Founder Chat.');
+
+  chat.messages.push({ role: 'founder', text: message });
+  chat.error = null;
+  chat.sending = true;
+  render();
+
+  try {
+    let missionId = chat.missionId;
+    if (!missionId) {
+      const project = state.projects.find((item) => item.slug === projectSlug);
+      const condensed = message.replace(/\s+/g, ' ');
+      const title = `Founder chat · ${condensed.slice(0, 70)}${condensed.length > 70 ? '…' : ''}`;
+      const created = await api(`/projects/${encodeURIComponent(projectSlug)}/missions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          description: `Founder Chat intent:\n${message}`,
+          riskLevel: project?.risk_level ?? 'medium',
+          requiredChecks: [],
+        }),
+      });
+      const mission = created?.mission ?? null;
+      missionId = mission?.id ?? null;
+      if (!missionId) throw new Error('Founder Chat mission creation returned no mission id.');
+      chat.missionId = missionId;
+      if (!state.missions.some((item) => item.id === missionId)) {
+        state.missions = [{ ...mission, project: { slug: projectSlug } }, ...state.missions];
+      }
+    }
+
+    const seed = chat.messages
+      .slice(-8)
+      .map((item) => `${item.role === 'founder' ? 'Founder' : 'Council'}: ${item.text}`)
+      .join('\n\n')
+      .slice(-12_000);
+
+    const result = await api(`/missions/${encodeURIComponent(missionId)}/council/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        goal: message,
+        seed,
+        capability: 'propose',
+        sensitivity: 'internal',
+        sourceRef: `control-room:founder-chat:${missionId}`,
+      }),
+    });
+
+    if (state.founderChat === chat) {
+      chat.messages.push({ role: 'council', text: founderChatReply(result) });
+    }
+  } catch (error) {
+    if (state.founderChat === chat) {
+      chat.error = error instanceof Error ? error.message : String(error);
+    }
+    throw error;
+  } finally {
+    chat.sending = false;
+  }
+}
+
+function bindFounderChat(mount) {
+  const projectSelect = mount.querySelector('[data-founder-chat-project]');
+  projectSelect?.addEventListener('change', () => {
+    state.founderChat = {
+      projectSlug: projectSelect.value,
+      missionId: null,
+      messages: [],
+      error: null,
+      sending: false,
+    };
+    render();
+  });
+
+  mount.querySelector('[data-founder-chat-new]')?.addEventListener('click', () => {
+    state.founderChat = {
+      projectSlug: founderChatProjectSlug(),
+      missionId: null,
+      messages: [],
+      error: null,
+      sending: false,
+    };
+    render();
+  });
+
+  mount.querySelector('[data-founder-chat-mission]')?.addEventListener('click', (event) => {
+    const missionId = event.currentTarget.dataset.founderChatMission;
+    if (!missionId) return;
+    const mission = state.missions.find((item) => item.id === missionId);
+    const navigate = window.__FCR_FIVE_SCREEN_NAVIGATE__;
+    if (typeof navigate === 'function') {
+      navigate({
+        screen: 'control',
+        view: 'work',
+        context: {
+          projectSlug: mission?.project?.slug ?? founderChatProjectSlug(),
+          missionId,
+          missionTitle: mission?.title ?? null,
+        },
+      });
+      return;
+    }
+    state.tab = 'missions';
+    guarded(() => selectMission(missionId));
+  });
+
+  mount.querySelector('#founder-chat-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = formValues(event.currentTarget);
+    const message = typeof values.message === 'string' ? values.message.trim() : '';
+    if (!message) return;
+    guarded(() => sendFounderChatTurn(message));
+  });
+}
+
 function renderHomeTab(mount) {
   const metrics = homeMetrics();
   const focus = state.missions.filter((m) => IN_FLIGHT_LANES.has(m.status)).slice(0, 6);
@@ -424,6 +648,17 @@ function renderHomeTab(mount) {
           </div>
         </aside>
       </div>
+
+      <section class="panel home-founder-chat" data-home-founder-chat aria-labelledby="founder-chat-heading">
+        <div class="panel-head">
+          <div>
+            <p class="chief-kicker">Founder Chat</p>
+            <h2 id="founder-chat-heading">Talk to the Control Room</h2>
+          </div>
+          <span class="muted">Intent → Council → mission</span>
+        </div>
+        ${founderChatMarkup()}
+      </section>
 
       <div class="kpi-strip" data-home-kpis>
         ${metrics.map((m) => `
@@ -487,6 +722,8 @@ function renderHomeTab(mount) {
       guarded(() => selectMission(node.dataset.focusMission));
     });
   });
+
+  bindFounderChat(mount);
 
   const projectsMount = mount.querySelector('[data-home-projects]');
   renderProjectsTab(projectsMount);
@@ -569,10 +806,14 @@ function renderProjectsTab(mount) {
       <div class="card" data-slug="${escapeHtml(p.slug)}">
         <div class="meta">${escapeHtml(p.repo_provider)} · ${riskBadge(p.risk_level)} · ${escapeHtml(p.status)}</div>
         <div class="title">${escapeHtml(p.name)} <span class="muted mono">(${escapeHtml(p.slug)})</span></div>
+        <a class="link-button" href="/control-room/github-workspace.html?project=${encodeURIComponent(p.slug)}" aria-label="Open ${escapeHtml(p.name)} GitHub workspace">Open workspace ↗</a>
       </div>
     `).join('');
     list.querySelectorAll('.card').forEach((card) => {
-      card.addEventListener('click', () => selectProject(card.dataset.slug));
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        selectProject(card.dataset.slug);
+      });
     });
   }
 
@@ -617,6 +858,7 @@ function renderProjectDetail(mount) {
 
   panel.innerHTML = `
     <h2>${escapeHtml(p.project.name)} <span class="muted mono">(${escapeHtml(p.project.slug)})</span></h2>
+    <p><a href="/control-room/github-workspace.html?project=${encodeURIComponent(p.project.slug)}">Open this project's GitHub Workspace ↗</a> · <a href="/control-room/?tab=terminal">Guarded terminal</a></p>
     ${p.liveError ? `<p class="error">Live repository fetch failed: ${escapeHtml(p.liveError)}</p>` : ''}
     ${p.live ? `<p class="muted">Default branch: <span class="mono">${escapeHtml(p.live.defaultBranch)}</span></p>` : ''}
 
@@ -702,11 +944,21 @@ function renderProjectDetail(mount) {
   panel.querySelectorAll('.connection-check-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       guarded(async () => {
-        await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
+        const data = await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
           method: 'POST',
           body: JSON.stringify({ status: 'active' }),
         });
-        await loadProjectConnections(p.project.slug);
+        const updatedConnection = data?.connection;
+        if (!updatedConnection || updatedConnection.id !== btn.dataset.connectionId || !updatedConnection.last_checked_at) {
+          throw new Error('Connection check did not return the updated connection receipt.');
+        }
+        const loadedIndex = state.projectConnections.findIndex((connection) => connection.id === updatedConnection.id);
+        if (loadedIndex < 0) {
+          throw new Error('Connection check receipt does not match the loaded project connection.');
+        }
+        state.projectConnections = state.projectConnections.map((connection) => (
+          connection.id === updatedConnection.id ? updatedConnection : connection
+        ));
         setBanner('notice', 'Connection check recorded.');
       });
     });
@@ -824,8 +1076,13 @@ async function selectMission(id) {
 function renderMissionDetail(mount) {
   const panel = mount.querySelector('#mission-detail');
   const mission = state.missions.find((m) => m.id === state.selectedMissionId);
-  if (!mission) { panel.style.display = 'none'; return; }
+  if (!mission) {
+    panel.style.display = 'none';
+    delete panel.dataset.missionId;
+    return;
+  }
   panel.style.display = 'block';
+  panel.dataset.missionId = mission.id;
 
   const editable = mission.status === 'sandboxed' || mission.status === 'in_review';
   // create_branch is proof-gated too (PROOF_GATED_ACTIONS in approvals.ts)
@@ -1014,11 +1271,23 @@ function renderMissionDetail(mount) {
     const content = panel.querySelector('#mission-file-editor').value;
     const message = panel.querySelector('#mission-commit-message').value.trim() || `Edit ${path}`;
     if (!path) { setBanner('error', 'Path is required.'); render(); return; }
+    // One idempotency key per exact payload, tracked per mission. Double-clicks
+    // and retries after a network error resend the same payload, so they reuse
+    // the same key and the server replays instead of committing twice.
+    // A changed payload mints a new key.
+    const payload = JSON.stringify({ path, message, content });
+    const intent = patchIntentFor(mission.id, payload);
     guarded(async () => {
-      await api(`/approvals/${mission.id}/patch`, {
-        method: 'POST',
-        body: JSON.stringify({ message, changes: [{ path, content }] }),
-      });
+      try {
+        await api(`/approvals/${mission.id}/patch`, {
+          method: 'POST',
+          body: JSON.stringify({ message, idempotencyKey: intent.key, changes: [{ path, content }] }),
+        });
+      } catch (err) {
+        if (POISONED_KEY_CODES.has(err.code)) patchCommitIntents.delete(mission.id);
+        throw err;
+      }
+      patchCommitIntents.delete(mission.id);
       setBanner('notice', `Committed ${path} to ${mission.branch_ref}.`);
     });
   });

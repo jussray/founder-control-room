@@ -1,4 +1,4 @@
-Contact: mailto:support@jussco.company
-Expires: 2027-04-09T00:00:00Z
+Contact: mailto:support@foundercontrolroom.org
+Expires: 2027-06-30T00:00:00.000Z
 Preferred-Languages: en
-Policy: https://github.com/jussray/founder-control-room/blob/main/SECURITY.md
+Canonical: https://foundercontrolroom.org/.well-known/security.txt
