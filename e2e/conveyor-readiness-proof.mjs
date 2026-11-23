@@ -204,6 +204,10 @@ try {
   // The readiness badge intentionally lives inside the closed founder-stack dock.
   // Open the real dock first, which also triggers a fresh authenticated readiness read.
   await page.locator('.launch-dock > summary').click();
+  const designCommandsLink = page.locator('[data-project-design-commands]');
+  await designCommandsLink.waitFor({ state: 'visible' });
+  assert.equal(await designCommandsLink.getAttribute('href'), '/control-room/design-commands.html',
+    'authenticated founder dock retains the canonical Design Commands link');
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
   assert.equal(lastAuthorization, null, 'opaque browser session must not emit a bearer Authorization header');
   assert.match(lastCookie ?? '', new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=${SESSION_VALUE}(?:;|$)`));

@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundercontrolroom.org/contracts/juss-agent-contract-v1.schema.json",
+  "title": "Juss Agent Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "status",
+    "kernelFingerprint",
+    "kernel",
+    "binding"
+  ],
+  "properties": {
+    "contract": {
+      "const": "juss/agent-contract@v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "status": {
+      "const": "active"
+    },
+    "kernelFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlModel",
+        "requiredMissionFields",
+        "requiredAuthorityFields",
+        "requiredStateFields",
+        "requiredExecutionFields",
+        "requiredProofFields",
+        "truthClassifications",
+        "proofLevels",
+        "taskStates",
+        "returnContract",
+        "invariants"
+      ],
+      "properties": {
+        "controlModel": {
+          "const": ["DECLARE", "PERMIT", "ATTEMPT", "RECORD", "PROVE", "DECIDE"]
+        },
+        "requiredMissionFields": {
+          "const": ["goal", "definitionOfDone", "target", "constraints", "stopCondition"]
+        },
+        "requiredAuthorityFields": {
+          "const": ["requester", "decisionOwner", "authorityCeiling", "allowedActions", "forbiddenActions", "protectedResources", "approvalGates"]
+        },
+        "requiredStateFields": {
+          "const": ["repository", "branch", "immutableFingerprint", "truthObservedAt", "evidenceRefs"]
+        },
+        "requiredExecutionFields": {
+          "const": ["ownerLane", "smallestReversibleAction", "idempotencyKey", "timeoutOrStop", "singleWriter"]
+        },
+        "requiredProofFields": {
+          "const": ["executionEvidence", "independentOutcomeEvidence", "proofLevel", "classification"]
+        },
+        "truthClassifications": {
+          "const": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED"]
+        },
+        "proofLevels": {
+          "const": ["plan-only", "local-evidence", "exact-head", "deployed-observation", "outcome-verified"]
+        },
+        "taskStates": {
+          "const": ["OPEN", "ACTIVE", "BLOCKED", "PROOF_PENDING", "PROVEN", "CLEARED"]
+        },
+        "returnContract": {
+          "const": ["REALITY", "FIX", "PROOF", "RISK", "ROLLBACK", "NEXT GATE"]
+        },
+        "invariants": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "humanAuthorityIsRoot",
+            "intentIsNotAuthority",
+            "capabilityIsNotPermission",
+            "planIsNotAction",
+            "actionIsNotOutcomeProof",
+            "receiptIsNotOutcomeProof",
+            "evidenceIsNotDecision",
+            "providerSuccessIsNotOutcomeTruth",
+            "consensusDoesNotAuthorizeMutation",
+            "mutationRequiresBoundAuthority",
+            "ambiguousMutationRequiresReconciliation",
+            "staleProofCannotCarryForward",
+            "localStricterRulesWin",
+            "rollbackOrSafeContinuationRequired"
+          ],
+          "properties": {
+            "humanAuthorityIsRoot": {"const": true},
+            "intentIsNotAuthority": {"const": true},
+            "capabilityIsNotPermission": {"const": true},
+            "planIsNotAction": {"const": true},
+            "actionIsNotOutcomeProof": {"const": true},
+            "receiptIsNotOutcomeProof": {"const": true},
+            "evidenceIsNotDecision": {"const": true},
+            "providerSuccessIsNotOutcomeTruth": {"const": true},
+            "consensusDoesNotAuthorizeMutation": {"const": true},
+            "mutationRequiresBoundAuthority": {"const": true},
+            "ambiguousMutationRequiresReconciliation": {"const": true},
+            "staleProofCannotCarryForward": {"const": true},
+            "localStricterRulesWin": {"const": true},
+            "rollbackOrSafeContinuationRequired": {"const": true}
+          }
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "defaultBranch",
+        "role",
+        "authorityHost",
+        "reasoningHost",
+        "behaviorHost",
+        "canonicalSchema",
+        "schemaRequiredAtRuntime",
+        "runtimeDependencyOnPeers",
+        "localOverlays",
+        "inheritanceRule",
+        "authorityRule"
+      ],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+        "defaultBranch": {"const": "main"},
+        "role": {"type": "string", "minLength": 1},
+        "authorityHost": {"const": "jussray/founder-control-room"},
+        "reasoningHost": {"const": "jussray/chief-ai-machine"},
+        "behaviorHost": {"const": "jussray/promptos"},
+        "canonicalSchema": {"const": "github:jussray/founder-control-room/contracts/juss-agent-contract-v1.schema.json"},
+        "schemaRequiredAtRuntime": {"const": false},
+        "runtimeDependencyOnPeers": {"const": false},
+        "localOverlays": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "inheritanceRule": {"type": "string", "minLength": 1},
+        "authorityRule": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

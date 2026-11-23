@@ -231,7 +231,7 @@
           <div class="field">
             <label for="lifecycle-provider">Provider lane</label>
             <select class="control-select" id="lifecycle-provider" name="provider">
-              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
             </select>
           </div>
           <div class="field">
@@ -245,18 +245,19 @@
           <div class="field full"><label for="lifecycle-draft">Public draft text</label><textarea class="control-textarea" id="lifecycle-draft" name="draft_text" placeholder="Exact public-safe copy for review" required></textarea></div>
         </div>
         <div class="lifecycle-toolbar"><button class="control-button primary" type="submit" data-live-only>Store draft</button></div>
-        <p class="field-note">Use provider=linkedin only for the current first-party direct publish path. Other provider lanes remain adapter-gated until activated.</p>
+        <p class="field-note" data-postiz-readback-note>Use provider=linkedin only for the current first-party direct publish path. Postiz is account/status readback only; it does not expose scheduling or publication authority here. Other provider lanes remain adapter-gated until activated.</p>
       </form>
 
       <div class="control-card">
         <h3>Provider account gate</h3>
         <p>Account discovery and OAuth connection stay provider-owned. No account connection grants publication authority.</p>
         <div class="field-grid">
-          <div class="field"><label for="account-provider">Provider</label><select class="control-select" id="account-provider" data-account-provider><option value="buffer">Buffer</option><option value="linkedin">LinkedIn</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
+          <div class="field"><label for="account-provider">Provider</label><select class="control-select" id="account-provider" data-account-provider><option value="buffer">Buffer</option><option value="linkedin">LinkedIn</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
           <div class="field"><label for="account-platform">Platform</label><select class="control-select" id="account-platform" data-account-platform><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></div>
           <div class="field full"><label for="account-name">Optional account label</label><input class="control-input" id="account-name" data-account-name placeholder="Account label for provider connection flow" /></div>
         </div>
         <div class="lifecycle-toolbar"><button class="control-button" type="button" data-account-list data-live-only>List accounts</button><button class="control-button" type="button" data-account-connect data-live-only>Connect account</button></div>
+        <p class="field-note">Postiz supports account listing/status readback in this FCR lane. Postiz account connection and provider writes are not enabled here and fail closed.</p>
       </div>
     </div>
 

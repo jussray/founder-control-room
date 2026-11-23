@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -74,11 +75,7 @@ function app() {
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, "founder-user"),
   };
 }
 
@@ -102,7 +99,7 @@ function configureProvider() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: "founder-user", email: FOUNDER_EMAIL } },
+    data: { user: { id: "founder-user", email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   configureProvider();
@@ -290,8 +287,24 @@ describe("GitLab approvals routing", () => {
           select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: GITLAB_PROJECT, error: null }) }) }),
         };
       }
+      if (table === "approval_executions") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+          insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }) }),
+          update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+        };
+      }
       if (table === "project_events") {
         return { insert: () => Promise.resolve({ error: null }) };
+      }
+      if (table === "approval_executions") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+          insert: () => ({
+            select: () => ({ single: () => Promise.resolve({ data: { id: EXECUTION_ID }, error: null }) }),
+          }),
+          update: () => twoEqUpdate(),
+        };
       }
       return {};
     });
@@ -299,7 +312,7 @@ describe("GitLab approvals routing", () => {
     const response = await request(app())
       .post(`/approvals/${MISSION_ID}/patch`)
       .set("Authorization", BEARER)
-      .send({ message: "edit via GitLab", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
+      .send({ message: "edit via GitLab", idempotencyKey: "gitlab-patch-test-1", changes: [{ path: "src/example.ts", content: "export const ok = true;" }] });
 
     expect(response.status).toBe(201);
     expect(mockCommitPatch).toHaveBeenCalledWith(

@@ -151,6 +151,27 @@ describe('evaluateContentTrendRadar', () => {
     expect(result.ranked.find((item) => item.id === 'future')?.reasons).toContain('future_evidence');
   });
 
+  it('caps caller-configured future skew at the supported two-minute tolerance', () => {
+    const tooFarFuture = candidate({
+      id: 'too-far-future',
+      trend: 'Future signal hidden behind an oversized caller skew',
+      evidenceState: 'VERIFIED',
+      evidenceRefs: [{
+        id: 'future-skew-evidence',
+        source: 'authoritative-source',
+        observedAt: '2026-09-14T15:10:00.000Z',
+      }],
+    });
+
+    const result = evaluateContentTrendRadar([tooFarFuture], {
+      evaluatedAt: NOW,
+      futureSkewMs: 24 * 60 * 60 * 1000,
+    });
+
+    expect(result.firstWave).toEqual([]);
+    expect(result.ranked[0]?.reasons).toContain('future_evidence');
+  });
+
   it('requires contrarian, practical, and future angles before a candidate enters the first wave', () => {
     const incomplete = candidate({
       id: 'incomplete',

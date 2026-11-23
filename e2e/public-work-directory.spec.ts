@@ -25,8 +25,8 @@ function publicAssets(): FetchBinding {
   return {
     fetch: async (request: Request) => {
       const pathname = new URL(request.url).pathname;
-      const source = pathname === '/'
-        ? 'public/index.html'
+      const source = pathname === '/welcome'
+        ? 'public/welcome.html'
         : pathname === '/work.html'
           ? 'public/work.html'
           : pathname === '/juss-rayy/' || pathname === '/juss-rayy'
@@ -41,7 +41,7 @@ function publicAssets(): FetchBinding {
   };
 }
 
-test('public front door visibly links people to Juss Rayy and the public work directory', async ({ page }) => {
+test('canonical root serves the private invitation-only welcome door', async ({ page }) => {
   const handler = await loadHandler();
   let apiCalls = 0;
   const fcrApi = {
@@ -60,20 +60,21 @@ test('public front door visibly links people to Juss Rayy and the public work di
   expect(apiCalls).toBe(0);
   await page.setContent(await response.text());
 
-  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toBeVisible();
-  await expect(page.getByRole('link', { name: "Explore Juss Rayy's work" })).toHaveAttribute('href', '/work.html');
-  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveAttribute('href', '/juss-rayy/');
+  await expect(page).toHaveTitle('Welcome | Founder Control Room');
+  await expect(page.getByRole('heading', { name: /Welcome to Founder Control Room/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Founder sign-in' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Explore public work' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Meet Juss Rayy' })).toHaveCount(0);
 
   mkdirSync(outputDir, { recursive: true });
-  await page.screenshot({ path: resolve(outputDir, 'desktop-front-door-founder-work.png'), fullPage: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-private-welcome-door.png'), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(hasHorizontalOverflow).toBe(false);
-  await page.screenshot({ path: resolve(outputDir, 'mobile-front-door-founder-work.png'), fullPage: true });
+  await page.screenshot({ path: resolve(outputDir, 'mobile-private-welcome-door.png'), fullPage: true });
 });
 
 test('serves the public work directory from Pages and keeps live/source states distinct', async ({ page }) => {
@@ -117,4 +118,47 @@ test('serves the public work directory from Pages and keeps live/source states d
   );
   expect(hasHorizontalOverflow).toBe(false);
   await page.screenshot({ path: resolve(outputDir, 'mobile-work-directory.png'), fullPage: true });
+});
+
+test('renders Claude Cowork as a GitHub-grounded Council lane in the founder stack', async ({ page }) => {
+  const appHtml = readFileSync(resolve(repoRoot, 'public/control-room/index.html'), 'utf8');
+  const stackRouterSource = readFileSync(resolve(repoRoot, 'public/control-room/stack-router.js'), 'utf8')
+    .replace("import { installMissionBoard } from './mission-board.js';", 'const installMissionBoard = () => {};')
+    .replace("import { installProjectShellUi } from './project-shell-ui.js';", 'const installProjectShellUi = () => {};')
+    .replace("import { installTruthConsole } from './truth-console.js';", 'const installTruthConsole = () => {};');
+
+  await page.setContent(appHtml);
+  await expect(page.locator('.launch-dock')).toBeHidden();
+  // This isolated structural fixture has no auth server. Simulate only the DOM
+  // shell after proving that the signed-out navigation starts hidden; the
+  // separate opaque-cookie Playwright test is authoritative for sign-in.
+  await page.evaluate(() => {
+    const root = document.getElementById('root');
+    if (!root) throw new Error('Missing Control Room root');
+    root.innerHTML = '<main class="shell" data-synthetic-auth-fixture></main>';
+  });
+  await page.addScriptTag({ content: stackRouterSource, type: 'module' });
+  await expect(page.locator('.launch-dock')).toBeVisible();
+  await page.locator('.launch-dock > summary').click();
+
+  const cowork = page.locator('[data-lane="cowork"]');
+  await expect(cowork).toBeVisible();
+  await expect(cowork.getByRole('heading', { name: /Cowork/ })).toBeVisible();
+  await expect(cowork).toContainText('Claude Cowork');
+  await expect(cowork).toContainText('Claude GitHub connector required');
+  await expect(cowork).toContainText('FCR receipt adapter not wired');
+  await expect(cowork).not.toContainText('GitHub + Council receipts');
+  await expect(cowork.getByRole('link', { name: /Shared GitHub source/ })).toHaveAttribute('href', '/control-room/github-workspace.html');
+  await expect(cowork.getByRole('link', { name: /Founder AI Council/ })).toHaveAttribute('href', '/control-room/?tab=missions');
+  await expect(page.getByText('Cowork changes return through GitHub commit / PR evidence; FCR receipt binding remains separate')).toBeVisible();
+
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-cowork-council.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+  await page.screenshot({ path: resolve(outputDir, 'mobile-cowork-council.png'), fullPage: true });
 });
