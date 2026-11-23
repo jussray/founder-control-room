@@ -590,7 +590,8 @@ export function createFounderContentLifecycleRouter(
       if (!post) return;
       const directProviderReady =
         (post.platform === 'linkedin' && post.provider === 'linkedin') ||
-        (post.platform === 'x' && post.provider === 'x');
+        (post.platform === 'x' && post.provider === 'x') ||
+        (post.platform === 'facebook' && post.provider === 'facebook');
       if (!directProviderReady) {
         return res.status(409).json({
           ok: false,
@@ -598,7 +599,7 @@ export function createFounderContentLifecycleRouter(
           provider: post.provider,
           platform: post.platform,
           published: false,
-          reason: 'Direct authoritative publish-now supports LinkedIn or X; other destinations remain adapter-gated.',
+          reason: 'Direct authoritative publish-now supports LinkedIn, X, or Facebook Page text; other destinations remain adapter-gated.',
         });
       }
       if (!['approved', 'scheduled'].includes(post.status)) {
@@ -606,12 +607,16 @@ export function createFounderContentLifecycleRouter(
       }
       const configuredLinkedInAccountId = text(process.env.LINKEDIN_AUTHOR_URN);
       const configuredXAccountId = text(process.env.X_USER_ID);
+      const configuredFacebookPageId = text(process.env.META_FACEBOOK_PAGE_ID);
       const linkedinMismatch = post.platform === 'linkedin' &&
         (!configuredLinkedInAccountId || post.accountId !== configuredLinkedInAccountId);
       const xMismatch = post.platform === 'x' &&
         (!configuredXAccountId || !/^[0-9]{1,24}$/.test(configuredXAccountId) ||
           post.accountId !== configuredXAccountId);
-      if (linkedinMismatch || xMismatch) {
+      const facebookMismatch = post.platform === 'facebook' &&
+        (!/^[0-9]{1,24}$/.test(configuredFacebookPageId) ||
+          post.accountId !== configuredFacebookPageId);
+      if (linkedinMismatch || xMismatch || facebookMismatch) {
         return res.status(409).json({
           ok: false,
           code: 'POST_DESTINATION_ACCOUNT_MISMATCH',
