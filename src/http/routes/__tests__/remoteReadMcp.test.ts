@@ -322,9 +322,21 @@ describe('Founder Control Room paired remote MCP', () => {
       name: 'fcr_save_task_checkpoint',
       arguments: {},
     }));
-    expect(blocked.status).toBe(400);
-    expect(blocked.body.error.message).toContain('Unknown tool or invalid arguments');
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.error.message).toContain('outside this remote MCP grant');
     expect(invokeReadTool).not.toHaveBeenCalled();
+  });
+
+  it('uses route-specific instructions for a dedicated client lane', async () => {
+    const app = buildApp({ instructions: 'Truth Compass read-only bridge. No checkpoint writes or peer relay.' });
+    const initialized = await legacyPost(app, rpc('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'truth-compass', version: '1.0.0' },
+    }));
+    const discovered = await modernPost(app, modernRpc('server/discover'));
+    expect(initialized.body.result.instructions).toContain('Truth Compass read-only bridge');
+    expect(discovered.body.result.instructions).toContain('No checkpoint writes or peer relay');
   });
 
   it('implements modern stateless discovery with private cache hints', async () => {
