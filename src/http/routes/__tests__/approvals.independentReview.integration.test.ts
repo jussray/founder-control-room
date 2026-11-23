@@ -606,7 +606,9 @@ describe('FCR independent review merge membrane', () => {
     executeStack({ founderFinal: true });
     clearReviewGate();
     mockStoryEngineResolveRef.mockImplementation(async () => {
-      mockResolveRef.mockResolvedValue('f'.repeat(40));
+      mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+        ref === 'main' ? BASE_SHA : 'f'.repeat(40)
+      ));
       return STORYENGINE_SHA;
     });
 
@@ -627,6 +629,28 @@ describe('FCR independent review merge membrane', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/Branch moved during external peer verification/i);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reviewed base that moves during the external peer read', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    mockStoryEngineResolveRef.mockImplementation(async () => {
+      mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+        ref === 'main' ? 'f'.repeat(40) : HEAD_SHA
+      ));
+      return STORYENGINE_SHA;
+    });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({ actionType: 'merge', idempotencyKey: 'storyengine-race-base', payload: {
+        head: 'mission/review-gate', base: 'main', expectedHeadSha: HEAD_SHA,
+        independentReviews: [{ reviewHash: REVIEW_HASH }],
+        founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+      } });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Base moved during external peer verification/i);
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 

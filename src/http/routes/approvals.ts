@@ -1094,9 +1094,15 @@ approvalsRouter.post(
           );
         }
 
-        // Re-read the mutable FCR branch after the external peer round trip:
-        // the earlier head check can become stale while remote reads occur.
+        // Re-read both mutable FCR refs after the external peer round trip:
+        // either reviewed identity can become stale while remote reads occur.
         if (externalPeerFreshness) {
+          const finalBaseSha = await provider.resolveRef(project.slug, base);
+          if (lower(finalBaseSha) !== reviewedBaseSha) {
+            throw new Error(
+              `Base moved during external peer verification: current ${finalBaseSha}, reviewed ${reviewedBaseSha}.`,
+            );
+          }
           const finalHeadSha = await provider.resolveRef(project.slug, head);
           if (finalHeadSha !== expectedHeadSha) {
             throw new Error(
