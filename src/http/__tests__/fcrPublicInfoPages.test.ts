@@ -17,6 +17,27 @@ describe('FCR public information pages', () => {
     expect(html).not.toMatch(/<form\b/i);
   });
 
+  it.each(routes)('keeps redirected /%s navigation in Pages assets', async (route) => {
+    const worker = new Function(read('_worker.js').replace('export default', 'return'))();
+    const visited: string[] = [];
+    const env = {
+      ASSETS: { fetch: async (request: Request) => {
+        const path = new URL(request.url).pathname;
+        visited.push(path);
+        return path.endsWith('.html')
+          ? Response.redirect(`https://foundercontrolroom.org/${route}`, 308)
+          : new Response(read(`${route}.html`));
+      } },
+      FCR_API: { fetch: () => { throw new Error('information navigation reached API'); } },
+    };
+    const redirect = await worker.fetch(new Request(`https://foundercontrolroom.org/${route}.html`), env, {});
+    expect(redirect.status).toBe(308);
+    const page = await worker.fetch(new Request(redirect.headers.get('location')!), env, {});
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('<main id="main">');
+    expect(visited).toEqual([`/${route}.html`, `/${route}`]);
+  });
+
   it('links to every public information page from the home footer', () => {
     const home = read('index.html');
     expect(home).toContain('.foot nav { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }');

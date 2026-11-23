@@ -33,6 +33,7 @@ const PUBLIC_MCP_PROTOCOL_PATHS = new Set([
   '/mcp/portfolio/promptos',
 ]);
 const STATIC_EXACT_PATHS = new Set([
+  '/about', '/services', '/faq', '/support', '/delivery',
   '/products/business-leak-quickscan',
   '/products/business-leak-quickscan/',
   '/products/founder-proof-audit',
