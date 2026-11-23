@@ -326,6 +326,12 @@ export class GitHubProvider implements RepositoryProvider {
     });
     const baseTreeSha = branchData.data.commit.commit.tree.sha;
     const parentSha = branchData.data.commit.sha;
+    if (patch.expectedHeadSha && (
+      !/^[0-9a-f]{40}$/i.test(patch.expectedHeadSha)
+      || parentSha.toLowerCase() !== patch.expectedHeadSha.toLowerCase()
+    )) {
+      throw new Error('GitHubProvider: staged patch exact branch head changed before commit');
+    }
 
     const treeEntries = await Promise.all(
       patch.changes.map(async (change) => {
@@ -522,7 +528,7 @@ export class GitHubProvider implements RepositoryProvider {
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
-          require_code_owner_review: false, // FCR has no CODEOWNERS file; preserve the independent review count.
+          require_code_owner_review: requireNativeHumanReview,
           require_last_push_approval: requireNativeHumanReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
@@ -862,7 +868,7 @@ function fcrMainReviewRulesetReadbackErrors(
     errors.push("approving review count does not match requested policy");
   }
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
-  if (pullParameters.require_code_owner_review !== false) {
+  if (pullParameters.require_code_owner_review !== requireNativeHumanReview) {
     errors.push("Code Owner review requirement does not match the requested native-review phase");
   }
   if (pullParameters.require_last_push_approval !== requireNativeHumanReview) {

@@ -1,5 +1,9 @@
 # Founder Control Room Global AI Contract
 
+## Simulator editing boundary
+
+A Founder OS stage can describe a bounded edit, but must never carry founder session credentials, a raw GitHub token, inherited approval, or authority to merge and deploy. The existing FCR founder-authenticated mission patch route must reread current repository and mission state, branch SHA, original provider files, staged SHA-256 hashes and the idempotency ledger before a write. Local test results and an exported request are not provider commit or production proof.
+
 For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
 
 ## Parent operating contract
@@ -189,7 +193,7 @@ Investor email remains separate. Never auto-send without both the applicable sta
 
 ## Founder-selected GitHub Auto-merge queue
 
-The founder's own GitHub **Enable auto-merge** click on an identified PR is an explicit merge-queue instruction for that PR, so no second verbal merge command or manual merge click is needed. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. The GitHub queue click is not an independent human code review and does not impersonate FCR's separately authenticated exact-repo/PR/base/head founder-final receipt. It cannot bypass stale-head, conflict, required-check, or provider-uncertainty gates. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
+The founder may use GitHub's **Enable auto-merge** UI for an individual PR. The PR is queued, not immediately merged, until GitHub enforces every configured required check/test/review and branch protection or merge-queue rule. Every genuinely load-bearing step must feed a configured required check; a non-required advisory check does not block native Auto-merge. PR Continuity observes the live queue setting on `auto_merge_enabled`/`auto_merge_disabled` events but cannot authorize or dispatch a merge. Native queue intent is not a replacement for the canonical exact-repo/PR/base/head founder-final approval receipt; stale heads, conflicts, missing approval, or provider uncertainty remain blocked. No extra manual merge click is needed after GitHub independently clears its enforced gates, and queueing confers no deploy/provider-write authority. Verify live rulesets before claiming enforcement.
 
 ## FCR merge review boundary
 
@@ -290,3 +294,11 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 ## CI lockfile determinism — current exact-head source contract
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
+
+## CI queue economy without authority reduction
+
+For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.

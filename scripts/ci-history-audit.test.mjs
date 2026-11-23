@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLedger, auditLedger, auditAllCommits, classifyHistoricalCoverage, parseLedgerBase, auditBase, verifyRemediation } from './ci-history-audit.mjs';
+import { parseLedger, auditLedger, auditAllCommits, classifyHistoricalCoverage, parseLedgerBase, parseLedgerPr, auditRecordedRows, auditBase, verifyRemediation } from './ci-history-audit.mjs';
 
 const sha = 'a'.repeat(40);
 const run = { id: 123, name: 'CI', head_sha: sha, conclusion: 'failure' };
@@ -127,6 +127,36 @@ test('a fully verified historical snapshot is reconciled but never a release gra
   assert.equal(r.complete, true);
   assert.equal(r.authorizesMerge, false);
   assert.equal(r.authorizesDeployment, false);
+});
+
+
+test('historical ledger identifies its owning PR instead of borrowing another PR history', () => {
+  const historical = '# Historical CI accountability — PR #1071\n\nBase-bound: \`' + sha + '\`';
+  assert.equal(parseLedgerPr(historical), 1071);
+  assert.notEqual(parseLedgerPr(historical), 779);
+  assert.equal(parseLedgerPr('Unowned historical ledger'), null);
+  assert.equal(parseLedgerPr('# Historical CI accountability — PR #0'), null);
+});
+
+test('all recorded rows are structurally checked even when the current PR is not the ledger owner', () => {
+  assert.deepEqual(auditRecordedRows(parseLedger(ledger)), []);
+  const duplicate = parseLedger(ledger + '\n' + ledger);
+  assert.ok(auditRecordedRows(duplicate).some(e => e.includes('DUPLICATE_RUN')));
+  const badStatus = parseLedger(ledger.replace('| OPEN |', '| FALSE_GREEN |'));
+  assert.ok(auditRecordedRows(badStatus).some(e => e.includes('INVALID_STATUS')));
+  const badOutcome = parseLedger(ledger.replace('| failure |', '| success |'));
+  assert.ok(auditRecordedRows(badOutcome).some(e => e.includes('INVALID_OUTCOME')));
+  const noCorrection = parseLedger(ledger.replace('| OPEN |', '| REMEDIATED |'));
+  assert.ok(auditRecordedRows(noCorrection).some(e => e.includes('UNVERIFIED_REMEDIATION')));
+});
+
+test('an unrelated PR cannot make a stale ledger base current or claim reconciliation', () => {
+  const ledgerBase = 'a'.repeat(40);
+  const currentBase = 'b'.repeat(40);
+  assert.match(auditBase(ledgerBase, currentBase)[0], /STALE_BASE_BINDING/);
+  assert.equal(classifyHistoricalCoverage(auditRecordedRows(parseLedger(ledger))).state, 'RECONCILED_SNAPSHOT');
+  // Outside its owning PR, only recorded-row structure is known, never live run coverage.
+  assert.equal(parseLedgerPr('# Historical CI accountability — PR #1071') !== 779, true);
 });
 
 import { readFileSync } from 'node:fs';

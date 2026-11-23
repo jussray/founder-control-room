@@ -165,6 +165,35 @@ try {
   assert.equal(await failing.locator('button[data-stage="PREPARE"]').isDisabled(),true,'editing stops after failure');
   await failing.close();
 
+  // Two queued edits: the first save succeeding must not report "Saved" while the second is still pending.
+  const pending=await context.newPage();
+  await wire(pending,true,'pending-save-probe@example.com');
+  const pendingWrites=[];
+  const releases=[];
+  const seen=[];
+  await pending.route(ORIGIN + '/pa-funding/reviews/*',async route=>{
+    if(route.request().method()!=='PUT')return route.fallback();
+    const index=pendingWrites.push(route.request().postDataJSON())-1;
+    await new Promise(resolve=>{releases[index]=resolve;seen[index]?.();});
+    const id=new URL(route.request().url()).pathname.split('/').pop();
+    return route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify({record:{id,...pendingWrites[index],updatedAt:'2026-11-16T00:00:00Z'},applicationAuthorized:false})});
+  });
+  const writeArrived=index=>new Promise(resolve=>{ if(releases[index])resolve(); else seen[index]=resolve; });
+  await pending.goto(ORIGIN + '/control-room/pa-funding.html',{waitUntil:'networkidle'});
+  await pending.locator('input[data-check="0"]').check();
+  await writeArrived(0);
+  await pending.locator('input[data-check="1"]').check();
+  releases[0]();
+  await writeArrived(1);
+  await pending.waitForTimeout(150);
+  assert.doesNotMatch(await pending.locator('#save-status').innerText(),/Saved privately/,
+    'first acknowledged save does not claim saved while a later edit is still pending');
+  releases[1]();
+  await pending.waitForFunction(()=>document.getElementById('save-status')?.textContent?.includes('Saved privately'));
+  assert.equal(pendingWrites.length,2,'both queued edits were written');
+  await pending.close();
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: proofDir + '/mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true,
@@ -173,7 +202,7 @@ try {
   assert.ok(mutationRequests.length>=2,'private checklist and evidence updates were sent');
   assert.ok(mutationRequests.every(url=>new URL(url).pathname.startsWith('/pa-funding/reviews/')),
     'the workspace only mutates its own private review endpoint, never external funding systems');
-  console.log('PA funding workspace Playwright checks passed: auth, sourcing, filtering, evidence, checklist, APPLY lock, queued-save failure, mobile.');
+  console.log('PA funding workspace Playwright checks passed: auth, sourcing, filtering, evidence, checklist, APPLY lock, queued-save failure, pending-save status, mobile.');
   await context.close();
 } finally {
   await browser.close();
