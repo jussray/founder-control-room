@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Close a FutureYou Mission Control blind spot: critical/error activity events older than 14 days were silently excluded from buildMissionControlBrief with no disclosure, instead of being named in blindSpots like every other excluded-evidence case this read model already reports. No live route, store, deploy, provider, or authority change.",
+  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -14,6 +14,12 @@
     "founder-permission-authority"
   ],
   "changes": [
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."
+      ]
+    },
     {
       "path": ".github/workflows/ci.yml",
       "claims": [
@@ -50,6 +56,7 @@
         "`.github/workflows/deploy.yml` must pass `--tag ${{ inputs.expected_head_sha }}` (the exact approved 40-character SHA) and a short space-free `--message` run provenance to the production `wrangler deploy`, keeping `--var GIT_SHA`; this records intent on the provider Worker version only and does not prove any deploy succeeded.",
         "`.github/workflows/deploy.yml` must, after the Worker deploy and before the Pages release, read back `wrangler deployments list --json` and `versions view --json` (names/ids/annotations only) and fail closed via `scripts/worker-deployment-version-tag.mjs` unless the newest deployment routes 100% to one version whose `workers/tag` equals the exact SHA; a pass proves the provider tag only, not runtime `/version`, Pages binding, or any past deploy.",
         "The production Deploy authority gate in `.github/workflows/deploy.yml` must run the var/secret collision verifier on the same name-only secret receipt it already reads, after that readback and before the Supabase, Worker and Pages mutation jobs, so a [vars] name that already exists as a Worker secret stops the run. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health.",
+        "`.github/workflows/deploy.yml` must wait read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to serve the exact `expected_head_sha` before its fail-closed health, identity, exact-SHA and disabled-grant checks; the wait itself never passes a run and only emits a warning when propagation is slow.",
         "`.github/workflows/deploy.yml` `rollback-receipt` must run only when at least one deploy-plane job fails (`always() && contains(needs.*.result, 'failure')`), must record failed job names, per-job results and the expected head SHA in a names-only `fcr-rollback-receipt.json`, must set `secret_values_recorded: false`, and must never perform a rollback or provider mutation; its artifact is retained for 90 days and is non-authorizing evidence."
       ]
     },
@@ -74,7 +81,8 @@
         "A passing Worker-only secret-name preflight proves binding-name presence, not credential validity, source-to-runtime identity, live service-health, or production V4 conformance; those require independent exact-source provider/runtime receipts.",
         "`worker-reconcile.yml` must prove both direct API and public Pages `/version` response service-identity headers, exact approved source SHA, and disabled broad Founder Signal automation grant after authorized Worker reconciliation. A simulated Cloudflare edge trace, provider deployment-bot comment, configured binding, or green source contract cannot replace live API + Pages proof or confer deploy/merge authority.",
         "`worker-reconcile.yml` must accept a valid Cloudflare secret-name JSON list even when Wrangler precedes it with human authentication notices, reject missing or duplicate required names and malformed receipts without echoing provider text, and retain the exact-main approval, bounded legacy plaintext-removal exception, strict post-deploy binding-type verification, and live API/Pages proof requirements.",
-        "`.github/workflows/worker-reconcile.yml`: The canonical Worker Reconcile authority gate must run the var/secret collision verifier on its name-only secret receipt before the secret-put and deploy job. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
+        "`.github/workflows/worker-reconcile.yml`: The canonical Worker Reconcile authority gate must run the var/secret collision verifier on its name-only secret receipt before the secret-put and deploy job. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health.",
+        "`.github/workflows/worker-reconcile.yml` must retry its exact-SHA API proof for about four minutes (24 attempts at 10s) because custom-domain edges served the prior version beyond the earlier ~60-second window after successful deploys."
       ]
     },
     {
@@ -422,7 +430,8 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must pin Se’kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` `e3430ef2`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (registry `5b1c6e39`, pair contract `dd008420`) after semantic review of each changed blob; the other nine blobs are unchanged. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement."
       ]
     },
     {
@@ -945,7 +954,7 @@
     {
       "path": "scripts/verify-worker-var-secret-collisions.mjs",
       "claims": [
-        "`scripts/verify-worker-var-secret-collisions.mjs`: The collision verifier must compare names only \u2014 top-level [vars] names against the [secrets].required/optional registries and against a supplied `wrangler secret list` receipt \u2014 exit non-zero naming every collision, fail closed on an unparseable receipt or config, and never read, print or change a value. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
+        "`scripts/verify-worker-var-secret-collisions.mjs`: The collision verifier must compare names only — top-level [vars] names against the [secrets].required/optional registries and against a supplied `wrangler secret list` receipt — exit non-zero naming every collision, fail closed on an unparseable receipt or config, and never read, print or change a value. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
       ]
     },
     {

@@ -1,5 +1,12 @@
 # Cloudflare Reasoning Contract
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 15, 2026 — exact-commit Worker version tag readback (candidate)
 
 Reasoning about which commit the production Worker runs must not rely on the `/version` `gitSha` runtime marker alone. Candidate `.github/workflows/deploy.yml` tags each production Worker version with the exact approved SHA (`--tag`) and fails the deploy job unless provider readback shows the newest deployment routing 100% to one version whose `workers/tag` equals it (`scripts/worker-deployment-version-tag.mjs`). A matching tag shows only the commit recorded on the provider version. It does not show runtime behaviour, the Pages binding, or secret state. No deploy was run for this change. A read-only audit on November 15, 2026 observed that no existing version carries a tag, message or commit SHA.
@@ -359,3 +366,7 @@ The production Cloudflare credential diagnostic is founder-dispatched only. It c
 ## November 15, 2026 — Worker `[vars]`/secret collision boundary (candidate)
 
 `scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. Why: a name bound both as plain text and as a secret makes the first canonical `wrangler deploy` fail or leaves the runtime binding ambiguous, and the current provider Worker has never been uploaded from `wrangler.worker.toml`, so the first real deploy is untested. The gate proves only that the checked-in names and the read-back names were disjoint at gate time; it does not prove which value the runtime would use, credential validity, release, or runtime health.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.

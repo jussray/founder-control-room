@@ -87,11 +87,17 @@ function mockDatabase() {
         select: () => {
           const query = {
             eq: () => query,
+            not: () => query,
             order: (column: string) => {
               if (column === 'checkpoint_observed_at') dbState.orderedByObservation = true;
               return query;
             },
-            limit: () => query,
+            limit: (count: number) => count === 1 ? query : Promise.resolve({
+              data: dbState.fail ? null : [...storeRows].sort((a, b) =>
+                Date.parse(String(b.checkpoint_observed_at))
+                - Date.parse(String(a.checkpoint_observed_at))).slice(0, count),
+              error: dbState.fail ? { code: 'down' } : null,
+            }),
             maybeSingle: async () => ({
               data: dbState.orderedByObservation
                 ? [...storeRows].sort((a, b) =>
@@ -159,6 +165,59 @@ describe('founder-only cross-mode continuation storage', () => {
     expect(deniedGet.headers['cache-control']).toBe('private, no-store');
     expect((await request(app()).post(endpoint).send({ continuation: basePacket })).status).toBe(401);
     expect(storeRows).toHaveLength(0);
+  });
+
+  it('keeps founder-only checkpoint discovery bounded, reference-only and non-authorizing', async () => {
+    const blocked = await request(app()).get(endpoint + scope);
+    expect(blocked.status).toBe(401);
+    expect(blocked.headers['cache-control']).toBe('private, no-store');
+
+    await request(app()).post(endpoint)
+      .set('Authorization', authorization).send({ continuation: basePacket });
+    const found = await request(app()).get(endpoint + scope)
+      .set('Authorization', authorization);
+    expect(found.status).toBe(200);
+    expect(found.headers['cache-control']).toBe('private, no-store');
+    expect(found.body).toMatchObject({
+      boundedWindow: true,
+      scanned: 1,
+      currentEvidenceVerified: false,
+      authorizesExecution: false,
+      executionAuthorityFromHandoff: false,
+      items: [{
+        taskId: 'task-12',
+        remainingStepIds: ['verify'],
+        nextActionRef: 'fcr:actions/verify',
+        sourceMode: 'chat',
+        status: 'PERSISTED_NOT_REVALIDATED',
+      }],
+    });
+    expect(JSON.stringify(found.body)).not.toContain('chatgpt:threads');
+    expect(found.body.items[0]).not.toHaveProperty('record');
+    expect(found.body.items[0]).not.toHaveProperty('contextRefs');
+
+    const wrongRepo = await request(app()).get(
+      endpoint + '?projectSlug=founder-control-room&repositoryFullName=other%2Frepo',
+    ).set('Authorization', authorization);
+    expect(wrongRepo.status).toBe(404);
+    for (const limit of ['0', '21', '-1', '1abc', '2.0']) {
+      const invalid = await request(app()).get(endpoint + scope + '&limit=' + encodeURIComponent(limit))
+        .set('Authorization', authorization);
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.code).toBe('invalid_continuation_scope');
+    }
+    expect((await request(app()).get(endpoint).set('Authorization', authorization)).status).toBe(400);
+    const limited = await request(app()).get(endpoint + scope + '&limit=1')
+      .set('Authorization', authorization);
+    expect(limited.body.items).toHaveLength(1);
+  });
+
+  it('reports a sanitized failure for founder checkpoint discovery when storage is unavailable', async () => {
+    dbState.fail = true;
+    const response = await request(app()).get(endpoint + scope)
+      .set('Authorization', authorization);
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({ code: 'continuation_store_unavailable' });
   });
 
   it('saves a non-authorizing packet and retrieves the same pointers', async () => {

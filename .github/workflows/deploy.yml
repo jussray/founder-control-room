@@ -443,6 +443,28 @@ jobs:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
+      - name: Wait for the edge to serve the exact deployed SHA
+        # Read-only propagation wait. It proves nothing by itself; the checks
+        # below still fail closed on identity, SHA and grant state.
+        run: |
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          for attempt in $(seq 1 24); do
+            live="$(curl --silent --max-time 15 "$DEPLOY_URL/version" | python3 -c 'import json,sys
+          try: print(json.load(sys.stdin).get("gitSha",""))
+          except Exception: print("")' || true)"
+            if [[ "$live" == "$EXPECTED_SHA" ]]; then
+              echo "Edge serves $EXPECTED_SHA after $attempt attempt(s)."
+              exit 0
+            fi
+            echo "Attempt $attempt: edge serves '${live:-unknown}', waiting for $EXPECTED_SHA."
+            sleep 10
+          done
+          echo "::warning title=Edge propagation slow::$DEPLOY_URL did not serve $EXPECTED_SHA within ~4 minutes; the fail-closed checks below decide."
+        env:
+          DEPLOY_URL: https://api.foundercontrolroom.org
+          EXPECTED_SHA: ${{ inputs.expected_head_sha }}
+
       - name: Verify Worker health and identity
         run: |
           set -euo pipefail

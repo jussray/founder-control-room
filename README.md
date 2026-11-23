@@ -1,5 +1,12 @@
 # Founder Control Room
 
+## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
+
+`src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
+
+The credential has **not** been provisioned to the FCR Worker, so authenticated HTTP 200 and production UI/runtime behaviour are **not verified**. No FCR Worker deployment, secret rotation, Council Bus transport, or founder approval policy was changed by this source implementation. The source pin must be reviewed explicitly before adopting future ULTRATHINK commits.
+
+
 ## November 17, 2026 — FutureYou Mission Control discloses aged-out critical events (source-only, not runtime proof)
 
 `src/futureyou/missionControl.ts`'s `buildMissionControlBrief` excluded `critical`/`error` severity activity events older than 14 days from `priorities` with no trace anywhere in the response, unlike every other excluded-evidence case this read model already names in `blindSpots` (stale, invalid, or future-dated observations). `GET /futureyou/v8/brief` now adds a `blindSpots` line naming the count whenever this happens, so an unresolved critical signal cannot silently age out of the founder's own dashboard. The function is pure and unit-tested (red before, green after); no `missions`/`project_events` query, authority level, or `requireFounder` gate changed.
@@ -11,6 +18,8 @@ This adds the founder-only Pennsylvania funding review workspace from PR #1094 o
 ## November 16, 2026 — webchat `/human` handoff wired behind a project allowlist (candidate, not runtime proof)
 
 `POST /webchat/messages` accepts first-party webchat messages, records a `/human` request as a `pending_human` row in the service-role-only `webchat_human_handoffs` table (at most one open row per conversation, enforced by a partial unique index, so retries collapse), and reports `botMayReply: false` for that conversation until a founder releases it through `POST /webchat/handoffs/:key/release` (queue: `GET /webchat/handoffs`). The public route returns 404 unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`, which is unset by default; it is rate limited, capped at 4 KB, stamps time server-side, never generates or sends a reply, and returns 503 rather than success when the queue cannot be written. Nothing is live until the migration is applied, the allowlist is set, and the webchat channel's notice, disclosure, consent, retention and security-review requirements are met.
+
+The canonical Worker bundle pins `iconv-lite` to `0.6.3` through an npm `overrides` entry. Wrangler/esbuild honors `iconv-lite@0.4.x`'s `browser` map, which blanks `./lib/streams`, while that version still calls it whenever `process.versions.node` is set under `nodejs_compat`; Cloudflare then rejected the uploaded Worker at startup (`10021`, `require_streams(...) is not a function`). Verified locally by starting the bundled Worker in workerd (crash before, `/health` 200 after). This does **not** by itself prove a production deploy.
 
 ## November 15, 2026 — Federated relay v3 public-key immutability trigger (candidate, not provider proof)
 
@@ -625,6 +634,8 @@ When the live StoryEngine ref advances after a previously proven FCR head, updat
 
 The exact predecessor/successor SHAs and the comparison that justified a peer refresh belong in the audit/receipt provenance, not as a durable “current SHA” in this README. Rebinding the peer selects a new evidence subject only; it never carries predecessor green forward.
 
+The October 14 StoryEngine peer advance identified during FCR draft PR #975 is a peer-freshness gate failure, not a failed local browser journey. The successor pin is recovery setup only. Independent StoryEngine checks must be examined separately, and FCR federation remains `UNKNOWN` until its own successor-head Playwright run completes; partial or unrelated provider-preview failures must be reported, never concealed.
+
 ## Resident Council and Muse relay truth
 
 The Founder Council is resident in both the founder assistant host and the project Control Room. `.control-room/council-residency.contract.json` is the machine-readable residency contract; `.control-room/COUNCIL.md` carries the human-readable project policy. Residency means Council selection, challenge, dissent, evidence binding, and project-local routing are available as standing infrastructure. It does **not** centralize project execution authority or expose Council controls to project users.
@@ -821,6 +832,14 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
 
+## Founder OS lab adapter promotion eligibility
+
+`assessProjectAdapterFreshness` in `src/founder-os-lab/projectAdapterFreshness.ts` reports `promotionAllowed: true` and `recommendation: 'candidate-promote'` only when the authoritative current head equals the audited exact head and every required contract blob matches. Head movement, drift, missing or invalid blobs, and unknown heads keep it `false`. Eligibility means the evidence may go to founder review; `founderReviewRequired` stays `true` and `mutationAuthorized` stays `false`, so it never grants merge, deploy, publication, or provider authority.
+
+## Project adapter re-pin (November 17, 2026)
+
+`src/founder-os-lab/projectAdapters.ts` now pins Se'kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` blob `e3430ef2c9bc99507f9040b90ec6d54977d28ca8`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (`src/domain/capability-registry.js` blob `5b1c6e39a9ec675e03032a480ff00c2967479f22`, `config/founder-chief-pair.contract.json` blob `dd008420e1a91e78516b45d9e27de89344abf432`). Every other pinned blob was unchanged. The reviewed changes: Bip routes to an age gate before consent when its compliance check requires one; Chief adds non-authorizing continuity fingerprint, cookie and execution-slot markers (`actionAuthority: false`) and states the standalone-peers relationship and stricter posting-approval rules in the pair contract, which now matches FCR's own copy. The re-pin is evidence identity only. It proves no Bip or Chief deployment or runtime behavior and grants no merge, deploy, publication, or provider authority. Any further source or blob movement must fail closed until reviewed again.
+
 ## Four-system Founder Operator contract (source candidate, October 15, 2026)
 
 `src/founder-os-lab/founderOperatorContract.ts` is **source-level staged code**, not wired to the live FCR Worker, GitHub provider or a production UI. The existing privileged V10 approval middleware, FCR authority envelope, PR merge gate, federated relay, and production launch authority remain canonical; this module cannot replace or bypass them.
@@ -831,3 +850,7 @@ The source-first publisher now includes an X (Twitter) user-context text adapter
 - **FCR** controls trusted approval readback, durable pending reservation, guarded patch execution, exact ref and immutable commit readback, proof verification, and final receipt persistence.
 
 The candidate rejects protected branch writes, noncanonical repository paths, unbound proposal hashes, failed pending-reservation storage, stale commits, absent browser/documentation/pro-vider proof, and unverified target identity. A trusted adapter must atomically validate/consume live approval and compare-and-swap the branch head immediately before mutation. Merely implementing this interface **does not prove** the actual adapter exists or is secure. Any connection to real execution requires a separate scoped review and real-path evidence. Exact-head tests and PR evidence do not grant a merge or deployment. The full proof must be reacquired when PR/base/head changes.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
