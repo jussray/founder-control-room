@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -26,7 +27,7 @@ function app() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user', email: 'founder@example.com' } },
+    data: { user: { id: 'founder-user', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 });
@@ -36,14 +37,7 @@ describe('GET /onboarding/state profile evidence isolation', () => {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') {
         return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => Promise.resolve({
-                data: { email: 'founder@example.com' },
-                error: null,
-              }),
-            }),
-          }),
+          ...boundFounderRow('founder@example.com', 'founder-user'),
         };
       }
       if (table === 'projects') {
