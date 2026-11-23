@@ -30,7 +30,7 @@ import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
-import { mcpRouter } from './routes/mcp.js';
+import { handleTruthCompassProtectedResourceMetadata, mcpRouter } from './routes/mcp.js';
 import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { publicMcpRouter } from './routes/publicMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
@@ -298,6 +298,10 @@ export function createServer(options: CreateServerOptions = {}) {
   app.get(
     '/.well-known/oauth-protected-resource/mcp',
     handleRemoteMcpProtectedResourceMetadata,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource/mcp/portfolio/truth-compass',
+    handleTruthCompassProtectedResourceMetadata,
   );
 
   // Separate OAuth-scoped customer MCP. Parsing is limited to this path;
