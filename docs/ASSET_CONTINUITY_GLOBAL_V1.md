@@ -166,3 +166,6 @@ Never delete visual provenance merely because a new asset is current. Mark the p
 `skills/asset-continuity/SKILL.md` is the operational gate. `config/asset-continuity.portfolio.json` is the portfolio rollout registry. `scripts/verify-asset-continuity.mjs` verifies that all governed repositories are classified and that registry entries satisfy the contract shape.
 
 Project-local rules may strengthen this invariant. They may not weaken the requirement that identity-bearing visuals survive at asset level.
+## Canonical record completeness — repair candidate
+
+The candidate asset verifier now rejects incomplete canonical records: source authority, provenance, continuity fingerprint, status, transformations and a supported local path or external reference are required before location-specific checks. Focused negative fixtures verify rejection; structural acceptance still proves neither visual fidelity nor runtime rendering.

@@ -857,3 +857,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+## Canonical record completeness — repair candidate
+
+The candidate asset verifier now rejects incomplete canonical records: source authority, provenance, continuity fingerprint, status, transformations and a supported local path or external reference are required before location-specific checks. Focused negative fixtures verify rejection; structural acceptance still proves neither visual fidelity nor runtime rendering.
