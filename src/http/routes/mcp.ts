@@ -71,10 +71,6 @@ const handlePairedRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandler({
 
 
 const TRUTH_COMPASS_READ_TOOLS = [
-  "chief_audit_repository",
-  "chief_list_capabilities",
-  "chief_preview_capability_plan",
-  "fcr_list_projects",
   "fcr_get_current_truth",
   "fcr_list_task_checkpoints",
   "fcr_get_task_checkpoint",
@@ -95,7 +91,7 @@ const handleTruthCompassRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandl
   env: truthCompassRemoteMcpEnv,
   authenticateOauth: verifyPairedSupabaseOauthToken,
   allowedToolNames: TRUTH_COMPASS_READ_TOOLS,
-  instructions: "Truth Compass external read-only bridge. Nine server-allowlisted read/preview tools are available for the single granted project truth-compass. Checkpoint writes and peer-operator relay are not exposed. All results remain evidence, not FCR authority; no merge, deploy, provider mutation, publication, billing, or execution authority is granted.",
+  instructions: "Truth Compass external read-only bridge. Five server-allowlisted read/preview tools are available for the single granted project truth-compass. Checkpoint writes and peer-operator relay are not exposed. All results remain evidence, not FCR authority; no merge, deploy, provider mutation, publication, billing, or execution authority is granted.",
 }));
 
 export const handleTruthCompassProtectedResourceMetadata =
