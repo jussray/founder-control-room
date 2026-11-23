@@ -5,10 +5,16 @@ export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
 export const CANONICAL_NATIVE_APPROVAL_COUNT = 0;
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
+export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
+  'required_linear_history',
+  'code_quality',
+  'copilot_code_review',
+  'required_signatures',
+]);
 export const CODEQL_SECURITY_FLOOR = Object.freeze({
   tool: 'CodeQL',
   securityAlertsThreshold: 'high_or_higher',
-  alertsThreshold: 'errors',
+  alertsThreshold: 'all',
 });
 
 const API_VERSION = '2026-03-10';
@@ -131,6 +137,19 @@ function exactRuleTypesMatch(snapshot, expectedRuleTypes) {
   return JSON.stringify(observed) === JSON.stringify(expected);
 }
 
+function canonicalReviewRuleTypesMatch(snapshot) {
+  const observed = Array.isArray(snapshot?.ruleTypes) ? [...snapshot.ruleTypes] : [];
+  const required = ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'];
+  const allowed = new Set([...required, ...PRESERVABLE_REVIEW_RULE_TYPES]);
+
+  if (observed.some((type) => !allowed.has(type))) return false;
+  if (required.some((type) => observed.filter((value) => value === type).length !== 1)) return false;
+  if (PRESERVABLE_REVIEW_RULE_TYPES.some(
+    (type) => observed.filter((value) => value === type).length > 1,
+  )) return false;
+  return true;
+}
+
 export function codeQLSecurityFloorSatisfied(snapshot) {
   const observed = Array.isArray(snapshot?.codeScanningTools) ? snapshot.codeScanningTools : [];
   return observed.length === 1
@@ -150,7 +169,7 @@ export function canonicalFloorSatisfied(
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
-    && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
+    && canonicalReviewRuleTypesMatch(snapshot)
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
     && snapshot.dismissStaleReviewsOnPush === true
@@ -204,6 +223,8 @@ export function buildReport({
   const canonical = canonicalMatches[0] ?? null;
   const freshness = freshnessMatches[0] ?? null;
   const eligibleReviewers = collaborators.filter((collaborator) => collaboratorCanReview(collaborator, owner));
+  const independentReviewerReady = eligibleReviewers.length > 0;
+  const needsIndependentReviewer = CANONICAL_NATIVE_APPROVAL_COUNT > 0 && !independentReviewerReady;
   const bypassObservationComplete = canonical?.bypassObservationComplete === true;
   const freshnessBypassObservationComplete = freshness?.bypassObservationComplete === true;
   const observationComplete = expectedBypassActors !== null
@@ -215,7 +236,7 @@ export function buildReport({
       ? 'review_bypass_observation_unavailable'
       : freshness !== null && !freshnessBypassObservationComplete
         ? 'freshness_bypass_observation_unavailable'
-        : null;
+        : needsIndependentReviewer ? 'independent_reviewer_unavailable' : null;
   const canonicalFloor = canonicalFloorSatisfied(canonical, expectedBypassActors);
   const freshnessFloor = freshnessFloorSatisfied(freshness, freshnessName);
   const reviewBypassSatisfied = canonical === null ? false : bypassPolicyMatches(canonical, expectedBypassActors);
@@ -250,7 +271,7 @@ export function buildReport({
     trustedBypassPolicyAvailable: expectedBypassActors !== null,
     bypassPolicySatisfied: reviewBypassSatisfied,
     freshnessBypassPolicySatisfied: freshnessBypassSatisfied,
-    independentReviewerReady: eligibleReviewers.length > 0,
+    independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: eligibleReviewers.length,
     observedBranchRulesets: snapshots,
     status: !observationComplete
@@ -260,6 +281,7 @@ export function buildReport({
         && activeTargetingRef.length === 2
         && canonicalFloor
         && freshnessFloor
+        && !needsIndependentReviewer
           ? 'READY'
           : 'NOT_READY',
   };

@@ -60,7 +60,9 @@ The terminal route still validates:
 
 ## Product design intent
 
-The UI should feel like an operator cockpit, not a chat log. A founder should see each command as a card with:
+Command Bridge itself should feel like an operator cockpit, not collapse execution receipts into an unstructured chat log. That rule is local to the execution surface, not to Founder Control Room as a whole. Text chat is a first-class founder-intent modality: conversation may create or continue a proposed mission and call bounded reasoning, while command cards remain the explicit surface for execution, evidence, rollback, and approval.
+
+A founder should see each command as a card with:
 
 - what will run;
 - why it was requested;

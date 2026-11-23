@@ -34,11 +34,11 @@ export interface MirrorModelOutput {
 }
 
 export interface MirrorModelProvenance {
-  provider: 'openai';
+  provider: 'openai' | 'anthropic';
   model: string;
   responseId: string | null;
   promptVersion: string;
-  storedByProvider: false;
+  storedByProvider: false | null;
 }
 
 export interface MirrorModelResult {

@@ -1,16 +1,38 @@
 import { requestHash } from './safety.js';
 import { hubForMcpProject } from './vaultHub.js';
+import { auditGitHubChangeGenealogy } from './github-truth/changeGenealogy.js';
+import type {
+  GitHubChangeGenealogyEvidence,
+  GitHubChangeGenealogyReaderLike,
+} from '../providers/GitHubChangeGenealogyReader.js';
+import { createAppAwareRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
 import { supabase } from '../lib/supabaseClient.js';
+import {
+  listRecentOperatorExecutionContinuations,
+  readOperatorExecutionContinuation,
+  storeOperatorExecutionContinuation,
+} from '../lib/operatorExecutionContinuationStore.js';
+import {
+  createOperatorContinuityReceiptV2,
+  createOperatorExecutionContinuation,
+  type OperatorContinuityInputV2,
+  type OperatorExecutionContinuation,
+  type OperatorExecutionContinuationInput,
+} from '../lib/operatorContinuity.js';
 import {
   routeFcrSkills,
   type FcrSkillRouterAction,
 } from '../lib/fcrSkillRouter.js';
 import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import { relayBetweenOperators } from '../lib/operatorRelayBridge.js';
+import { OperatorRelayDispatchError } from '../lib/operatorRelayDispatch.js';
 import { createServerOperatorRelayAdapters } from '../lib/operatorRelayModelProviders.js';
+import { OperatorRelayProviderBoundaryError } from '../lib/operatorRelayProvider.js';
+import { OPERATOR_RELAY_PEERS, OPERATOR_RELAY_SOURCES } from '../lib/operatorRelayConstants.js';
 import type {
   RelayCapability,
   RelayOperatorId,
+  RelaySourceId,
   RelaySensitivity,
 } from '../lib/operatorRelay.js';
 
@@ -20,6 +42,10 @@ export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_preview_capability_plan',
   'fcr_list_projects',
   'fcr_get_current_truth',
+  'fcr_list_task_checkpoints',
+  'fcr_get_task_checkpoint',
+  'fcr_save_task_checkpoint',
+  'fcr_audit_change_genealogy',
   'fcr_preview_skill_route',
   'fcr_relay_operator',
 ] as const;
@@ -59,6 +85,12 @@ export interface RecordExternalMcpEvidenceInput {
   durationMs: number;
   risk?: 'read' | 'external_side_effect';
   estimatedCostUsd?: number;
+  outcomeStatus?: 'passed' | 'failed';
+  failure?: {
+    code: string;
+    provider?: string;
+    externalProviderCall: boolean;
+  };
 }
 
 export interface ExternalMcpToolDependencies {
@@ -72,6 +104,15 @@ export interface ExternalMcpToolDependencies {
   listProjects?: (allowedProjects: ReadonlySet<string>) => Promise<unknown>;
   listCapabilities?: (projectSlug: string) => Promise<unknown>;
   getCurrentTruth?: (projectSlug: string) => Promise<unknown>;
+  listTaskCheckpoints?: (input: { projectSlug: string; limit: number }) => Promise<unknown>;
+  getTaskCheckpoint?: (input: { projectSlug: string; taskId: string }) => Promise<unknown>;
+  saveTaskCheckpoint?: (input: { projectSlug: string; continuation: OperatorExecutionContinuation }) => Promise<unknown>;
+  auditChangeGenealogy?: (input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  }) => Promise<unknown>;
   previewCapabilityPlan?: (proposal: Record<string, unknown>) => Promise<unknown>;
   previewSkillRoute?: (input: {
     goal: string;
@@ -83,7 +124,7 @@ export interface ExternalMcpToolDependencies {
     provider: string;
   }) => Promise<unknown> | unknown;
   relayOperator?: (input: {
-    fromOperator: RelayOperatorId;
+    fromOperator: RelaySourceId;
     toOperator: RelayOperatorId;
     capability: RelayCapability;
     goal: string;
@@ -103,7 +144,8 @@ const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>([
   'review',
   'draft',
 ]);
-const RELAY_OPERATORS = new Set<RelayOperatorId>(['gemini', 'codex', 'claude-code', 'perplexity']);
+const RELAY_OPERATORS = new Set<RelayOperatorId>(OPERATOR_RELAY_PEERS);
+const RELAY_SOURCES = new Set<RelaySourceId>(OPERATOR_RELAY_SOURCES);
 const RELAY_CAPABILITIES = new Set<RelayCapability>(['research', 'propose', 'review', 'implement']);
 const RELAY_SENSITIVITIES = new Set<RelaySensitivity>(['public', 'internal']);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -112,6 +154,33 @@ const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function relayResultHasProviderEvidence(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const response = isRecord(value.response) ? value.response : null;
+  const evidenceRefs = Array.isArray(response?.evidenceRefs) ? response.evidenceRefs : [];
+  return evidenceRefs.some((entry) => typeof entry === 'string' && entry.startsWith('provider:'));
+}
+
+function relayFailureEvidence(error: unknown, targetOperator: RelayOperatorId): JsonRecord {
+  const providerBoundary = error instanceof OperatorRelayProviderBoundaryError ? error : null;
+  const dispatch = error instanceof OperatorRelayDispatchError ? error : null;
+  const externalProviderCall = providerBoundary !== null || dispatch?.externalProviderCall === true;
+  return {
+    contract: 'fcr/operator-relay-failure@v1',
+    status: 'failed',
+    targetOperator,
+    externalProviderCall,
+    ...(providerBoundary ? {
+      provider: providerBoundary.provider,
+      code: 'provider_boundary_failure',
+    } : dispatch ? {
+      code: dispatch.code,
+    } : {
+      code: 'relay_failed_before_provider',
+    }),
+  };
 }
 
 function text(value: unknown, field: string, maxLength = 200): string {
@@ -142,6 +211,20 @@ function projectSlug(value: unknown): string {
   return slug;
 }
 
+function boundedInteger(value: unknown, field: string, min: number, max: number, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) {
+    throw new Error(`${field} must be an integer between ${min} and ${max}`);
+  }
+  return value as number;
+}
+
+function optionalBoolean(value: unknown, field: string, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') throw new Error(`${field} must be a boolean`);
+  return value;
+}
+
 function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): string {
   if (!allowedProjects.has(slug)) {
     throw new Error('Requested project is outside this remote MCP grant');
@@ -152,6 +235,12 @@ function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): str
 function relayOperator(value: unknown, field: string): RelayOperatorId {
   const operator = text(value, field, 40) as RelayOperatorId;
   if (!RELAY_OPERATORS.has(operator)) throw new Error(`${field} is not a peer relay operator`);
+  return operator;
+}
+
+function relaySourceOperator(value: unknown, field: string): RelaySourceId {
+  const operator = text(value, field, 40) as RelaySourceId;
+  if (!RELAY_SOURCES.has(operator)) throw new Error(`${field} is not an allowed relay source identity`);
   return operator;
 }
 
@@ -171,7 +260,7 @@ function relaySensitivity(value: unknown): RelaySensitivity {
   return sensitivity;
 }
 
-function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelayOperatorId> {
+function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelaySourceId> {
   const raw = env.FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP?.trim();
   if (!raw) return new Map();
   let parsed: unknown;
@@ -181,15 +270,15 @@ function configuredOperatorClientMap(env: NodeJS.ProcessEnv): Map<string, RelayO
     throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be valid JSON');
   }
   if (!isRecord(parsed)) throw new Error('FCR_REMOTE_MCP_OPERATOR_CLIENT_MAP must be an object');
-  const entries: Array<[string, RelayOperatorId]> = [];
+  const entries: Array<[string, RelaySourceId]> = [];
   for (const [clientId, value] of Object.entries(parsed)) {
     if (!clientId.trim()) throw new Error('operator client mapping contains an empty client id');
-    entries.push([clientId.trim(), relayOperator(value, 'mapped operator')]);
+    entries.push([clientId.trim(), relaySourceOperator(value, 'mapped operator')]);
   }
   return new Map(entries);
 }
 
-function sourceOperatorForIdentity(identity: ExternalMcpIdentity, env: NodeJS.ProcessEnv): RelayOperatorId {
+function sourceOperatorForIdentity(identity: ExternalMcpIdentity, env: NodeJS.ProcessEnv): RelaySourceId {
   if (identity.authMode !== 'oauth') {
     throw new Error('operator relay requires OAuth-bound client identity');
   }
@@ -230,6 +319,84 @@ async function projectRow(slug: string) {
     risk_level: string;
     updated_at: string;
   };
+}
+
+async function defaultListTaskCheckpoints(input: { projectSlug: string; limit: number }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier) throw new Error('Project has no registered repository');
+  return listRecentOperatorExecutionContinuations(project.slug, project.repo_identifier, input.limit);
+}
+
+async function defaultGetTaskCheckpoint(input: { projectSlug: string; taskId: string }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier) throw new Error('Project has no registered repository');
+  const continuation = await readOperatorExecutionContinuation(
+    project.slug, project.repo_identifier, input.taskId,
+  );
+  const invalidated = continuation?.invalidatedAt !== null && continuation !== null;
+  return {
+    found: continuation !== null,
+    continuation,
+    resumeState: continuation === null ? 'NOT_FOUND' : invalidated ? 'INVALID' : 'REVALIDATE',
+    resumeAllowed: false,
+    revalidationRequired: continuation !== null,
+    currentEvidenceVerified: false,
+    executionAuthorityFromHandoff: false,
+  };
+}
+
+async function defaultSaveTaskCheckpoint(input: { projectSlug: string; continuation: OperatorExecutionContinuation }) {
+  const project = await projectRow(input.projectSlug);
+  if (!project.repo_identifier || project.repo_identifier.toLowerCase() !== input.continuation.observation.repositoryFullName.toLowerCase()) {
+    throw new Error('Checkpoint repository does not match registered project');
+  }
+  const { disposition, stored } = await storeOperatorExecutionContinuation(input.continuation);
+  return {
+    disposition, recordId: stored.id, taskId: stored.record.taskId,
+    observedAt: stored.record.observation.observedAt,
+    status: 'PERSISTED_NOT_REVALIDATED' as const,
+    taskState: stored.record.taskState ?? 'ACTIVE',
+    sourceOperator: stored.record.sourceOperator ?? null,
+    destinationOperator: stored.record.destinationOperator ?? null,
+    currentEvidenceVerified: false as const,
+    executionAuthorityFromHandoff: false as const,
+  };
+}
+
+async function defaultAuditChangeGenealogy(
+  input: {
+    projectSlug: string;
+    limit: number;
+    includeComments: boolean;
+    includeDiff: boolean;
+  },
+  env: NodeJS.ProcessEnv,
+) {
+  const project = await projectRow(input.projectSlug);
+  if (project.repo_provider.trim().toLowerCase() !== 'github' || !project.repo_identifier?.trim()) {
+    throw new Error('Project does not have a registered GitHub repository');
+  }
+  const repository = project.repo_identifier.trim();
+  const provider = await createAppAwareRepositoryProvider({
+    slug: project.slug,
+    repoProvider: project.repo_provider,
+    repoIdentifier: repository,
+  }, env);
+  if (!provider.readChangeGenealogyEvidence) {
+    throw new Error('Configured repository provider does not expose change-genealogy evidence');
+  }
+  const reader: GitHubChangeGenealogyReaderLike = {
+    readGenealogyEvidence: async (options) => {
+      const evidence = await provider.readChangeGenealogyEvidence!(project.slug, options);
+      return evidence as GitHubChangeGenealogyEvidence;
+    },
+  };
+  return auditGitHubChangeGenealogy(reader, {
+    repository,
+    limit: input.limit,
+    includeComments: input.includeComments,
+    includeDiff: input.includeDiff,
+  });
 }
 
 async function defaultListProjects(allowedProjects: ReadonlySet<string>) {
@@ -433,42 +600,69 @@ function defaultPreviewSkillRoute(input: {
   });
 }
 
+function boundedEvidenceLabel(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+  return normalized.slice(0, 120).replace(/[^a-zA-Z0-9._:-]/g, '_');
+}
+
+export function buildExternalMcpEvidenceRow(
+  projectId: string,
+  input: RecordExternalMcpEvidenceInput,
+): Record<string, unknown> {
+  const inputDigest = requestHash(input.arguments);
+  const resultDigest = requestHash(input.result);
+  const costEstimateAvailable = input.estimatedCostUsd !== undefined;
+  const outcomeStatus = input.outcomeStatus ?? 'passed';
+  const failure = outcomeStatus === 'failed'
+    ? {
+        code: boundedEvidenceLabel(input.failure?.code, 'external_mcp_failed'),
+        provider: input.failure?.provider
+          ? boundedEvidenceLabel(input.failure.provider, 'unknown')
+          : null,
+        externalProviderCall: input.failure?.externalProviderCall === true,
+      }
+    : undefined;
+
+  return {
+    project_id: projectId,
+    server_id: 'founder-control-room-external',
+    tool_name: input.toolName,
+    risk: input.risk ?? 'read',
+    policy_decision: 'allow',
+    status: outcomeStatus,
+    request_hash: inputDigest,
+    request_summary: {
+      contract: 'founder-control-room/external-mcp-receipt@v1',
+      requestId: input.requestId,
+      projectSlug: input.projectSlug,
+      argumentKeys: Object.keys(input.arguments).sort(),
+      actorHash: requestHash(input.identity.userId),
+      clientHash: requestHash(input.identity.clientId),
+      authMode: input.identity.authMode,
+      cookiesUsed: false,
+      fingerprintsUsed: false,
+    },
+    response_summary: {
+      resultHash: resultDigest,
+      rawResultStored: false,
+      costEstimateAvailable,
+      ...(failure ? { failure } : {}),
+    },
+    duration_ms: input.durationMs,
+    estimated_cost_usd: input.estimatedCostUsd ?? 0,
+  };
+}
+
 async function defaultRecordEvidence(
   input: RecordExternalMcpEvidenceInput,
 ): Promise<ExternalMcpReceipt> {
   const project = await projectRow(input.projectSlug);
   const inputDigest = requestHash(input.arguments);
   const resultDigest = requestHash(input.result);
-  const costEstimateAvailable = input.estimatedCostUsd !== undefined;
   const { data, error } = await supabase
     .from('mcp_tool_calls')
-    .insert({
-      project_id: project.id,
-      server_id: 'founder-control-room-external',
-      tool_name: input.toolName,
-      risk: input.risk ?? 'read',
-      policy_decision: 'allow',
-      status: 'passed',
-      request_hash: inputDigest,
-      request_summary: {
-        contract: 'founder-control-room/external-mcp-receipt@v1',
-        requestId: input.requestId,
-        projectSlug: input.projectSlug,
-        argumentKeys: Object.keys(input.arguments).sort(),
-        actorHash: requestHash(input.identity.userId),
-        clientHash: requestHash(input.identity.clientId),
-        authMode: input.identity.authMode,
-        cookiesUsed: false,
-        fingerprintsUsed: false,
-      },
-      response_summary: {
-        resultHash: resultDigest,
-        rawResultStored: false,
-        costEstimateAvailable,
-      },
-      duration_ms: input.durationMs,
-      estimated_cost_usd: input.estimatedCostUsd ?? 0,
-    })
+    .insert(buildExternalMcpEvidenceRow(project.id, input))
     .select('id,created_at')
     .single();
 
@@ -496,6 +690,12 @@ async function defaultRecordEvidence(
 export function externalMcpToolDefinitions(): JsonRecord[] {
   const readAnnotations = {
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  };
+  const checkpointAnnotations = {
+    readOnlyHint: false,
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
@@ -577,6 +777,81 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       annotations: readAnnotations,
     },
     {
+      name: 'fcr_list_task_checkpoints',
+      title: 'Find recent shared FCR work checkpoints',
+      description: 'Discover only recent reference-only task checkpoints for a granted project, using the existing founder-only continuity ledger. A bounded historical scan is not proof of current progress or complete coverage.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+        },
+      },
+      annotations: readAnnotations,
+    },
+    {
+      name: 'fcr_get_task_checkpoint',
+      title: 'Resume an existing FCR task checkpoint',
+      description: 'Read one reference-only saved task continuation from an authorized project. Historical context never grants execution, current evidence, or a founder approval.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId', 'taskId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          taskId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$' },
+        },
+      },
+      annotations: readAnnotations,
+    },
+    {
+      name: 'fcr_save_task_checkpoint',
+      title: 'Save reference-only FCR task progress',
+      description: 'Persist a non-authorizing historical checkpoint in the existing founder-only continuity ledger. Requires founder-bound OAuth and a granted project. No merge, deploy, execution or approval authority.',
+      inputSchema: {
+        type: 'object', additionalProperties: false, required: ['projectId', 'destinationOperator', 'continuationInput'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          destinationOperator: { type: 'string', enum: [...OPERATOR_RELAY_SOURCES] },
+          continuationInput: {
+            type: 'object', additionalProperties: false,
+            required: ['sourceMode', 'taskId', 'intentRef', 'contextRefs', 'completedSteps', 'remainingStepIds', 'nextActionRef', 'pendingDecisionRefs', 'observation'],
+            properties: {
+              sourceMode: { type: 'string', enum: ['chat', 'work'] },
+              taskState: { type: 'string', enum: ['ACTIVE', 'RESULT_SUBMITTED', 'VERIFIED', 'CLOSED'] },
+              resultRef: { type: ['string', 'null'], maxLength: 256 },
+              verificationRefs: { type: 'array', maxItems: 40, items: { type: 'string', maxLength: 256 } },
+              taskId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$' },
+              intentRef: { type: 'string' },
+              contextRefs: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              completedSteps: { type: 'array', maxItems: 40, items: { type: 'object' } },
+              remainingStepIds: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              nextActionRef: { type: ['string', 'null'] },
+              pendingDecisionRefs: { type: 'array', maxItems: 40, items: { type: 'string' } },
+              observation: { type: 'object', description: 'OperatorContinuityInputV2; the server computes fingerprints and validates opaque source references.' },
+            },
+          },
+        },
+      },
+      annotations: checkpointAnnotations,
+    },
+    {
+      name: 'fcr_audit_change_genealogy',
+      title: 'Audit recent GitHub change genealogy',
+      description:
+        'Read a granted project’s registered GitHub repository and reconstruct a bounded recent-change genealogy: ten PRs by default, every PR commit identity, bounded comments/reviews and file-level diff evidence, recent default-branch commits, and provider-proven commit-to-PR associations. Returns separate failure receipts and never returns raw patch bodies or grants mutation authority.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', minLength: 1, maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+          includeComments: { type: 'boolean', default: true },
+          includeDiff: { type: 'boolean', default: true },
+        },
+      },
+      annotations: { ...readAnnotations, openWorldHint: true },
+    },
+    {
       name: 'fcr_preview_skill_route',
       title: 'Preview a fail-closed skill route',
       description:
@@ -608,13 +883,13 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       name: 'fcr_relay_operator',
       title: 'Relay a bounded task to a peer AI operator',
       description:
-        'Send a bounded research, proposal, review, or implementation-work task to exactly one named peer operator (Gemini, ChatGPT/Codex, Claude, or Perplexity) and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
+        'Send a bounded research, proposal, review, or implementation-work task to exactly one named canonical peer operator and return its provider-bound response. Requires OAuth client identity, carries zero mutation authority, never targets DeepSeek Instructor, and never substitutes another provider when the requested operator is unavailable.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
         required: ['targetOperator', 'capability', 'goal', 'contextSummary'],
         properties: {
-          targetOperator: { type: 'string', enum: ['gemini', 'codex', 'claude-code', 'perplexity'] },
+          targetOperator: { type: 'string', enum: [...OPERATOR_RELAY_PEERS] },
           capability: { type: 'string', enum: ['research', 'propose', 'review', 'implement'] },
           goal: { type: 'string', minLength: 1, maxLength: 4000 },
           contextSummary: { type: 'string', minLength: 1, maxLength: 12000 },
@@ -645,6 +920,11 @@ export function createExternalMcpToolExecutor(
   const listProjects = overrides.listProjects ?? defaultListProjects;
   const listCapabilities = overrides.listCapabilities ?? defaultListCapabilities;
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
+  const listTaskCheckpoints = overrides.listTaskCheckpoints ?? defaultListTaskCheckpoints;
+  const getTaskCheckpoint = overrides.getTaskCheckpoint ?? defaultGetTaskCheckpoint;
+  const saveTaskCheckpoint = overrides.saveTaskCheckpoint ?? defaultSaveTaskCheckpoint;
+  const auditChangeGenealogy = overrides.auditChangeGenealogy
+    ?? ((input) => defaultAuditChangeGenealogy(input, env));
   const previewCapabilityPlan = overrides.previewCapabilityPlan
     ?? ((proposal: Record<string, unknown>) => defaultPreviewCapabilityPlan(proposal, env));
   const previewSkillRoute = overrides.previewSkillRoute ?? defaultPreviewSkillRoute;
@@ -659,6 +939,7 @@ export function createExternalMcpToolExecutor(
     let result: unknown;
     let receiptProject = 'founder-control-room';
     let evidenceRisk: RecordExternalMcpEvidenceInput['risk'] = 'read';
+    let relayExternalProviderCall = false;
 
     if (input.name === 'chief_audit_repository') {
       allowedProject('chief-ai-machine', input.allowedProjects);
@@ -709,6 +990,64 @@ export function createExternalMcpToolExecutor(
       noUnexpectedKeys(input.arguments, ['projectId'], input.name);
       receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
       result = await getCurrentTruth(receiptProject);
+    } else if (input.name === 'fcr_list_task_checkpoints') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'limit'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      result = await listTaskCheckpoints({
+        projectSlug: receiptProject,
+        limit: boundedInteger(input.arguments.limit, 'limit', 1, 20, 10),
+      });
+    } else if (input.name === 'fcr_get_task_checkpoint') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'taskId'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      const taskId = text(input.arguments.taskId, 'taskId', 128);
+      if (!/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(taskId)) {
+        throw new Error('taskId must be a bounded task identifier');
+      }
+      result = await getTaskCheckpoint({ projectSlug: receiptProject, taskId });
+    } else if (input.name === 'fcr_save_task_checkpoint') {
+      if (input.identity.authMode !== 'oauth') throw new Error('Saving a task checkpoint requires founder-bound OAuth');
+      noUnexpectedKeys(input.arguments, ['projectId', 'destinationOperator', 'continuationInput'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      if (!isRecord(input.arguments.continuationInput)) throw new Error('continuationInput must be an object');
+      const checkpoint = input.arguments.continuationInput as unknown as OperatorExecutionContinuationInput;
+      if (!isRecord(checkpoint.observation)) throw new Error('checkpoint observation must be an object');
+      const observation = createOperatorContinuityReceiptV2(checkpoint.observation as OperatorContinuityInputV2);
+      const sourceOperator = sourceOperatorForIdentity(input.identity, env);
+      const destinationOperator = relaySourceOperator(input.arguments.destinationOperator, 'destinationOperator');
+      const taskState = checkpoint.taskState ?? 'ACTIVE';
+      const prior = await getTaskCheckpoint({ projectSlug: receiptProject, taskId: text(checkpoint.taskId, 'taskId', 128) });
+      const priorRecord = isRecord(prior) && isRecord(prior.continuation) && isRecord(prior.continuation.record)
+        ? prior.continuation.record as unknown as OperatorExecutionContinuation
+        : null;
+      const continuation = createOperatorExecutionContinuation({
+        ...checkpoint,
+        sourceOperator,
+        destinationOperator,
+        taskState,
+        resultRef: taskState === 'ACTIVE' ? null : checkpoint.resultRef ?? priorRecord?.resultRef ?? null,
+        resultSubmittedByOperator: taskState === 'ACTIVE' ? null
+          : taskState === 'RESULT_SUBMITTED' ? sourceOperator
+            : priorRecord?.resultSubmittedByOperator ?? null,
+        verificationRefs: taskState === 'VERIFIED' ? checkpoint.verificationRefs ?? []
+          : taskState === 'CLOSED' ? priorRecord?.verificationRefs ?? [] : [],
+        verifiedByOperator: taskState === 'VERIFIED' ? sourceOperator
+          : taskState === 'CLOSED' ? priorRecord?.verifiedByOperator ?? null : null,
+        closedAt: taskState === 'CLOSED' ? new Date().toISOString() : null,
+        observation,
+      });
+      if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');
+      evidenceRisk = 'external_side_effect';
+      result = await saveTaskCheckpoint({ projectSlug: receiptProject, continuation });
+    } else if (input.name === 'fcr_audit_change_genealogy') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'limit', 'includeComments', 'includeDiff'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      result = await auditChangeGenealogy({
+        projectSlug: receiptProject,
+        limit: boundedInteger(input.arguments.limit, 'limit', 1, 20, 10),
+        includeComments: optionalBoolean(input.arguments.includeComments, 'includeComments', true),
+        includeDiff: optionalBoolean(input.arguments.includeDiff, 'includeDiff', true),
+      });
     } else if (input.name === 'fcr_relay_operator') {
       receiptProject = allowedProject('founder-control-room', input.allowedProjects);
       noUnexpectedKeys(
@@ -719,8 +1058,7 @@ export function createExternalMcpToolExecutor(
       const fromOperator = sourceOperatorForIdentity(input.identity, env);
       const toOperator = relayOperator(input.arguments.targetOperator, 'targetOperator');
       if (fromOperator === toOperator) throw new Error('operator relay requires a distinct target operator');
-      evidenceRisk = 'external_side_effect';
-      result = await relayOperatorCall({
+      const relayInput = {
         fromOperator,
         toOperator,
         capability: relayCapability(input.arguments.capability),
@@ -728,7 +1066,40 @@ export function createExternalMcpToolExecutor(
         contextSummary: text(input.arguments.contextSummary, 'contextSummary', 12000),
         sourceRef: optionalText(input.arguments.sourceRef, 'sourceRef', 500) ?? null,
         sensitivity: relaySensitivity(input.arguments.sensitivity),
-      });
+      };
+      try {
+        result = await relayOperatorCall(relayInput);
+      } catch (error) {
+        const failure = relayFailureEvidence(error, toOperator);
+        const failedExternalProviderCall = failure.externalProviderCall === true;
+        try {
+          await recordEvidence({
+            identity: input.identity,
+            requestId: input.requestId,
+            projectSlug: receiptProject,
+            toolName: input.name,
+            arguments: input.arguments,
+            result: failure,
+            durationMs: Math.max(0, Date.now() - startedAt),
+            risk: failedExternalProviderCall ? 'external_side_effect' : 'read',
+            outcomeStatus: 'failed',
+            failure: {
+              code: typeof failure.code === 'string' ? failure.code : 'external_mcp_failed',
+              provider: typeof failure.provider === 'string' ? failure.provider : undefined,
+              externalProviderCall: failedExternalProviderCall,
+            },
+          });
+        } catch {
+          throw new Error(
+            failedExternalProviderCall
+              ? 'operator relay evidence recording failed after external provider call'
+              : 'operator relay evidence recording failed before external provider call',
+          );
+        }
+        throw error;
+      }
+      relayExternalProviderCall = relayResultHasProviderEvidence(result);
+      evidenceRisk = relayExternalProviderCall ? 'external_side_effect' : 'read';
     } else {
       noUnexpectedKeys(
         input.arguments,
@@ -780,12 +1151,14 @@ export function createExternalMcpToolExecutor(
     });
 
     const relay = input.name === 'fcr_relay_operator';
+    const checkpointWrite = input.name === 'fcr_save_task_checkpoint';
     return {
       data: result,
       receipt,
       governanceBoundary: {
-        readOrPreviewOnly: !relay,
-        externalProviderCall: relay,
+        readOrPreviewOnly: !relay && !checkpointWrite,
+        internalCheckpointPersistenceOnly: checkpointWrite,
+        externalProviderCall: relay ? relayExternalProviderCall : false,
         mutationAuthority: false,
         executionAllowed: false,
         founderApprovalGranted: false,

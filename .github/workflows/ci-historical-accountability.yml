@@ -1,0 +1,38 @@
+name: Historical CI Accountability
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  historical-ci-evidence:
+    name: Verify historical CI evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Test evidence auditor
+        run: node --test scripts/ci-history-audit.test.mjs
+      - name: Verify historical failure coverage against GitHub
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/ci-history-audit.mjs
+      - name: Preserve historical CI observation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: historical-ci-observation-${{ github.run_id }}
+          path: artifacts/ci-historical-accountability.json
+          if-no-files-found: warn
+          retention-days: 14

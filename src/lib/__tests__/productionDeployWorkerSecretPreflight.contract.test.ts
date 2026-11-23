@@ -6,10 +6,8 @@ const workflow = readFileSync(
   'utf8',
 );
 const wrangler = readFileSync(new URL('../../../wrangler.worker.toml', import.meta.url), 'utf8');
-const receiptRoute = readFileSync(
-  new URL('../../http/routes/hairCommerceReceipts.ts', import.meta.url),
-  'utf8',
-);
+
+const receiptRoute = readFileSync(new URL('../../http/routes/hairCommerceReceipts.ts', import.meta.url), 'utf8');
 
 describe('production Worker secret preflight contract', () => {
   it('reads provider-held secret names before any production mutation can start', () => {
@@ -38,21 +36,26 @@ describe('production Worker secret preflight contract', () => {
     expect(authorityGate).not.toContain('.get(\'value\')');
   });
 
-  it('fails closed on malformed Cloudflare credentials before secret-name readback', () => {
+  it('runs the shared fail-closed credential contract before secret-name readback', () => {
     const authorityStart = workflow.indexOf('  authority-gate:');
     const supabaseStart = workflow.indexOf('  # ── 1.', authorityStart);
     const authorityGate = workflow.slice(authorityStart, supabaseStart);
 
-    const credentialCheckIndex = authorityGate.indexOf('token.encode(\'ascii\')');
+    const credentialCheckIndex = authorityGate.indexOf(
+      'node scripts/provider-credential-contract.mjs',
+    );
     const providerReadbackIndex = authorityGate.indexOf(
       'npx --yes wrangler@4.110.0 secret list',
     );
 
     expect(credentialCheckIndex).toBeGreaterThanOrEqual(0);
     expect(providerReadbackIndex).toBeGreaterThan(credentialCheckIndex);
-    expect(authorityGate).toContain('contains non-ASCII characters');
-    expect(authorityGate).toContain('contains whitespace or non-printable characters');
-    expect(authorityGate).toContain("re.fullmatch(r'[0-9a-f]{32}', account_id)");
+    expect(authorityGate).toContain('--env CLOUDFLARE_API_TOKEN');
+    expect(authorityGate).toContain('--account-id-env CLOUDFLARE_ACCOUNT_ID');
+    expect(authorityGate).toContain('--require-account-id true');
+    expect(authorityGate).toContain('--purpose fcr-production-deploy-authority');
+    expect(authorityGate).not.toContain("token.encode('ascii')");
+    expect(authorityGate).not.toContain("re.fullmatch(r'[0-9a-f]{32}', account_id)");
   });
 
   it('derives the provider-held set from the canonical Worker contract', () => {
@@ -62,8 +65,31 @@ describe('production Worker secret preflight contract', () => {
     expect(wrangler).toContain('"FOUNDER_SESSION_ENCRYPTION_KEY",');
   });
 
-  it('keeps the JBH receipt receiver binding inside canonical deploy preflight', () => {
+  it('declares the fail-closed JBH receiver credential as feature-gated under Path B', () => {
     expect(receiptRoute).toContain('process.env.JBH_RECEIPT_INGEST_TOKEN?.trim()');
-    expect(wrangler).toContain('"JBH_RECEIPT_INGEST_TOKEN",');
+    const optional = wrangler.split('optional = [')[1];
+    expect(optional).toContain('"JBH_RECEIPT_INGEST_TOKEN",');
+    expect(wrangler.split('optional = [')[0]).not.toContain('"JBH_RECEIPT_INGEST_TOKEN",');
+  });
+
+  it('fails closed on [vars]/secret name collisions inside the authority gate before any deploy', () => {
+    const reconcile = readFileSync(
+      new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
+      'utf8',
+    );
+    const collisionCommand = 'node scripts/verify-worker-var-secret-collisions.mjs';
+    for (const source of [workflow, reconcile]) {
+      const authorityStart = source.indexOf('  authority-gate:');
+      const deployJobStart = source.indexOf('  worker-deploy:');
+      expect(authorityStart).toBeGreaterThanOrEqual(0);
+      expect(deployJobStart).toBeGreaterThan(authorityStart);
+      const authorityGate = source.slice(authorityStart, deployJobStart);
+      const readbackIndex = authorityGate.indexOf('secret list');
+      const collisionIndex = authorityGate.indexOf(collisionCommand);
+      expect(readbackIndex).toBeGreaterThanOrEqual(0);
+      expect(collisionIndex).toBeGreaterThan(readbackIndex);
+      expect(authorityGate).toContain('--secret-receipt "$secret_receipt"');
+      expect(source.indexOf(collisionCommand)).toBeLessThan(deployJobStart);
+    }
   });
 });

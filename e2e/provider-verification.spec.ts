@@ -4,7 +4,7 @@
  * Verifies:
  * 1. Server is live and /health returns { ok: true }
  * 2. /_debug/provider returns a real provider (not mock, not fallback)
- * 3. The provider name is 'openai' or 'perplexity'
+ * 3. The provider name is one of the governed real provider lanes
  * 4. Required env keys are present in the runtime (key existence only — never values)
  *
  * This is the Control Room end-to-end evidence artifact.
@@ -27,10 +27,10 @@ test.describe('Control Room – provider verification', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
 
-    // Must declare a known real provider
-    expect(['openai', 'perplexity']).toContain(body.provider);
+    // Must declare a known real provider.
+    expect(['openai', 'perplexity', 'deepseek']).toContain(body.provider);
 
-    // Must not be flagged as mock or fallback
+    // Must not be flagged as mock or fallback.
     expect(body.mock).toBe(false);
     expect(body.fallback).toBe(false);
   });
@@ -39,8 +39,10 @@ test.describe('Control Room – provider verification', () => {
     const res = await request.get('/_debug/provider');
     const body = await res.json();
 
-    // At least one AI provider key must be set in the CI environment
-    const hasKey = body.openaiKeyPresent === true || body.perplexityKeyPresent === true;
+    // At least one governed AI provider key must be set in the CI/runtime environment.
+    const hasKey = body.openaiKeyPresent === true ||
+      body.perplexityKeyPresent === true ||
+      body.deepseekKeyPresent === true;
     expect(hasKey).toBe(true);
   });
 
@@ -48,9 +50,8 @@ test.describe('Control Room – provider verification', () => {
     const res = await request.get('/_debug/provider');
     const raw = await res.text();
 
-    // Ensure the response body contains no secret-shaped strings
-    // (basic guard: no string longer than 20 chars that looks like a key)
-    expect(raw).not.toMatch(/sk-[A-Za-z0-9]{20,}/);
-    expect(raw).not.toMatch(/pplx-[A-Za-z0-9]{20,}/);
+    // Ensure the response body contains no secret-shaped provider key strings.
+    expect(raw).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
+    expect(raw).not.toMatch(/pplx-[A-Za-z0-9_-]{20,}/);
   });
 });
