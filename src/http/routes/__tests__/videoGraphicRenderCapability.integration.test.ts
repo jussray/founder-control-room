@@ -1,5 +1,5 @@
-import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { boundFounderRow } from './founderAuthFixture.js';
 
 const { mockGetUser, mockReadEffectiveDesiredState, supabaseMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
