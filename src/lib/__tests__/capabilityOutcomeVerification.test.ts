@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RepositoryProvider, VerificationSignal } from '../../providers/RepositoryProvider.js';
 import {
   capabilityOutcomeVerificationHash,
+  independentlyVerifiedResponseHashes,
   matchingCapabilityOutcomeVerification,
   repositoryRepairSourceRef,
   validateCapabilityOutcomeVerificationReceipt,
@@ -16,6 +17,7 @@ import {
   type OperatorRelayRequestV1,
   type OperatorRelayResponseV1,
 } from '../operatorRelay.js';
+import { foldRelayReceiptsIntoCapabilityObservation } from '../capabilityObservationFeed.js';
 
 const HEAD = 'a'.repeat(40);
 const REPOSITORY = 'jussray/founder-control-room';
@@ -376,5 +378,111 @@ describe('repository repair outcome verifier', () => {
 
     const { verificationHash: _verificationHash, ...identity } = receipt;
     expect(capabilityOutcomeVerificationHash(identity)).toBe(receipt.verificationHash);
+  });
+
+  it('rejects a relay outcome completed outside its request window', async () => {
+    const request = relayRequest();
+    const result = await verifyRepositoryRepairOutcome({
+      request,
+      response: relayResponse(request, { completedAt: '2026-10-06T22:00:00.000Z' }),
+      repository: REPOSITORY,
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, { providerFactory: () => fakeProvider([signal('CI')]) });
+
+    expect(result.verified).toBe(false);
+    expect(result.evidenceReceipt).toBeNull();
+    expect(result.blockers).toContain('relay response completed outside the request window');
+  });
+});
+
+describe('independently verified response hashes feed the capability observation', () => {
+  async function verifiedPair() {
+    const request = relayRequest();
+    const response = relayResponse(request);
+    const result = await verifyRepositoryRepairOutcome({
+      request,
+      response,
+      repository: REPOSITORY,
+      expectedHeadSha: HEAD,
+      requiredChecks: [{ name: 'CI', issuerId: '15368' }],
+    }, { providerFactory: () => fakeProvider([signal('CI')]) });
+    expect(result.verified).toBe(true);
+    return { response, receipt: result.receipt! };
+  }
+
+  it('produces proof only for the runtime-verified response hash', async () => {
+    const { response, receipt } = await verifiedPair();
+    const otherRequest = relayRequest(HEAD, { relayId: 'relay-2' });
+    const unverified = relayResponse(otherRequest, { completedAt: '2026-10-06T20:20:00.000Z' });
+
+    const hashes = independentlyVerifiedResponseHashes({
+      operatorId: 'codex',
+      taskClass: 'repository-repair',
+      responses: [response, unverified],
+      verifications: [receipt],
+    });
+    expect([...hashes]).toEqual([response.responseHash]);
+
+    const { observation } = foldRelayReceiptsIntoCapabilityObservation({
+      operatorId: 'codex',
+      taskClass: 'repository-repair',
+      receipts: [response, unverified],
+      verifiedResponseHashes: hashes,
+    });
+    expect(observation).toMatchObject({ sampleSize: 2, proofRate: 0.5, verifiedCompletedCount: 1 });
+  });
+
+  it('never counts a copied or deserialized receipt, or a mismatched operator or task class', async () => {
+    const { response, receipt } = await verifiedPair();
+    const copied = structuredClone(receipt);
+    expect(validateCapabilityOutcomeVerificationReceipt(copied)).toEqual([]);
+
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [response], verifications: [copied],
+    }).size).toBe(0);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'gemini', taskClass: 'repository-repair', responses: [response], verifications: [receipt],
+    }).size).toBe(0);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'architecture-review', responses: [response], verifications: [receipt],
+    }).size).toBe(0);
+  });
+
+  it('cannot be re-aimed at another response by mutating the issued receipt in place', async () => {
+    const { response, receipt } = await verifiedPair();
+    const later = relayResponse(relayRequest(), { answer: 'forged answer', completedAt: '2026-10-06T20:30:00.000Z' });
+    expect(later.responseHash).not.toBe(response.responseHash);
+
+    const mutable = receipt as { -readonly [K in keyof typeof receipt]: (typeof receipt)[K] };
+    expect(() => {
+      mutable.responseHash = later.responseHash;
+      const { verificationHash: _ignored, ...identity } = mutable;
+      mutable.verificationHash = capabilityOutcomeVerificationHash(identity);
+    }).toThrow(TypeError);
+    expect(() => {
+      (receipt.evidenceRefs as string[]).push('forged:evidence');
+    }).toThrow(TypeError);
+    expect(() => {
+      (receipt.subject as { exactSha: string }).exactSha = 'b'.repeat(40);
+    }).toThrow(TypeError);
+
+    expect(receipt.responseHash).toBe(response.responseHash);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [later], verifications: [receipt],
+    }).size).toBe(0);
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [response], verifications: [receipt],
+    }).size).toBe(1);
+  });
+
+  it('does not let a later response on the same relay id borrow earlier verification', async () => {
+    const { response, receipt } = await verifiedPair();
+    const later = relayResponse(relayRequest(), { answer: 'second answer', completedAt: '2026-10-06T20:30:00.000Z' });
+    expect(later.relayId).toBe(response.relayId);
+
+    expect(independentlyVerifiedResponseHashes({
+      operatorId: 'codex', taskClass: 'repository-repair', responses: [later], verifications: [receipt],
+    }).size).toBe(0);
   });
 });

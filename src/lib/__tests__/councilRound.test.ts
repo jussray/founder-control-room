@@ -163,9 +163,10 @@ describe('runCouncilRound', () => {
       goal: 'g', initiator: 'fcr', seed: 'A', seats: [seats[0]], now: fixedNow,
     }, { 'claude-code': seat('claude', {}) });
 
-    const legacy = structuredClone(row.transcript) as any;
-    delete legacy.hops[0].unresolved;
-    delete legacy.hops[0].authorityRequested;
+    const legacy = structuredClone(row.transcript);
+    const legacyHop: Partial<(typeof legacy.hops)[number]> = legacy.hops[0];
+    delete legacyHop.unresolved;
+    delete legacyHop.authorityRequested;
     expect(recoverPersistedRelayResponses(legacy)).toMatchObject({
       responses: [],
       ignoredLegacyProjections: 1,

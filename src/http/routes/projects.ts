@@ -6,6 +6,13 @@ import { providerForProject } from "../../providers/providerFactory.js";
 import type { RepositoryProvider } from "../../providers/RepositoryProvider.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { AUTHORITY_LEVEL_IDS } from "../../lib/authorityLevels.js";
+import {
+  CONNECTION_CONFIG_SECRET_ERROR,
+  CONNECTION_CONFIG_SECRET_REJECTED,
+  CONNECTION_SECRET_REF_ERROR,
+  connectionConfigSecretViolation,
+  looksLikeRawCredential,
+} from "../../lib/connectionConfigSecrets.js";
 
 export const projectsRouter = Router();
 
@@ -182,6 +189,26 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
     return res.status(400).json({ error: `authorityLevel must be one of: ${[...AUTHORITY_LEVEL_IDS].join(", ")}` });
   }
 
+  // Reject raw credential material before any project lookup or write. The
+  // response names the offending key path only, never the submitted value.
+  const config = typeof body["config"] === "object" && body["config"] !== null ? body["config"] : {};
+  const configViolation = connectionConfigSecretViolation(config);
+  if (configViolation) {
+    return res.status(400).json({
+      error: CONNECTION_CONFIG_SECRET_ERROR,
+      code: CONNECTION_CONFIG_SECRET_REJECTED,
+      field: configViolation,
+    });
+  }
+  const secretRef = typeof body["secretRef"] === "string" ? body["secretRef"] : null;
+  if (secretRef !== null && looksLikeRawCredential(secretRef)) {
+    return res.status(400).json({
+      error: CONNECTION_SECRET_REF_ERROR,
+      code: CONNECTION_CONFIG_SECRET_REJECTED,
+      field: "secretRef",
+    });
+  }
+
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id")
@@ -191,8 +218,6 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
   if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
 
   const label = typeof body["label"] === "string" ? body["label"] : null;
-  const config = typeof body["config"] === "object" && body["config"] !== null ? body["config"] : {};
-  const secretRef = typeof body["secretRef"] === "string" ? body["secretRef"] : null;
   const capabilities = Array.isArray(body["capabilities"]) && body["capabilities"].every((c) => typeof c === "string")
     ? body["capabilities"]
     : [];

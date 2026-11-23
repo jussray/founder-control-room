@@ -26,7 +26,7 @@ The market ranks from `CapabilityObservation` records. Its intended first receip
 
 When the provider reports it, a relay response also carries optional `usage` (input, output, cache-write and cache-read token counts; Anthropic only today). Usage is included in `responseHash` only when present, so receipts without it keep their original hash. Council rounds copy it onto each hop. It is measurement, not evidence or authority, and a missing or malformed usage block is omitted rather than estimated.
 
-Council rounds (`POST /missions/:missionId/council/run`, `src/lib/councilRound.ts`) now persist every field needed to reconstruct and re-hash each completed, blocked, or failed `OperatorRelayResponseV1` outcome when a provider response exists. `recoverPersistedRelayResponses()` accepts only hash-matching projections; historical Council rows written before the missing hash fields were retained are classified as legacy and excluded instead of being upgraded into synthetic receipts. Provider exceptions that produced no relay response remain absent. Standalone `fcr_relay_operator` calls are still returned to the caller and not persisted. Nothing reads recovered Council receipts through verification and into the capability fold yet, and no store persists observations, so market routing remains advisory. (Earlier text said relay responses were persisted nowhere; that was true before the council round route landed and is superseded.)
+Today relay responses are returned to the caller and are not persisted anywhere in this repository. Persisting them is a separate gate. Until it lands, the fold has no stored population to read.
 
 Fold rules:
 
@@ -34,7 +34,7 @@ Fold rules:
 - receipts answered by another operator are ignored, never re-attributed
 - exact duplicate receipts (same `responseHash`) count once; when one `relayId` has several outcome receipts, only the latest counts
 - with a freshness window, receipts older than the window are excluded so stale evidence cannot ride on one fresh receipt; a receipt whose `completedAt` does not parse is always excluded
-- a provider answering is not outcome proof: `src/lib/capabilityObservationFeed.ts` accepts only `CapabilityOutcomeVerificationReceipt` records whose task class, relay id, canonical response hash, and operator all match the outcome; caller-supplied relay IDs are never proof, and observation evidence comes from the independent verifier rather than the operator's self-reported refs
+- a provider answering is not outcome proof: only exact `responseHash` values confirmed by an independent verifier contribute to `proofRate` and `evidenceRefs`; a later response using the same relay ID cannot borrow earlier proof; the fold additionally recomputes each independently verified receipt's canonical response hash and denies proof if its contents were changed; with no verifier the observation carries no evidence and the market's own gate keeps the operator in trial (adapter-proven is not provider-outcome-proven)
 - a `completed` receipt with no evidence reference is a false green, even if it bypassed the relay validator
 - any runtime `authorityRequested` other than the exact string `none` — including a missing or malformed value — is an authority violation
 - `blocked` is an honest authority stop: it stays in the sample but is excluded from the success denominator, so stopping correctly never lowers a score
@@ -42,33 +42,16 @@ Fold rules:
 - task classification is upstream — the caller names the task class, the fold does not infer it
 - `evidenceRefs` inside an observation are Sauce-Guard-private routing evidence, never public content
 
-### First independent verifier slice
-
-`src/lib/capabilityOutcomeVerification.ts` implements the first bounded verifier for `repository-repair`. It is read-only and non-authorizing.
-
-For one completed relay outcome, it:
-
-- validates both the canonical relay request and response hashes, requires `capability=implement`, and requires no unresolved work;
-- requires the original request's hash-bound `sourceRef` to equal `repository:<owner/repo>@<exact-sha>`, preventing an unrelated successful relay from being paired with a green repository head;
-- binds verification to that exact `owner/repo` and 40-character commit SHA;
-- re-observes repository identity and exact-head verification signals through the existing repository provider;
-- requires caller-declared check names to resolve to their newest placeable exact-head attempt and requires each selected attempt to be terminal `passed`;
-- requires every required check to bind a provider-backed App issuer id and fails closed when producer identity is absent or mismatched;
-- requires a declared browser-shaped check plus passed exact-head Playwright/browser evidence when the repair's user-facing claim requires Playwright;
-- emits verifier-owned evidence references and a non-authorizing `fcr/capability-outcome-verification@v1` receipt bound to the exact relay response hash.
-
-The `verificationHash` is a deterministic packet-integrity hash, not a signature and not issuer authentication. Independent proof comes from the verifier's provider-backed readback. The fold additionally accepts only the same process-local receipt object emitted by a successful verifier call; a serialized/reconstructed receipt loses that runtime provenance and contributes zero proof until independently reverified. Durable verification persistence therefore needs a separately trusted signing/store design or fresh verifier replay, not JSON reload. The verifier cannot grant selection, execution, merge, deploy, publish, spend, or provider-mutation authority.
-
-This first slice does not verify architecture, research, business-workflow, multimodal, or other task classes. Those lanes stay unproven until they have task-specific verifiers. It also does not make stored Council history directly verifiable yet: current Council persistence preserves enough response fields to recover canonical outcomes but does not preserve the complete original `OperatorRelayRequestV1` packet required by the repository-repair subject-binding check. A live market path must close that request-persistence seam before recovered Council outcomes can enter this verifier.
-
 Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; new Council rows preserve hash-recoverable relay outcomes and a repository-repair verifier exists in source, but full subject-bound relay requests are not yet recoverable from Council storage and no live path verifies, folds, or persists observations
+configured / allowlisted  not yet — no live route calls the market; no store persists relay responses or observations; a repository-repair outcome verifier exists as tested source only (see below)
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
+
+Independent outcome verification (`src/lib/capabilityOutcomeVerification.ts`, candidate source): `verifyRepositoryRepairOutcome` issues a non-authorizing receipt only when the relay request is an `implement` request bound to `repository:<owner/name>@<full sha>`, the response is completed, hash-valid, inside the request window, and reports no unresolved work, and exact-head provider evidence shows every required check passed by its declared producer identity. `independentlyVerifiedResponseHashes` turns only runtime-issued, matching receipts into the fold's `verifiedResponseHashes`; deserialized or copied receipts never count. `recoverPersistedRelayResponses` (Council) rebuilds only hash-verifiable responses from transcripts and ignores legacy projections. This proves the observed CI signals for one subject, not deployment, runtime, or other task classes.
 
 Until a live route calls `buildCapabilityRoute` with observations folded from persisted, independently verified relay receipts, the market is advisory source, not enforced routing. Do not describe it in present tense as selecting operators.
 
@@ -89,7 +72,9 @@ A public benchmark cannot by itself make an operator eligible for primary routin
 The market deliberately scores failure modes that common benchmark tables usually omit:
 
 - false-green claims are penalized
-- any fresh authority-boundary violation blocks the candidate from primary routing
+- any fresh authority-boundary violation blocks the candidate from primary routing, even if that observation has no proof references or its authority metric is malformed
+- primary eligibility requires both the proven share of fresh observations (the floor of sample size times independently verified proof rate) and enough independently verified completed outcomes; verified failures or blocked stops are retained as evidence but cannot promote a model, and legacy observations without explicit verified completion counts stay in trial
+- the score uses the same proof-weighted samples; aggregate success rates still cannot substitute for independently verified outcome-quality measures
 - stale local evidence expires instead of self-renewing
 - cost and time are measured alongside correctness
 - external benchmark influence is capped

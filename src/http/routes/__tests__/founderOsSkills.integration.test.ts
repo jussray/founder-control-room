@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { boundFounderRow } from './founderAuthFixture.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
@@ -36,17 +37,13 @@ function buildApp() {
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'founder-user-1'),
   };
 }
 
 function founderSession() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
@@ -374,5 +371,113 @@ describe('POST /founder-os/preview', () => {
     });
     expect(response.body.plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('GET /founder-os/distribution/skills', () => {
+  const PIN = 'de476e73754ca9616cb7ed178e1ff9c2f84416ba';
+  const READ_TOKEN = 'test-fcr-distribution-read-token-at-least-24-chars';
+  const upstreamBody = {
+    repo: 'jussray/ULTRATHINK-',
+    repo_sha: PIN,
+    kernel_status: 'draft',
+    skills: [
+      { name: 'juss-os', version: '3.1.1', repo_sha: PIN },
+      { name: 'truthmode', version: '1', repo_sha: PIN },
+    ],
+  };
+  const upstreamResponse = (payload: unknown = upstreamBody, state = 'current', status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { 'Content-Type': 'application/json', 'X-Distribution-State': state },
+    });
+
+  beforeEach(() => {
+    vi.stubEnv('FCR_DISTRIBUTION_READ_TOKEN', '');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('requires the existing founder session before reading any distribution data', async () => {
+    vi.stubEnv('FCR_DISTRIBUTION_READ_TOKEN', READ_TOKEN);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'missing' } });
+    const response = await request(buildApp()).get('/founder-os/distribution/skills');
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without a scoped server-held token', async () => {
+    founderSession();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await request(buildApp()).get('/founder-os/distribution/skills')
+      .set('Authorization', BEARER);
+    expect(response.status).toBe(503);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body.reason).toBe('distribution_client_not_configured');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fetches the fixed upstream with a server token and returns only an exact-SHA receipt', async () => {
+    founderSession();
+    vi.stubEnv('FCR_DISTRIBUTION_READ_TOKEN', READ_TOKEN);
+    const fetchMock = vi.fn().mockResolvedValue(upstreamResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await request(buildApp()).get('/founder-os/distribution/skills')
+      .set('Authorization', BEARER);
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toEqual({
+      contract: 'juss/fcr-distribution-read@v1',
+      status: 'source_observed',
+      executionAllowed: false,
+      canonicalizationGranted: false,
+      repo: 'jussray/ULTRATHINK-',
+      repo_sha: PIN,
+      kernel_status: 'draft',
+      skill_names: ['juss-os', 'truthmode'],
+    });
+    expect(JSON.stringify(response.body)).not.toContain(READ_TOKEN);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://juss-distribution.mcgill-raylene.workers.dev/api/v1/skills');
+    expect(options).toMatchObject({
+      method: 'GET', headers: { Authorization: `Bearer ${READ_TOKEN}`, Accept: 'application/json' },
+      redirect: 'error', cache: 'no-store',
+    });
+  });
+
+  it.each([
+    ['stale cache', () => upstreamResponse(upstreamBody, 'stale')],
+    ['wrong repository', () => upstreamResponse({ ...upstreamBody, repo: 'somebody/else' })],
+    ['moved repository SHA', () => upstreamResponse({ ...upstreamBody, repo_sha: 'f'.repeat(40) })],
+    ['mismatched skill source', () => upstreamResponse({ ...upstreamBody, skills: [{ name: 'juss-os', version: '3.1.1', repo_sha: 'f'.repeat(40) }] })],
+    ['upstream unauthorized', () => upstreamResponse({ error: 'unauthorized' }, 'current', 401)],
+    ['missing kernel', () => upstreamResponse({ ...upstreamBody, skills: [{ name: 'truthmode', version: '1', repo_sha: PIN }] })],
+  ])('blocks %s instead of fabricating a successful council receipt', async (_name, fixture) => {
+    founderSession();
+    vi.stubEnv('FCR_DISTRIBUTION_READ_TOKEN', READ_TOKEN);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fixture()));
+    const response = await request(buildApp()).get('/founder-os/distribution/skills')
+      .set('Authorization', BEARER);
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({ status: 'blocked', reason: 'distribution_unverified' });
+  });
+
+  it('does not expose downstream network errors or token values', async () => {
+    founderSession();
+    vi.stubEnv('FCR_DISTRIBUTION_READ_TOKEN', READ_TOKEN);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('sensitive downstream detail')));
+    const response = await request(buildApp()).get('/founder-os/distribution/skills')
+      .set('Authorization', BEARER);
+    expect(response.status).toBe(502);
+    expect(JSON.stringify(response.body)).not.toContain('sensitive');
+    expect(JSON.stringify(response.body)).not.toContain(READ_TOKEN);
   });
 });

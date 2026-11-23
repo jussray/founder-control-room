@@ -28,6 +28,8 @@ export interface CapabilityObservation {
   sampleSize: number;
   successRate: number;
   proofRate: number;
+  /** Independently verified completed outcomes, excluding verified failures and blocked stops. */
+  verifiedCompletedCount?: number;
   falseGreenRate: number;
   authorityViolationRate: number;
   rootCauseAccuracy?: number;
@@ -193,25 +195,45 @@ export function rankCapabilityCandidates(input: {
     .filter((candidate) => candidate.taskClasses.includes(input.taskClass))
     .map((candidate): RankedCapabilityCandidate => {
       const reasons: string[] = [];
-      // Authority violations are safety signals even when an outcome has no
-      // independently verified evidence refs. Do not erase them with the
-      // stricter primary-routing eligibility filter below.
+      // Inspect every fresh observation for authority violations, including unproven
+      // observations that cannot contribute to primary-routing eligibility.
       const fresh = input.observations.filter(
         (observation) => observation.operatorId === candidate.operatorId
           && observation.taskClass === input.taskClass
-          && Number.isSafeInteger(observation.sampleSize)
-          && observation.sampleSize > 0
           && isFresh(observation.observedAt, now, maxObservationAgeMs),
       );
-      const local = fresh.filter((observation) => observation.evidenceRefs.length > 0);
+      // Exactly zero is the only valid safe authority-violation rate; negative,
+      // missing, non-finite, or positive values fail closed.
+      const hasAuthorityViolation = fresh.some(
+        (observation) => observation.authorityViolationRate !== 0,
+      );
+      // A provider response is not an independently proven outcome. Count only
+      // the proven share of each well-formed observation toward the sample gate
+      // and score; never promote from a large pool of unverified responses.
+      const local = fresh
+        .filter((observation) => Number.isSafeInteger(observation.sampleSize)
+          && observation.sampleSize > 0
+          && Number.isFinite(observation.proofRate)
+          && observation.proofRate > 0
+          && observation.proofRate <= 1
+          && Array.isArray(observation.evidenceRefs)
+          && observation.evidenceRefs.length > 0)
+        .map((observation) => ({
+          ...observation,
+          sampleSize: Math.floor(observation.sampleSize * observation.proofRate),
+        }))
+        .filter((observation) => observation.sampleSize > 0);
       const localSamples = local.reduce((sum, observation) => sum + observation.sampleSize, 0);
+      // Verified failures/authority stops are evidence, not successful model capability.
+      // Missing or malformed counts from legacy sources never establish promotion.
+      const verifiedCompletedSamples = local.reduce((sum, observation) => {
+        const count = observation.verifiedCompletedCount;
+        return sum + (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+          ? Math.min(count, observation.sampleSize)
+          : 0);
+      }, 0);
       const benchmark = benchmarkScore(freshPriors, candidate.operatorId);
       const canOperate = agentCanOperate(candidate.operatorId, candidate.capability);
-      const hasAuthorityViolation = fresh.some(
-        (observation) => !Number.isFinite(observation.authorityViolationRate)
-          || observation.authorityViolationRate < 0
-          || observation.authorityViolationRate > 0,
-      );
 
       let status: CapabilityMarketStatus;
       let score = 0;
@@ -222,9 +244,9 @@ export function rankCapabilityCandidates(input: {
       } else if (hasAuthorityViolation) {
         status = 'blocked';
         reasons.push('fresh local evidence contains an authority-boundary violation');
-      } else if (localSamples < minLocalSamples) {
+      } else if (localSamples < minLocalSamples || verifiedCompletedSamples < minLocalSamples) {
         status = 'trial';
-        reasons.push('insufficient fresh local samples for primary routing');
+        reasons.push('insufficient independently verified successful completions for primary routing');
         score = benchmark.score === null ? 0 : benchmark.score * benchmarkPriorWeight;
       } else {
         status = 'eligible';

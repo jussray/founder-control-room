@@ -5,6 +5,7 @@ import {
   OPERATOR_RELAY_RESPONSE_CONTRACT,
   operatorRelayRequestHash,
   operatorRelayResponseHash,
+  operatorRelayUsageErrors,
   relayContextFingerprint,
   type OperatorRelayRequestV1,
   type OperatorRelayResponseV1,
@@ -13,6 +14,22 @@ import {
 import { OPERATOR_RELAY_PEERS } from './operatorRelayConstants.js';
 import type { CapabilityTaskClass } from './modelCapabilityMarket.js';
 
+/**
+ * Independent outcome verification for operator relay results.
+ *
+ * The capability observation feed only counts a relay response as proven when its exact
+ * `responseHash` is in `verifiedResponseHashes`. This module is the producer of that set:
+ * a hash enters it only through a receipt issued in this process by an independent verifier
+ * that re-read provider evidence for the exact repository subject the relay request was bound
+ * to. Caller-supplied hashes, deserialized receipts, and the operator's own self-reported
+ * evidence are never proof.
+ *
+ * Boundaries:
+ * - Verification receipts carry no selection or execution authority.
+ * - Only `repository-repair` outcomes have a verifier today; other task classes stay in trial.
+ * - Exact-head CI evidence proves the observed provider signals only. It does not prove
+ *   deployment, runtime, or provider-outcome state beyond those signals.
+ */
 export const CAPABILITY_OUTCOME_VERIFICATION_CONTRACT = 'fcr/capability-outcome-verification@v1' as const;
 
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -21,6 +38,14 @@ const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const BROWSER_CHECK = /playwright|browser|e2e/i;
 const RELAY_OPERATORS = new Set<string>(OPERATOR_RELAY_PEERS);
 const RUNTIME_VERIFIED_RECEIPTS = new WeakSet<object>();
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value;
+}
 const CAPABILITY_TASK_CLASSES: ReadonlySet<string> = new Set<CapabilityTaskClass>([
   'repository-repair',
   'architecture-review',
@@ -236,6 +261,11 @@ function relayRequestIntegrityErrors(
   const expiresAt = Date.parse(request.expiresAt ?? '');
   if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt) || createdAt >= expiresAt) {
     errors.push('relay request time bounds are invalid');
+  } else {
+    const completedAt = Date.parse(response.completedAt ?? '');
+    if (Number.isFinite(completedAt) && (completedAt < createdAt || completedAt > expiresAt)) {
+      errors.push('relay response completed outside the request window');
+    }
   }
   if (SHA256.test(request.requestHash ?? '')) {
     const { requestHash: _requestHash, ...identity } = request;
@@ -256,6 +286,7 @@ function relayResponseIntegrityErrors(response: OperatorRelayResponseV1): string
   if (!Array.isArray(response.evidenceRefs) || response.evidenceRefs.some((item) => typeof item !== 'string')) errors.push('relay evidenceRefs are malformed');
   if (!Array.isArray(response.unresolved) || response.unresolved.some((item) => typeof item !== 'string')) errors.push('relay unresolved list is malformed');
   if (!Number.isFinite(Date.parse(response.completedAt ?? ''))) errors.push('relay completedAt is invalid');
+  if (response.usage !== undefined) errors.push(...operatorRelayUsageErrors(response.usage));
   if (errors.length === 0) {
     const { responseHash: _responseHash, ...identity } = response;
     if (operatorRelayResponseHash(identity) !== response.responseHash) errors.push('relay responseHash does not match response content');
@@ -371,6 +402,37 @@ export function matchingCapabilityOutcomeVerification(
     && verification.responseHash === response.responseHash
     && verification.operatorId === operatorId
     && response.fromOperator === operatorId;
+}
+
+export interface IndependentlyVerifiedResponseHashesInput {
+  operatorId: RelayOperatorId;
+  taskClass: CapabilityTaskClass;
+  responses: readonly OperatorRelayResponseV1[];
+  verifications: readonly CapabilityOutcomeVerificationReceipt[];
+}
+
+/**
+ * Produce the `verifiedResponseHashes` set consumed by `foldRelayReceiptsIntoCapabilityObservation`.
+ *
+ * A response hash is included only when a runtime-issued, hash-valid verification receipt matches
+ * the same relay id, canonical response hash, operator, and task class. Anything else is omitted,
+ * so the fold keeps the operator in trial rather than inferring proof.
+ */
+export function independentlyVerifiedResponseHashes(
+  input: IndependentlyVerifiedResponseHashesInput,
+): Set<string> {
+  const hashes = new Set<string>();
+  for (const response of input.responses) {
+    if (input.verifications.some((verification) => matchingCapabilityOutcomeVerification(
+      verification,
+      response,
+      input.taskClass,
+      input.operatorId,
+    ))) {
+      hashes.add(response.responseHash);
+    }
+  }
+  return hashes;
 }
 
 export async function verifyRepositoryRepairOutcome(
@@ -501,10 +563,13 @@ export async function verifyRepositoryRepairOutcome(
     selectionAuthority: false,
     executionAuthority: false,
   };
-  const receipt: CapabilityOutcomeVerificationReceipt = {
+  // Freeze before registering: membership in RUNTIME_VERIFIED_RECEIPTS is by object identity,
+  // so a mutable receipt could be re-aimed at another response (and re-hashed with the exported
+  // hash helper) while keeping its runtime-verified status.
+  const receipt: CapabilityOutcomeVerificationReceipt = deepFreeze({
     ...identity,
     verificationHash: capabilityOutcomeVerificationHash(identity),
-  };
+  });
   RUNTIME_VERIFIED_RECEIPTS.add(receipt);
 
   return { verified: true, receipt, blockers: [], evidenceReceipt };

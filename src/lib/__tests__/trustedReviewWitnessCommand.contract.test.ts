@@ -137,6 +137,35 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('main moved during governance reconciliation');
   });
 
+  it('fails malformed GitHub App credentials before any governance provider mutation', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+    const credentialPreflight = governanceJob.split(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    )[1]?.split('- name: Reconcile canonical two-membrane governance and prove full topology')[0] ?? '';
+    const preflightIndex = governanceJob.indexOf(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    );
+    const mutationIndex = governanceJob.indexOf(
+      '- name: Reconcile canonical two-membrane governance and prove full topology',
+    );
+
+    expect(preflightIndex).toBeGreaterThan(-1);
+    expect(mutationIndex).toBeGreaterThan(preflightIndex);
+    expect(credentialPreflight).toContain(
+      "import { createGitHubAppJwt } from './dist/providers/githubAppAuth.js';",
+    );
+    expect(credentialPreflight).toContain('createGitHubAppJwt(appId, privateKey, Date.now())');
+    expect(credentialPreflight).toContain('APP_PRIVATE_KEY_SHAPE_INVALID');
+    expect(credentialPreflight).toContain('providerMutationAttempted: false');
+    expect(credentialPreflight).toContain("providerMutationState: 'NOT_ATTEMPTED'");
+    expect(credentialPreflight).toContain("name: 'CredentialShapeError'");
+    expect(credentialPreflight).toContain(
+      'Provider authentication and provider mutation were not attempted.',
+    );
+    expect(credentialPreflight).not.toContain('console.log(privateKey');
+    expect(credentialPreflight).not.toContain('console.error(privateKey');
+  });
+
   it('keeps provider-policy mutation inside production App authority and the canonical provider factory', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
@@ -187,6 +216,21 @@ describe('trusted review witness command contract', () => {
 
     expect(governanceJob).toContain('let providerMutationAttempted = false;');
     expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('GOVERNANCE_OBSERVATION_INCOMPLETE');
+    expect(governanceJob).toContain('INDEPENDENT_REVIEWER_UNAVAILABLE');
+    expect(governanceJob).toContain('if (!beforeTopology.observationComplete) {');
+    expect(governanceJob).toContain(
+      'FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0 && !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob).not.toContain(
+      '!beforeTopology.observationComplete || !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob.indexOf('beforeTopology.observationComplete')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
+    expect(governanceJob.indexOf('beforeTopology.independentReviewerReady')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
     expect(governanceJob).toContain('} catch (error) {');
     expect(governanceJob).toContain('} finally {');
     expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
@@ -200,7 +244,7 @@ describe('trusted review witness command contract', () => {
     expect(receiptUpload).toContain('if: always()');
   });
 
-  it('emits a sanitized founder-phase provider receipt without widening authority', () => {
+  it('emits a sanitized independent-review provider receipt without widening authority', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
@@ -209,7 +253,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded',
+      'Human review phase: founder-only native Auto-merge; zero additional approving reviewers; deterministic independent checks and founder-final in-app authority remain separate',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',

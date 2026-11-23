@@ -12,7 +12,25 @@ const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const API_OWNED_ASSET_PATHS = new Set([
   '/assets/auth-callback.js',
+  '/auth/member/callback.js',
   '/assets/control-room.css',
+  '/assets/oauth-consent.js',
+  '/assets/oauth-consent.css',
+]);
+// Only these MCP protocol routes may cross public Pages to FCR_API. Each one
+// carries its own OAuth/static-token/public-metadata contract at the API.
+// Founder administration (vault, founder-permissions, servers), the
+// write-capable founder-signal-engine lane, and any unknown /mcp descendant
+// fail closed here and stay reachable only on the API origin.
+const PUBLIC_MCP_PROTOCOL_PATHS = new Set([
+  '/mcp',
+  '/mcp/read',
+  '/mcp/public',
+  '/mcp/founder-signal-x-engagement',
+  '/mcp/registry/v0.1/servers',
+  '/mcp/portfolio/founder-control-room',
+  '/mcp/portfolio/solcontinuity',
+  '/mcp/portfolio/promptos',
 ]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
@@ -21,6 +39,7 @@ const STATIC_EXACT_PATHS = new Set([
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|json|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
+  '/member',
   '/portable-founder-console',
   '/juss-rayy',
 ];
@@ -57,6 +76,39 @@ function shouldServeFromPages(request) {
     || STATIC_FILE_PATTERN.test(pathname);
 }
 
+function isBlockedMcpPath(pathname) {
+  // Canonicalize encoding, case, repeated and trailing slashes before deciding.
+  // An undecodable path is never a reason to open an unknown route.
+  let canonicalPath;
+  try {
+    canonicalPath = decodeURIComponent(pathname)
+      .toLowerCase()
+      .replace(/\/{2,}/g, '/')
+      .replace(/\/+$/, '') || '/';
+  } catch {
+    return true;
+  }
+  if (canonicalPath !== '/mcp' && !canonicalPath.startsWith('/mcp/')) return false;
+  return !PUBLIC_MCP_PROTOCOL_PATHS.has(canonicalPath);
+}
+
+function mcpRouteNotPublicResponse(request) {
+  return new Response(request.method === 'HEAD' ? null : JSON.stringify({
+    ok: false,
+    error: 'This MCP route is not available through the public Pages origin.',
+    code: 'MCP_ROUTE_NOT_PUBLIC',
+  }), {
+    status: 404,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
+}
+
 function createApiRequest(request) {
   const sourceUrl = new URL(request.url);
   const targetUrl = new URL(`${sourceUrl.pathname}${sourceUrl.search}`, API_ORIGIN);
@@ -75,6 +127,9 @@ function createApiRequest(request) {
 
   if (!STATIC_METHODS.has(request.method) && request.body !== null) {
     init.body = request.body;
+    // A forwarded request carries a ReadableStream, not a fresh string body.
+    // Node's Request constructor and streaming fetch require half-duplex.
+    init.duplex = 'half';
   }
 
   return new Request(targetUrl, init);
@@ -301,8 +356,93 @@ export default {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
     }
 
+    // OAuth consent and its API-owned assets travel through the same Pages
+    // browser origin as the __Host-fcr_session cookie and same-origin CSRF
+    // checks. They are served by FCR_API, never by public Pages ASSETS.
+
+    // Browser sessions use host-only cookies on the apex Pages hostname.
+    // Normalize only top-level www login/navigation GETs before collecting
+    // credentials; do not redirect login POSTs or claim cross-origin authority.
+    if ((request.method === 'GET' || request.method === 'HEAD') &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org' &&
+        (requestUrl.pathname === '/welcome' ||
+         requestUrl.pathname === '/welcome/' ||
+         requestUrl.pathname === '/member' ||
+         requestUrl.pathname === '/member/')) {
+      const canonicalPath = requestUrl.pathname.startsWith('/member') ? '/member/' : '/welcome';
+      const destination = new URL(canonicalPath, 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
+    }
+
+    // Canonical founder OAuth/session origin is the apex Pages hostname.
+    // A www entry must move to apex *before* collecting pending auth state.
+    if (request.method === 'GET' &&
+        requestUrl.pathname === '/oauth/consent' &&
+        requestUrl.origin === 'https://www.foundercontrolroom.org') {
+      const destination = new URL('/oauth/consent', 'https://foundercontrolroom.org');
+      destination.search = requestUrl.search;
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: destination.toString(),
+          'Cache-Control': 'no-store',
+          'Referrer-Policy': 'no-referrer',
+          'X-Robots-Tag': 'noindex, nofollow',
+        },
+      });
+    }
+
     if (requestUrl.pathname === SYNC_CONTROL_ROUTE) {
       return relaySyncControl(request, env);
+    }
+
+    if (isBlockedMcpPath(requestUrl.pathname)) {
+      return mcpRouteNotPublicResponse(request);
+    }
+
+    // The canonical FCR domain is a private product entrypoint, not a public
+    // marketing surface. Keep the URL stable while serving the single
+    // invitation-only sign-in door; authenticated routing remains owned by
+    // the existing FCR session flow.
+    if (requestUrl.pathname === '/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
+    // The Pages asset layer canonicalizes /work.html -> /work with a 308,
+    // and /work is a public page, not an API route. Ask ASSETS for the
+    // canonical /work URL itself: fetching the /work.html filename returns
+    // the asset layer's 308 back to /work, and returning it verbatim loops
+    // /work -> /work forever. Falling through to the API proxy instead
+    // answers without the service identity header and yields a 503 degraded
+    // page for a link on the public homepage.
+    if (requestUrl.pathname === '/work' || requestUrl.pathname === '/work/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/work';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
+
+    // /welcome is a public page, not an API route, but no static rule above
+    // classifies the extensionless path, so it falls through to the API
+    // proxy; the answer carries no service identity header and yields a 503
+    // degraded page. Ask ASSETS for the canonical /welcome URL itself: the
+    // Pages asset layer canonicalizes /welcome.html -> /welcome with a 308,
+    // so fetching the /welcome.html filename would return that redirect
+    // instead of the page.
+    if (requestUrl.pathname === '/welcome' || requestUrl.pathname === '/welcome/') {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = '/welcome';
+      return env.ASSETS.fetch(new Request(assetUrl, request));
     }
 
     if (shouldServeFromPages(request)) {

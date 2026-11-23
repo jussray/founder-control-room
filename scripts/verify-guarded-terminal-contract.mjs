@@ -1,9 +1,13 @@
 import {readFile} from 'node:fs/promises';
+import { Script } from 'node:vm';
+import { extractSingleInlineScript } from './extract-single-inline-script.mjs';
 
 const files = {
   mission: await readFile(new URL('../src/controllers/MissionController.ts', import.meta.url), 'utf8'),
   approvals: await readFile(new URL('../src/http/routes/approvals.ts', import.meta.url), 'utf8'),
   terminalRoute: await readFile(new URL('../src/http/routes/terminal.ts', import.meta.url), 'utf8'),
+  workspaceUi: await readFile(new URL('../public/control-room/github-workspace.html', import.meta.url), 'utf8'),
+  mainUi: await readFile(new URL('../public/control-room/app.js', import.meta.url), 'utf8'),
   runner: await readFile(new URL('../src/terminal/runner.ts', import.meta.url), 'utf8'),
   registry: await readFile(new URL('../src/terminal/registry.ts', import.meta.url), 'utf8'),
   githubProvider: await readFile(new URL('../src/providers/GitHubProvider.ts', import.meta.url), 'utf8'),
@@ -59,6 +63,35 @@ forbidText('Approvals', files.approvals, 'connection_config');
 forbidText('Approvals', files.approvals, "eq('provider'");
 forbidText('Approvals', files.approvals, 'branch_name');
 
+// The founder's actual GitHub workbench must be reachable and mission-scoped.
+// This verifies source wiring, not production browser/runtime success.
+requireText('FCR sidebar workspace navigation', files.mainUi, "['Build · GitHub', '/control-room/github-workspace.html']");
+requireText('Portfolio-specific workspace deep link', files.mainUi, '/control-room/github-workspace.html?project=${encodeURIComponent(p.slug)}');
+requireText('Workspace mission-branch patch endpoint', files.workspaceUi, '/approvals/${encodeURIComponent(missionId)}/patch');
+requireText('Workspace patch request idempotency', files.workspaceUi, 'body: JSON.stringify({ idempotencyKey, message, changes })');
+requireText('Workspace patch UUID without guessing', files.workspaceUi, 'crypto.randomUUID()');
+requireText('Workspace stable retry proposal', files.workspaceUi, 'pendingPatch?.signature !== signature');
+requireText('Workspace idempotent readback', files.workspaceUi, "data.result && typeof data.result === 'object'");
+requireText('Workspace concurrent double-click guard', files.workspaceUi, 'if (patchInFlight) return;');
+requireText('Workspace project source read', files.workspaceUi, '/projects/${slug}/file?');
+requireText('Workspace guarded command discovery', files.workspaceUi, '/terminal/${encodeURIComponent(slug)}/commands');
+requireText('Workspace guarded command run', files.workspaceUi, '/terminal/${encodeURIComponent(slug)}/run');
+requireText('Workspace exact-head input', files.workspaceUi, 'id="terminal-head"');
+requireText('Workspace require read risk', files.workspaceUi, "cmd.risk === 'read'");
+requireText('Workspace deny write confirmation', files.workspaceUi, 'confirmWrite: false');
+requireText('Workspace project-slug validation', files.workspaceUi, "test(linkedProject)");
+requireText('Workspace browser session', files.workspaceUi, "credentials: 'same-origin'");
+requireText('Workspace command bridge link', files.workspaceUi, '/control-room/command-bridge.html');
+requireText('Workspace L99 scope note', files.workspaceUi, 'separately approved L99 sandbox');
+forbidText('Workspace unsafe shell', files.workspaceUi, 'shell: true');
+forbidText('Workspace unsafe evaluation', files.workspaceUi, 'eval(');
+const inlineScript = extractSingleInlineScript(files.workspaceUi);
+if (!inlineScript) failures.push('GitHub workspace: missing inline interaction script');
+else {
+  try { new Script(inlineScript, { filename: 'public/control-room/github-workspace.html' }); }
+  catch (error) { failures.push(`GitHub workspace: invalid inline JS: ${String(error)}`); }
+}
+
 requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ENABLED');
 requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ALLOW_REMOTE');
 requireText('Terminal route', files.terminalRoute, 'expectedCommitSha');
@@ -90,12 +123,16 @@ for (const project of [
   'sekret-bip',
   'l99',
   'chief-ai-machine',
+  'signal-loop',
   'juss-beautiful-hair-private',
   'juss-beautiful-hair',
   'untold-stories',
 ]) {
   requireText('Terminal registry portfolio coverage', files.registry, `'${project}'`);
 }
+requireText('SignalLoop exact-head read commands', files.registry, "...gitReadCommands('signal-loop', 'signal-loop')");
+forbidText('SignalLoop non-read execution', files.registry, "spec('signal-loop'");
+forbidText('SignalLoop unverified script execution', files.registry, "...playwrightSetupCommands('signal-loop'");
 forbidText('Terminal registry', files.registry, "'bash'");
 forbidText('Terminal registry', files.registry, "'sh'");
 forbidText('Terminal registry', files.registry, "'powershell'");
