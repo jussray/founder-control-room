@@ -19,6 +19,7 @@ import {
 import { connectionVaultRouter } from "./connectionVault.js";
 import { founderPermissionsRouter } from "./founderPermissions.js";
 import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
+import type { ExternalMcpToolName } from "../../mcp/externalTools.js";
 
 export const mcpRouter = Router();
 // The public OAuth resource has one canonical identity, even for /mcp/read callers.
@@ -66,6 +67,33 @@ const handlePairedRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandler({
   authMode: "oauth",
   env: portfolioRemoteMcpEnv,
   authenticateOauth: verifyPairedSupabaseOauthToken,
+}));
+
+
+const TRUTH_COMPASS_READ_TOOLS = [
+  "chief_audit_repository",
+  "chief_list_capabilities",
+  "chief_preview_capability_plan",
+  "fcr_list_projects",
+  "fcr_get_current_truth",
+  "fcr_list_task_checkpoints",
+  "fcr_get_task_checkpoint",
+  "fcr_audit_change_genealogy",
+  "fcr_preview_skill_route",
+] as const satisfies readonly ExternalMcpToolName[];
+
+const truthCompassRemoteMcpEnv: NodeJS.ProcessEnv = {
+  ...portfolioRemoteMcpEnv,
+  // External project access is a separate, single-project grant. It is not
+  // added to PORTFOLIO_PROJECTS and cannot widen the active portfolio lane.
+  FCR_REMOTE_MCP_READ_PROJECTS: "truth-compass",
+};
+
+const handleTruthCompassRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandler({
+  authMode: "oauth",
+  env: truthCompassRemoteMcpEnv,
+  authenticateOauth: verifyPairedSupabaseOauthToken,
+  allowedToolNames: TRUTH_COMPASS_READ_TOOLS,
 }));
 
 const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler({
@@ -125,6 +153,10 @@ function invocationFromRequest(
 // founder completes Supabase authorization; an optional exact client allowlist
 // can be enabled separately without making it a prerequisite for DCR.
 mcpRouter.post("/", rateLimitExternalMcp, handlePairedRemoteMcp);
+
+// Dedicated Truth Compass bridge. Its project grant and nine read/preview tools
+// are server-bound; checkpoint writes and peer relay are not advertised or callable.
+mcpRouter.post("/portfolio/truth-compass", rateLimitExternalMcp, handleTruthCompassRemoteMcp);
 
 // Backward-compatible endpoint that now auto-upgrades to the same OAuth/DCR
 // contract as /mcp. The legacy static token remains a bounded fallback only for
