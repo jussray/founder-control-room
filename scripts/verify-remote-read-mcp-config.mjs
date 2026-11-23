@@ -138,7 +138,7 @@ assert(
 assert(
   docs.includes('POST /mcp/portfolio/truth-compass')
     && docs.includes('FCR_TRUTH_COMPASS_READ_TOKEN')
-    && docs.includes('five read/preview tools'),
+    && docs.includes('four read/preview tools'),
   'MCP stack docs must document the single-project Truth Compass grant and reduced tool catalog',
 );
 
