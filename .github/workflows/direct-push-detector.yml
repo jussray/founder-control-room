@@ -1,0 +1,45 @@
+name: Direct Push Detector
+
+# Flags commits that reach main without a merged pull request. Prevention is the
+# GitHub ruleset (pull request required, no direct-push bypass); this workflow is
+# the readback that proves it, and makes any break-glass push visible.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  detect:
+    name: Direct push detector
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require a merged pull request for every pushed commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+          PUSHER: ${{ github.actor }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The commit-to-PR association can lag a merge by a few seconds.
+          for attempt in 1 2 3 4; do
+            merged=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.merged_at != null)] | length')
+            if [[ "$merged" -gt 0 ]]; then
+              echo "Commit $HEAD_SHA landed through a merged pull request."
+              exit 0
+            fi
+            sleep $((attempt * 15))
+          done
+          title="Direct push to main: ${HEAD_SHA:0:12}"
+          body="Commit \`$HEAD_SHA\` reached \`main\` without a merged pull request (pushed by @$PUSHER). If this was a deliberate break-glass fix, record why here and close this issue; otherwise tighten the main ruleset so direct pushes are rejected."
+          gh label create direct-push-to-main --repo "$REPO" --color B60205 --description "Commit reached main without a PR" 2>/dev/null || true
+          gh issue create --repo "$REPO" --title "$title" --body "$body" --label direct-push-to-main
+          echo "::error title=Direct push to main::$HEAD_SHA has no merged pull request"
+          exit 1

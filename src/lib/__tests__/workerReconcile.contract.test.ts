@@ -20,12 +20,59 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('The repository Actions secret is a valid source');
+    expect(workflow).toContain('this error does not establish secret scope');
+    expect(workflow).toContain('only if one is configured');
+    expect(workflow).toContain('do not silently trim, rotate, expose, or bypass validation');
     expect(workflow).toContain('without a Bearer prefix');
     expect(workflow).toContain('without a NAME=value wrapper');
     expect(workflow).toContain('without wrapping quotes');
     expect(workflow).toContain('The token value was not printed.');
     expect(workflow).not.toContain('echo "$CLOUDFLARE_API_TOKEN"');
     expect(workflow).not.toContain('print(token)');
+  });
+
+  it('fails closed on absent provider-held secrets before any Worker mutation', () => {
+    const reconcileGate = workflow.indexOf('  authority-gate:');
+    const preflight = workflow.indexOf('- name: Verify provider-held Worker secret names before reconciliation');
+    const authorityReceipt = workflow.indexOf('- name: Record bounded authority receipt');
+    const deployJob = workflow.indexOf('  worker-deploy:');
+    const firstMutation = workflow.indexOf('- name: Force publication grant disabled on canonical Worker');
+    expect(reconcileGate).toBeGreaterThanOrEqual(0);
+    expect(preflight).toBeGreaterThan(reconcileGate);
+    expect(authorityReceipt).toBeGreaterThan(preflight);
+    expect(deployJob).toBeGreaterThan(authorityReceipt);
+    expect(firstMutation).toBeGreaterThan(deployJob);
+
+    const preflightStep = workflow.slice(preflight, authorityReceipt);
+    expect(preflightStep).toContain('npx --yes wrangler@4.110.0 secret list');
+    expect(preflightStep).toContain('--config wrangler.worker.toml');
+    expect(preflightStep).toContain('--format json');
+    expect(preflightStep).toContain("names = config.get('secrets', {}).get('required')");
+    expect(preflightStep).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
+    expect(preflightStep).toContain('len(set(names)) != len(names)');
+    expect(preflightStep).toContain('required = set(names) - workflow_written');
+    expect(preflightStep).toContain('missing = sorted(required - present)');
+    expect(preflightStep).toContain('contains_stale_cf_api_token(config)');
+    expect(preflightStep).toContain("if not isinstance(observed, list)");
+    expect(preflightStep).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(preflightStep).toContain('sys.exit(1)');
+    expect(preflightStep).not.toContain('wrangler secret get');
+    expect(preflightStep).not.toContain('wrangler secret put');
+  });
+
+  it('explains exhausted live proof safely without weakening exact-head validation', () => {
+    expect(workflow).toContain('for attempt in $(seq 1 24); do');
+    expect(workflow).toContain('Runtime proof diagnostics (last attempt): health_http=');
+    expect(workflow).toContain('version_http=$version_http');
+    expect(workflow).toContain('health_service_header=$health_service_header');
+    expect(workflow).toContain('version_service_header=$version_service_header');
+    expect(workflow).toContain('live_sha=$live_sha expected_sha=$EXPECTED_HEAD_SHA');
+    expect(workflow).toContain('grant_contract=$grant_contract');
+    expect(workflow).toContain('if [[ ! "$live_sha" =~ ^[0-9a-f]{40}$ ]]');
+    expect(workflow).not.toContain('echo "$candidate_version"');
+    expect(workflow).not.toContain('echo "$candidate_health"');
+    expect(workflow).toContain('api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA');
   });
 
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
