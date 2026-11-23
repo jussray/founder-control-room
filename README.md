@@ -858,3 +858,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+## Workflow applicability and exact-head test execution — conflict-repair candidate
+
+The test ledger continues to reject skipped or pending exact-head test evidence. Production Playwright is moved to a dedicated Deploy-completion workflow so normal PR/main checks no longer schedule that deliberately inapplicable production job. Its trusted main source, successful manual Deploy, production environment and exact deployed SHA checks remain required; this source repair proves no deployment or production browser result.

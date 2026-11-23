@@ -276,9 +276,12 @@ test('CI-SKIP FCR02 rollover remains in a main-scoped workflow', () => {
 
 test('CI-SKIP FCR03 production witness needs successful main deploy event', () => {
   const workflow = skipPolicyWorkflow('playwright.yml');
-  assertExactJobSkipGuard(workflow, 'playwright', "github.event_name != 'workflow_run'");
+  assert.doesNotMatch(workflow, /^  workflow_run:/m);
+  assert.doesNotMatch(workflow, /^  production-release-witness:/m);
+  const productionWorkflow = skipPolicyWorkflow('production-playwright-witness.yml');
+  assert.doesNotMatch(productionWorkflow, /^  (pull_request|push):/m);
   const production = assertExactJobSkipGuard(
-    workflow,
+    productionWorkflow,
     'production-release-witness',
     "github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'",
   );

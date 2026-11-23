@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const playwrightWorkflow = readFileSync(
-  new URL('../../../.github/workflows/playwright.yml', import.meta.url),
+  new URL('../../../.github/workflows/production-playwright-witness.yml', import.meta.url),
   'utf8',
 );
 const witness = readFileSync(
@@ -29,7 +29,11 @@ describe('production Playwright exact-SHA witness contract', () => {
   });
 
   it('keeps normal PR and push E2E separate from the post-deploy witness', () => {
-    expect(playwrightWorkflow).toContain("if: github.event_name != 'workflow_run'");
+    const ordinary = readFileSync(new URL('../../../.github/workflows/playwright.yml', import.meta.url), 'utf8');
+    expect(ordinary).not.toContain('workflow_run:');
+    expect(ordinary).not.toContain('production-release-witness:');
+    expect(playwrightWorkflow).not.toContain('  pull_request:');
+    expect(playwrightWorkflow).not.toContain('  push:');
   });
 
   it('uses the canonical public API origin instead of a duplicate secret', () => {
