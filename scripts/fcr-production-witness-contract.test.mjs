@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const playwright = readFileSync(new URL('../.github/workflows/playwright.yml', import.meta.url), 'utf8');
+const playwright = readFileSync(new URL('../.github/workflows/production-playwright-witness.yml', import.meta.url), 'utf8');
 const deploy = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
 
 test('production witness is restricted to successful manual Deploy on main', () => {

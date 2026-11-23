@@ -716,6 +716,10 @@ StoryEngine `main` advanced from the previously pinned `168d65ede38d2477ea00902f
 
 Rebinding `.github/workflows/playwright.yml` to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the successor evidence subject only. The successor FCR head must complete the live-ref check, immutable peer checkout, exact StoryEngine runtime identity, directive/receipt binding, replay protections, and full Playwright browser witness before federation may be called current. Pin alignment grants no merge, deploy, production, publication, billing, or provider-mutation authority.
 
+## Mandatory Vitest execution proof
+
+The required GitHub Actions `Test` job in `.github/workflows/ci.yml` must run every test discovered by the default Vitest suite, emit an exact-head JSON report, and fail when any unit/integration test is skipped, pending, todo, failed, missing, or not backed by assertion-level execution. The existing `Required Gate` depends on this Test job. The test-discovery ratchet prevents hidden test files; discovery alone does not prove execution. CI results and JSON artifacts do not grant merge or deployment authority. Conditional cleanup and production-only workflows retain their separate authorization and event conditions; their skipped states never become passing proof. See `docs/REQUIRED_TEST_EXECUTION.md`.
+
 ## October 13 federation recovery and PR continuity
 
 FCR PR #969 refreshed its StoryEngine peer identity after a live-ref check proved that the historical peer SHA no longer matched StoryEngine `main`. The successor must still pass the complete exact-head federation Playwright flow: immutable peer checkout, runtime identity, directive and receipt binding, replay protections, and browser witness. The first successor branch run passed, but later branch reconciliation with `main` changed the FCR head, so that result is historical for the new head and must not be reused as current proof. Branch ancestry repair also does not repair documentation truth by itself; this documentation transition records the source and evidence limits. Neither the peer pin nor a successful CI job establishes production deployment, Shopify payments, provider mutation, or merge authority.
@@ -854,3 +858,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+## Workflow applicability and exact-head test execution — conflict-repair candidate
+
+The test ledger continues to reject skipped or pending exact-head test evidence. Production Playwright is moved to a dedicated Deploy-completion workflow so normal PR/main checks no longer schedule that deliberately inapplicable production job. Its trusted main source, successful manual Deploy, production environment and exact deployed SHA checks remain required; this source repair proves no deployment or production browser result.
