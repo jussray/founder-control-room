@@ -602,6 +602,15 @@ export function createFounderContentLifecycleRouter(
           reason: 'Direct authoritative publish-now supports LinkedIn, X, or Facebook Page text; other destinations remain adapter-gated.',
         });
       }
+      if (post.platform === 'facebook' && post.mediaCount !== 0) {
+        return res.status(409).json({
+          ok: false,
+          code: 'FACEBOOK_PAGE_TEXT_ONLY',
+          platform: post.platform,
+          published: false,
+          reason: 'The first-party Facebook Page adapter supports text-only posts; media remains blocked.',
+        });
+      }
       if (!['approved', 'scheduled'].includes(post.status)) {
         return res.status(409).json({ ok: false, code: 'POST_NOT_PUBLISHABLE', status: post.status, published: false });
       }
