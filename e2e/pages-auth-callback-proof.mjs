@@ -23,7 +23,10 @@ const env = {
     async fetch(request) {
       const pathname = new URL(request.url).pathname;
       assetPaths.push(pathname);
-      if (pathname === '/') {
+      // The canonical root stays in the browser address bar while the Pages
+      // edge serves the private welcome asset. Keep this proof aligned with
+      // that non-public entrypoint rather than restoring a public root.
+      if (pathname === '/welcome') {
         return new Response('<!doctype html><html><body><h1>Founder Control Room</h1><p id="proof-complete">Magic-link handoff complete.</p></body></html>', {
           status: 200,
           headers: { 'content-type': 'text/html; charset=utf-8' },
@@ -135,6 +138,10 @@ try {
     if (assetPaths.includes(pathname)) {
       throw new Error(`MAGIC_LINK_EDGE_PROOF_STATIC_SWALLOW: ${pathname}`);
     }
+  }
+
+  if (!assetPaths.includes('/welcome')) {
+    throw new Error('MAGIC_LINK_EDGE_PROOF_MISSING_PRIVATE_WELCOME');
   }
 
   if (sessionBodies.length !== 1) {
