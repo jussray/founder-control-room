@@ -9,6 +9,7 @@ import {
   isExternalMcpToolName,
   type ExternalMcpIdentity,
   type ExternalMcpToolDependencies,
+  type ExternalMcpToolName,
 } from '../../mcp/externalTools.js';
 
 const MODERN_PROTOCOL_VERSION = '2026-07-28';
@@ -39,6 +40,8 @@ export interface RemoteReadMcpDependencies extends ExternalMcpToolDependencies {
     token: string,
     env: NodeJS.ProcessEnv,
   ) => Promise<RemoteMcpOauthIdentity>;
+  /** Optional server-enforced catalog and invocation allowlist for a dedicated client lane. */
+  allowedToolNames?: readonly ExternalMcpToolName[];
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -354,6 +357,11 @@ export function createRemoteReadMcpHandler(
   const authMode = overrides.authMode ?? 'static';
   const authenticateOauth = overrides.authenticateOauth ?? verifyRemoteMcpOauthToken;
   const executeTool = createExternalMcpToolExecutor({ ...overrides, env });
+  const allowedToolNames = overrides.allowedToolNames
+    ? new Set<ExternalMcpToolName>(overrides.allowedToolNames)
+    : null;
+  const toolIsAllowed = (name: string): name is ExternalMcpToolName =>
+    isExternalMcpToolName(name) && (!allowedToolNames || allowedToolNames.has(name));
 
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     applyMcpHeaders(res);
@@ -517,7 +525,9 @@ export function createRemoteReadMcpHandler(
     }
 
     if (body.method === 'tools/list') {
-      const result: JsonRecord = { tools: externalMcpToolDefinitions() };
+      const tools = externalMcpToolDefinitions().filter((tool) =>
+        typeof tool.name === 'string' && toolIsAllowed(tool.name));
+      const result: JsonRecord = { tools };
       res.json(rpcResult(id, modern
         ? modernResult(result, { ttlMs: 300_000, cacheScope: 'private' })
         : result));
@@ -532,7 +542,7 @@ export function createRemoteReadMcpHandler(
     const params = isRecord(body.params) ? body.params : null;
     const name = boundedString(params?.name, 160);
     const args = params?.arguments === undefined ? {} : params.arguments;
-    if (!isExternalMcpToolName(name) || !isRecord(args)) {
+    if (!name || !toolIsAllowed(name) || !isRecord(args)) {
       res.status(400).json(rpcError(id, -32602, 'Unknown tool or invalid arguments object'));
       return;
     }
