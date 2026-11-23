@@ -1,20 +1,51 @@
 import type { OperatorRelayRequestV1, OperatorRelayUsageV1 } from './operatorRelay.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
 import { anthropicPlaywrightMcpAttachment } from './operatorRelayAnthropicMcp.js';
-import { operatorRelayAdapterFromTextProvider } from './operatorRelayProvider.js';
+import {
+  OperatorRelayProviderBoundaryError,
+  operatorRelayAdapterFromTextProvider,
+  type OperatorRelayExternalProvider,
+} from './operatorRelayProvider.js';
+
+export { OperatorRelayProviderBoundaryError };
+export type { OperatorRelayExternalProvider };
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
-const ANTHROPIC_API_VERSION = '2023-06-01';
+const ANTHROPIC_API_VERSION = '2026-10-21';
 const MAX_PROVIDER_RESPONSE_ID_LENGTH = 200;
 const SAFE_GEMINI_MODEL = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_PERPLEXITY_AGENT_MODEL = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SAFE_DEEPSEEK_MODEL = /^(?:deepseek-flash|deepseek-v4-pro)$/;
 
 export const SEMANTIC_PEER_REVIEW_SPEND_MODE = 'paused' as const;
+
+function providerBoundaryError(
+  providerId: OperatorRelayExternalProvider,
+  label: string,
+  error: unknown,
+): OperatorRelayProviderBoundaryError {
+  if (error instanceof OperatorRelayProviderBoundaryError) return error;
+  const message = error instanceof Error && error.message.startsWith(label)
+    ? error.message
+    : `${label} returned an invalid response`;
+  return new OperatorRelayProviderBoundaryError(providerId, message);
+}
+
+function providerParsedResult<T>(
+  providerId: OperatorRelayExternalProvider,
+  label: string,
+  build: () => T,
+): T {
+  try {
+    return build();
+  } catch (error) {
+    throw providerBoundaryError(providerId, label, error);
+  }
+}
 
 function record(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -115,6 +146,7 @@ async function invokeJsonProvider(
   url: string,
   init: RequestInit,
   label: string,
+  providerId: OperatorRelayExternalProvider,
 ): Promise<JsonRecord> {
   let response: Response;
   try {
@@ -122,12 +154,19 @@ async function invokeJsonProvider(
   } catch {
     // Do not serialize the provider/fetch exception. A transport exception can
     // contain request metadata, URLs, proxies, or secret-bearing diagnostics.
-    throw new Error(`${label} request failed`);
+    throw new OperatorRelayProviderBoundaryError(providerId, `${label} request failed`);
   }
-  return jsonResponse(response, label);
+  try {
+    return await jsonResponse(response, label);
+  } catch (error) {
+    throw providerBoundaryError(providerId, label, error);
+  }
 }
 
 function openAiText(body: JsonRecord): string {
+  if (body.status !== 'completed') {
+    throw new Error('OpenAI relay returned a non-completed response');
+  }
   if (typeof body.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
   const output = Array.isArray(body.output) ? body.output : [];
   const parts: string[] = [];
@@ -343,8 +382,12 @@ export function createServerOperatorRelayAdapters(
               signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
             },
             'Gemini relay',
+            'gemini',
           );
-          return { text: geminiText(body), evidenceRef: evidenceRef('gemini', body, 'responseId') };
+          return providerParsedResult('gemini', 'Gemini relay', () => ({
+            text: geminiText(body),
+            evidenceRef: evidenceRef('gemini', body, 'responseId'),
+          }));
         },
       });
     }
@@ -369,8 +412,11 @@ export function createServerOperatorRelayAdapters(
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'OpenAI relay');
-        return { text: openAiText(body), evidenceRef: evidenceRef('openai', body) };
+        }, 'OpenAI relay', 'openai');
+        return providerParsedResult('openai', 'OpenAI relay', () => ({
+          text: openAiText(body),
+          evidenceRef: evidenceRef('openai', body),
+        }));
       },
     });
   }
@@ -383,21 +429,25 @@ export function createServerOperatorRelayAdapters(
         const body = await invokeJsonProvider(fetchImpl, 'https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
+            ...(anthropicMcp?.headers ?? {}),
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
-            ...(anthropicMcp?.headers ?? {}),
           },
           body: JSON.stringify({
+            ...(anthropicMcp?.body ?? {}),
             model: anthropicModel,
             max_tokens: 2_000,
             messages: [{ role: 'user', content: relayPrompt(request) }],
-            ...(anthropicMcp?.body ?? {}),
           }),
           redirect: 'error',
           signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }, 'Anthropic relay');
-        return { text: anthropicText(body), evidenceRef: evidenceRef('anthropic', body), usage: anthropicUsage(body) };
+        }, 'Anthropic relay', 'anthropic');
+        return providerParsedResult('anthropic', 'Anthropic relay', () => ({
+          text: anthropicText(body),
+          evidenceRef: evidenceRef('anthropic', body),
+          usage: anthropicUsage(body),
+        }));
       },
     });
   }
@@ -424,8 +474,11 @@ export function createServerOperatorRelayAdapters(
             }),
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }, 'Perplexity Agent relay');
-          return { text: perplexityText(body), evidenceRef: evidenceRef('perplexity', body) };
+          }, 'Perplexity Agent relay', 'perplexity');
+          return providerParsedResult('perplexity', 'Perplexity Agent relay', () => ({
+            text: perplexityText(body),
+            evidenceRef: evidenceRef('perplexity', body),
+          }));
         },
       });
     }
@@ -451,8 +504,11 @@ export function createServerOperatorRelayAdapters(
             }),
             redirect: 'error',
             signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }, 'DeepSeek relay');
-          return { text: deepSeekText(body), evidenceRef: evidenceRef('deepseek', body) };
+          }, 'DeepSeek relay', 'deepseek');
+          return providerParsedResult('deepseek', 'DeepSeek relay', () => ({
+            text: deepSeekText(body),
+            evidenceRef: evidenceRef('deepseek', body),
+          }));
         },
       });
     }
