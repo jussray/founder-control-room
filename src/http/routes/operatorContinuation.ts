@@ -4,6 +4,7 @@ import {
   OPERATOR_CONTINUATION_STORAGE_CONTRACT,
   OperatorContinuationStoreError,
   readOperatorExecutionContinuation,
+  listRecentOperatorExecutionContinuations,
   storeOperatorExecutionContinuation,
 } from '../../lib/operatorExecutionContinuationStore.js';
 import {
@@ -63,6 +64,36 @@ operatorContinuationRouter.post('/', async (req: FounderRequest, res) => {
       continuation: result.stored,
       executionAuthorityFromHandoff: false,
       currentEvidenceVerified: false,
+    });
+  } catch (error) {
+    const mapped = failure(error);
+    return res.status(mapped.status).json({ code: mapped.code });
+  }
+});
+
+/**
+ * GET /operator/continuity?projectSlug=...&repositoryFullName=...&limit=10
+ * Founder-only discovery over bounded existing checkpoint metadata. The
+ * response has no transcripts, live-source proof, or inherited approvals.
+ */
+operatorContinuationRouter.get('/', async (req: FounderRequest, res) => {
+  const projectSlug = typeof req.query.projectSlug === 'string' ? req.query.projectSlug.trim() : '';
+  const repository = typeof req.query.repositoryFullName === 'string'
+    ? req.query.repositoryFullName.trim() : '';
+  const rawLimit = req.query.limit;
+  if (!projectSlug || !repository || (rawLimit !== undefined
+    && (typeof rawLimit !== 'string' || !/^(?:[1-9]|1[0-9]|20)$/.test(rawLimit)))) {
+    return res.status(400).json({ code: 'invalid_continuation_scope' });
+  }
+  const limit = rawLimit === undefined ? 10 : Number(rawLimit);
+
+  try {
+    const result = await listRecentOperatorExecutionContinuations(projectSlug, repository, limit);
+    return res.json({
+      contract: OPERATOR_CONTINUATION_STORAGE_CONTRACT,
+      ...result,
+      executionAuthorityFromHandoff: false,
+      nextGate: 'Retrieve the task ID and independently revalidate source, runtime and founder authority.',
     });
   } catch (error) {
     const mapped = failure(error);
