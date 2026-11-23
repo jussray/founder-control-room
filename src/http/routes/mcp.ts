@@ -151,7 +151,7 @@ function invocationFromRequest(
 // can be enabled separately without making it a prerequisite for DCR.
 mcpRouter.post("/", rateLimitExternalMcp, handlePairedRemoteMcp);
 
-// Dedicated Truth Compass bridge. Its project grant and nine read/preview tools
+// Dedicated Truth Compass bridge. Its project grant and four read-only tools
 // are server-bound; checkpoint writes and peer relay are not advertised or callable.
 mcpRouter.post("/portfolio/truth-compass", rateLimitExternalMcp, handleTruthCompassRemoteMcp);
 
