@@ -444,7 +444,7 @@ export function createRemoteReadMcpHandler(
         return;
       }
       if (!secureEqual(token, configuredToken)) {
-        challenge(res, env, { error: 'invalid_token' });
+        if (overrides.challengeUnauthenticated !== false) challenge(res, env, { error: 'invalid_token' });
         res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
         return;
       }
