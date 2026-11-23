@@ -143,12 +143,15 @@ assert(
 );
 const truthCompassMigration = read('supabase/migrations/20261123160000_register_truth_compass_external_read_identity.sql');
 assert(
-  /'truth-compass',[\\s\\S]*?'jussray\\/truth-compass',[\\s\\S]*?'paused',[\\s\\S]*?'low'/.test(truthCompassMigration)
-    && /on conflict \\(slug\\) do nothing/i.test(truthCompassMigration),
+  truthCompassMigration.includes("'truth-compass'")
+    && truthCompassMigration.includes("'jussray/truth-compass'")
+    && truthCompassMigration.includes("'paused'")
+    && truthCompassMigration.includes("'low'")
+    && /on conflict \(slug\) do nothing/i.test(truthCompassMigration),
   'Truth Compass must be registered as a paused, low-risk external evidence identity without overwriting an existing row',
 );
-const truthCompassTools = mcpRouter.match(/const TRUTH_COMPASS_READ_TOOLS = \\[([\\s\\S]*?)\\] as const/);
-const truthCompassToolNames = truthCompassTools?.[1].match(/"([a-z_]+)"/g)?.map((name) => name.slice(1, -1)) ?? [];
+const truthCompassToolBlock = mcpRouter.split('const TRUTH_COMPASS_READ_TOOLS = [')[1]?.split('] as const')[0] ?? '';
+const truthCompassToolNames = [...truthCompassToolBlock.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
 assert(
   truthCompassToolNames.length === 4
     && truthCompassToolNames.includes('fcr_get_current_truth')
