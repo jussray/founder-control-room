@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE_PATH = /^(?:scripts|src|worker|app|server|api|functions|supabase\/functions|plugins\/proofmode\/src)\/.*\.(?:[cm]?js|jsx|tsx?|mts|cts)$/;
+const SOURCE_PATH = /^(?:scripts|src|public|worker|app|server|api|functions|supabase\/functions|plugins\/proofmode\/src)\/.*\.(?:[cm]?js|jsx|tsx?|mts|cts)$/;
 const EVENT = /^[A-Z][A-Z0-9_]{2,100}$/;
 // Structured/debug console methods can disclose entire user or provider objects;
 // only level-based fixed event codes may be used by changed logging calls.
@@ -93,6 +93,15 @@ function inspectSource(filename, text, added) {
         if (!safe) findings.push({ path: filename, line: from, reason: 'SAUCE_GUARD_DYNAMIC_LOG' });
       }
     }
+    // Passing a sink directly as a callback exposes values supplied by the caller.
+    if (loggerTarget(node) && ts.isCallExpression(node.parent)
+      && node.parent.arguments.includes(node)) {
+      const from = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+      const to = source.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+      if ([...added.keys()].some(line => line >= from && line <= to)) {
+        findings.push({ path: filename, line: from, reason: 'SAUCE_GUARD_DYNAMIC_LOG' });
+      }
+    }
     ts.forEachChild(node, visit);
   }
   visit(source);
@@ -121,7 +130,7 @@ export function auditChangedLogs({ base, root = ROOT } = {}) {
   const diff = execFileSync('git', [
     'diff', '--unified=0', '--no-ext-diff', '--diff-filter=ACMRT',
     base, 'HEAD', '--', 'scripts', 'src', 'worker', 'app', 'server',
-    'api', 'functions', 'supabase/functions', 'plugins/proofmode/src',
+    'api', 'public', 'functions', 'supabase/functions', 'plugins/proofmode/src',
   ], { cwd: root, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
   const map = changedLines(diff);
   const sources = Object.fromEntries([...map.keys()]

@@ -100,3 +100,15 @@ test('Sauce Guard blocks structured console output and computed sensitive log si
     assert.equal(scanAddedLines(diff, { [file]: source }).length, 0, source);
   }
 });
+
+
+test('rejects logger callbacks and audits deployed browser JavaScript', () => {
+  for (const file of ['src/task.ts', 'public/control-room/opaque-session-bootstrap.js']) {
+    for (const source of ['operation().catch(console.error);', "operation().then(logger['warn']);"]) {
+      const diff = '+++ b/' + file + '\n@@ -1,0 +1,1 @@\n+' + source + '\n';
+      assert.equal(scanAddedLines(diff, { [file]: source }).length, 1, source);
+    }
+  }
+  const verifier = read('scripts/verify-sauce-guard-egress.mjs');
+  assert.ok(verifier.includes("'api', 'public', 'functions'"));
+});

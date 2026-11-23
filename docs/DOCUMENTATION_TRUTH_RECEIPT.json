@@ -34,7 +34,8 @@
         "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation.",
         "`.github/workflows/ci.yml` must explicitly verify that the exact-SHA migration scope step output is true or false; a missing, malformed, or unevaluated decision cannot skip every database lint step while leaving Required Gate green.",
         "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority.",
-        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state."
+        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state.",
+        "`.github/workflows/ci.yml` The changed-line Sauce Guard audit covers deployed browser JavaScript under `public/` as well as server sources and rejects logger methods passed directly as callbacks. It preserves inherited logs as historical scope and never treats a clean changed-line scan as a complete privacy audit."
       ]
     },
     {
