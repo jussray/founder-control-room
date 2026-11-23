@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // External site snapshot: read-only Playwright evidence for a public URL.
-// No secrets, no cookies, no founder bearer. Produces screenshots + report.json.
+// No user credentials or founder bearer. Only ephemeral public-navigation cookies are carried.
+// Produces screenshots + report.json; request guards are not runtime identity attestation.
 import { createHash } from 'node:crypto';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -34,6 +35,14 @@ function privateOrReservedIpv4(address) {
 
 function privateOrReservedIpv6(address) {
   const value = address.toLowerCase();
+  let canonical;
+  try { canonical = new URL(`http://[${value}]/`).hostname.slice(1, -1); } catch { return true; }
+  const mapped = canonical.match(/^::ffff:([a-f0-9]{1,4}):([a-f0-9]{1,4})$/);
+  if (mapped) {
+    const high = Number.parseInt(mapped[1], 16);
+    const low = Number.parseInt(mapped[2], 16);
+    return privateOrReservedIpv4(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`);
+  }
   return (
     value === '::' ||
     value === '::1' ||
@@ -120,6 +129,7 @@ export function isPublicAddress(ip) {
     return true;
   }
   if (family === 6) {
+    if (privateOrReservedIpv6(v)) return false;
     const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     if (mapped) return isPublicAddress(mapped[1]);
     if (v === '::' || v === '::1') return false;

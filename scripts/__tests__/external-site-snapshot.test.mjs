@@ -306,3 +306,12 @@ test('a redirect without a fragment keeps the original fragment; an explicit one
 test('malformed published URLs never retain sensitive suffixes', () => {
   assert.equal(sanitizePublishedUrl('https://[/?token=secret#private'), '[invalid URL redacted]');
 });
+
+test('DNS guard rejects hexadecimal IPv4-mapped private IPv6 destinations', async () => {
+  for (const address of ['::ffff:7f00:1', '0:0:0:0:0:ffff:a00:1', '::ffff:c0a8:101']) {
+    assert.equal(isPublicAddress(address), false, address);
+    const lookup = async () => [{ address, family: 6 }];
+    assert.equal((await checkRequestUrl('https://mapped.example.com/', lookup)).ok, false, address);
+  }
+  assert.equal(isPublicAddress('::ffff:808:808'), true);
+});
