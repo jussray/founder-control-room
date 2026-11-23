@@ -374,3 +374,7 @@ NEXT GATE
 ```
 
 Say explicitly whether source files changed, commits were pushed, browser tests actually ran, CI actually ran, a PR was merged, deployment occurred, and the original live URL was reverified. Never upgrade `INFERRED`, `UNKNOWN`, `BLOCKED`, or `STALE` to `VERIFIED` for narrative convenience.
+
+## Candidate machine-verifiable proof contract
+
+`skills/urlfix/CANDIDATE_V0_2.md` preserves the earlier v0.2 candidate proof-state and tuple-binding contract alongside its schemas and source verifier. It is a subordinate candidate annex to this active skill, not a replacement authority or a downgrade of version 1.0.0. Its `skills/urlfix/MERGE_REVIEW.md` handoff remains review-only; current exact-head founder, privacy, SSRF, runtime, and provider gates continue to apply.

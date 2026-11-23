@@ -745,3 +745,7 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
 - Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
 - Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+## URLFIX current skill and candidate proof annex — conflict-repair candidate
+
+The active URLFIX 1.0.0 skill remains canonical. The older v0.2.0 candidate contract is retained as skills/urlfix/CANDIDATE_V0_2.md with its tuple-bound ownership, runtime, artifact and same-witness proof-state validator and review-only merge handoff. The annex cannot downgrade current privacy, SSRF or exact-candidate approval rules, and local verifier tests are not live browser or production evidence.

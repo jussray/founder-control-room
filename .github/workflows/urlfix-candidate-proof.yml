@@ -1,0 +1,91 @@
+name: URLFix Candidate Proof
+
+on:
+  push:
+    branches:
+      - 'feat/urlfix-v0.2.0-candidate'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: urlfix-candidate-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  urlfix-proof:
+    name: Exact-head URLFix contract + Playwright proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify URLFix contract and attack tests
+        run: npm run verify:urlfix
+
+      - name: Type check exact candidate
+        run: npm run typecheck
+
+      - name: Lint URLFix source and focused tests
+        run: npx eslint src/lib/urlfix.ts src/lib/__tests__/urlfix.test.ts --max-warnings 0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run same-witness Playwright proof
+        env:
+          URLFIX_PROOF_DIR: ${{ runner.temp }}/urlfix-proof
+        run: npx tsx e2e/urlfix-proof.ts
+
+      - name: Run read-only live Se’kret Bip dogfood
+        env:
+          EXPECTED_SEKRET_SOURCE_SHA: 36c109d9a15ef348540a3d92ca93377f963e9505
+          URLFIX_LIVE_PROOF_DIR: ${{ runner.temp }}/urlfix-live-sekretbip
+        run: npx tsx e2e/urlfix-live-sekretbip.ts
+
+      - name: Upload live dogfood evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urlfix-live-sekretbip-${{ github.run_id }}
+          path: ${{ runner.temp }}/urlfix-live-sekretbip
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urlfix-candidate-failure-${{ github.run_id }}
+          path: |
+            test-results
+            playwright-report
+            ${{ runner.temp }}/urlfix-proof
+            ${{ runner.temp }}/urlfix-live-sekretbip
+          if-no-files-found: ignore
+          retention-days: 14
