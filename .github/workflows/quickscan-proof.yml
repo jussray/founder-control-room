@@ -14,13 +14,30 @@ on:
       - 'e2e/quickscan-proof.mjs'
       - 'scripts/build-pages.mjs'
       - '.github/workflows/quickscan-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/quickscan/**'
+      - 'src/http/routes/quickscan.ts'
+      - 'src/http/routes/__tests__/quickscan.integration.test.ts'
+      - 'src/http/webhooks/stripeQuickScan.ts'
+      - 'src/http/webhooks/__tests__/stripeQuickScan.test.ts'
+      - 'src/http/server.ts'
+      - 'public/control-room/quickscan.*'
+      - 'e2e/quickscan-proof.mjs'
+      - 'scripts/build-pages.mjs'
+      - '.github/workflows/quickscan-proof.yml'
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+concurrency:
+  group: quickscan-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   proof:
@@ -39,12 +56,13 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - name: Typecheck
         run: npm run typecheck
       - name: Focused domain and route tests
-        run: npx vitest run src/quickscan/__tests__/engine.test.ts src/quickscan/__tests__/stripeWebhook.test.ts src/quickscan/__tests__/chiefOpenaiClient.test.ts src/http/routes/__tests__/quickscan.integration.test.ts src/http/webhooks/__tests__/stripeQuickScan.test.ts
+        run: npx vitest run src/quickscan/__tests__/engine.test.ts src/quickscan/__tests__/stripeWebhook.test.ts src/quickscan/__tests__/chiefOpenaiClient.test.ts src/quickscan/__tests__/chiefPrompts.test.ts src/http/routes/__tests__/quickscan.integration.test.ts src/http/webhooks/__tests__/stripeQuickScan.test.ts
       - name: Build Pages assets
         run: npm run build:pages
       - name: Install Chromium

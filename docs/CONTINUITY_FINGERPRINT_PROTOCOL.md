@@ -44,6 +44,17 @@ Rules:
 7. Preserve predecessor fingerprints/cookies and link successors. Do not overwrite history to make the present look cleaner.
 8. For UI/runtime truth, exact-head Playwright or equivalent real-path evidence remains required where the governing project contract requires it.
 
+### Browser proof authority
+
+Playwright is the default first browser and runtime proof surface for portfolio web work unless a stricter project-local contract names another primary authority.
+
+- For customer-facing UI, routes, auth flows, onboarding, checkout, release, or browser-observable runtime changes, use exact-head Playwright evidence before calling the changed path complete.
+- When the governing project requires desktop and mobile coverage, both must be proven before cutover.
+- Browser connectors such as Opera may provide exploratory readback or a secondary independent view, but they are not substitutes for required Playwright evidence.
+- A secondary browser connector being disconnected, unavailable, stale, or unable to invoke must never block work that Playwright and the authoritative repository/provider/runtime can still perform.
+- Do not rewrite a user's connector configuration as broken merely because the current agent surface cannot invoke it. Record the current observation precisely and continue through the primary proof path.
+- If Playwright itself is blocked by environment policy, network controls, missing browser dependencies, or runner infrastructure, record that exact Playwright blocker and continue all non-substitutive verification that remains available. Do not convert secondary-browser failure into the blocker.
+
 The executable FCR implementation is `src/continuity/trueFirstPortfolio.ts`. It intentionally returns `BASELINE_STALE` when a head/cookie binding moves instead of manufacturing a FALSE verdict.
 
 ## Genesis fingerprint

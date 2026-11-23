@@ -10,6 +10,10 @@ import {
   routeContentFoundryCouncil,
   type ContentFoundryCouncilDecision,
 } from './contentFoundryCouncil.js';
+import {
+  FCR_ALWAYS_ON_STANDING_COMMAND_IDS,
+  routeFcrStandingCommands,
+} from './fcrStandingCommandRegistry.js';
 
 export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
 
@@ -19,27 +23,10 @@ export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
  * in every goal or capability plan for FCR to apply them.
  */
 export const FCR_AUTOMATIC_COUNCIL_LENSES = [
-  'human',
-  'futureyou',
-  'truthmode',
-  'confess',
-  'ultrathink',
+  ...FCR_ALWAYS_ON_STANDING_COMMAND_IDS,
   'product-design',
   'data-analytics',
   'deep-research',
-  'steal',
-  'redteam',
-  'lindymode',
-  'l99',
-  'ooda',
-  'hormozi',
-  'billgates',
-  'elonmusk',
-  'firstprinciples',
-  'socrates',
-  'antiadvice',
-  'unlearn',
-  'loop',
 ] as const;
 
 export const FCR_REQUIRED_PARALLEL_LENSES = FCR_AUTOMATIC_COUNCIL_LENSES;
@@ -86,6 +73,11 @@ export interface FcrSkillRoutingDecision {
   automaticCouncilLenses: string[];
   requiredParallelLenses: string[];
   missingParallelLenses: string[];
+  explicitCommandIds: string[];
+  autoRoutedCommandIds: string[];
+  standingCommandIds: string[];
+  operatingSystemIds: string[];
+  attackIntensity: number | null;
   contentFoundry: ContentFoundryCouncilDecision;
   requiredTools: string[];
   requiredProof: string[];
@@ -114,6 +106,15 @@ const DESIGN_COMMAND_ALIASES: Readonly<Record<string, string>> = Object.fromEntr
 
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: 'goalfix',
+  godmode: 'ultrathink-attack-godmode',
+  'attack-godmode': 'ultrathink-attack-godmode',
+  urlfix: 'urlfix',
+  'repair-to-proof': 'repair-to-proof',
+  continuity: 'continuity-proof-ledger',
+  receipt: 'continuity-proof-ledger',
+  fixfast: 'goalfix',
+  'repair-verify-merge': 'goalfix',
+  goal: 'goalfix',
   'repo-truth': 'repo-truth',
   'truth-decay': 'truth-decay-audit',
   'truth-decay-audit': 'truth-decay-audit',
@@ -131,6 +132,11 @@ const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   ...DESIGN_COMMAND_ALIASES,
 };
 
+// URL path segments are not commands; composed commands such as /truthmode/confess stay parseable.
+function withoutUrls(goal: string): string {
+  return goal.replace(/https?:\/\/\S+/gi, ' ');
+}
+
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
@@ -145,16 +151,18 @@ function canonicalCapabilityId(value: string): string {
 
 function explicitSkillsFromGoal(goal: string): string[] {
   const required: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     const skill = EXPLICIT_SKILL_ALIASES[match[1]];
     if (skill) pushUnique(required, skill);
   }
+  // Unprefixed invocation is honored only when the request starts with it; prose mentions do not bind a companion.
+  if (/^repair-to-proof\b/.test(goal.trim())) pushUnique(required, 'repair-to-proof');
   return required;
 }
 
 function explicitDesignCommandsFromGoal(goal: string): string[] {
   const commands: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
+  for (const match of withoutUrls(goal).matchAll(/\/([a-z0-9-]+)/g)) {
     if (DESIGN_COMMAND_IDS.has(match[1])) pushUnique(commands, match[1]);
   }
   return commands;
@@ -182,11 +190,17 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  if (/\bgodmode\b/.test(withoutUrls(goal))) pushUnique(policyRequiredCapabilityIds, 'ultrathink-attack-godmode');
   const designCommandIds = explicitDesignCommandsFromGoal(goal);
+  const standingCommands = routeFcrStandingCommands(input.goal, input.action);
+  if (standingCommands.standingCommandIds.includes('urlfix')) pushUnique(policyRequiredCapabilityIds, 'urlfix');
   const automaticCouncilLenses = [...FCR_AUTOMATIC_COUNCIL_LENSES];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
-  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
+  const urlfixGoal = policyRequiredCapabilityIds.includes('urlfix');
+  const godmodeGoal = policyRequiredCapabilityIds.includes('ultrathink-attack-godmode');
+  const repairToProofGoal = policyRequiredCapabilityIds.includes('repair-to-proof');
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository) || repairToProofGoal || godmodeGoal || (urlfixGoal && mutationRequested);
   const uiGoal = isUiGoal(goal) || designCommandIds.length > 0;
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
@@ -194,11 +208,16 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const contentFoundry = routeContentFoundryCouncil(input.goal, input.action);
 
   pushUnique(requiredProof, 'Founder Council is applied automatically in code; slash commands are optional foreground aliases and never create authority');
+  pushUnique(requiredProof, 'Standing command routing is inferred from founder intent and action; manual slash invocation is emphasis or override, not an activation requirement');
+  pushUnique(requiredProof, `Operating-system identity remains separate from implementation/runtime proof: ${standingCommands.operatingSystemIds.join(', ')}`);
   pushUnique(requiredProof, 'Redteam remains two separate passes: premise before selection and solution after selection; distinct failures keep distinct receipts');
   pushUnique(requiredProof, 'Steal adapts principles, structures, and durable mechanisms only; protected expression, private implementation, credentials, branding, and proprietary assets stay out of scope');
   pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
   pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
   pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
+  if (standingCommands.attackIntensity !== null) {
+    pushUnique(requiredProof, `Attack intensity ${standingCommands.attackIntensity} is an adversarial coverage hint only and never expands tool or mutation authority`);
+  }
 
   for (const capabilityId of contentFoundry.policyRequiredCapabilityIds) {
     pushUnique(policyRequiredCapabilityIds, capabilityId);
@@ -244,6 +263,12 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     pushUnique(requiredProof, 'exact-head Playwright evidence for UI/runtime claims');
   }
 
+  if (urlfixGoal) {
+    pushUnique(requiredTools, 'playwright');
+    pushUnique(requiredProof, 'URLFIX ownership and live runtime identity must be resolved before source mutation');
+    pushUnique(requiredProof, 'URLFIX repair proof must rerun the same failing browser path after the patch');
+  }
+
   if (mutationRequested) {
     pushUnique(requiredProof, 'action-specific authority, approval, rollback, and execution receipt');
   }
@@ -283,7 +308,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const status = errors.length === 0 ? 'ready_for_runtime_discovery' : 'blocked';
   const nextGate = status === 'blocked'
     ? 'Return the policy failures to Chief AI and require a corrected hash-bound capability plan before runtime discovery or mutation.'
-    : 'Discover runtime availability only for capabilities in the validated Chief AI plan; the automatic Founder Council remains advisory and preserves Product Design, Data Analytics, Deep Research, Content Foundry, provider, proof, approval, rollback, and execution boundaries.';
+    : 'Discover runtime availability only for capabilities in the validated Chief AI plan; standing commands and the automatic Founder Council remain advisory and preserve OS identity, Product Design, Data Analytics, Deep Research, Content Foundry, provider, proof, approval, rollback, and execution boundaries.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
@@ -298,6 +323,11 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     automaticCouncilLenses,
     requiredParallelLenses,
     missingParallelLenses,
+    explicitCommandIds: standingCommands.explicitCommandIds,
+    autoRoutedCommandIds: standingCommands.autoRoutedCommandIds,
+    standingCommandIds: standingCommands.standingCommandIds,
+    operatingSystemIds: standingCommands.operatingSystemIds,
+    attackIntensity: standingCommands.attackIntensity,
     contentFoundry,
     requiredTools,
     requiredProof,

@@ -3,8 +3,8 @@ import { agentOperatorPolicy } from '../agentRegistry.js';
 import { OPERATOR_RELAY_INSTRUCTOR, OPERATOR_RELAY_PEERS } from '../operatorRelayConstants.js';
 
 describe('operator relay lanes', () => {
-  it('keeps the five governed peer operators in one canonical lane', () => {
-    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'deepseek']);
+  it('keeps the six governed peer operators in one canonical lane', () => {
+    expect(OPERATOR_RELAY_PEERS).toEqual(['gemini', 'codex', 'claude-code', 'perplexity', 'deepseek', 'muse']);
   });
 
   it('keeps every canonical peer enabled for bounded relay work', () => {

@@ -12,8 +12,14 @@ import {
   classifyUpdateBranchFailure,
   replaceManagedBlock,
   continuityBlock,
+  observedAutoMerge,
+  observedFounderAutoMerge,
   collectRolloverOrder,
   sameRepositoryPull,
+  rolloverDeferral,
+  deferralAlreadyRecorded,
+  ROLLOVER_DEFER_LABEL,
+  DEFERRED_PROOF_STATE,
 } from '../scripts/pr-continuity.mjs';
 
 const repo = 'jussray/example';
@@ -64,6 +70,62 @@ test('AT16 receipt exposes merge authority while denying candidate approval and 
   assert.match(block, /authorizes_merge: \*\*false\*\*/);
   assert.match(block, /must not execute/);
 });
+test('auto-merge intent distinguishes queued, not queued, and provider-unknown without inferring authority', () => {
+  assert.equal(observedAutoMerge({ auto_merge: { enabled_by: { login: 'founder' } } }), 'QUEUED');
+  assert.equal(observedAutoMerge({ auto_merge: null }), 'NOT_QUEUED');
+  assert.equal(observedAutoMerge({}), 'UNKNOWN');
+  assert.equal(observedAutoMerge({ auto_merge: 'true' }), 'UNKNOWN');
+  for (const autoMergeIntent of ['QUEUED', 'NOT_QUEUED', 'UNKNOWN']) {
+    const block = continuityBlock({
+      repository: repo,
+      prNumber: 1010,
+      rootBaseRef: 'main',
+      rootBaseSha: '1'.repeat(40),
+      baseRef: 'main',
+      baseSha: '1'.repeat(40),
+      headRef: 'feature',
+      headSha: '2'.repeat(40),
+      continuityState: 'CURRENT',
+      proofState: 'EXACT_HEAD_PROOF_SEPARATE',
+      autoMergeIntent,
+    });
+    assert.ok(block.includes(`auto_merge_intent: **${autoMergeIntent}**`));
+    assert.match(block, /merge_approved: \*\*false\*\*/);
+    assert.match(block, /authorizes_merge: \*\*false\*\*/);
+    assert.match(block, /configured required checks, tests, review-thread resolution and branch protections/);
+  }
+});
+
+test('founder native Auto-merge is read from current provider actor, never promoted to in-app approval', () => {
+  const otherRepo = pr(976, 'main', 'feature');
+  const current = { ...otherRepo, auto_merge: { enabled_by: { login: 'jussray' } } };
+  assert.equal(observedFounderAutoMerge(current, 'jussray/founder-control-room'), 'UNKNOWN');
+  const ownerRepo = { full_name: 'jussray/founder-control-room' };
+  const founderPr = { ...current, head: { ...current.head, repo: ownerRepo }, base: { ...current.base, repo: ownerRepo } };
+  assert.equal(observedFounderAutoMerge(founderPr, 'jussray/founder-control-room'), 'FOUNDER_SELECTED');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: { enabled_by: { login: 'other' } } }, 'jussray/founder-control-room'), 'OTHER_ACTOR');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: null }, 'jussray/founder-control-room'), 'NOT_QUEUED');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: {} }, 'jussray/founder-control-room'), 'UNKNOWN');
+  assert.equal(observedFounderAutoMerge(founderPr, 'jussray/other-repository'), 'NOT_APPLICABLE');
+  const block = continuityBlock({
+    repository: 'jussray/founder-control-room', prNumber: 976, rootBaseRef: 'main',
+    rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'feature', headSha: '2',
+    continuityState: 'CURRENT', proofState: 'SEPARATE', autoMergeIntent: 'QUEUED',
+    founderAutoMergeSelection: 'FOUNDER_SELECTED',
+  });
+  assert.ok(block.includes('founder_auto_merge_selection: **FOUNDER_SELECTED**'));
+  assert.ok(block.includes('merge_approved: **false**'));
+  assert.ok(block.includes('authorizes_merge: **false**'));
+});
+
+test('auto-merge click or cancellation triggers authoritative continuity metadata refresh', () => {
+  const workflow = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+  assert.match(workflow, /pull_request_target:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(workflow, /pull_request:[\s\S]*auto_merge_enabled, auto_merge_disabled/);
+  assert.match(workflow, /permissions: \{\}/);
+  assert.match(workflow, /name: PR Continuity Metadata Receipt/);
+});
+
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
 test('AT18 stacked dependency graph rolls parent before child', () => assert.deepEqual(collectRolloverOrder([pr(10, 'main', 'parent'), pr(11, 'parent', 'child')]), [10, 11]));
 test('AT19 unrelated stack is excluded', () => assert.deepEqual(collectRolloverOrder([pr(10, 'other', 'child')]), []));
@@ -130,4 +192,112 @@ test('AT30 rollover aggregate preserves per-state and per-failure receipt fields
   assert.match(continuitySource, /failureReceipts/);
   assert.match(continuitySource, /receiptId: `pr-\$\{number\}:\$\{receipt\.code\}`/);
 });
+test('AT31 drafts are deferred from rollover instead of rolled forward', () => {
+  assert.equal(rolloverDeferral({ ...pr(1, 'main', 'a'), draft: true, labels: [] }), 'DEFERRED_DRAFT');
+});
+test('AT32 stale-labelled ready PRs are deferred; other labels are not', () => {
+  assert.equal(ROLLOVER_DEFER_LABEL, 'stale');
+  assert.equal(rolloverDeferral({ ...pr(2, 'main', 'b'), draft: false, labels: [{ name: 'stale' }] }), 'DEFERRED_STALE');
+  assert.equal(rolloverDeferral({ ...pr(3, 'main', 'c'), draft: false, labels: [{ name: 'keep-open' }] }), null);
+  assert.equal(rolloverDeferral({ ...pr(4, 'main', 'd'), draft: false }), null);
+  assert.equal(rolloverDeferral(undefined), null);
+});
+test('AT33 deferred receipts never claim current proof and are written once', () => {
+  assert.equal(DEFERRED_PROOF_STATE, 'REVERIFY_OR_ROLLOVER_REQUIRED');
+  const block = continuityBlock({ repository: repo, prNumber: 5, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'DEFERRED_DRAFT', proofState: DEFERRED_PROOF_STATE });
+  assert.match(block, /continuity: \*\*DEFERRED_DRAFT\*\*/);
+  assert.match(block, /authorizes_merge: \*\*false\*\*/);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_DRAFT'), true);
+  assert.equal(deferralAlreadyRecorded(block, 'DEFERRED_STALE'), false);
+  assert.equal(deferralAlreadyRecorded('', 'DEFERRED_DRAFT'), false);
+});
+test('AT34 rollover routes deferred PRs away from update-branch and keeps them out of blocked debt', () => {
+  assert.match(continuitySource, /const deferral = rolloverDeferral\(byNumber\.get\(number\)\)/);
+  assert.match(continuitySource, /deferredCount: deferred\.length/);
+  assert.match(continuitySource, /const blocked = results\.filter\(\(item\) => item\.state\.startsWith\('BLOCKED'\)\)/);
+});
+test('AT35 stacked children are still ordered after a deferred parent', () => {
+  assert.deepEqual(collectRolloverOrder([{ ...pr(10, 'main', 'parent'), draft: true }, pr(11, 'parent', 'child')]), [10, 11]);
+});
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
+
+
+// Fail closed if a privileged event guard is broadened.
+// Static contract tests do not execute production, cleanup, or rollover jobs.
+function skipPolicyJob(source, name) {
+  const marker = '\n  ' + name + ':\n';
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, 'Missing job ' + name);
+  const tail = source.slice(start + marker.length);
+  const next = tail.search(/\n  [a-zA-Z_][a-zA-Z0-9_-]*:\s*\n/);
+  return next === -1 ? tail : tail.slice(0, next);
+}
+function skipPolicyWorkflow(name) {
+  return readFileSync(new URL('../.github/workflows/' + name, import.meta.url), 'utf8');
+}
+function assertExactJobSkipGuard(source, name, expected) {
+  const job = skipPolicyJob(source, name);
+  const conditions = job.split('\n').filter((line) => /^    if:/.test(line));
+  assert.deepEqual(conditions, ['    if: ' + expected], 'Unsafe or missing job-level if on ' + name);
+  return job;
+}
+test('CI-SKIP FCR01 exact-head and privileged metadata retain separated events', () => {
+  const source = skipPolicyWorkflow('pr-continuity.yml');
+  const audit = assertExactJobSkipGuard(source, 'exact-head-audit', "github.event_name == 'pull_request'");
+  const metadata = assertExactJobSkipGuard(source, 'metadata-receipt', "github.event_name == 'pull_request_target'");
+  assert.match(audit, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.match(metadata, /ref:.*github\.sha/);
+  assert.doesNotMatch(metadata, /ref:.*github\.event\.pull_request\.head\.sha/);
+  assert.match(metadata, /^    permissions:\n      contents: read\n      pull-requests: write$/m);
+});
+test('CI-SKIP FCR02 rollover remains restricted to main events', () => {
+  assertExactJobSkipGuard(
+    skipPolicyWorkflow('pr-continuity.yml'),
+    'rollover',
+    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')",
+  );
+});
+test('CI-SKIP FCR03 production witness needs successful main deploy event', () => {
+  const workflow = skipPolicyWorkflow('playwright.yml');
+  assertExactJobSkipGuard(workflow, 'playwright', "github.event_name != 'workflow_run'");
+  const production = assertExactJobSkipGuard(
+    workflow,
+    'production-release-witness',
+    "github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'",
+  );
+  assert.match(production, /^    environment: production$/m);
+});
+test('CI-SKIP FCR04 Neon cleanup requires closed same-repo PR', () => {
+  const workflow = skipPolicyWorkflow('neon-pr-branches.yml');
+  const create = skipPolicyJob(workflow, 'create_neon_branch');
+  const cleanup = skipPolicyJob(workflow, 'delete_neon_branch');
+  assert.match(create, /github\.event\.action == 'opened'/);
+  assert.match(create, /github\.event\.action == 'synchronize'/);
+  assert.match(cleanup, /github\.event\.action == 'closed'/);
+  assert.match(cleanup, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(cleanup, /^    if: \|$/m);
+  assert.doesNotMatch(cleanup, /if: always\(\)/);
+});
+test('CI-SKIP FCR05 release contract is PR-tested, provenance is gated', () => {
+  const workflow = skipPolicyWorkflow('main-release-provenance.yml');
+  assert.match(skipPolicyJob(workflow, 'contract'), /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+  const provenance = assertExactJobSkipGuard(workflow, 'provenance', "${{ github.event_name != 'pull_request' }}");
+  assert.match(provenance, /^    needs: contract$/m);
+});
+test('CI-SKIP FCR06 reject unconditional and widened metadata expressions', () => {
+  const source = skipPolicyWorkflow('pr-continuity.yml');
+  const original = "if: github.event_name == 'pull_request_target'";
+  for (const replacement of [
+    'if: always()',
+    original + ' || true',
+    original + " || github.event_name == 'pull_request'",
+    'if: >',
+  ]) {
+    const mutant = source.replace(original, replacement);
+    assert.notEqual(mutant, source);
+    assert.throws(
+      () => assertExactJobSkipGuard(mutant, 'metadata-receipt', "github.event_name == 'pull_request_target'"),
+      /Unsafe or missing job-level if/,
+    );
+  }
+});
