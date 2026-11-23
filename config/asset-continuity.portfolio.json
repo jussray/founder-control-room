@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "authorityRepository": "jussray/founder-control-room",
+  "canonicalContract": "docs/ASSET_CONTINUITY_GLOBAL_V1.md",
+  "canonicalSkill": "skills/asset-continuity/SKILL.md",
+  "defaultManifestPath": "visual/project.asset-manifest.json",
+  "rule": "Every governed project must be explicitly classified for asset continuity. Projects with identity-bearing visual or media assets must carry a project-local manifest and runtime/source verification before visual continuity can be claimed.",
+  "statusDefinitions": {
+    "required": "Identity-bearing assets exist or the project has a user-facing visual surface. A project-local manifest is required.",
+    "conditional": "No canonical visual identity is currently established, but any future identity-bearing asset adoption activates the manifest requirement before visual continuity claims.",
+    "external-reference": "The strongest canonical asset currently lives in an external provider or conversation-approved artifact and must be recorded with provider/reference truth until materialized.",
+    "blocked": "Asset continuity cannot currently be verified because source, manifest, provenance, or runtime evidence is missing or contradictory."
+  },
+  "projects": [
+    {
+      "repository": "jussray/founder-control-room",
+      "slug": "founder-control-room",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Create and verify the local manifest for Founder Home, Control Room shell, canonical logos/illustrations, and future visual assets before the next material visual redesign."
+    },
+    {
+      "repository": "jussray/Sekret-Bip",
+      "slug": "sekret-bip",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Bind Night, Suhana, Sy, Cloud, cosmic-family motifs, splash/onboarding hero art, and approved source visuals as canonical assets with stricter teen/privacy boundaries."
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "slug": "chief-ai-machine",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Inventory the independent Chief interface identity, logo/host/command visuals, and rendered shell assets before further visual convergence with FCR or PromptOS."
+    },
+    {
+      "repository": "jussray/StoryEngine",
+      "slug": "l99",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Inventory story-world identity assets, canon graphics, covers/illustrations, and any generated visual families while preserving story provenance."
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "slug": "juss-beautiful-hair",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Bind storefront hero/product-image families, logo/wordmark treatment, campaign graphics, and canonical commerce imagery without confusing asset fidelity with Shopify catalog truth."
+    },
+    {
+      "repository": "jussray/jbh-private",
+      "slug": "juss-beautiful-hair-private",
+      "visualSurface": false,
+      "status": "conditional",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Activate a local manifest before private operational graphics, supplier visual evidence, or campaign assets become identity-bearing production inputs."
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "slug": "untold-stories",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Bind canonical story-commerce hero art, cover/product imagery, logo system, motifs, and campaign assets before the next visual redesign."
+    },
+    {
+      "repository": "jussray/sync-party-game",
+      "slug": "sync-party",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Bind Live Site arena art and ChatGPT SYNC AI-host assets separately; treat the founder-approved trilogy references as distinct asset families and block cross-surface visual collapse."
+    },
+    {
+      "repository": "jussray/promptos",
+      "slug": "promptos",
+      "visualSurface": true,
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json",
+      "nextGate": "Inventory PromptOS independent interface identity, diagrams, logos, visual grammar, and any canonical prompt/workflow graphics before further product-shell work."
+    }
+  ],
+  "externalCoverage": [
+    {
+      "repository": "jussray/THINK-TANK",
+      "slug": "think-tank",
+      "status": "conditional",
+      "manifestPath": "visual/project.asset-manifest.json"
+    },
+    {
+      "repository": "jussray/solcontinuity",
+      "slug": "solcontinuity",
+      "status": "conditional",
+      "manifestPath": "visual/project.asset-manifest.json"
+    },
+    {
+      "repository": "jussray/SleepWealth-Agent",
+      "slug": "sleepwealth-agent",
+      "status": "conditional",
+      "manifestPath": "visual/project.asset-manifest.json"
+    },
+    {
+      "repository": "jussray/Sweats",
+      "slug": "sweats",
+      "status": "required",
+      "manifestPath": "visual/project.asset-manifest.json"
+    }
+  ],
+  "truthBoundary": "This registry proves portfolio classification only. It does not prove a repository-local manifest exists, canonical assets are current, external assets are retrievable, runtime surfaces render them, licensing is sufficient, visual QA passed, or a visual change is merge/deploy/publish ready."
+}

@@ -218,6 +218,9 @@ For `main` pull requests, `.github/workflows/ci.yml` must still execute the guar
 
 Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
 
+## Asset Continuity verifier — Quality Gate step (candidate, November 15, 2026)
+
+Draft PR #906 adds `npm run verify:asset-continuity` to the `Guarded Terminal and AI Skill Contracts` job in `.github/workflows/quality-gate.yml`, after the existing terminal, juss-flow, production-authority, and AI-skill checks, which stay in place. A pass is exact-head structural evidence that the asset continuity registry, manifest template, contract, and skill keep their invariants. It cannot certify visual fidelity, prove runtime assets, or substitute for deterministic independent review, authenticated Founder Final, provider readback, or live GitHub ruleset state. This step adds no merge authority, and whether GitHub requires it is a separate provider fact.
 
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 

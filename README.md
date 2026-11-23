@@ -832,6 +832,9 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
 
+## Asset Continuity gate (candidate, 2026-11-15)
+
+Draft PR #906 adds a portfolio Asset Continuity skill (`skills/asset-continuity/SKILL.md`, status `active-candidate`), its contract (`docs/ASSET_CONTINUITY_GLOBAL_V1.md`), a portfolio registry and manifest template under `config/`, and `scripts/verify-asset-continuity.mjs`. The Quality Gate `Guarded Terminal and AI Skill Contracts` job now also runs `npm run verify:asset-continuity` on the exact PR head. The verifier checks structure only: every governed and external-coverage repository has a classification, visual projects are not left optional, and the contract, skill, and template keep their required invariants. It does not judge artistic fidelity, does not prove that any project manifest or runtime asset exists, and changes no review, merge, deployment, or provider authority.
 ## Founder OS lab adapter promotion eligibility
 
 `assessProjectAdapterFreshness` in `src/founder-os-lab/projectAdapterFreshness.ts` reports `promotionAllowed: true` and `recommendation: 'candidate-promote'` only when the authoritative current head equals the audited exact head and every required contract blob matches. Head movement, drift, missing or invalid blobs, and unknown heads keep it `false`. Eligibility means the evidence may go to founder review; `founderReviewRequired` stays `true` and `mutationAuthorized` stays `false`, so it never grants merge, deploy, publication, or provider authority.
@@ -854,3 +857,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+## Canonical record completeness — repair candidate
+
+The candidate asset verifier now rejects incomplete canonical records: source authority, provenance, continuity fingerprint, status, transformations and a supported local path or external reference are required before location-specific checks. Focused negative fixtures verify rejection; structural acceptance still proves neither visual fidelity nor runtime rendering.
