@@ -7,6 +7,7 @@ import {
   normalizeTokenScopes,
   parseVaultEnvironment,
 } from '../../connectionVault/tokens.js';
+import { looksLikeRawCredential } from '../../lib/connectionConfigSecrets.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
@@ -289,6 +290,12 @@ connectionVaultRouter.post('/bindings', async (req: FounderRequest, res) => {
     }
     if (/(TOKEN|SECRET|PASSWORD|PRIVATE_KEY|SERVICE_ROLE|API_KEY)/i.test(name) && kind !== 'secret') {
       return res.status(400).json({ error: 'secret-like environment names must use kind=secret' });
+    }
+    if (secretRefInput && looksLikeRawCredential(secretRefInput)) {
+      return res.status(400).json({ error: 'secretRef must be an opaque reference, not the credential itself' });
+    }
+    if (variableValue !== null && looksLikeRawCredential(variableValue)) {
+      return res.status(400).json({ error: 'variableValue looks like raw credential material; store it as kind=secret with a secretRef instead' });
     }
     const secretRef = kind === 'secret' ? normalizeSecretReference(secretRefInput) : null;
 

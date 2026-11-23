@@ -216,8 +216,21 @@ describe('trusted review witness command contract', () => {
 
     expect(governanceJob).toContain('let providerMutationAttempted = false;');
     expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('GOVERNANCE_OBSERVATION_INCOMPLETE');
     expect(governanceJob).toContain('INDEPENDENT_REVIEWER_UNAVAILABLE');
-    expect(governanceJob.indexOf('beforeTopology.independentReviewerReady')).toBeLessThan(governanceJob.indexOf('providerMutationAttempted = true;'));
+    expect(governanceJob).toContain('if (!beforeTopology.observationComplete) {');
+    expect(governanceJob).toContain(
+      'FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0 && !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob).not.toContain(
+      '!beforeTopology.observationComplete || !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob.indexOf('beforeTopology.observationComplete')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
+    expect(governanceJob.indexOf('beforeTopology.independentReviewerReady')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
     expect(governanceJob).toContain('} catch (error) {');
     expect(governanceJob).toContain('} finally {');
     expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
@@ -240,7 +253,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-plus-independent; one native approval and eligible non-owner human reviewer required',
+      'Human review phase: founder-only native Auto-merge; zero additional approving reviewers; deterministic independent checks and founder-final in-app authority remain separate',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',

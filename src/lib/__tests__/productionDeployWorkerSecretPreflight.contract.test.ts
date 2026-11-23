@@ -80,4 +80,25 @@ describe('production Worker secret preflight contract', () => {
     expect(wrangler).toContain('"SUPABASE_SERVICE_ROLE_KEY",');
     expect(wrangler).toContain('"FOUNDER_SESSION_ENCRYPTION_KEY",');
   });
+
+  it('fails closed on [vars]/secret name collisions inside the authority gate before any deploy', () => {
+    const reconcile = readFileSync(
+      new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
+      'utf8',
+    );
+    const collisionCommand = 'node scripts/verify-worker-var-secret-collisions.mjs';
+    for (const source of [workflow, reconcile]) {
+      const authorityStart = source.indexOf('  authority-gate:');
+      const deployJobStart = source.indexOf('  worker-deploy:');
+      expect(authorityStart).toBeGreaterThanOrEqual(0);
+      expect(deployJobStart).toBeGreaterThan(authorityStart);
+      const authorityGate = source.slice(authorityStart, deployJobStart);
+      const readbackIndex = authorityGate.indexOf('secret list');
+      const collisionIndex = authorityGate.indexOf(collisionCommand);
+      expect(readbackIndex).toBeGreaterThanOrEqual(0);
+      expect(collisionIndex).toBeGreaterThan(readbackIndex);
+      expect(authorityGate).toContain('--secret-receipt "$secret_receipt"');
+      expect(source.indexOf(collisionCommand)).toBeLessThan(deployJobStart);
+    }
+  });
 });

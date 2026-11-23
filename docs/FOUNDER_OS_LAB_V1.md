@@ -207,6 +207,14 @@ A broad autonomous runtime would compound authority mistakes faster than it comp
 - treating successful content validation as a Buffer or platform receipt;
 - expanding one preview route into a second orchestration system.
 
+## Bounded repository-source edit handoff
+
+The L0 simulator remains free of provider calls and live writes. The branch-only extension in `labs/ai-company/process-sandbox/virtual-workspace.mjs` accepts explicitly labeled `repository-source` snapshots, applies exact one-occurrence text replacements **in memory**, and returns separate source artifacts and a sanitized hash receipt. No file is modified merely by staging it.
+
+`buildFounderOsMissionPatchHandoff()` prepares the matching payload for FCR's existing `POST /approvals/:missionId/patch`. The server's `validateFounderOsStagedPatch()` guards the real branch handoff through founder authentication, a registered GitHub mission branch, exact live head and mission pin, live original file hashes, edit hashes, and idempotent provider mutation. This is **not** a second executor, a new command center, or automatic merge/deploy authority.
+
+Do not treat an exported request, a passing isolated unit test, or a Cloudflare preview as a live commit or production proof. A branch write is complete only after the existing FCR approval-execution ledger and provider commit receipt are independently observed.
+
 ## Graduation gates
 
 A capability may leave the lab only through a separate focused change that provides:
