@@ -166,6 +166,8 @@ export interface PatchFileChange {
 export interface Patch {
   message: string;
   changes: PatchFileChange[];
+  /** Optional stale-head guard; supplied only for externally staged branch edits. */
+  expectedHeadSha?: string;
   /** Who/what authored this patch — an agent name, not a human identity. */
   authorName: string;
   authorEmail?: string;
