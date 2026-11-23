@@ -18,9 +18,9 @@ const approvedPost = {
   contract: 'fcr/founder-content-lifecycle-store@v1',
   postId: '11111111-1111-4111-8111-111111111111',
   founderUserId: 'founder-proof',
-  provider: 'linkedin',
-  platform: 'linkedin',
-  accountId: 'urn:li:person:proof',
+  provider: 'facebook',
+  platform: 'facebook',
+  accountId: '123456789',
   title: 'Proof-bound founder post',
   publicPayload: { draft_text: 'A proof-bound founder update.' },
   contentHash: 'a'.repeat(64),
@@ -78,7 +78,7 @@ const server = createServer(async (req, res) => {
       ok: true,
       totalPosts: 1,
       byStatus: { approved: 1, scheduled: 0, posted: 0, failed: 0, outcome_unknown: 0 },
-      byPlatform: { linkedin: 1 },
+      byPlatform: { facebook: 1 },
       failureCount: 0,
       retryQueue: [],
       ambiguous: [],
@@ -121,6 +121,17 @@ const server = createServer(async (req, res) => {
       },
       published: false,
       providerMutationAttempted: false,
+    });
+  }
+  if (url.pathname === `${lifecycleBase}/posts/${approvedPost.postId}/publish-now` && req.method === 'POST') {
+    const body = await readJsonBody(req);
+    mutationRequests.push({ method: req.method, pathname: url.pathname, body });
+    return json(res, 409, {
+      ok: false,
+      code: 'PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED',
+      truthState: 'BLOCKED',
+      published: false,
+      reasons: ['local browser proof deliberately disables provider writes'],
     });
   }
   if (url.pathname.startsWith(lifecycleBase) || url.pathname === '/automation/conveyor/founder-content/approvals') {
@@ -305,7 +316,7 @@ try {
   const selected = controlPlane.locator('[data-selected-console]');
   await selected.waitFor({ state: 'visible' });
   assert.equal(await selected.locator('[data-selected-status]').innerText(), 'approved');
-  assert.equal(await selected.locator('[data-selected-provider]').innerText(), 'linkedin/linkedin');
+  assert.equal(await selected.locator('[data-selected-provider]').innerText(), 'facebook/facebook');
   assert.equal(await selected.locator('[data-selected-write-state]').innerText(), 'not_attempted');
   assert.equal(await selected.locator('[data-selected-hash]').innerText(), approvedPost.contentHash);
 
@@ -314,7 +325,20 @@ try {
   assert.equal(await selected.locator('[data-publish-confirm]').isChecked(), false);
   await publish.click();
   assert.match(await controlPlane.locator('[data-console-output]').innerText(), /Explicit publish confirmation is required/i);
-  assert.equal(mutationRequests.length, 0, 'browser proof must not emit any lifecycle mutation before explicit confirmation');
+  const mutationRequestsBeforeConfirmation = mutationRequests.length;
+  assert.equal(mutationRequestsBeforeConfirmation, 0, 'browser proof must not emit any lifecycle mutation before explicit confirmation');
+
+  await page.locator('[data-proposal-json]').fill('{}');
+  await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
+  await page.locator('[data-public-payload-hash]').fill(approvedPost.contentHash);
+  await page.locator('[data-publish-confirm]').check();
+  await publish.click();
+  await page.waitForFunction(() => document.querySelector('[data-console-output]')?.textContent?.includes('PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED'));
+  assert.equal(mutationRequests.length, 1, 'exactly one local Facebook publish request follows explicit confirmation');
+  assert.equal(mutationRequests[0].pathname, `${lifecycleBase}/posts/${approvedPost.postId}/publish-now`);
+  assert.equal(mutationRequests[0].body.approval_id, approvedPost.approvalId);
+  assert.equal(mutationRequests[0].body.confirmation.confirm_publication, true);
+  assert.equal(mutationRequests[0].body.confirmation.public_payload_hash, approvedPost.contentHash);
 
   const publishText = await page.locator('[data-content-stage="publish"]').innerText();
   assert.match(publishText, /First-party founder content can dispatch to LinkedIn/i);
@@ -375,7 +399,9 @@ try {
       postizPublicationAuthority: false,
       selectedStatus: 'approved',
       explicitPublishConfirmationRequired: true,
-      mutationRequestsBeforeConfirmation: mutationRequests.length,
+      mutationRequestsBeforeConfirmation,
+      mutationRequestsAfterConfirmation: mutationRequests.length,
+      providerWritePerformed: false,
     },
     contentLearning: {
       analyticsAuthority: 'observation-only',
