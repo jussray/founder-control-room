@@ -147,6 +147,16 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('founder-content-outcome-contract');
   });
 
+  it('requires a fresh path-bound invariant against the reviewed base receipt', () => {
+    expect(documentationVerifier).toContain("from './documentation-truth-claim-fingerprint.mjs'");
+    expect(documentationVerifier).toContain('receiptClaimsAtRevision(baseSha)');
+    expect(documentationVerifier).toContain('receiptClaimsUnionByPath');
+    expect(documentationVerifier).toContain('hasFreshMeaningfulInvariant(');
+    expect(documentationVerifier).toContain('documentation-truth-claim-fingerprint\\.mjs');
+    expect(documentationVerifier).toContain('must add or change a meaningful path-bound invariant in the reviewed range');
+    expect(documentationVerifier).toContain('must be readable to prove claim freshness');
+  });
+
   it('registers mandatory ULTRATHINK companions for documentation truth without overriding canonical Goalfix', () => {
     expect(documentationVerifier).toContain('ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger');
     expect(documentationVerifier).toContain('ultrathink-suite');
@@ -280,5 +290,24 @@ describe('repository documentation truth control', () => {
   it('keeps documentation analytics observation-only', () => {
     expect(truthDecay).toContain('Documentation truth gate');
     expect(truthDecay).toContain('**Analytics remains observation-only.**');
+  });
+});
+
+describe('exact-head CI queue consolidation', () => {
+  it('keeps main PR authority in CI and extended coverage on staging only', () => {
+    const requiredCi = read('.github/workflows/ci.yml');
+    const stagingQuality = read('.github/workflows/quality-gate.yml');
+    const evidence = read('.github/workflows/fcr-search-evidence-gate.yml');
+    expect(requiredCi).toContain('name: Required Gate');
+    expect(requiredCi).toContain('name: Verify guarded terminal and AI skill contracts (required)');
+    for (const command of ['verify:terminal-contract', 'verify:juss-flow', 'verify:production-authority', 'verify:ai-skills']) {
+      expect(requiredCi).toContain(`npm run ${command}`);
+    }
+    expect(requiredCi).toContain('- test');
+    expect(stagingQuality).toMatch(/pull_request:\s*\n\s*branches:\s*\n\s*- staging/);
+    expect(stagingQuality).not.toMatch(/^\s*- main\s*$/m);
+    expect(evidence).toContain('branches: [main]');
+    expect(evidence).toContain('ref: ${{ env.EXPECTED_HEAD_SHA }}');
+    expect(evidence).toContain('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"');
   });
 });

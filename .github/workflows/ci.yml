@@ -90,6 +90,12 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
+      - name: Verify guarded terminal and AI skill contracts (required)
+        run: |
+          npm run verify:terminal-contract
+          npm run verify:juss-flow
+          npm run verify:production-authority
+          npm run verify:ai-skills
 
   e2e:
     name: Playwright e2e
@@ -292,6 +298,8 @@ jobs:
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/verify-worker-var-secret-collisions.node-test.mjs
+          node scripts/verify-worker-var-secret-collisions.mjs --config wrangler.worker.toml
 
   test-discovery:
     name: Test discovery ratchet

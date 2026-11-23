@@ -1,5 +1,9 @@
 # Founder Control Room Global AI Contract
 
+## Simulator editing boundary
+
+A Founder OS stage can describe a bounded edit, but must never carry founder session credentials, a raw GitHub token, inherited approval, or authority to merge and deploy. The existing FCR founder-authenticated mission patch route must reread current repository and mission state, branch SHA, original provider files, staged SHA-256 hashes and the idempotency ledger before a write. Local test results and an exported request are not provider commit or production proof.
+
 For pull-request Documentation Truth and test-discovery proof, resolve and fetch the live target branch before comparing it with the exact candidate; reject missing, invalid, unavailable, or non-ancestor bases. Keep the event's historical base identity separate from current scope. Default-branch push proof uses the exact push-before SHA. This repairs proof inputs without transferring merge, deployment, or provider authority.
 
 ## Parent operating contract
@@ -296,3 +300,11 @@ Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund`
 FCR must treat `skills/juss-authored/` as an inert, versioned proposal until a separately reviewed runtime adapter deliberately selects an exact skill version. Do not shadow the active FCR skill router, import the export as an auto-executing agent, or inherit authority from the separate Chief AI system.
 
 The `.github/workflows/ci.yml` `Python tests` lane must run the exported receipt and SHA-256 inventory validators and remain required by `Required Gate`. The proof scope is locally observable code and file consistency, not production integration. Current documentation-truth receipts, external action receipts, and exact-candidate founder-final review remain independently required before merge or release.
+
+## CI queue economy without authority reduction
+
+For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
