@@ -1,20 +1,72 @@
 {
-  "contract": "juss/founder-council-residency@v1",
-  "project": "jussray/founder-control-room",
+  "contract": "juss/founder-council-federation@v2",
   "owner": "founder",
-  "purpose": "Keep one logical Founder Council resident in the founder assistant host and this project Control Room so it can serve the founder, the project, and project users behind the scenes without centralizing execution authority.",
-  "residency": {
-    "assistantHost": {
-      "required": true,
-      "standing": true,
-      "role": "Select, coordinate, challenge, and reconcile the smallest useful task-specific Council for founder work."
+  "purpose": "Connect Founder Control Room, Chief AI, Sol, and PromptOS as first-class standalone peer systems through a neutral shared Council protocol/ledger while keeping external AI providers replaceable and non-load-bearing.",
+  "topology": {
+    "sharedCouncilLayer": {
+      "neutral": true,
+      "ownedByCoreSystem": false,
+      "ownedByExternalProvider": false,
+      "role": "Shared protocol/ledger for council messages, plans, architecture, decisions, evidence, receipts, fingerprints, authority, lineage, and state.",
+      "mustRemainAvailableAcrossExternalProviderReplacement": true,
+      "mustNotBecomeCoreDependencyForPeerOperation": true,
+      "physicalBacking": "UNDECIDED_UNTIL_SEPARATELY_AUTHORIZED"
     },
-    "projectControlRoom": {
+    "coreSystems": [
+      {
+        "id": "fcr",
+        "name": "Founder Control Room",
+        "repository": "jussray/founder-control-room",
+        "standalone": true,
+        "peer": true,
+        "coreFunctionSurvivesCouncilUnavailable": true,
+        "role": "founder_operating_build_intelligence",
+        "description": "Standalone founder operating/build intelligence for planning, inspecting, building, repairing, verifying, operating, and advancing the portfolio without requiring an external AI host."
+      },
+      {
+        "id": "chief",
+        "name": "Chief AI",
+        "repository": "jussray/chief-ai-machine",
+        "standalone": true,
+        "peer": true,
+        "coreFunctionSurvivesCouncilUnavailable": true,
+        "role": "executive_synthesis_reasoning_intelligence",
+        "description": "Standalone executive synthesis, decomposition, orchestration, routing, and decision-quality intelligence."
+      },
+      {
+        "id": "sol",
+        "name": "Sol",
+        "repository": "jussray/solcontinuity",
+        "standalone": true,
+        "peer": true,
+        "coreFunctionSurvivesCouncilUnavailable": true,
+        "role": "challenge_evaluation_continuity_intelligence",
+        "description": "Standalone challenge, evaluation, continuity, state-recovery, drift-detection, and evidence-lineage intelligence."
+      },
+      {
+        "id": "promptos",
+        "name": "PromptOS",
+        "repository": "jussray/promptos",
+        "standalone": true,
+        "peer": true,
+        "coreFunctionSurvivesCouncilUnavailable": true,
+        "role": "prompt_workflow_compiler_routing_intelligence",
+        "description": "Standalone prompt/workflow compilation, routing, evaluation, promotion, and reusable protocol intelligence."
+      }
+    ],
+    "externalProviderSeats": {
+      "replaceable": true,
+      "coreDependency": false,
+      "mayParticipateThroughSharedCouncilLayer": true,
+      "mayBeInvokedFromFCR": true,
+      "providerLossMustNotErasePortfolioState": true,
+      "examples": ["ChatGPT", "Claude", "Muse", "DeepSeek", "Perplexity"]
+    },
+    "localProjectAdapter": {
       "required": true,
       "path": ".control-room",
-      "role": "Own project-local Council policy, routing constraints, evidence bindings, receipts, and authority boundaries."
+      "role": "Own only this repository's local Council policy, routing constraints, evidence bindings, receipts, and authority membrane; it does not own the shared Council layer."
     },
-    "sameLogicalCouncil": true,
     "centralizedExecutionAuthority": false
   },
   "invocation": {
@@ -23,24 +75,6 @@
     "seatSelection": "smallest_useful_task_specific_council",
     "allSeatsByDefault": false,
     "liveProviderInvocationMustBeVerified": true
-  },
-  "jurisdiction": {
-    "sameCourtCouncilKernel": true,
-    "repoProductProductionScoped": true,
-    "subjects": [
-      "portfolio_truth",
-      "workflow_authority",
-      "execution",
-      "revenue_and_money_path",
-      "deployment_and_runtime",
-      "visual_truth",
-      "witness_provenance",
-      "task_accuracy",
-      "evidence_receipts",
-      "rollback",
-      "outcome_proof",
-      "production_proof"
-    ]
   },
   "intelligenceBoundary": {
     "principle": "learn_encode_verify_compound_expose_value_protect_machinery",
@@ -62,21 +96,13 @@
     "founderIsConsequentialAuthority": true,
     "localProjectAuthorityMembraneWins": true,
     "councilConsensusGrantsMutationAuthority": false,
-    "crossProjectExecutionRequiresOwningControlRoom": true,
-    "providerAvailabilityGrantsAuthority": false
+    "crossProjectExecutionRequiresOwningProject": true,
+    "providerAvailabilityGrantsAuthority": false,
+    "sharedCouncilLayerGrantsExecutionAuthority": false
   },
   "evidence": {
     "statuses": ["VERIFIED", "INFERRED", "UNKNOWN", "BLOCKED", "FAIL"],
-    "witnessClasses": [
-      "repository_source",
-      "ci_receipt",
-      "provider_readback",
-      "runtime_identity",
-      "browser_functional",
-      "browser_visual",
-      "independent_challenger",
-      "human_observation"
-    ],
+    "witnessClasses": ["repository_source", "ci_receipt", "provider_readback", "runtime_identity", "browser_functional", "browser_visual", "independent_challenger", "human_observation"],
     "verifiedClaimsRequireWitnessClass": true,
     "singleEvidenceChainMustBeLabeled": true,
     "repeatedUpstreamReceiptDoesNotCreateIndependence": true,
@@ -109,5 +135,12 @@
     "earlierStagesDoNotSatisfyLive": true,
     "requiredLiveProof": ["source_head", "deployment_identity", "runtime_path", "playwright_evidence", "successor_fingerprint"],
     "layeredCompletion": ["SOURCE_IMPLEMENTED", "MERGED", "DEPLOYED", "RUNTIME_VERIFIED", "VISUAL_VERIFIED", "OUTCOME_VERIFIED"]
+  },
+  "project": "jussray/founder-control-room",
+  "projectRole": "founder_operating_build_intelligence",
+  "jurisdiction": {
+    "sameCourtCouncilKernel": true,
+    "repoProductProductionScoped": true,
+    "subjects": ["portfolio_truth", "workflow_authority", "execution", "revenue_and_money_path", "deployment_and_runtime", "visual_truth", "witness_provenance", "task_accuracy", "evidence_receipts", "rollback", "outcome_proof", "production_proof"]
   }
 }

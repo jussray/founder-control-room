@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -45,7 +46,7 @@ import request from 'supertest';
 import { authRouter } from '../auth.js';
 
 const EMAIL = 'founder@example.com';
-const USER = { id: 'founder-user', email: EMAIL };
+const USER = { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' };
 const SESSION = {
   access_token: 'access-token',
   refresh_token: 'refresh-token',
@@ -65,11 +66,7 @@ function allowlist() {
   mocks.supabaseFrom.mockImplementation((table: string) => {
     if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
     return {
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: { email: EMAIL }, error: null }),
-        }),
-      }),
+      ...boundFounderRow(EMAIL, 'founder-user'),
     };
   });
 }

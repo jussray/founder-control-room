@@ -14,6 +14,9 @@ on:
       - "src/services/__tests__/repositoryVerification.test.ts"
       - "package.json"
       - ".github/workflows/**"
+      - "config/cloudflare-logpush.portfolio.json"
+      - "scripts/cloudflare-logpush-plan.mjs"
+      - "scripts/cloudflare-logpush-plan.node-test.mjs"
   push:
     branches: [main]
     paths:
@@ -27,6 +30,9 @@ on:
       - "src/services/__tests__/repositoryVerification.test.ts"
       - "package.json"
       - ".github/workflows/**"
+      - "config/cloudflare-logpush.portfolio.json"
+      - "scripts/cloudflare-logpush-plan.mjs"
+      - "scripts/cloudflare-logpush-plan.node-test.mjs"
   workflow_dispatch:
 
 permissions:
@@ -48,7 +54,7 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
 
@@ -60,7 +66,7 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
 
@@ -70,9 +76,14 @@ jobs:
       - name: Verify dynamic package-script and workflow catalog
         run: node scripts/verify-control-room-tests.mjs
 
+      - name: Verify Cloudflare Logpush control-plane contract
+        run: |
+          node --test scripts/cloudflare-logpush-plan.node-test.mjs
+          node scripts/cloudflare-logpush-plan.mjs verify
+
       - name: Retain sanitized self-test receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: founder-control-room-tests-${{ env.EXPECTED_HEAD_SHA }}
           path: artifacts/control-room-tests.json

@@ -1,0 +1,417 @@
+/**
+ * Incident Escalation Module
+ * Routes security verdicts from Chief AI (REPAIR_REQUIRED, CONTAIN_ONLY) to incident channels.
+ * Integrates with Slack, PagerDuty, Linear for severity-based escalation.
+ * Called from emitReciprocalTelemetry hook after security verdict is determined.
+ */
+
+export interface SecurityVerdict {
+  schema: string;
+  service: string;
+  verdict: 'HALLWAY' | 'CONTAIN_ONLY' | 'CONTAIN_ESCALATE' | 'REPAIR_REQUIRED' | 'OBSERVE';
+  meaningful: boolean;
+  unit?: {
+    unitVerdict?: string;
+    findings?: Array<{
+      category: string;
+      severity: 'critical' | 'high' | 'medium' | 'low';
+      title: string;
+      description?: string;
+    }>;
+  };
+  technicalIdentity?: {
+    actorFingerprint?: string | null;
+    asn?: number | null;
+    country?: string | null;
+    claimedCrawler?: string | null;
+    verifiedBot?: boolean;
+    botScore?: number | null;
+  };
+  receipt?: string;
+  hallway?: {
+    active: boolean;
+    baseExpansion: number;
+  };
+  boundaries?: {
+    ownedOrAuthorizedSurfacesOnly?: boolean;
+    externalCompromise?: boolean;
+    externalExploit?: boolean;
+  };
+}
+
+export interface IncidentEnv extends Record<string, string | undefined> {
+  SLACK?: string;
+  FCR_SLACK_CHANNEL_ID?: string;
+  SLACK_WEBHOOK_URL?: string;
+  /** Events API v2 routing key; legacy name supported during migration. */
+  PAGERDUTY_ROUTING_KEY?: string;
+  PAGERDUTY_INTEGRATION_KEY?: string;
+  LINEAR_API_KEY?: string;
+  INCIDENT_WEBHOOK_URL?: string;
+  FOUNDER_SLACK_USER_ID?: string;
+}
+
+const SEVERITY_MAP = Object.freeze({
+  REPAIR_REQUIRED: 'critical',
+  CONTAIN_ESCALATE: 'high',
+  CONTAIN_ONLY: 'medium',
+  HALLWAY: 'info',
+  OBSERVE: 'low',
+} as const);
+
+function verdictToSeverity(verdict: string): keyof typeof SEVERITY_MAP {
+  if (verdict === 'REPAIR_REQUIRED') return 'REPAIR_REQUIRED';
+  if (verdict === 'CONTAIN_ESCALATE') return 'CONTAIN_ESCALATE';
+  if (verdict === 'CONTAIN_ONLY') return 'CONTAIN_ONLY';
+  if (verdict === 'HALLWAY') return 'HALLWAY';
+  return 'OBSERVE';
+}
+
+/** Chief's attack-unit verdict may be more severe than its perimeter classification. */
+function effectiveVerdict(verdict: SecurityVerdict): keyof typeof SEVERITY_MAP {
+  const perimeter = verdictToSeverity(verdict.verdict);
+  const unit = verdict.unit?.unitVerdict;
+  if (perimeter === 'REPAIR_REQUIRED' || unit === 'REPAIR_REQUIRED') return 'REPAIR_REQUIRED';
+  if (perimeter === 'CONTAIN_ESCALATE' || unit === 'CONTAIN_ESCALATE') return 'CONTAIN_ESCALATE';
+  return perimeter;
+}
+
+function shouldEscalate(verdict: SecurityVerdict): boolean {
+  if (!verdict.meaningful) return false;
+  const s = effectiveVerdict(verdict);
+  return SEVERITY_MAP[s] === 'critical' || SEVERITY_MAP[s] === 'high';
+}
+
+function formatSlackMessage(verdict: SecurityVerdict): {
+  text: string;
+  blocks: Array<Record<string, unknown>>;
+} {
+  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
+  const emoji =
+    severity === 'critical'
+      ? ':rotating_light:'
+      : severity === 'high'
+        ? ':warning:'
+        : severity === 'medium'
+          ? ':information_source:'
+          : ':white_check_mark:';
+
+  const actor =
+    verdict.technicalIdentity?.claimedCrawler ||
+    (verdict.technicalIdentity?.verifiedBot ? 'verified-bot' : 'unknown-actor');
+  const country = verdict.technicalIdentity?.country || 'unknown';
+
+  const text = `${emoji} ${effectiveVerdict(verdict)} | ${verdict.service} | Actor: ${actor} | Country: ${country}`;
+
+  const blocks: Array<Record<string, unknown>> = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `${emoji} Security Incident: ${effectiveVerdict(verdict)}`,
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*Service:*\n${verdict.service}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Verdict:*\n${effectiveVerdict(verdict)}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Actor:*\n${actor}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Country:*\n${country}`,
+        },
+      ],
+    },
+  ];
+
+  if (verdict.unit?.findings && verdict.unit.findings.length > 0) {
+    const findingsText = verdict.unit.findings
+      .map((f) => `• ${f.severity.toUpperCase()}: ${f.title}`)
+      .join('\n');
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Findings:*\n${findingsText}`,
+      },
+    });
+  }
+
+  if (verdict.boundaries?.externalCompromise || verdict.boundaries?.externalExploit) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '⚠️ *EXTERNAL THREAT DETECTED* - May require immediate incident response',
+      },
+    });
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `Receipt: \`${verdict.receipt?.slice(0, 16) || 'unknown'}\`  |  Timestamp: <!date^${Math.floor(Date.now() / 1000)}^{date_num} {time_secs}|${new Date().toISOString()}>`,
+      },
+    ],
+  });
+
+  return { text, blocks };
+}
+
+export async function escalateToSlack(
+  verdict: SecurityVerdict,
+  env: IncidentEnv,
+): Promise<boolean> {
+  if (!shouldEscalate(verdict)) return false;
+
+  // GitHub Agents normalizes the founder's "slack" secret name to SLACK.
+  // The provider must separately bind it in the FCR runtime; Agents secrets do
+  // not become Cloudflare secrets automatically.
+  const credential = env.SLACK?.trim();
+  const webhookCandidate = (
+    env.SLACK_WEBHOOK_URL ||
+    (credential?.startsWith('https://hooks.slack.com/services/') ? credential : undefined)
+  )?.trim();
+  // Reject arbitrary endpoints: Slack incidents must not leave for a non-Slack URL.
+  const webhookUrl =
+    webhookCandidate && /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(webhookCandidate)
+      ? webhookCandidate
+      : undefined;
+  if (webhookCandidate && !webhookUrl) return false;
+  const botToken =
+    credential && /^xoxb-[A-Za-z0-9-]+$/.test(credential) ? credential : undefined;
+  const channel = env.FCR_SLACK_CHANNEL_ID;
+  if (!webhookUrl && (!botToken || !channel || !/^C[A-Z0-9]{8,}$/.test(channel))) {
+    return false;
+  }
+
+  try {
+    const message = formatSlackMessage(verdict);
+    const response = await fetch(webhookUrl ?? 'https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(webhookUrl ? {} : { Authorization: `Bearer ${botToken}` }),
+      },
+      body: JSON.stringify({
+        text: message.text,
+        blocks: message.blocks,
+        ...(webhookUrl ? {} : { channel }),
+      }),
+    });
+
+    if (!response.ok) {
+      // Neither Slack's response body nor the secret-bearing webhook URL may be logged.
+      console.error('[incident-escalation] Slack delivery failed:', response.status);
+      return false;
+    }
+
+    if (!webhookUrl) {
+      const result = (await response.json()) as { ok?: boolean };
+      if (result?.ok !== true) {
+        console.error('[incident-escalation] Slack API rejected delivery');
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    // Provider errors can embed credential-bearing URLs; never log them here.
+    console.error('[incident-escalation] Slack delivery error');
+    return false;
+  }
+}
+
+export async function escalateToPagerDuty(
+  verdict: SecurityVerdict,
+  env: IncidentEnv,
+): Promise<boolean> {
+  // Direct calls must enforce the same meaningful high-severity gate as the
+  // aggregate dispatcher; an untrusted synthetic verdict cannot create a page.
+  if (!shouldEscalate(verdict)) return false;
+  const integrationKey = env.PAGERDUTY_ROUTING_KEY?.trim() || env.PAGERDUTY_INTEGRATION_KEY?.trim();
+  if (!integrationKey) return false;
+
+  // PagerDuty Events API v2 accepts critical/error/warning/info, not 'high'.
+  const pagerDutySeverity = SEVERITY_MAP[effectiveVerdict(verdict)] === 'critical'
+    ? 'critical'
+    : 'error';
+
+  try {
+    const response = await fetch('https://events.pagerduty.com/v2/enqueue', {
+      method: 'POST',
+      redirect: 'error',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        routing_key: integrationKey,
+        event_action: 'trigger',
+        dedup_key: `${verdict.service}:${verdict.receipt?.slice(0, 16) || 'unknown'}`,
+        payload: {
+          summary: `${effectiveVerdict(verdict)} on ${verdict.service}`,
+          severity: pagerDutySeverity,
+          source: 'chief-ai-security',
+          component: verdict.service,
+          custom_details: {
+            verdict: effectiveVerdict(verdict),
+            actor: verdict.technicalIdentity?.claimedCrawler || 'unknown',
+            country: verdict.technicalIdentity?.country || 'unknown',
+            external_threat: verdict.boundaries?.externalCompromise ? 'yes' : 'no',
+          },
+        },
+      }),
+    });
+
+    if (response.status !== 202) {
+      // Provider response bodies are not log-safe and may echo request context.
+      console.error('[incident-escalation] PagerDuty escalation failed:', response.status);
+      return false;
+    }
+
+    // A generic HTTP success does not establish Events API v2 acceptance.
+    const acknowledgment = await response.json().catch(() => null) as { status?: unknown } | null;
+    if (acknowledgment?.status !== 'success') {
+      console.error('[incident-escalation] PagerDuty acceptance receipt invalid');
+      return false;
+    }
+
+    return true;
+  } catch {
+    console.error('[incident-escalation] PagerDuty delivery error');
+    return false;
+  }
+}
+
+export async function logIncidentToLinear(
+  verdict: SecurityVerdict,
+  env: IncidentEnv,
+): Promise<boolean> {
+  const apiKey = env.LINEAR_API_KEY;
+  if (!apiKey) return false;
+
+  const severity = SEVERITY_MAP[effectiveVerdict(verdict)];
+  if (severity !== 'critical') return false;
+
+  try {
+    const response = await fetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        query: `
+          mutation CreateIssue($input: IssueCreateInput!) {
+            issueCreate(input: $input) {
+              issue {
+                id
+                identifier
+              }
+            }
+          }
+        `,
+        variables: {
+          input: {
+            teamId: 'security', // Assumes 'security' team exists
+            title: `Security Incident: ${effectiveVerdict(verdict)} on ${verdict.service}`,
+            description: `Verdict: ${effectiveVerdict(verdict)}\nService: ${verdict.service}\nActor: ${verdict.technicalIdentity?.claimedCrawler || 'unknown'}\nCountry: ${verdict.technicalIdentity?.country || 'unknown'}\nReceipt: ${verdict.receipt}`,
+            priority: 1, // Urgent
+            labels: [effectiveVerdict(verdict), 'security', 'auto-created'],
+          },
+        },
+      }),
+    });
+
+    const body = (await response.json().catch(() => null)) as {
+      errors?: Array<{ message?: unknown }>;
+      data?: { issueCreate?: { issue?: { id?: unknown } } };
+    } | null;
+
+    // Linear may report GraphQL failure with HTTP 200. Provider-controlled
+    // response text is intentionally not written to logs.
+    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+      console.error('[incident-escalation] Linear GraphQL request rejected');
+      return false;
+    }
+
+    if (!response.ok) {
+      console.error('[incident-escalation] Linear HTTP error:', response.status);
+      return false;
+    }
+
+    if (typeof body?.data?.issueCreate?.issue?.id !== 'string' || body.data.issueCreate.issue.id.length === 0) {
+      console.error('[incident-escalation] Linear response missing issue ID');
+      return false;
+    }
+
+    return true;
+  } catch {
+    console.error('[incident-escalation] Linear delivery error');
+    return false;
+  }
+}
+
+export async function escalateIncident(
+  verdict: SecurityVerdict,
+  env: IncidentEnv,
+): Promise<void> {
+  if (!shouldEscalate(verdict)) return;
+
+  // Verdict fields are untrusted; log fixed event codes only.
+  console.log('[incident-escalation] ESCALATION_STARTED');
+
+  const results = await Promise.allSettled([
+    escalateToSlack(verdict, env),
+    escalateToPagerDuty(verdict, env),
+    logIncidentToLinear(verdict, env),
+  ]);
+
+  const succeeded = results.filter((r) => r.status === 'fulfilled' && r.value).length;
+  const failed = results.filter((r) => r.status === 'rejected' || !r.value).length;
+
+  const hasExternalThreat =
+    verdict.boundaries?.externalCompromise === true || verdict.boundaries?.externalExploit === true;
+  if (failed === results.length && (effectiveVerdict(verdict) === 'REPAIR_REQUIRED' || hasExternalThreat)) {
+    console.error('[incident-escalation] CRITICAL: Escalation failed for high-severity verdict:', {
+      channels_failed: failed,
+      has_external_threat: Boolean(hasExternalThreat),
+    });
+  }
+
+  console.log(`[incident-escalation] Escalation complete: ${succeeded} succeeded, ${failed} failed`);
+}
+
+export function emitReciprocalTelemetryWithEscalation(
+  verdict: SecurityVerdict,
+  env: IncidentEnv,
+  ctx?: { waitUntil?: (promise: Promise<unknown>) => void },
+): void {
+  if (!verdict.meaningful) return;
+
+  const logTask = Promise.resolve().then(() => {
+    console.log('[reciprocal-defense] SECURITY_VERDICT_OBSERVED');
+  });
+
+  const escalationTask = escalateIncident(verdict, env);
+
+  const allTasks = Promise.all([logTask, escalationTask]);
+
+  if (ctx?.waitUntil) {
+    ctx.waitUntil(allTasks);
+  } else {
+    allTasks.catch(() => undefined);
+  }
+}
