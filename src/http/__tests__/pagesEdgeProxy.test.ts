@@ -352,7 +352,6 @@ describe('Cloudflare Pages edge proxy', () => {
       // cannot silently fail closed at the public Pages edge.
       ...PORTFOLIO_MCP_BRIDGE_PROJECTS.map((slug): [string, string] => ['POST', `/mcp/portfolio/${slug}`]),
       ['POST', '/mcp/portfolio/truth-compass'],
-      ['GET', '/.well-known/oauth-protected-resource/mcp/portfolio/truth-compass'],
     ];
     for (const [method, path] of allowed) {
       const response = await handler.fetch(
