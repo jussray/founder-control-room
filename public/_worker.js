@@ -31,6 +31,8 @@ const PUBLIC_MCP_PROTOCOL_PATHS = new Set([
   '/mcp/portfolio/founder-control-room',
   '/mcp/portfolio/solcontinuity',
   '/mcp/portfolio/promptos',
+  '/mcp/portfolio/truth-compass',
+  '/.well-known/oauth-protected-resource/mcp/portfolio/truth-compass',
 ]);
 const STATIC_EXACT_PATHS = new Set([
   '/products/business-leak-quickscan',
