@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization.",
+  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization. Reconcile PR #833 with current target source; inherited current invariants remain authoritative and branch additions describe source contracts only.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -11,7 +11,8 @@
     "workflow-authority",
     "truth-governance",
     "capability-authority",
-    "founder-permission-authority"
+    "founder-permission-authority",
+    "founder-ui-auth-boundary"
   ],
   "changes": [
     {
@@ -831,7 +832,8 @@
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed."
+        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed.",
+        "`README.md` must describe the founder-stack launch dock as an authenticated-shell presentation boundary: signed-out/session-expired source state keeps it closed, hidden, and aria-hidden; authenticated shell state reveals the existing dock; browser/runtime proof remains separate from source implementation."
       ]
     },
     {
@@ -1011,6 +1013,18 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "public/control-room/stack-router.js",
+      "claims": [
+        "`public/control-room/stack-router.js` must derive founder-stack launch-dock visibility only from the existing rendered authenticated `.shell` inside `#root`, close/hide/aria-hide the dock whenever that shell is absent, reveal the same dock when the shell is present, and avoid creating a parallel browser authentication authority."
+      ]
+    },
+    {
+      "path": "e2e/conveyor-readiness-proof.mjs",
+      "claims": [
+        "`e2e/conveyor-readiness-proof.mjs` must exercise signed-out hidden → authenticated visible/readiness behavior → signed-out hidden again in the focused mobile Control Room flow, preserve opaque HttpOnly-cookie authority, and fail on signed-out mobile horizontal overflow instead of treating source attributes alone as browser proof."
       ]
     }
   ]
