@@ -1,0 +1,36 @@
+name: Install upstream Git security release
+description: Build and verify the official Git 2.56.1 release before repository checkout.
+runs:
+  using: composite
+  steps:
+    - name: Build and install checksum-pinned upstream Git
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends \
+          build-essential curl gettext libcurl4-openssl-dev \
+          libexpat1-dev libpcre2-dev libssl-dev zlib1g-dev
+
+        archive="$RUNNER_TEMP/git-2.56.1.tar.xz"
+        source_dir="$RUNNER_TEMP/git-2.56.1"
+        curl --fail --silent --show-error --location \
+          https://www.kernel.org/pub/software/scm/git/git-2.56.1.tar.xz \
+          --output "$archive"
+
+        printf '%s  %s\n' \
+          'f0b0bf89264b9bd2e1c640363e7529643989da76281600473c50745cd34a607f' \
+          "$archive" | sha256sum --check --status
+
+        mkdir -p "$source_dir"
+        tar -xJf "$archive" --strip-components=1 -C "$source_dir"
+        make -C "$source_dir" -j2 prefix=/usr/local all
+        sudo make -C "$source_dir" prefix=/usr/local install
+
+        echo /usr/local/bin >> "$GITHUB_PATH"
+        export PATH="/usr/local/bin:$PATH"
+        test "$(command -v git)" = "/usr/local/bin/git"
+        test "$(git --version)" = "git version 2.56.1"
+        printf 'verified_git=%s\n' "$(git --version)"
+        printf 'git_exec_path=%s\n' "$(git --exec-path)"
