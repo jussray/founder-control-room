@@ -551,6 +551,10 @@ export function createRemoteReadMcpHandler(
       res.status(403).json(rpcError(id, -32000, 'Tool is outside this remote MCP grant'));
       return;
     }
+    if (!toolIsAllowed(name)) {
+      res.status(403).json(rpcError(id, -32000, 'Tool is outside this remote MCP grant'));
+      return;
+    }
 
     try {
       assertNoSecretArguments(args);
