@@ -43,6 +43,7 @@ export interface RemoteReadMcpDependencies extends ExternalMcpToolDependencies {
   /** Optional server-enforced catalog and invocation allowlist for a dedicated client lane. */
   allowedToolNames?: readonly ExternalMcpToolName[];
   instructions?: string;
+  challengeUnauthenticated?: boolean;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -410,8 +411,10 @@ export function createRemoteReadMcpHandler(
 
     const token = bearerToken(req);
     if (!token) {
-      challenge(res, env);
-      res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+      const staticTokenMissing = authMode === 'static' && !env.FCR_REMOTE_MCP_READ_TOKEN?.trim();
+      if (overrides.challengeUnauthenticated !== false) challenge(res, env);
+      res.status(staticTokenMissing ? 503 : 401).json(rpcError(null, -32000,
+        staticTokenMissing ? 'Remote MCP static token is not configured' : 'Unauthorized'));
       return;
     }
 
