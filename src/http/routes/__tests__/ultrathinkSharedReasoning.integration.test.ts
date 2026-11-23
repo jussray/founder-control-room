@@ -29,18 +29,16 @@ function buildApp() {
 
 function authorizeFounder() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'u1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'u1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') {
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-          }),
-        }),
-      };
+      const query = {
+    eq: () => query,
+    maybeSingle: () => Promise.resolve({ data: { user_id: 'u1' }, error: null }),
+  };
+  return { select: () => query };
     }
     throw new Error(`Unexpected table: ${table}`);
   });

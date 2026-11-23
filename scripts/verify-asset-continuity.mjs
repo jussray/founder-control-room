@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const root = process.cwd();
-const readJson = (relativePath) => JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
+const readJson = (relativePath) => JSON.parse(fs.readFileSync(path.resolve(root, relativePath), 'utf8'));
 const fail = (message) => {
   console.error(`ASSET CONTINUITY FAIL: ${message}`);
   process.exitCode = 1;
@@ -109,13 +109,14 @@ if (process.argv.includes('--manifest')) {
   const manifestRelative = process.argv[manifestArgIndex];
   if (!manifestRelative) fail('--manifest requires a path');
   else {
-    const manifestFullPath = path.join(root, manifestRelative);
+    const manifestFullPath = path.resolve(root, manifestRelative);
     if (!fs.existsSync(manifestFullPath)) fail(`manifest not found: ${manifestRelative}`);
     else {
       const manifest = readJson(manifestRelative);
       if (manifest.schemaVersion !== 1) fail(`${manifestRelative} schemaVersion must equal 1`);
       requireString(manifest.project, `${manifestRelative}.project`);
       requireString(manifest.surface, `${manifestRelative}.surface`);
+      for (const field of ['type', 'reference', 'status']) requireString(manifest.sourceAuthority?.[field], `${manifestRelative}.sourceAuthority.${field}`);
       if (!Array.isArray(manifest.assets) || manifest.assets.length === 0) fail(`${manifestRelative} must contain assets`);
       const ids = new Set();
       for (const asset of manifest.assets || []) {
@@ -130,8 +131,19 @@ if (process.argv.includes('--manifest')) {
         requireStringArray(asset.runtimeRefs, `${asset.id}.runtimeRefs`);
         requireStringArray(asset.invalidationConditions, `${asset.id}.invalidationConditions`);
 
+        requireStringArray(asset.allowedTransformations, `${asset.id}.allowedTransformations`);
+        for (const field of ['type', 'creator', 'sourceReference']) requireString(asset.provenance?.[field], `${asset.id}.provenance.${field}`);
+        if (!asset.fingerprint || typeof asset.fingerprint !== 'object' || Array.isArray(asset.fingerprint)
+          || !Object.values(asset.fingerprint).some((value) => Array.isArray(value) && value.some((item) => typeof item === 'string' && item.trim()))) {
+          fail(`${asset.id}.fingerprint must identify at least one continuity dimension`);
+        }
+        if (!['current', 'historical', 'stale', 'superseded', 'external-reference', 'blocked'].includes(asset.status)) fail(`${asset.id}.status invalid`);
+        if (!['local', 'external'].includes(asset.location?.type)) fail(`${asset.id}.location must identify a local path or external reference`);
+        if (asset.location?.type === 'external') requireString(asset.location.reference, `${asset.id}.location.reference`);
+
         if (asset.location?.type === 'local') {
           requireString(asset.location.path, `${asset.id}.location.path`);
+          if (typeof asset.location.path !== 'string' || !asset.location.path.trim()) continue;
           const localFullPath = path.join(root, asset.location.path);
           if (!fs.existsSync(localFullPath)) fail(`${asset.id} local asset missing: ${asset.location.path}`);
           const expectedHash = asset.location.sha256;
