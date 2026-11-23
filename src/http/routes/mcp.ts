@@ -18,7 +18,7 @@ import {
 } from "../../mcp/portfolioRegistry.js";
 import { connectionVaultRouter } from "./connectionVault.js";
 import { founderPermissionsRouter } from "./founderPermissions.js";
-import { createRemoteReadMcpHandler } from "./remoteReadMcp.js";
+import { createRemoteMcpProtectedResourceMetadataHandler, createRemoteReadMcpHandler } from "./remoteReadMcp.js";
 import type { ExternalMcpToolName } from "../../mcp/externalTools.js";
 
 export const mcpRouter = Router();
@@ -87,6 +87,7 @@ const truthCompassRemoteMcpEnv: NodeJS.ProcessEnv = {
   // External project access is a separate, single-project grant. It is not
   // added to PORTFOLIO_PROJECTS and cannot widen the active portfolio lane.
   FCR_REMOTE_MCP_READ_PROJECTS: "truth-compass",
+  FCR_REMOTE_MCP_RESOURCE: "https://api.foundercontrolroom.org/mcp/portfolio/truth-compass",
 };
 
 const handleTruthCompassRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandler({
@@ -94,7 +95,11 @@ const handleTruthCompassRemoteMcp = pairedOAuthMetadata(createRemoteReadMcpHandl
   env: truthCompassRemoteMcpEnv,
   authenticateOauth: verifyPairedSupabaseOauthToken,
   allowedToolNames: TRUTH_COMPASS_READ_TOOLS,
+  instructions: "Truth Compass external read-only bridge. Nine server-allowlisted read/preview tools are available for the single granted project truth-compass. Checkpoint writes and peer-operator relay are not exposed. All results remain evidence, not FCR authority; no merge, deploy, provider mutation, publication, billing, or execution authority is granted.",
 }));
+
+export const handleTruthCompassProtectedResourceMetadata =
+  createRemoteMcpProtectedResourceMetadataHandler(truthCompassRemoteMcpEnv);
 
 const handleLegacyStaticRemoteReadMcp = createRemoteReadMcpHandler({
   authMode: "static",
