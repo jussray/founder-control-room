@@ -1,5 +1,11 @@
 # Cloudflare Reasoning Contract
 
+## October 29, 2026: FCR storefront product routing — source candidate only
+
+The FCR Shopify offer `founder-proof-audit` has a Shopify-declared product path `/products/founder-proof-audit` with a $99 active listing, but the previous Pages edge `STATIC_EXACT_PATHS` recognized only the QuickScan path. This candidate adds exact route ownership for both `/products/founder-proof-audit` and its trailing-slash twin, serving `public/products/founder-proof-audit/index.html` from Pages assets rather than the authenticated API proxy.
+
+The page provides honest offer scope and an inquiry CTA, never an unverified payment or delivery claim. A separate FCR Shopify draft theme corrects the wrong-store redirect to `www.foundercontrolroom.org`, but remains unpublished. A GitHub commit or passing source check does not show that Cloudflare Pages deployed this file, public DNS resolves to the intended runtime, a customer reached the page, or checkout belongs to FCR. Preserve the old Pages deployment and static path map for authorized rollback.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -369,3 +375,5 @@ The production Cloudflare credential diagnostic is founder-dispatched only. It c
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+The Pages-owned information routes `/about`, `/services`, `/faq`, `/support`, and `/delivery` stay in the static asset layer after Cloudflare normalizes their `.html` links. Redirect-following source tests exercise the edge dispatch; live deployed navigation still requires separate browser/provider proof.

@@ -114,7 +114,10 @@
         "The Pages FCR_API proxy must forward a consent POST's ReadableStream with compatible half-duplex request construction, without stripping the canonical Pages Origin, browser host-only founder session cookie, or approval request body. A 503 is never evidence that consent was applied.",
         "`public/_worker.js` must preserve Pages `ASSETS` handling for the static member and welcome screens while forwarding every `/auth/member/*` request, including its dynamic callback script, through the canonical same-origin `FCR_API` binding with service identity verification; static routing and unit tests cannot authorize a member session or prove live OAuth delivery.",
         "`public/_worker.js` must normalize only safe GET/HEAD www `/welcome` and `/member/` browser navigation to apex using no-store, no-referrer and noindex, while preserving host-only login cookies, existing OAuth consent routing, and fail-closed rejection of cross-origin mutation requests; source tests do not verify live Cloudflare routing.",
-        "`public/_worker.js` must forward only the allowlisted MCP protocol routes (`/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the mounted `/mcp/portfolio/<slug>` bridges) to FCR_API and must fail closed with `404 MCP_ROUTE_NOT_PUBLIC` for every other `/mcp` path after canonicalizing case, encoding, and slashes, never calling FCR_API for it. The allowlist is not authentication and does not prove deployed Pages, Access, or live MCP auth state."
+        "`public/_worker.js` must forward only the allowlisted MCP protocol routes (`/mcp`, `/mcp/read`, `/mcp/public`, `/mcp/founder-signal-x-engagement`, `/mcp/registry/v0.1/servers`, and the mounted `/mcp/portfolio/<slug>` bridges) to FCR_API and must fail closed with `404 MCP_ROUTE_NOT_PUBLIC` for every other `/mcp` path after canonicalizing case, encoding, and slashes, never calling FCR_API for it. The allowlist is not authentication and does not prove deployed Pages, Access, or live MCP auth state.",
+        "FCR Pages edge must treat both /products/founder-proof-audit and /products/founder-proof-audit/ as exact Pages-owned static routes, preserving the API proxy boundary for private routes; this source contract does not prove deployed Pages or Shopify theme routing.",
+        "`public/_worker.js` must serve both slash variants of `/products/founder-proof-audit` from Pages ASSETS before the authenticated API fallback. Anonymous storefront routing must preserve unrelated API ownership and cannot imply a verified payment or deployed checkout.",
+        "`public/_worker.js` The Pages-owned information routes `/about`, `/services`, `/faq`, `/support`, and `/delivery` stay in the static asset layer after Cloudflare normalizes their `.html` links. Redirect-following source tests exercise the edge dispatch; live deployed navigation still requires separate browser/provider proof."
       ]
     },
     {
@@ -1011,6 +1014,18 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "public/products/founder-proof-audit/index.html",
+      "claims": [
+        "Founder Proof Audit source page must present FCR's Shopify-observed $99 USD offer, SKU FCR-PROOF-AUDIT-99, with an inquiry-before-payment boundary, explicit no-secret handling, and no unverified direct checkout; live publication, payment, or delivery outcomes remain UNKNOWN."
+      ]
+    },
+    {
+      "path": "src/http/__tests__/founderProofAuditPublicProduct.test.ts",
+      "claims": [
+        "A focused source test must verify the Shopify-declared FCR Founder Proof Audit path and its trailing-slash Pages classification, branded SKU/price, and the absence of a JBH or unverified Shopify checkout CTA; static checks and CI are distinct from runtime/browser proof."
       ]
     }
   ]
