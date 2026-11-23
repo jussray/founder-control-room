@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Install upstream Git security release before checkout
+        uses: jussray/founder-control-room/.github/actions/refresh-git-security@0a739664e85443fb79cfe58202e2eea6ce01d7ff
       - name: Check out exact head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
