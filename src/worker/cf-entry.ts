@@ -76,7 +76,7 @@ const composed = composeWorkerHandler(
           aiProviderChangeWatchResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
-          runExternalUseHourlyCycle(new Date(), env.FCR_EMAIL),
+          runExternalUseHourlyCycle(new Date(), (env as unknown as ControlRoomWorkerEnv).FCR_EMAIL),
           runPublicCoverageWatchCycle(),
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
