@@ -6,6 +6,7 @@ import {
   type OperatorRelayRequestV1,
 } from '../operatorRelay.js';
 import {
+  OperatorRelayProviderBoundaryError,
   SEMANTIC_PEER_REVIEW_SPEND_MODE,
   createServerOperatorRelayAdapters,
 } from '../operatorRelayModelProviders.js';
@@ -30,7 +31,7 @@ function relay(
     authority: { externalWrite: false, merge: false, deploy: false, publish: false, providerMutation: false },
     sensitivity,
     createdAt: '2026-09-16T06:30:00.000Z',
-    expiresAt: '2099-09-16T06:40:00.000Z',
+    expiresAt: '2026-09-16T06:40:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
@@ -65,6 +66,26 @@ describe('createServerOperatorRelayAdapters', () => {
     await expect(adapters.perplexity?.(relay('internal', 'perplexity', 'review'))).rejects.toThrow('semantic peer review is paused');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each(['incomplete', 'failed', 'cancelled', 'queued', 'in_progress', undefined])(
+    'rejects non-completed OpenAI status %s without promoting partial text',
+    async (status) => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+        id: 'resp_openai_partial',
+        status,
+        output_text: 'unfinished answer',
+        error: { message: 'untrusted-provider-detail' },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+      const adapters = createServerOperatorRelayAdapters({
+        OPENAI_API_KEY: FIXTURE,
+        FCR_RELAY_OPENAI_MODEL: 'gpt-test-model',
+      }, fetchMock);
+
+      await expect(adapters.codex?.(relay('internal', 'codex')))
+        .rejects.toThrow('OpenAI relay returned a non-completed response');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('calls Gemini with the bounded request contract without serializing the configured key', async () => {
     const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -209,7 +230,7 @@ describe('createServerOperatorRelayAdapters', () => {
       expect(init?.signal).toBeInstanceOf(AbortSignal);
       expect(init?.headers).toMatchObject({
         'x-api-key': FIXTURE,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': '2026-10-21',
         'Content-Type': 'application/json',
       });
       const serialized = String(init?.body ?? '');
@@ -316,6 +337,30 @@ describe('createServerOperatorRelayAdapters', () => {
     const call = adapters['claude-code']?.(relay('internal', 'claude-code'));
     await expect(call).rejects.toThrow('Anthropic relay request failed');
     await expect(call).rejects.not.toThrow(marker);
+  });
+
+  it('marks a completed HTTP attempt as a structured provider-boundary failure without leaking provider detail', async () => {
+    const marker = 'provider-secret-detail-marker';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      error: { message: marker },
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    const adapters = createServerOperatorRelayAdapters({
+      ANTHROPIC_API_KEY: FIXTURE,
+      FCR_RELAY_ANTHROPIC_MODEL: 'claude-test-model',
+    }, fetchMock);
+
+    try {
+      await adapters['claude-code']?.(relay('internal', 'claude-code'));
+      throw new Error('expected Anthropic failure');
+    } catch (error) {
+      expect(error).toBeInstanceOf(OperatorRelayProviderBoundaryError);
+      expect(error).toMatchObject({
+        provider: 'anthropic',
+        externalProviderCall: true,
+      });
+      expect(String(error)).toContain('Anthropic relay failed with HTTP 500');
+      expect(String(error)).not.toContain(marker);
+    }
   });
 
   it('fails closed before provider dispatch for restricted context', async () => {

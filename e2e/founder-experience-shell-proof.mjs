@@ -158,21 +158,21 @@ async function provePublicFrontDoor(label, viewport) {
   }
 
   const founderCopy = await founderPanel.innerText();
-  if (!/Founder access still passes through FCR authentication/i.test(founderCopy)) {
-    throw new Error(`${label}: founder view must state that access passes through FCR authentication`);
+  if (!/Sign in with your founder account to open your private Control Room/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must require founder sign-in before private project access`);
   }
-  if (!/General member authentication and multi-tenant founder workspaces remain a separate implementation gate/i.test(founderCopy)) {
-    throw new Error(`${label}: founder view must not pretend general multi-tenant founder auth is live`);
+  if (!/Other members receive an empty personal workspace, separate from founder records/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must keep member workspaces separate from founder records`);
   }
-  if (!/Connection never creates authority by itself/i.test(founderCopy)) {
-    throw new Error(`${label}: founder view must preserve the connection-is-not-authority boundary`);
+  if (!/Only verified founders can open private project controls/i.test(founderCopy)) {
+    throw new Error(`${label}: founder view must preserve the founder-only project authority boundary`);
   }
   if (!/after founder sign-in/i.test(founderCopy)) {
     throw new Error(`${label}: founder view must gate private project, proof and decision state behind sign-in`);
   }
   const ownerCta = founderPanel.locator('a.owner-cta');
-  if (await ownerCta.count() !== 1 || await ownerCta.getAttribute('href') !== '/control-room/') {
-    throw new Error(`${label}: founder view must expose exactly one authenticated Control Room entry`);
+  if (await ownerCta.count() !== 1 || await ownerCta.getAttribute('href') !== '/welcome') {
+    throw new Error(`${label}: public founder entry must route through the sign-in welcome screen`);
   }
 
   await assertNoHorizontalOverflow(page, `${label} founder view`);
@@ -272,8 +272,10 @@ async function proveViewport(label, viewport) {
   }
 
   const truthNote = await page.locator('.truth-note').innerText();
-  if (!truthNote.includes('General member authentication and founder multi-tenancy are an explicit future implementation gate')) {
-    throw new Error(`${label}: visual shell must not pretend member auth is already live`);
+  if (!truthNote.includes('Member email sign-in and a blank personal workspace exist as a source candidate, not a verified production login')
+    || !truthNote.includes('member accounts do not inherit FCR owner authority')
+    || !truthNote.includes('General founder multi-tenancy remains unimplemented')) {
+    throw new Error(`${label}: visual shell must distinguish member source code, founder authority, and unverified production login`);
   }
 
   await assertNoHorizontalOverflow(page, label);
