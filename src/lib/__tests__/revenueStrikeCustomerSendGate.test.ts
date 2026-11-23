@@ -228,4 +228,71 @@ describe('Revenue Strike customer send authority membrane', () => {
     expect(sql).toContain('to service_role;');
     expect(sql).toContain('from authenticated;');
   });
+
+  it('replaces the finalize function with alias-qualified UPDATE columns so its claim_id OUT column is not ambiguous', () => {
+    const fix = readFileSync(
+      new URL(
+        '../../../supabase/migrations/20261115211500_fix_revenue_strike_lease_column_ambiguity.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+    const finalizeStart = fix.indexOf('create or replace function public.finalize_revenue_strike_customer_send_lease(');
+    const finalize = fix.slice(finalizeStart, fix.indexOf('$function$;', finalizeStart));
+    const update = finalize.slice(
+      finalize.indexOf('update public.revenue_strike_customer_send_leases'),
+      finalize.indexOf('return query'),
+    );
+
+    expect(finalizeStart).toBeGreaterThan(-1);
+    expect(update).toContain('update public.revenue_strike_customer_send_leases as l');
+    expect(update).toContain('where l.claim_id = lease_row.claim_id');
+    expect(update).toContain("and l.provider_outcome = 'claimed'");
+    expect(update).toContain('and l.finalized_at is null');
+    expect(update).toContain('returning l.* into lease_row');
+    expect(update).not.toMatch(/where\s+claim_id\b/);
+    expect(update).not.toMatch(/\n\s+and\s+(provider_outcome|finalized_at)\b/);
+    expect(fix).toContain('security definer');
+    expect(fix).toContain('set search_path = pg_catalog');
+    expect(fix).toContain('grant execute on function public.finalize_revenue_strike_customer_send_lease');
+    expect(fix).toContain('to service_role;');
+    expect(fix).toContain('from authenticated;');
+  });
+
+  it('replaces the claim function with alias-qualified lookups so its run_id/slot/recipient OUT columns are not ambiguous', () => {
+    const fix = readFileSync(
+      new URL(
+        '../../../supabase/migrations/20261115211500_fix_revenue_strike_lease_column_ambiguity.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+    const claimStart = fix.indexOf('create or replace function public.claim_revenue_strike_customer_send_lease(');
+    const claim = fix.slice(claimStart, fix.indexOf('$function$;', claimStart));
+
+    expect(claimStart).toBeGreaterThan(-1);
+    expect(claim).toContain('where l.run_id = btrim(p_run_id);');
+    expect(claim).toContain('where l.recipient_fingerprint = lower(btrim(p_recipient_fingerprint))');
+    expect(claim).toContain('and l.slot = p_slot');
+    expect(claim).not.toMatch(/where\s+(run_id|recipient_fingerprint)\s*=/);
+    expect(claim).not.toMatch(/and\s+slot\s*=/);
+    expect(claim).toContain('pg_advisory_xact_lock');
+    expect(claim).toContain('>= 5');
+    expect(claim).toContain("p_claimed_at - p_reply_gate_clear_at > interval '15 minutes'");
+    expect(fix).toContain('grant execute on function public.claim_revenue_strike_customer_send_lease');
+  });
+
+  it('adds the extensions schema to truth_console_reconcile_claim so pgcrypto digest() resolves on Supabase', () => {
+    const fix = readFileSync(
+      new URL(
+        '../../../supabase/migrations/20261115211600_fix_truth_console_reconcile_claim_search_path.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+
+    expect(fix).toMatch(
+      /alter function public\.truth_console_reconcile_claim\(uuid, bigint\)\s+set search_path = public, extensions, pg_temp;/,
+    );
+  });
 });
