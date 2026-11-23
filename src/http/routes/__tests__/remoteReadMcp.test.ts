@@ -168,15 +168,17 @@ function modernPost(
 describe('Supabase OAuth token verifier', () => {
   it('accepts only a current user and founder allowlist row after claim checks', async () => {
     mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
+      data: { user: { id: 'founder-user-1', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     mockFrom.mockReturnValueOnce({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: { email: 'founder@example.com' }, error: null }),
-        }),
-      }),
+      select: () => {
+        const query = {
+          eq: () => query,
+          maybeSingle: async () => ({ data: { email: 'founder@example.com', user_id: 'founder-user-1' }, error: null }),
+        };
+        return query;
+      },
     });
 
     await expect(verifyRemoteMcpOauthToken(jwt(validClaims()), oauthEnv())).resolves.toEqual({
@@ -186,6 +188,24 @@ describe('Supabase OAuth token verifier', () => {
       projectIds: [CHIEF, FCR],
       authMode: 'oauth',
     });
+  });
+
+  it('denies the same founder email bound to a different user ID', async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'founder-user-1', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce({
+      select: () => {
+        const query = {
+          eq: () => query,
+          maybeSingle: async () => ({ data: { user_id: 'different-founder-id' }, error: null }),
+        };
+        return query;
+      },
+    });
+    await expect(verifyRemoteMcpOauthToken(jwt(validClaims()), oauthEnv()))
+      .rejects.toThrow('not on the founder allowlist');
   });
 
   it.each([
@@ -272,6 +292,9 @@ describe('Founder Control Room paired remote MCP', () => {
       'chief_preview_capability_plan',
       'fcr_list_projects',
       'fcr_get_current_truth',
+      'fcr_list_task_checkpoints',
+      'fcr_get_task_checkpoint',
+      'fcr_save_task_checkpoint',
       'fcr_audit_change_genealogy',
       'fcr_preview_skill_route',
       'fcr_relay_operator',
