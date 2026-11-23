@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { evaluateUrlFixMergeReviewHandoff } from './urlfix-merge-review-contract.mjs';
 
-const skill = readFileSync(new URL('../skills/urlfix/SKILL.md', import.meta.url), 'utf8');
+const canonicalSkill = readFileSync(new URL('../skills/urlfix/SKILL.md', import.meta.url), 'utf8');
+const skill = readFileSync(new URL('../skills/urlfix/CANDIDATE_V0_2.md', import.meta.url), 'utf8');
 const mergeAnnex = readFileSync(new URL('../skills/urlfix/MERGE_REVIEW.md', import.meta.url), 'utf8');
 const schema = JSON.parse(readFileSync(new URL('../config/urlfix.schema.json', import.meta.url), 'utf8'));
 const mergeSchema = JSON.parse(readFileSync(new URL('../config/urlfix-merge-review.schema.json', import.meta.url), 'utf8'));
@@ -52,6 +53,7 @@ const noPrDecision = evaluateUrlFixMergeReviewHandoff({
 });
 
 const checks = [
+  ['current active skill remains canonical', /version:\s*1\.0\.0/.test(canonicalSkill) && /status:\s*active/.test(canonicalSkill) && canonicalSkill.includes('CANDIDATE_V0_2.md')],
   ['candidate version is 0.2.0', /version:\s*0\.2\.0/.test(skill) && /status:\s*candidate/.test(skill)],
   ['existing FCR registry remains authority', /existing FCR active portfolio registry/.test(skill) && /Do not create a parallel project registry/.test(skill)],
   ['goalfix owns source repair', /Goalfix owns source-repair discipline/.test(skill)],

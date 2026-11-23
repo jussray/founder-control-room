@@ -1,352 +1,380 @@
 ---
 name: urlfix
-version: 0.2.0
-status: candidate
-scope: portfolio
-owner: Juss
-aliases:
-  - /urlfix
+description: >
+  Given a live URL, inspect the real deployed experience with Playwright,
+  reproduce material defects, collect browser/network/console/visual evidence,
+  map each verified defect to its authoritative Juss-owned repository, apply
+  the smallest reversible root-cause repair, and rerun the identical browser
+  path until the fix is proven. External or unowned URLs are observation-only.
+version: 1.0.0
+status: active
+scope: founder-control-room
 category: engineering
-requires:
-  - playwright
-  - goalfix
-  - fcr-portfolio-registry
-  - review-verify-merge
+owner: Juss & Co.
 ---
 
-# URLFix
+# URLFIX
 
 ## Mission
 
-Turn a live URL into a truthful repair loop:
+Turn a URL into a bounded repair loop:
+
+```text
+URL
+→ resolve ownership + runtime identity
+→ test the real browser path
+→ capture reproducible issues
+→ rank material defects
+→ map defect to authoritative source
+→ apply one smallest reversible repair
+→ rerun the exact reproduction
+→ verify the live URL when production truth matters
+→ record proof and continue
+```
 
-`URL -> resolve -> browser baseline -> issue ledger -> failure plane -> causal hypothesis -> goalfix -> same witness -> runtime identity -> live recheck -> merge-review handoff when applicable`
+Do not become a generic Lighthouse report generator. The goal is to repair verified defects in owned products while preserving project authority, user safety, rollback, and exact evidence.
 
-URLFix observes, diagnoses, and verifies. Goalfix owns source-repair discipline. FCR owns project identity, authority, runtime truth, expectation truth, and evidence trust. Playwright supplies browser evidence. `review-verify-merge` owns merge readiness and merge execution authority after a separately valid handoff.
+## Activation
 
-The mandatory merge-review annex is `skills/urlfix/MERGE_REVIEW.md`.
+Use for:
+- `/urlfix <url>`
+- `urlfix <url>`
+- `URL → Test → Find issues → Fix them`
+- requests to test a live Juss-owned site and repair what is broken
+
+Activation requests rigorous investigation. It does not create merge, deploy, provider-write, publication, payment, message-send, account-change, deletion, credential, or production-mutation authority.
+
+## Compatibility and precedence
+
+This skill composes with existing controls:
+1. repository `AGENTS.md` and project-specific contracts
+2. Juss Founder OS and portfolio authority
+3. `ultrathink-attack-godmode` for adversarial execution
+4. `goalfix` semantics for root-cause repair
+5. `repair-to-proof` for exact-head and release truth
+6. `continuity-proof-ledger` for fingerprints, cookies, drift, and handoff
 
-## Governing axiom
+Do not create duplicate authority, duplicate PRs, or a second source of truth.
+
+## Input contract
 
-URLFix may advance a defect only to the highest proof state actually observed.
+Required:
 
-`LIVE_BROWSER_PROVEN` requires the same meaningful behavioral witness that exposed the defect to fail on the real live baseline and pass on the identified repaired live runtime, using real dependencies and independently verified semantic and artifact evidence.
+```text
+URL:
+```
 
-A stable URL is a locator, not runtime identity. Source green, local green, preview green, provider acceptance, a page merely loading, or browser proof itself are not merge approval.
+Optional:
 
-## Authority model
+```text
+EXPECTED USER PATH:
+KNOWN SYMPTOM:
+VIEWPORT / DEVICE:
+AUTH CONTEXT:
+TARGET ENVIRONMENT:
+STOP CONDITION:
+```
 
-Resolve project authority from the existing FCR active portfolio registry. Do not create a parallel project registry and do not infer repository ownership from a hostname.
+If only a URL is supplied, infer the smallest safe test plan from the owned product's existing routes, tests, documentation, and browser configuration. Do not invent credentials, private test accounts, expected product behavior, or ownership.
 
-Keep these truths separate:
+## Phase 0: RESOLVE
 
-- source ownership;
-- URL/origin ownership;
-- bounded repair authority;
-- expected product behavior;
-- observed browser behavior;
-- runtime identity;
-- merge-review readiness;
-- merge authority;
-- deploy authority;
-- consequential external-effect authority.
+Before testing or mutating source, establish:
 
-A URLFix payload cannot grant itself authority or truth. FCR trust facts must be tuple-bound, not loose booleans or reusable strings:
+```text
+CANONICAL URL:
+ORIGIN:
+OWNERSHIP: VERIFIED_OWNED | EXTERNAL | UNKNOWN
+PROJECT:
+AUTHORITATIVE REPOSITORY:
+TARGET BRANCH / SHA:
+LIVE RUNTIME IDENTITY:
+AUTH BOUNDARY:
+EXPECTED CORE PATH:
+MUTATION AUTHORITY:
+PROOF REQUIRED:
+ROLLBACK:
+STOP CONDITION:
+```
+
+For a Juss-owned URL, resolve project and repository through current FCR portfolio/control-plane evidence or another authoritative project registry. A hostname resemblance, repo name, chat memory, page metadata, or generated claim is not sufficient ownership proof.
+
+Destination guard (applies to every ownership class, before any browser navigation):
+
+- Allow only `https:` URLs to public hostnames. Reject loopback, private, link-local, unique-local and other non-public addresses, IP literals, credentials in the URL, and bare hostnames.
+- The literal-URL check in `validateTargetUrl` (`scripts/external-site-snapshot.mjs`) is necessary but not sufficient. It does not resolve DNS and does not follow redirects. Resolve the hostname and reject any non-public address. Re-apply the same checks to every redirect hop and to the final URL.
+- If any check fails, stop with `BLOCKED`, name the rejected destination class, and do not load, capture, screenshot or persist responses from that destination.
 
-- origin + project slug + canonical repository + ownership evidence ref;
-- repair receipt + project slug + canonical repository;
-- artifact id + exact SHA-256;
-- runtime evidence ref + runtime identity + origin;
-- witness-run receipt + run id + fingerprint + target URL + evidence mode + observed result + artifacts;
-- expectation evidence ref + full route + browser family + expected observable result.
+Artifact hygiene (applies to every URLFIX run, before any screenshot, trace, console, network or receipt is written):
+
+- Use only synthetic or test identities. Never load a real user's or privileged account's authenticated browser state (storage state, cookies, bearer or session tokens) into a URLFIX run.
+- Never persist cookies, `Authorization` or other request headers, request or response bodies, form field values, or private page text. Console and network capture may keep method, status, and the URL with query strings and fragments removed.
+- Redact any token-like or credential-like value that appears in a captured artifact or receipt before it is stored. If redaction cannot be verified, discard the artifact and report `BLOCKED`.
+
+If ownership is `EXTERNAL` or `UNKNOWN`:
+
+```text
+TEST → DIAGNOSE → REPORT
+```
+
+Do not mutate source.
+
+If ownership is `VERIFIED_OWNED` and repair authority exists:
 
-Do not combine individually true facts from different projects, origins, runs, expectations, candidates, or runtimes into authority or proof.
+```text
+TEST → DIAGNOSE → PATCH → VERIFY → LIVE RECHECK
+```
+
+## Phase 1: BASELINE
+
+Use a real browser. Prefer the repository's existing Playwright configuration, fixtures, authenticated state, device projects, and established runtime proof harness.
+
+Capture the pre-fix state before changing source:
+- final URL after redirects
+- page status and visible load result
+- representative desktop and mobile behavior when the product supports both
+- screenshots for material visual failures
+- browser console errors and warnings relevant to the path
+- failed, 4xx, and 5xx network requests
+- route transitions
+- broken images, fonts, scripts, and other user-visible assets
+- important navigation and links
+- buttons or controls that do not produce their expected state transition
+- forms, validation, loading, error, and empty states
+- authentication and authorization boundaries
+- obvious clipping, overlap, horizontal overflow, unreachable controls, or responsive breakage
+- basic accessibility failures that materially block use
+- the actual product-critical path relevant to that site
+
+A successful HTTP response alone is not browser proof. A screenshot alone is not interaction proof. A preview build does not prove production.
+
+## Consequential-action membrane
+
+Testing must remain non-destructive by default.
+
+For checkout, payment, purchase, publication, deletion, account changes, outbound messaging, external API writes, credential rotation, production data mutation, or another consequential action:
+- exercise the path up to the side-effect boundary using existing safe fixtures, test modes, mocks, or sandbox environments when available;
+- do not create a real external effect without separate exact authorization;
+- record the boundary as `BLOCKED_BY_AUTHORITY` if the effect itself is required for proof and no safe authorized test lane exists.
+
+Never bypass authentication, CAPTCHA, access controls, or provider restrictions merely to continue the loop.
+
+## Phase 2: FIND
+
+Convert only reproducible findings into the issue ledger.
+
+### Severity
+- **P0**: site or core runtime unusable
+- **P1**: core user journey broken or materially unsafe
+- **P2**: significant UX, responsive, accessibility, reliability, or correctness defect
+- **P3**: polish, preference, or low-impact improvement
 
-External, ambiguous, continuity-only, quarantined, unverified-origin, or otherwise non-authority targets remain observation-only.
+Auto-repair only P0/P1/P2 issues that are verified, owned, bounded, and safe to change. Record P3 without silently expanding scope.
+
+### Issue ledger
 
-## Invocation repair scope
+```text
+ISSUE:
+SEVERITY:
+REPRODUCTION:
+URL / ROUTE:
+VIEWPORT / DEVICE:
+OBSERVED:
+EXPECTED:
+CONSOLE:
+NETWORK:
+SCREENSHOT / TRACE:
+LIKELY SOURCE:
+SOURCE CONFIDENCE:
+OWNERSHIP:
+CURRENT SHA:
+STATUS: VERIFIED | INFERRED | UNKNOWN | BLOCKED | STALE
+```
 
-For a confirmed-owned active project, a trusted founder/operator URLFix invocation may authorize the bounded repair loop only when FCR produces or recognizes the matching project-bound repair-authority receipt.
+Do not convert a suspicion into a defect merely because a console warning exists. Require user-visible or contract-relevant impact, a failing assertion, or another concrete violated expectation.
 
-That bounded scope may cover:
+## Browser state and artifact handling
 
-- inspect the public/live path;
-- create an evidence-backed issue ledger;
-- inspect the canonical owned repository;
-- modify a compatible current authorized repair carrier;
-- make the smallest reversible P0/P1/P2 source fix;
-- add focused regression proof;
-- run local/preview browser verification;
-- prepare a review-only merge-review handoff when a compatible PR already exists.
+- Use only synthetic or test identities for authenticated flows. Never reuse a real user's or a privileged account's browser state, storage state, cookies or tokens, and never sign in with a founder or operator credential.
+- Before any screenshot, trace, console or network capture is stored, or copied into a continuity receipt, redact cookies, authorization and other secret headers, request bodies, and private page content. Restrict captures to the minimum needed to show the defect.
+- Rejecting credentials in the URL does not protect browser state or response data. Keep artifacts out of committed files and receipts unless they pass this redaction step.
 
-It does not itself authorize merge, production deployment, database/provider mutation, payment, publication, messaging, deletion, credential changes, or authority widening.
+## Phase 3: TRACE
 
-## Strategic cognition, compiled
+For each highest-severity independent issue, map:
 
-Apply five gates rather than reciting a prompt stack:
+```text
+URL
+→ project
+→ authoritative repository
+→ live deployment identity
+→ route/page
+→ component/service/API/config/provider boundary
+→ smallest plausible root cause
+→ relevant current diff/history if needed
+```
 
-1. **Blind spot:** What could make the current failure model wrong?
-2. **Value:** Which broken path matters most to the product/user?
-3. **Cause:** What falsifiable root cause best explains the evidence?
-4. **Simplicity:** What is the smallest reversible correction?
-5. **Proof:** What exact observation must change before state advances?
+Attack at most three credible hypotheses before patching. Prefer evidence that can falsify the suspected cause. Do not patch the first file whose name resembles the symptom.
 
-Execution shorthand: `SEE -> PRIORITIZE -> ATTACK -> PIVOT -> SIMPLIFY -> PROVE`.
+## Phase 4: FIX
 
-## URL and ownership resolution
+Repair one independent root cause at a time.
 
-Record original URL, final URL, redirect chain, host/origin, path, query/fragment presence, and capture timestamp.
+Rules:
+- re-read current remote head before mutation;
+- use the existing authorized repair carrier when one exists;
+- do not create a duplicate PR merely because URLFIX found a defect;
+- preserve unrelated work;
+- use existing architecture and tests;
+- apply the smallest reversible change that explains the evidence;
+- add or tighten a regression witness for the reproduced defect;
+- do not silence checks, hide console failures, loosen auth, disable security, weaken accessibility assertions, or replace a real failure with a mock-only green;
+- do not bundle unrelated P2/P3 cleanup into a P0/P1 repair.
 
-Both original and final origins must have FCR evidence binding that exact origin to the same project slug and canonical repository before source mutation is considered. A redirect that lacks that exact tuple downgrades the run to observation-only until separately resolved.
+If the defect belongs to another independent Juss product, hand off to that product's canonical repository and local gates rather than absorbing its code into FCR.
 
-Hostname text alone is never authority.
+## Phase 5: VERIFY SOURCE
 
-Ownership states:
+Run proof proportional to the changed surface:
+1. touched-area static/type validation
+2. focused lint
+3. focused unit test
+4. focused integration/contract test
+5. targeted browser test for the reproduced path
+6. broader affected suite when justified
+7. exact-head CI when release truth is requested
 
-- `OWNED_CONFIRMED`
-- `OWNED_AMBIGUOUS`
-- `EXTERNAL`
-- `UNKNOWN`
-- `BLOCKED`
+Record the exact candidate SHA for every proof claim.
 
-## Browser and network safety
+## Phase 6: VERIFY THE SAME FAILURE PATH
 
-Use Playwright Chromium against the requested public URL only after target validation.
+The original failing reproduction is the regression witness. The same failing browser path must be rerun after the repair.
 
-The browser runner must fail closed against private/local/link-local/metadata destinations on the initial URL, redirects, frames, and subrequests. Do not rely only on the hostname string. Resolve addresses and reject private/reserved targets before allowing requests where the runner can observe DNS.
+If baseline evidence was:
 
-Do not bypass authentication, network controls, robots/policy gates, or provider security boundaries merely to obtain a screenshot.
+```text
+viewport: 390px
+route: /cart
+action: click "Checkout"
+request: POST /api/cart
+result: 500
+```
 
-Minimum viewports:
+the repair is not proven by a generic home-page load. Rerun the same viewport, route, action, request boundary, and expected observable result.
 
-- desktop `1440x900`
-- mobile `390x844`
+Required comparison:
 
-Prefer declared critical flows, then existing Playwright flows, then documented journeys, then the smallest safe public path visible from the UI.
+```text
+BEFORE:
+exact reproduction → verified failure
 
-Inspect reachability, redirects, console/page errors, failed requests, broken assets, overflow/clipping, primary controls, forms, loading/error/empty states, obvious accessibility defects, layout shift, slow/failing API calls, and user-visible JavaScript failure.
+AFTER:
+same reproduction → expected result
+```
 
-Never improvise into a consequential action.
+If the reproduction changes because source, environment, fixture, or route identity changed, explain why and classify predecessor evidence accordingly.
 
-## Expected-behavior provenance
+## Phase 7: VERIFY LIVE
 
-Do not let the tester invent success after seeing the page.
+When the requested outcome is production truth, prove each layer separately:
 
-Every witness must carry an `expectationEvidenceRef` that independently supports the expected observable result for the exact route/browser contract. Acceptable sources include an explicit founder/product requirement, established behavior test, API/UI contract, or other authoritative product evidence.
+```text
+SOURCE
+→ BUILD
+→ DEPLOY
+→ LIVE IDENTITY
+→ HEALTH
+→ ORIGINAL URL + SAME PATH
+→ OUTCOME
+```
 
-A caller-supplied `expectedObservableResult` is not proof by itself. If expectation provenance is missing or contradicts current product truth, do not advance the issue to a browser-proven state.
+A merge does not prove deployment. A deployment event does not prove the live hostname serves that artifact. A live hostname serving the artifact does not prove the repaired user path.
 
-## Failure-plane contract
+Re-check the original URL only after the deployed identity is current enough to support the claim.
 
-Classify each reproduced defect before editing:
+## Phase 8: LOOP
 
-- `BROWSER`
-- `APPLICATION`
-- `API`
-- `DATABASE`
-- `AUTH`
-- `CONFIG_SECRET`
-- `DEPLOYMENT`
-- `DNS`
-- `CDN_EDGE`
-- `THIRD_PARTY_PROVIDER`
-- `UNKNOWN`
-
-Fix the earliest causal plane supported by evidence, not merely the nearest visible symptom.
-
-## Issue state model
-
-Primary evidence progression:
-
-`OBSERVED -> REPRODUCED -> CAUSE_BOUNDED -> PATCHED -> SOURCE_PROVEN`
-
-Browser proof states are conditional evidence levels, not mandatory hops:
-
-- `LOCAL_BROWSER_PROVEN`
-- `PREVIEW_BROWSER_PROVEN` when a meaningful preview exists
-- `LIVE_BROWSER_PROVEN`
-
-Do not claim a higher state without its required evidence. Preview may be inapplicable; its absence does not authorize skipping live requirements.
-
-Side/terminal states:
-
-- `NOT_REPRODUCED`
-- `DUPLICATE`
-- `P3_LOGGED`
-- `OBSERVATION_ONLY`
-- `BLOCKED_AUTHORITY`
-- `BLOCKED_PROVIDER`
-- `BLOCKED_MAPPING`
-- `BLOCKED_CARRIER_SCOPE`
-- `BLOCKED_CONSEQUENTIAL_ACTION`
-- `PATCHED_NOT_LIVE`
-- `ROLLBACK_REQUIRED`
-
-Merge-review status is tracked separately from the issue proof state. Legal URLFix merge-review statuses are defined by `skills/urlfix/MERGE_REVIEW.md`; merge approval is never a URLFix issue state.
-
-## Same behavioral witness law
-
-The stable witness fingerprint covers behavior only:
-
-- full browser route: pathname + query + fragment;
-- Playwright browser family: `chromium`;
-- viewport;
-- preconditions;
-- ordered browser actions;
-- expected observable result.
-
-A query string or hash route can change product behavior and may not be silently dropped from the witness. A different browser family is not the same witness.
-
-Environment and evidence mode are execution metadata, not part of the behavioral fingerprint. This allows the same behavior to be replayed from local to preview to live without pretending those environments are equivalent.
-
-Before and after executions must have different run IDs, distinct trace artifacts, and the same witness fingerprint.
-
-## Observed-result provenance
-
-The semantic observation must come from the verified browser-run receipt, not from a caller rewriting `observedResult` after the trace exists.
-
-A trusted witness-run receipt binds the exact run id, witness fingerprint, target, target URL, runtime identity/ref, evidence mode, observed result, trace, and screenshot metadata. If the supplied run disagrees with that trusted receipt, it cannot satisfy browser proof.
-
-## Evidence modes
-
-Every browser execution records one mode:
-
-- `REAL`
-- `INTERCEPTED`
-- `MOCKED`
-- `FIXTURE`
-
-Fixture/mocked/intercepted evidence may establish local interaction or branching behavior. It may not establish preview or live provider/API/data outcomes.
-
-`PREVIEW_BROWSER_PROVEN` requires real preview dependencies plus a preview runtime identity independently bound to its runtime evidence receipt and origin.
-
-`LIVE_BROWSER_PROVEN` requires all of:
-
-- trusted expected-behavior evidence;
-- independently trusted before and after witness-run receipts;
-- real live before execution;
-- real live after execution;
-- same behavioral witness fingerprint;
-- same live origin and full browser route;
-- failing before observable result;
-- expected after observable result;
-- distinct before and after trace artifacts bound to their exact SHA-256 in trusted evidence;
-- known baseline runtime identity with a trusted runtime receipt bound to that identity and origin;
-- known repaired runtime identity with a trusted runtime receipt bound to that identity and origin.
-
-A caller-supplied expected/observed result, artifact ID, hash, authority receipt, or runtime string is not proof by itself.
-
-## Reproduction count
-
-Default to two consistent reproductions when useful.
-
-One strong reproduction is sufficient when the failure is deterministic with high-quality browser/network evidence, repeating it risks an external effect, or a P0 outage makes repetition diagnostically pointless.
-
-Use more runs for suspected race, timing, or flaky behavior.
-
-## Source mapping
-
-After reproduction:
-
-1. identify route and action boundary;
-2. correlate browser evidence with router/component/API/backend/config/provider evidence;
-3. review relevant recent diffs or deployment movement;
-4. form one falsifiable root-cause hypothesis;
-5. attack that hypothesis before editing;
-6. pivot failure planes when evidence rejects it;
-7. delegate one bounded cause to Goalfix.
-
-Mapping disagreement must return evidence. Do not patch on vibes.
-
-## Goalfix handoff
-
-Provide Goalfix with issue ID, severity, exact behavioral witness, expectation evidence, verified before-run evidence, failure plane, root-cause hypothesis, canonical repository/branch/SHA facts, compatible carrier, project-bound authority receipt reference, external-effect boundary, and required same-witness retest.
-
-Expect root cause, smallest reversible patch, files changed, source checks, focused regression test, local/preview result, candidate runtime identity when available, residual risk, and rollback.
-
-## Carrier policy
-
-Do not create or contaminate a PR merely because URLFix found a problem.
-
-Reuse an existing carrier only when all are true:
-
-- same canonical repository;
-- same root cause or repair objective;
-- carrier is current enough to remain valid;
-- added work keeps scope coherent;
-- repository/founder authority permits the edit.
-
-Otherwise stop at `BLOCKED_CARRIER_SCOPE`. A separately authorized branch may preserve source work without implying a new PR or merge authority.
-
-## Merge review handoff
-
-URLFix never treats source proof, browser proof, runtime proof, or a repair commit as merge authority.
-
-When a compatible existing PR carries the repair and merge review is requested by the founder/operator or checked-in policy:
-
-1. re-read the current repository, PR number, base ref + exact base SHA, and head ref + exact head SHA;
-2. ensure URLFix proof references are bound to that exact head SHA;
-3. emit `juss/urlfix-merge-review@v1` using `config/urlfix-merge-review.schema.json`;
-4. validate the packet with `scripts/urlfix-merge-review-contract.mjs`;
-5. keep handoff intent `REVIEW_ONLY` and `mergeAuthorized: false`;
-6. hand the packet to the existing `review-verify-merge` skill;
-7. require `review-verify-merge` to independently reacquire current PR/base/head/diff/checks/reviews/mergeability/browser proof and exact-candidate approval before any merge decision;
-8. expire the packet on any base/head movement and rebuild it from fresh truth.
-
-If there is no compatible existing PR, report `MERGE_REVIEW_BLOCKED_NO_PR`. Do not create a PR merely to satisfy URLFix.
-
-URLFix may report `READY_FOR_MERGE_REVIEW`; it must not report `MERGE_APPROVED`, `MERGED`, or equivalent from its own evidence. Merge execution and post-merge source verification belong to `review-verify-merge`. Deployment/runtime verification remains separate after merge.
-
-See `skills/urlfix/MERGE_REVIEW.md` for the complete handoff contract.
-
-## Consequential-action boundary
-
-Stop before account creation, payments, subscriptions, publication, deletion, messaging, invitations, role changes, production configuration, credential changes, or other real external effects unless separately authorized.
-
-Use sandbox/test identities or boundary proof where available. Simulated behavior stays non-live evidence.
-
-## Evidence hygiene
-
-Artifacts default outside the product repository and outside public git history.
-
-Never persist passwords, cookies, Authorization headers, API keys, access/refresh tokens, secret form values, raw sensitive request bodies, or unnecessary teen/family/private content.
-
-Do not publish arbitrary screenshots, traces, DOM/body text, or network logs into a public repository or public tag. Redact, omit, or use an approved access-controlled evidence store when capture could expose sensitive or identifying material.
-
-## Verification ladder
-
-1. expectation provenance + trusted failing run receipt;
-2. source checks from Goalfix;
-3. same-witness local browser proof;
-4. same-witness preview browser proof when meaningful, bound to the preview runtime;
-5. real live baseline + repaired runtime identity;
-6. real live repaired same-witness recheck;
-7. before/after comparison and regression scan;
-8. when merge review is applicable, exact repo/PR/base/head handoff to `review-verify-merge` without carrying merge approval forward.
-
-The exact defect witness must pass. A generic page-load check is not a substitute. Merge review must bind to the exact candidate head; a branch name alone is not enough.
+After one repair:
+1. update the issue ledger;
+2. expire stale evidence when head/runtime moves;
+3. rerun the bounded browser sweep for affected paths;
+4. continue with the next independent P0/P1/P2 issue if authority, time, and risk remain acceptable;
+5. stop rather than accumulating unrelated refactors.
 
 ## Stop conditions
 
-Stop when material P0/P1 issues and selected bounded P2 issues are proven at the highest reachable state or explicitly blocked, and the remainder is P3, duplicate, speculative, or not reproducible.
+Stop when any of these is true:
+- all verified material issues in the authorized scope are repaired and re-proven;
+- remaining findings are P3/preferences;
+- ownership cannot be verified;
+- the next repair requires another repository or owner handoff;
+- exact mutation, merge, deploy, provider, credential, or external-effect authority is missing;
+- current head/runtime drift invalidates the proof and cannot be safely refreshed;
+- a provider or infrastructure blocker prevents reliable reproduction;
+- further changes would create more risk than the verified defect justifies.
 
-Also stop when the next move requires missing authority, expectation provenance, credentials, provider repair, incompatible carrier scope, deployment access, merge-review carrier/PR truth, exact-candidate approval, or consequential-action authorization.
+## Attack checklist
 
-## Final receipt
+Before declaring success, try to falsify it:
+- Did the test hit the intended hostname after redirects?
+- Is the browser testing the current candidate or an old preview?
+- Did the same failing path actually rerun?
+- Could cached assets hide the defect?
+- Did mobile pass only because the broken control was off-screen?
+- Did an error disappear because auth or data silently failed earlier?
+- Did a mock replace the real boundary being claimed?
+- Is a 200 response masking a broken client render?
+- Did a console/network failure remain after the visible symptom disappeared?
+- Did a provider accept a deployment while the custom domain still serves an older artifact?
+- Did the patch weaken security, privacy, accessibility, validation, or evidence requirements?
+- Did the repair accidentally cross product authority boundaries?
+- Did a new head SHA make earlier proof stale?
 
-Return:
+## Continuity receipt
 
-- tested/final URL and ownership class;
-- project slug, canonical repo, branch/SHA, runtime identity when observed;
-- critical paths/viewports tested;
-- issue ledger with failure plane and proof state;
-- expectation evidence ref;
-- before/after behavioral fingerprint plus distinct run IDs;
-- trusted witness-run refs and tuple-bound artifact/runtime refs;
-- Goalfix patch/carrier refs when applicable;
-- highest proof state actually observed;
-- merge-review status: `MERGE_REVIEW_NOT_REQUESTED`, `READY_FOR_MERGE_REVIEW`, or the exact blocking status from the annex;
-- exact PR/base/head identifiers when a merge-review handoff exists;
-- blockers, residual risk, and untested consequential flows.
+Record:
 
-No fake green. No authority inflation. No live claim from mock evidence. No merge claim from URLFix evidence alone.
+```text
+URL:
+PROJECT:
+REPOSITORY:
+BASE SHA:
+CANDIDATE SHA:
+LIVE SHA / ARTIFACT:
+ISSUES VERIFIED:
+ISSUES REPAIRED:
+ISSUES REMAINING:
+TESTS:
+PLAYWRIGHT:
+CONSOLE:
+NETWORK:
+DEPLOYMENT:
+LIVE RECHECK:
+AUTHORITY:
+ROLLBACK:
+FINGERPRINT:
+CONTINUITY COOKIE:
+NEXT GATE:
+```
+
+A fingerprint identifies the evidence subject. It does not make an unverified result true. A continuity cookie is a resumable pointer, never authorization.
+
+## Output contract
+
+```text
+REALITY
+ATTACK FINDINGS
+ISSUE LEDGER
+FIX
+PROOF
+LIVE RECHECK
+RISK
+ROLLBACK
+NEXT GATE
+```
+
+Say explicitly whether source files changed, commits were pushed, browser tests actually ran, CI actually ran, a PR was merged, deployment occurred, and the original live URL was reverified. Never upgrade `INFERRED`, `UNKNOWN`, `BLOCKED`, or `STALE` to `VERIFIED` for narrative convenience.
+
+## Candidate machine-verifiable proof contract
+
+`skills/urlfix/CANDIDATE_V0_2.md` preserves the earlier v0.2 candidate proof-state and tuple-binding contract alongside its schemas and source verifier. It is a subordinate candidate annex to this active skill, not a replacement authority or a downgrade of version 1.0.0. Its `skills/urlfix/MERGE_REVIEW.md` handoff remains review-only; current exact-head founder, privacy, SSRF, runtime, and provider gates continue to apply.
