@@ -14,6 +14,7 @@ const employee = await read('employee.mjs');
 const worker = await read('worker-entry.mjs');
 const dockerfile = await read('Dockerfile');
 const host = await read('host.mjs');
+const bridge = await read('founder-os-bridge.mjs');
 
 for (const [label, pattern] of [
   ['Node built-in import', /from\s+['"]node:/],
@@ -88,5 +89,24 @@ assert.ok(host.includes("child.kill('SIGKILL')"), 'host must enforce a hard kill
 assert.equal(CONTAINER_SANDBOX_LIMITS.maxInputBytes, 32 * 1024);
 assert.equal(CONTAINER_SANDBOX_LIMITS.maxOutputBytes, 64 * 1024);
 assert.equal(CONTAINER_SANDBOX_LIMITS.timeoutMs, 3_000);
+
+for (const invariant of [
+  "const ALLOWED_ACTIONS = new Set(['inspect', 'plan'])",
+  "controlPlane: 'juss-chief-ai'",
+  "executionAllowed: false",
+  "runSyntheticEmployeeContainer(workerRequest, options)",
+  "receiptFingerprint: fingerprint(payload)",
+]) {
+  assert.ok(bridge.includes(invariant), `Founder OS bridge missing ${invariant}`);
+}
+for (const forbidden of [
+  'node:child_process',
+  'spawn(',
+  'exec(',
+  'execFile(',
+  'shell: true',
+]) {
+  assert.equal(bridge.includes(forbidden), false, `Founder OS bridge contains ${forbidden}`);
+}
 
 console.log('AI Company process sandbox boundary contract passed.');
