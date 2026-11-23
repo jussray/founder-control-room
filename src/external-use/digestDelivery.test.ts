@@ -15,7 +15,8 @@ describe('external-use digest delivery', () => {
       text: 'Verified source links',
     });
     expect(id).toBe('mail-123');
-    expect(send).toHaveBeenCalledExactlyOnceWith({
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
       to: EXTERNAL_USE_DIGEST_RECIPIENT,
       from: 'welcome@api.foundercontrolroom.org',
       subject: 'External-use discovery',
