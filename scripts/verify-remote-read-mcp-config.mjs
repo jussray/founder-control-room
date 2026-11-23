@@ -141,6 +141,22 @@ assert(
     && docs.includes('four read/preview tools'),
   'MCP stack docs must document the single-project Truth Compass grant and reduced tool catalog',
 );
+const truthCompassMigration = read('supabase/migrations/20261123160000_register_truth_compass_external_read_identity.sql');
+assert(
+  /'truth-compass',[\\s\\S]*?'jussray\\/truth-compass',[\\s\\S]*?'paused',[\\s\\S]*?'low'/.test(truthCompassMigration)
+    && /on conflict \\(slug\\) do nothing/i.test(truthCompassMigration),
+  'Truth Compass must be registered as a paused, low-risk external evidence identity without overwriting an existing row',
+);
+const truthCompassTools = mcpRouter.match(/const TRUTH_COMPASS_READ_TOOLS = \\[([\\s\\S]*?)\\] as const/);
+const truthCompassToolNames = truthCompassTools?.[1].match(/"([a-z_]+)"/g)?.map((name) => name.slice(1, -1)) ?? [];
+assert(
+  truthCompassToolNames.length === 4
+    && truthCompassToolNames.includes('fcr_get_current_truth')
+    && truthCompassToolNames.includes('fcr_audit_change_genealogy')
+    && !truthCompassToolNames.includes('fcr_save_task_checkpoint')
+    && !truthCompassToolNames.includes('fcr_relay_operator'),
+  'Truth Compass must receive exactly four project-scoped read tools and no write/relay tool',
+);
 
 console.log(
   `[verify:remote-read-mcp] registry-derived active scope (${exactRemoteScope}), external-project exclusion, OAuth intersection, static-token compatibility, secret rejection, and read/preview-only routing are pinned.`,
