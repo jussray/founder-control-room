@@ -105,9 +105,9 @@ for (const requiredMcpRouterFragment of [
   'authMode: "static"',
   'env: portfolioRemoteMcpEnv',
   'FCR_REMOTE_MCP_READ_PROJECTS: "truth-compass"',
-  'FCR_REMOTE_MCP_RESOURCE: "https://api.foundercontrolroom.org/mcp/portfolio/truth-compass"',
+  'FCR_REMOTE_MCP_READ_TOKEN: process.env.FCR_TRUTH_COMPASS_READ_TOKEN',
+  'challengeUnauthenticated: false',
   'allowedToolNames: TRUTH_COMPASS_READ_TOOLS',
-  'handleTruthCompassProtectedResourceMetadata',
 ]) {
   assert(
     mcpRouter.includes(requiredMcpRouterFragment),
@@ -137,7 +137,7 @@ assert(
 );
 assert(
   docs.includes('POST /mcp/portfolio/truth-compass')
-    && docs.includes('mcp_projects: ["truth-compass"]')
+    && docs.includes('FCR_TRUTH_COMPASS_READ_TOKEN')
     && docs.includes('five read/preview tools'),
   'MCP stack docs must document the single-project Truth Compass grant and reduced tool catalog',
 );
