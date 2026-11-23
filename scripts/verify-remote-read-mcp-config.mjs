@@ -85,6 +85,8 @@ for (const requiredRemoteRouteFragment of [
   'assertNoSecretArguments(args)',
   'timingSafeEqual',
   'intersectProjects(serverProjects, oauthIdentity.projectIds)',
+  'const allowedToolNames = overrides.allowedToolNames',
+  'Tool is outside this remote MCP grant',
 ]) {
   assert(
     remoteRoute.includes(requiredRemoteRouteFragment),
@@ -102,6 +104,10 @@ for (const requiredMcpRouterFragment of [
   'authMode: "oauth"',
   'authMode: "static"',
   'env: portfolioRemoteMcpEnv',
+  'FCR_REMOTE_MCP_READ_PROJECTS: "truth-compass"',
+  'FCR_REMOTE_MCP_RESOURCE: "https://api.foundercontrolroom.org/mcp/portfolio/truth-compass"',
+  'allowedToolNames: TRUTH_COMPASS_READ_TOOLS',
+  'handleTruthCompassProtectedResourceMetadata',
 ]) {
   assert(
     mcpRouter.includes(requiredMcpRouterFragment),
@@ -122,6 +128,18 @@ assert(
     && !remoteRoute.includes("'write_tool'")
     && !remoteRoute.includes("'merge_tool'"),
   'served MCP route may not advertise write-shaped tools',
+);
+assert(
+  /const TRUTH_COMPASS_READ_TOOLS = \[[\s\S]*?\] as const satisfies readonly ExternalMcpToolName\[\]/.test(mcpRouter)
+    && !mcpRouter.includes('"fcr_save_task_checkpoint"')
+    && !mcpRouter.includes('"fcr_relay_operator"'),
+  'Truth Compass must have a dedicated server-side allowlist that excludes checkpoint writes and peer relay',
+);
+assert(
+  docs.includes('POST /mcp/portfolio/truth-compass')
+    && docs.includes('mcp_projects: ["truth-compass"]')
+    && docs.includes('five read/preview tools'),
+  'MCP stack docs must document the single-project Truth Compass grant and reduced tool catalog',
 );
 
 console.log(
