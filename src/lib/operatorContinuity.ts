@@ -671,6 +671,16 @@ function normalizedContinuation(input: OperatorExecutionContinuationInput): Oper
   if (remainingStepIds.some((id) => completedIds.includes(id))) {
     throw new Error('a completed step cannot also be remaining');
   }
+  const hasLifecycleFields = input.sourceOperator !== undefined
+    || input.destinationOperator !== undefined
+    || input.resultRef !== undefined
+    || input.resultSubmittedByOperator !== undefined
+    || input.verificationRefs !== undefined
+    || input.verifiedByOperator !== undefined
+    || input.closedAt !== undefined;
+  if (input.taskState === undefined && hasLifecycleFields) {
+    throw new Error('lifecycle fields require taskState');
+  }
   if (input.taskState !== undefined) {
     if (!['ACTIVE', 'RESULT_SUBMITTED', 'VERIFIED', 'CLOSED'].includes(input.taskState)) {
       throw new Error('taskState must be ACTIVE, RESULT_SUBMITTED, VERIFIED, or CLOSED');
