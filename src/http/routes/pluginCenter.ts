@@ -11,9 +11,13 @@ import {
 } from '../../lib/pluginCenter.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { pluginCenterMessagingRouter } from './pluginCenterMessaging.js';
+import { granolaRouter } from './granola.js';
 
 export const pluginCenterRouter = Router();
 pluginCenterRouter.use(requireFounder);
+pluginCenterRouter.use('/messaging', pluginCenterMessagingRouter);
+pluginCenterRouter.use('/granola', granolaRouter);
 
 type DbRecord = Record<string, unknown>;
 

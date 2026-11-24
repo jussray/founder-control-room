@@ -22,21 +22,18 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain("re.fullmatch(r'[0-9a-f]{40}', main_sha)");
   });
 
-  it('fails closed on live current main and exact ancestry while treating the PR base SHA as diagnostic snapshot only', () => {
+  it('fails closed unless the command names exact current main and an open PR targeting it', () => {
     expect(reviewWorkflow).toContain('/git/ref/heads/main');
     expect(reviewWorkflow).toContain('test "$current_main" = "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).toContain('pulls/${PR_NUMBER}');
     expect(reviewWorkflow).toContain("test \"$state\" = 'open'");
     expect(reviewWorkflow).toContain("test \"$base_ref\" = 'main'");
-    expect(reviewWorkflow).toContain("base_snapshot_sha=\"$(jq -r '.base.sha' <<< \"$pr_json\")\"");
-    expect(reviewWorkflow).toContain('base_snapshot_sha=%s');
+    expect(reviewWorkflow).toContain('test "$base_sha" = "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).toContain('compare/${EXPECTED_MAIN_SHA}...${head_sha}');
-    expect(reviewWorkflow).toContain("behind_by=\"$(jq -r '.behind_by' <<< \"$compare_json\")\"");
-    expect(reviewWorkflow).toContain("merge_base_sha=\"$(jq -r '.merge_base_commit.sha' <<< \"$compare_json\")\"");
+    expect(reviewWorkflow).toContain('merge_base_commit.sha');
+    expect(reviewWorkflow).toContain('behind_by');
     expect(reviewWorkflow).toContain("test \"$behind_by\" = '0'");
     expect(reviewWorkflow).toContain('test "$merge_base_sha" = "$EXPECTED_MAIN_SHA"');
-    expect(reviewWorkflow).not.toContain('test "$base_snapshot_sha" = "$EXPECTED_MAIN_SHA"');
-    expect(reviewWorkflow).not.toContain('test "$base_sha" = "$EXPECTED_MAIN_SHA"');
   });
 
   it('scopes workflow-dispatch write authority to the founder command job', () => {
@@ -145,6 +142,35 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('main moved during governance reconciliation');
   });
 
+  it('fails malformed GitHub App credentials before any governance provider mutation', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+    const credentialPreflight = governanceJob.split(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    )[1]?.split('- name: Reconcile canonical two-membrane governance and prove full topology')[0] ?? '';
+    const preflightIndex = governanceJob.indexOf(
+      '- name: Verify GitHub App credential shape before provider mutation',
+    );
+    const mutationIndex = governanceJob.indexOf(
+      '- name: Reconcile canonical two-membrane governance and prove full topology',
+    );
+
+    expect(preflightIndex).toBeGreaterThan(-1);
+    expect(mutationIndex).toBeGreaterThan(preflightIndex);
+    expect(credentialPreflight).toContain(
+      "import { createGitHubAppJwt } from './dist/providers/githubAppAuth.js';",
+    );
+    expect(credentialPreflight).toContain('createGitHubAppJwt(appId, privateKey, Date.now())');
+    expect(credentialPreflight).toContain('APP_PRIVATE_KEY_SHAPE_INVALID');
+    expect(credentialPreflight).toContain('providerMutationAttempted: false');
+    expect(credentialPreflight).toContain("providerMutationState: 'NOT_ATTEMPTED'");
+    expect(credentialPreflight).toContain("name: 'CredentialShapeError'");
+    expect(credentialPreflight).toContain(
+      'Provider authentication and provider mutation were not attempted.',
+    );
+    expect(credentialPreflight).not.toContain('console.log(privateKey');
+    expect(credentialPreflight).not.toContain('console.error(privateKey');
+  });
+
   it('keeps provider-policy mutation inside production App authority and the canonical provider factory', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
@@ -195,6 +221,21 @@ describe('trusted review witness command contract', () => {
 
     expect(governanceJob).toContain('let providerMutationAttempted = false;');
     expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('GOVERNANCE_OBSERVATION_INCOMPLETE');
+    expect(governanceJob).toContain('INDEPENDENT_REVIEWER_UNAVAILABLE');
+    expect(governanceJob).toContain('if (!beforeTopology.observationComplete) {');
+    expect(governanceJob).toContain(
+      'FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS > 0 && !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob).not.toContain(
+      '!beforeTopology.observationComplete || !beforeTopology.independentReviewerReady',
+    );
+    expect(governanceJob.indexOf('beforeTopology.observationComplete')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
+    expect(governanceJob.indexOf('beforeTopology.independentReviewerReady')).toBeLessThan(
+      governanceJob.indexOf('providerMutationAttempted = true;'),
+    );
     expect(governanceJob).toContain('} catch (error) {');
     expect(governanceJob).toContain('} finally {');
     expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
@@ -208,7 +249,7 @@ describe('trusted review witness command contract', () => {
     expect(receiptUpload).toContain('if: always()');
   });
 
-  it('emits a sanitized founder-phase provider receipt without widening authority', () => {
+  it('emits a sanitized independent-review provider receipt without widening authority', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
@@ -217,7 +258,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
     expect(governanceJob).toContain(
-      'Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded',
+      'Human review phase: founder-only native Auto-merge; zero additional approving reviewers; deterministic independent checks and founder-final in-app authority remain separate',
     );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',

@@ -9,11 +9,20 @@ export const FOUNDER_SYSTEM_OWNED_CONTROL_MODES = [
   'truthmode',
   'confess',
   'redteam',
+  'redteam2',
   'attackten',
+  'attack10',
   'lindymode',
   'ooda',
   'proofmode',
   'l99',
+  'investor-redteam',
+  '10truth',
+  'money-path',
+  'launch',
+  'localfirst',
+  'leevize',
+  'law',
 ] as const;
 
 export const FOUNDER_CONTROL_INPUT_RULES = Object.freeze({
