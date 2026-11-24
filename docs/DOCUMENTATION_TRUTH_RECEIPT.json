@@ -1055,6 +1055,18 @@
       "claims": [
         "The Friend Intake review cookie must be an explicitly declared sensitive HttpOnly, SameSite=Strict five-minute cookie scoped to /friend-intake, written only from the approved server-only review receipt module."
       ]
+    },
+    {
+      "path": ".github/workflows/neon-pr-branches.yml",
+      "claims": [
+        "Neon preview scope must classify canonical Supabase changes separately from explicitly fixture-backed Neon previews; all Supabase changes must run exact-head local Supabase full migration replay and schema lint, and Neon provider NOT_APPLICABLE may be asserted only after canonical proof succeeds without creating, deleting, or treating provider branch state as authorization."
+      ]
+    },
+    {
+      "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
+      "claims": [
+        "Regression tests must preserve the exact-main ref check, canonical Supabase replay/lint, fixture-specific Neon scope, provider preview write/readback gates, and safe non-applicability semantics."
+      ]
     }
   ]
 }

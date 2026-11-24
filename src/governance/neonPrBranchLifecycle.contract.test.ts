@@ -30,14 +30,26 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT');
   });
 
-  it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {
+  it('requires canonical Supabase proof and gates Neon only on explicit provider preview scope', () => {
     expect(workflow).toContain('name: Create Neon Branch');
     expect(workflow).toContain('pull-requests: read');
     expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(1);
+    expect(workflow).toContain('NEEDS_SUPABASE=false');
+    expect(workflow).toContain('NEEDS_NEON=false');
     expect(workflow).toContain('supabase/*)');
+    expect(workflow).toContain('supabase/preview-fixtures/*.sql');
+    expect(workflow).toContain('supabase/preview-contracts/*.sql');
+    expect(workflow).toContain('supabase/preview-assertions/*.sql');
+    expect(workflow).toContain('if [ -f "supabase/preview-fixtures/$preview_file" ]');
+    expect(workflow).toContain('needs_supabase=${NEEDS_SUPABASE}');
+    expect(workflow).toContain('needs_neon=${NEEDS_NEON}');
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'true'");
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'false'");
+    expect(workflow).toContain('uses: supabase/setup-cli@v1');
+    expect(workflow).toContain('supabase start');
+    expect(workflow).toContain('supabase db lint --local --fail-on error');
+    expect(workflow).toContain('Neon provider preview NOT_APPLICABLE');
     expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(1);
-    expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
     expect(workflow).not.toContain('Neon cleanup skipped because this PR does not change supabase/.');
   });
 
