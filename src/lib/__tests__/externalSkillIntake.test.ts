@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { listExternalSkills, inspectExternalSkill } from '../externalSkillIntake.js';
 
@@ -24,5 +25,24 @@ describe('external skill intake', () => {
     ]);
     expect(first?.executionAllowed).toBe(false);
     expect(inspectExternalSkill('repomix')).not.toBe(first);
+  });
+});
+
+describe('observed upstream review pins', () => {
+  it('matches the recorded evidence without granting activation', () => {
+    const evidence = JSON.parse(readFileSync(new URL('../../../docs/external-skills/review-pins.json', import.meta.url), 'utf8'));
+    expect(evidence.candidates).toHaveLength(14);
+    for (const row of evidence.candidates) {
+      const actual = inspectExternalSkill(row.id);
+      expect(actual?.repository).toBe(row.repository);
+      expect(actual?.reviewRevision).toMatch(/^[a-f0-9]{40}$/);
+      expect(actual?.reviewRevision).toBe(row.revision);
+      expect(actual?.revision).toBeNull();
+      expect(actual?.executionAllowed).toBe(false);
+    }
+    const held = inspectExternalSkill('last30days-skill');
+    expect(held?.reviewRevision).toBeNull();
+    expect(held?.source).toBeNull();
+    expect(held?.destinations).toEqual(['skills-library']);
   });
 });
