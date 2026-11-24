@@ -864,3 +864,8 @@ The founder-only `/friend-intake` route and browser page compose a deterministic
 ### Canonical database proof for Friend Intake
 
 The Friend Intake SQL relies on Supabase-owned authentication/schema objects. A plain Neon PostgreSQL preview cannot establish those constraints without an explicit isolated Neon fixture/contract. The PR database check therefore requires exact-head local Supabase migration replay and schema lint for any Supabase source change, and only launches a Neon provider preview where a matching explicit provider-specific fixture, contract, or assertion exists. A Neon NOT_APPLICABLE result is not itself a passing production migration or proof of applied runtime state.
+
+
+### Cookie scan coverage correction
+
+The cookie writer scan now recognizes `Response.append('Set-Cookie', …)` in addition to existing writer patterns. The legitimate opaque `__Host-fcr_member_session` cookie is explicitly documented and its server-only writer allowlisted. The unused historical bearer/refresh cookie emitter in `src/http/middleware/sessionCookies.ts` is retained as a non-writing, fail-closed compatibility stub; it cannot issue legacy bearer cookies. This change does not establish production member authentication or authorize using member sessions as founder credentials.

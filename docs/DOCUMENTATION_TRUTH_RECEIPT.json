@@ -886,7 +886,8 @@
     {
       "path": "src/auth/memberSession.ts",
       "claims": [
-        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable."
+        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable.",
+        "The existing member-session writer may emit only its short-lived server-held opaque __Host-fcr_member_session with Path=/, Secure, HttpOnly and SameSite=Strict; member identity is not founder/provider mutation authorization."
       ]
     },
     {
@@ -1066,6 +1067,18 @@
       "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
       "claims": [
         "Regression tests must preserve the exact-main ref check, canonical Supabase replay/lint, fixture-specific Neon scope, provider preview write/readback gates, and safe non-applicability semantics."
+      ]
+    },
+    {
+      "path": "src/http/middleware/sessionCookies.ts",
+      "claims": [
+        "Legacy founder bearer and refresh-cookie issuing helpers must remain non-writing and throw on attempted use; no source may re-enable Set-Cookie from this obsolete transport. Current founder browser session transport is the opaque server-held cookie."
+      ]
+    },
+    {
+      "path": "scripts/verify-cookie-contract.mjs",
+      "claims": [
+        "Cookie writers using Response.append('Set-Cookie') must be detected as well as Set-Cookie headers, all active writers must have explicit manifest allowance, and sensitive cookies must remain HttpOnly with no-store and a bounded explicit path."
       ]
     }
   ]
