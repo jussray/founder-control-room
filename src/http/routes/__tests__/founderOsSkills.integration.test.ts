@@ -483,6 +483,33 @@ describe('GET /founder-os/distribution/skills', () => {
   });
 });
 
+describe('GET /founder-os/external-skills', () => {
+  it('requires founder authentication', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'missing' } });
+    const response = await request(buildApp()).get('/founder-os/external-skills');
+    expect(response.status).toBe(401);
+  });
+  it('lists fifteen quarantined candidates with no execution authority', async () => {
+    founderSession();
+    const response = await request(buildApp()).get('/founder-os/external-skills').set('Authorization', BEARER);
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.body.executionAllowed).toBe(false);
+    expect(response.body.skills).toHaveLength(15);
+    expect(response.body.skills.every((row: { executionAllowed: boolean }) => row.executionAllowed === false)).toBe(true);
+  });
+  it('filters by destination and rejects unknown or repeated destinations', async () => {
+    founderSession();
+    const filtered = await request(buildApp()).get('/founder-os/external-skills?destination=medusa').set('Authorization', BEARER);
+    expect(filtered.status).toBe(200);
+    expect(filtered.body.skills.map((row: { id: string }) => row.id)).toEqual(['skillspector']);
+    for (const query of ['destination=unknown', 'destination=chief&destination=fcr']) {
+      const invalid = await request(buildApp()).get('/founder-os/external-skills?' + query).set('Authorization', BEARER);
+      expect(invalid.status).toBe(400);
+    }
+  });
+});
+
 
 describe('GET /founder-os/security-skills/catalog', () => {
   const url = '/founder-os/security-skills/catalog';
