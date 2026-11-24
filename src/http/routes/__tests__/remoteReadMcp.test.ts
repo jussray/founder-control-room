@@ -294,6 +294,9 @@ describe('Founder Control Room paired remote MCP', () => {
 
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-11-25');
+    expect(initialized.body.result.instructions).toContain(
+      'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool',
+    );
     expect(listed.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'chief_audit_repository',
       'chief_list_capabilities',
@@ -352,6 +355,9 @@ describe('Founder Control Room paired remote MCP', () => {
     const response = await modernPost(buildApp(), body);
 
     expect(response.status).toBe(200);
+    expect(response.body.result.instructions).toContain(
+      'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool',
+    );
     expect(response.body.result).toMatchObject({
       resultType: 'complete',
       supportedVersions: expect.arrayContaining(['2026-07-28', '2025-11-25']),
