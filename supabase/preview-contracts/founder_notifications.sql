@@ -35,7 +35,7 @@ grant select, insert, update on public.founder_notification_deliveries to servic
 create index founder_notification_delivery_due_idx on public.founder_notification_deliveries(state, next_attempt_at);
 
 -- The RPC runs with invoker privileges; only the server service role may call it.
-create function public.claim_founder_notification_deliveries(batch_limit integer default 20)
+create function public.claim_founder_notification_deliveries(owner_user_id uuid, batch_limit integer default 20)
 returns table(delivery_id uuid, subscription_id uuid, user_id uuid,
   encrypted_subscription text, claim_token uuid, attempt_count integer, metadata jsonb)
 language plpgsql security invoker set search_path = '' as $$
@@ -45,7 +45,7 @@ begin
   select e.id, s.id
     from public.project_events e
     join public.founder_notification_subscriptions s
-      on s.revoked_at is null and s.enrolled_at <= e.created_at
+      on s.user_id = owner_user_id and s.revoked_at is null and s.enrolled_at <= e.created_at
     join public.founder_users f on f.user_id = s.user_id
    where e.event_type = 'founder_notification_intent'
      and e.created_at >= now() - interval '24 hours'
@@ -64,7 +64,7 @@ begin
       join public.founder_notification_subscriptions s on s.id = d.subscription_id
       join public.founder_users f on f.user_id = s.user_id
       join public.project_events e on e.id = d.event_id
-     where s.revoked_at is null and s.enrolled_at <= e.created_at
+     where s.user_id = owner_user_id and s.revoked_at is null and s.enrolled_at <= e.created_at
        and e.created_at >= now() - interval '24 hours'
        and d.attempt_count < 3
        and ((d.state in ('pending','retry') and d.next_attempt_at <= now())
@@ -86,6 +86,6 @@ begin
     join public.project_events e on e.id = c.event_id;
 end;
 $$;
-revoke all on function public.claim_founder_notification_deliveries(integer) from public, anon, authenticated;
-grant execute on function public.claim_founder_notification_deliveries(integer) to service_role;
+revoke all on function public.claim_founder_notification_deliveries(uuid, integer) from public, anon, authenticated;
+grant execute on function public.claim_founder_notification_deliveries(uuid, integer) to service_role;
 commit;
