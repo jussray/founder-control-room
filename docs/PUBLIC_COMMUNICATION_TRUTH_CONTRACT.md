@@ -232,3 +232,9 @@ It is complete only when the intended publication artifact is observable, its cl
 ## X direct publication evidence boundary
 
 `src/lib/firstPartyFounderContentExecutor.ts` must bind X publication to the same authenticated Current You approval, exact public payload hash, source SHA, one-use durable reservation, and temporal truth gate used by first-party LinkedIn. The X adapter must validate the server-held user identity before any write and require matching destination-native post ID, author, exact text, and timestamp after writing. A provider 201, cached account configuration, network error, missing readback, or content alteration cannot be called verified publication; uncertain writes consume their reservation and must not be blindly retried. X account authorization and live result receipts remain UNKNOWN until provider readback is observed. No checked-in source test grants posting, deployment, or merge authority.
+
+## Facebook Page direct publication evidence boundary
+
+The first-party Facebook Page adapter is a text-only destination. The Content Manager lifecycle route must accept only the exact `facebook/facebook` provider/platform pair, bind the stored account to the numeric server-owned Page ID, and reject any Facebook post with media before dispatch. The executor must retain the same exact authenticated Current You approval, one-use reservation, and temporal revalidation used by the other first-party providers.
+
+A successful provider write response, configured Page ID, or source-level test is not publication proof. The terminal state remains UNKNOWN until provider-native readback confirms the Page identity, exact approved text, post ID, permalink, and timestamp. No public communication may claim that a Facebook Page is connected, live, or publishing until those observations are retained. OAuth, token installation, Page selection, app review, and live posting remain separate activation gates.

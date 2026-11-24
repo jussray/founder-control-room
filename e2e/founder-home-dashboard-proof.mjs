@@ -326,7 +326,8 @@ console.log('\n[2] Old deep links migrate to five-screen routes on mobile');
     await page.goto(baseUrl+'/control-room/?tab=truth-seo',{waitUntil:'load'});
     await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
     assert(new URL(page.url()).searchParams.get('screen')==='proof'
-      &&new URL(page.url()).searchParams.get('view')==='truth-seo',
+      &&new URL(page.url()).searchParams.get('view')==='truth-seo'
+      &&new URL(page.url()).searchParams.get('tab')===null,
       'Search & Evidence tile target migrates to the canonical Proof Search Console panel');
     await page.goto(baseUrl+'/control-room/search-evidence.html',{waitUntil:'load'});
     await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
