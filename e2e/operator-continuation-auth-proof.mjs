@@ -43,6 +43,18 @@ try {
   );
 
   assert.equal(view?.headers()['cache-control'], 'private, no-store');
+
+  // The founder-only task discovery path must fail closed in the real server.
+  const discovery = await page.goto(
+    baseUrl + '/operator/continuity?projectSlug=founder-control-room&repositoryFullName=jussray%2Ffounder-control-room',
+  );
+  assert.equal(discovery?.status(), 401, 'anonymous task discovery must return 401');
+  assert.equal(discovery?.headers()['cache-control'], 'private, no-store');
+  assert.equal(
+    JSON.parse(await page.locator('body').innerText()).error,
+    'Founder session required',
+  );
+
   const crossOrigin = await page.evaluate(async () => {
     const response = await fetch('/operator/continuity', {
       method: 'POST',
@@ -88,6 +100,7 @@ try {
     browser: 'chromium',
     fullFcrServer: true,
     anonymousGet: 401,
+    anonymousTaskDiscovery: 401,
     unexpectedBrowserOriginPost: 403,
     allowedOriginWithoutFounderPost: 401,
     routeSpecificRateLimit: 429,

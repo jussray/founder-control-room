@@ -330,3 +330,54 @@ jobs:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: ${{ steps.neon_branch.outputs.branch_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Verify Neon branch deletion with provider readback
+        if: steps.neon_branch.outputs.branch_found == 'true'
+        shell: bash
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          target_name="preview/pr-${PR_NUMBER}"
+          for attempt in {1..12}; do
+            response="$(curl --fail-with-body --silent --show-error --get \
+              "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" \
+              -H "Authorization: Bearer ${NEON_API_KEY}" \
+              --data-urlencode "search=${target_name}" \
+              --data "limit=100")" || {
+                if [ "$attempt" -eq 12 ]; then
+                  echo "::error title=Neon deletion readback failed::Provider API could not confirm the state of ${target_name}."
+                  exit 1
+                fi
+                sleep 5
+                continue
+              }
+
+            jq -e '.branches | type == "array"' >/dev/null <<<"$response" || {
+              echo "::error title=Invalid Neon readback response::Provider response did not contain a branches array."
+              exit 1
+            }
+
+            match_count="$(jq --arg target_name "$target_name" \
+              '[.branches[] | select(.name == $target_name)] | length' <<<"$response")"
+
+            if [ "$match_count" -eq 0 ]; then
+              echo "Provider readback confirmed exact preview branch is absent: ${target_name}."
+              exit 0
+            fi
+
+            if [ "$match_count" -ne 1 ]; then
+              echo "::error title=Ambiguous Neon deletion readback::Expected at most one exact ${target_name} branch, found ${match_count}."
+              exit 1
+            fi
+
+            if [ "$attempt" -lt 12 ]; then
+              sleep 5
+            fi
+          done
+
+          echo "::error title=Neon branch still exists after deletion::Provider readback still finds ${target_name} after 12 checks."
+          exit 1

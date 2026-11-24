@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { listExternalSkills } from '../../lib/externalSkillIntake.js';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
 import {
   type FounderOsLabAction,
@@ -33,6 +34,23 @@ import { requireFounder } from '../middleware/requireFounder.js';
 
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
+
+// Discovery only: no external code, secrets, execution or approval operations.
+founderOsSkillsRouter.get('/external-skills', (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const destination = req.query.destination;
+  if (destination !== undefined && destination !== 'fcr' && destination !== 'chief'
+      && destination !== 'promptos' && destination !== 'skills-library' && destination !== 'medusa') {
+    res.status(400).json({ error: 'invalid_destination' });
+    return;
+  }
+  res.json({
+    contract: 'juss/external-skill-discovery/v1',
+    executionAllowed: false,
+    skills: listExternalSkills(destination),
+  });
+});
+
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -405,6 +423,79 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
   const result = runFounderOsSandbox(request);
   res.set('Cache-Control', 'no-store');
   return res.status(result.status === 'simulated' ? 200 : 422).json(result);
+});
+
+
+// Server-side, founder-only read receipt. Never publish provider credentials or skill bodies.
+// This exact source pin is a governance gate, not a claim of founder canonicalization.
+const DISTRIBUTION_SKILLS_URL = 'https://juss-distribution.mcgill-raylene.workers.dev/api/v1/skills';
+const DISTRIBUTION_REPO_SHA = 'de476e73754ca9616cb7ed178e1ff9c2f84416ba';
+const DISTRIBUTION_REPO = 'jussray/ULTRATHINK-';
+
+founderOsSkillsRouter.get('/distribution/skills', async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const token = process.env.FCR_DISTRIBUTION_READ_TOKEN?.trim() ?? '';
+  if (token.length < 24 || /\s/.test(token)) {
+    return res.status(503).json({ status: 'blocked', reason: 'distribution_client_not_configured' });
+  }
+
+  try {
+    const upstream = await fetch(DISTRIBUTION_SKILLS_URL, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      redirect: 'error',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (upstream.status !== 200
+      || upstream.headers.get('X-Distribution-State') !== 'current'
+      || !/^application\/json\b/i.test(upstream.headers.get('content-type') ?? '')) {
+      return res.status(502).json({ status: 'blocked', reason: 'distribution_unverified' });
+    }
+    const length = Number(upstream.headers.get('content-length') ?? 0);
+    if (!Number.isSafeInteger(length) || length > 64_000) {
+      return res.status(502).json({ status: 'blocked', reason: 'distribution_unverified' });
+    }
+    const raw = await upstream.text();
+    if (new TextEncoder().encode(raw).length > 64_000) {
+      return res.status(502).json({ status: 'blocked', reason: 'distribution_unverified' });
+    }
+    const payload: unknown = JSON.parse(raw);
+    if (!isRecord(payload)
+      || payload.repo !== DISTRIBUTION_REPO
+      || payload.repo_sha !== DISTRIBUTION_REPO_SHA
+      || typeof payload.kernel_status !== 'string'
+      || payload.kernel_status.length > 64
+      || !Array.isArray(payload.skills)
+      || payload.skills.length < 1
+      || payload.skills.length > 32
+      || !payload.skills.every((item: unknown) =>
+        isRecord(item)
+        && typeof item.name === 'string'
+        && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.name)
+        && typeof item.version === 'string'
+        && item.version.length > 0
+        && item.version.length <= 64
+        && item.repo_sha === DISTRIBUTION_REPO_SHA
+      )
+      || !payload.skills.some((item: { name: string }) => item.name === 'juss-os')
+      || new Set(payload.skills.map((item: { name: string }) => item.name)).size !== payload.skills.length) {
+      return res.status(502).json({ status: 'blocked', reason: 'distribution_unverified' });
+    }
+    // Return only provenance and skill names. Skill content never leaves this server endpoint.
+    return res.status(200).json({
+      contract: 'juss/fcr-distribution-read@v1',
+      status: 'source_observed',
+      executionAllowed: false,
+      canonicalizationGranted: false,
+      repo: DISTRIBUTION_REPO,
+      repo_sha: DISTRIBUTION_REPO_SHA,
+      kernel_status: payload.kernel_status,
+      skill_names: payload.skills.map((item: { name: string }) => item.name),
+    });
+  } catch {
+    return res.status(502).json({ status: 'blocked', reason: 'distribution_unverified' });
+  }
 });
 
 installFounderCapitalDecisionRoute(founderOsSkillsRouter);
