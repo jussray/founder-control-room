@@ -30,7 +30,7 @@ jobs:
     env:
       FCR_RUNTIME_BASE_URL: ${{ inputs.runtime_base_url }}
       FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
-      FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}
+      FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}
       FCR_OPERATOR_RELAY_WITNESS_REQUIRED: 'true'
       FCR_OPERATOR_RELAY_TARGET: ${{ inputs.operator_target }}
       DEPLOY_URL: ${{ inputs.runtime_base_url }}

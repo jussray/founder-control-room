@@ -23,7 +23,7 @@ function request(): OperatorRelayRequestV1 {
     authority: { externalWrite: false, merge: false, deploy: false, publish: false, providerMutation: false },
     sensitivity: 'internal',
     createdAt: '2026-09-16T06:30:00.000Z',
-    expiresAt: '2099-09-16T06:40:00.000Z',
+    expiresAt: '2026-09-16T06:40:00.000Z',
   };
   return { ...base, requestHash: operatorRelayRequestHash(base) };
 }
@@ -91,6 +91,25 @@ describe('dispatchOperatorRelay', () => {
       },
     }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject({
       code: 'relay_response_invalid',
+      externalProviderCall: true,
     });
   });
+  it('blocks a hash-valid restricted request before a custom provider adapter sees context', async () => {
+    const req = request();
+    req.sensitivity = 'restricted';
+    const { requestHash: _oldHash, ...identity } = req;
+    req.requestHash = operatorRelayRequestHash(identity);
+    let adapterCalls = 0;
+
+    await expect(dispatchOperatorRelay(req, {
+      perplexity: async () => {
+        adapterCalls += 1;
+        throw new Error('restricted content must never reach this adapter');
+      },
+    }, Date.parse('2026-09-16T06:31:00.000Z'))).rejects.toMatchObject({
+      code: 'relay_disclosure_denied',
+    });
+    expect(adapterCalls).toBe(0);
+  });
+
 });
