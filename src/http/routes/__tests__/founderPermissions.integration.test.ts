@@ -30,7 +30,19 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
   supabase: {
     from: vi.fn((table: string) => {
       if (table === 'founder_users') {
-        const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => ({ data: { email: 'founder@example.com' }, error: null }) };
+        let requestedUserId = '';
+        const chain = {
+          select: () => chain,
+          eq: (field: string, value: unknown) => {
+            if (field === 'user_id') requestedUserId = String(value);
+            return chain;
+          },
+          maybeSingle: async () => ({
+            data: requestedUserId === '11111111-1111-4111-8111-111111111111'
+              ? { user_id: requestedUserId } : null,
+            error: null,
+          }),
+        };
         return chain;
       }
       if (table !== 'founder_permission_requests') throw new Error(`unexpected table: ${table}`);
@@ -117,7 +129,7 @@ const actionTarget = {
 };
 
 function founderUser(id = '11111111-1111-4111-8111-111111111111') {
-  return { data: { user: { id, email: 'founder@example.com' } }, error: null };
+  return { data: { user: { id, email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } }, error: null };
 }
 
 function interactivePost(app: ReturnType<typeof createServer>, path: string) {
@@ -178,14 +190,14 @@ describe('founder permission broker HTTP contract', () => {
       .send({ requestId: 'permission:cookie-authority-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
     interactiveSession.enabled = true;
     mockGetUser.mockImplementation(async (token: string) => token === 'browser-founder-token'
-      ? founderUser('22222222-2222-4222-8222-222222222222')
+      ? founderUser()
       : { data: { user: { id: 'agent-id', email: 'agent@example.com' } }, error: null });
 
     const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:cookie-authority-001/decision')
       .send({ decision: 'approved' });
     expect(approved.status).toBe(200);
     expect(rows.get('permission:cookie-authority-001')?.founder_user_id)
-      .toBe('22222222-2222-4222-8222-222222222222');
+      .toBe('11111111-1111-4111-8111-111111111111');
   });
 
   it('requires a browser Origin even when a bearer header is present', async () => {
