@@ -1064,7 +1064,7 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` declares the `GOVERNED_EXECUTION_WORKFLOW` binding for `fcr-governed-execution-v1`; the declaration alone does not prove Cloudflare configuration, Workflow instance creation, authorized provider effects, or live deployment."
+        "`wrangler.worker.toml` must bind `GOVERNED_EXECUTION_WORKFLOW` to the staged `fcr-governed-execution-v1` `GovernedExecutionWorkflowV1` class; it must never claim that the source declaration alone proves Cloudflare activation, a Workflow instance, independently authenticated founder authorization, a provider effect, or a live deployment."
       ]
     }
   ]
