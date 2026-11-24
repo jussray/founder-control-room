@@ -682,6 +682,11 @@ The read-only Se’kret Bip project adapter now stages an audit against independ
 
 ## September 27 StoryEngine peer transition
 
+The current StoryEngine peer refresh is recovery setup only. The successor peer was selected from a fresh independent `main` observation, while its exact predecessor/successor SHAs and comparison remain in the audit/receipt provenance rather than durable current-state prose. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full runtime, directive, receipt, replay-safety, and Playwright browser witness; pin alignment alone grants no production, merge, deploy, publication, or provider-mutation authority.
+
+## September 27 StoryEngine peer transition, governance refresh
+
+StoryEngine `main` advanced again after the prior federation witness. FCR independently observed the successor as the next evidence subject and keeps StoryEngine production separate because the successor's source and exact-head test-ledger, Node, provider-smoke, and preview checks can be green while its Cloudflare Workers build is still failing. This pin refresh is recovery setup only. FCR federation remains `UNKNOWN` until the exact successor FCR head completes the full live-ref, immutable-checkout, runtime-identity, directive/receipt, replay-safety, and Playwright browser witness. No predecessor green, founder approval, merge authority, deploy authority, publication authority, or provider-mutation authority transfers across this peer transition.
 The successor exact-head Playwright witness completed successfully after the independently observed StoryEngine peer refresh. That success makes federation proof current only for the exact FCR/StoryEngine evidence pair bound by the run and recorded in the structured receipt; it does not prove either product's production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of FCR or StoryEngine expires that witness and requires a new exact-head run.
 
 ## September 30 CI snapshot testing
@@ -854,3 +859,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Historical peer-repair reconciliation
+
+The earlier peer equality and SHA narratives above retain historical provenance. The current `.github/workflows/playwright.yml` from main owns the immutable peer identity and its live ancestry check; this repair preserves that newer witness rather than reverting its peer pin or restoring equality-only freshness. No predecessor browser, CI or provider result proves this reconciled candidate.

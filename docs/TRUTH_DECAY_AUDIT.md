@@ -578,6 +578,11 @@ Founder Control Room independently observed StoryEngine `main` at `d0689af02675b
 
 That observation does not prove StoryEngine production. Its Cloudflare Workers build check on the same successor SHA was failing, so production remains a separate unresolved plane. Updating FCR's `STORYENGINE_PEER_SHA` therefore resets FCR federation/browser proof to `UNKNOWN`; the successor FCR exact head must complete the full peer-ref check, immutable checkout, runtime identity, directive/receipt, replay-safety, and Playwright browser loop before FCR may call the federation path current. No predecessor browser green, merge approval, deploy authority, or provider-mutation authority transfers across this peer transition.
 
+## 2026-09-27 StoryEngine peer transition after governance refresh
+
+Founder Control Room independently observed StoryEngine `main` advance from `d0689af02675b2d278654ca37ba727dd8d2b6836` to `e2473a10945b57bb7abedba6d45ea0dbacbd904a`. The successor exact head reports green GitHub checks for Node tests, the test-ledger contract, Anthropic live smoke, and Supabase Preview. Its Cloudflare Workers build is failing, so that exact head is suitable only as the next federation evidence subject; StoryEngine production remains unproven and separately blocked.
+
+Refreshing FCR's `STORYENGINE_PEER_SHA` to this independently observed successor expires predecessor federation/browser proof immediately. The successor FCR head remains `UNKNOWN` until it completes the live-ref equality check, immutable StoryEngine checkout, exact runtime identity, directive/receipt and replay-safety contract, and the full Playwright browser witness. No predecessor CI/browser green, founder merge approval, deployment authority, publication authority, or provider-mutation authority transfers across the transition.
 ## 2026-09-27 correction: successor StoryEngine witness and all-secret runtime proof
 
 A later independent StoryEngine `main` observation moved the peer evidence subject again, from `d0689af02675b2d278654ca37ba727dd8d2b6836` to `e2473a10945b57bb7abedba6d45ea0dbacbd904a`. Founder Control Room then ran the exact-head Playwright workflow at FCR `c75a361cdee0a56ccd4351c48f38231429cf9e74`; run `36344620958` completed successfully, including the live-ref pin check and the FCR → StoryEngine receipt/browser loop. That renews federation proof only for this exact FCR/StoryEngine pair. It does not prove either production deployment and grants no merge, deploy, publication, or provider-mutation authority. Any movement of either repository immediately makes this witness historical.
@@ -745,3 +750,8 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
 - Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
 - Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+
+### Historical peer-repair reconciliation
+
+The earlier peer equality and SHA narratives above retain historical provenance. The current `.github/workflows/playwright.yml` from main owns the immutable peer identity and its live ancestry check; this repair preserves that newer witness rather than reverting its peer pin or restoring equality-only freshness. No predecessor browser, CI or provider result proves this reconciled candidate.
