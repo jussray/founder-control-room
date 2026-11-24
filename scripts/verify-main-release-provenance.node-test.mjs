@@ -528,3 +528,11 @@ test('main provenance workflow binds founder direct-main authority to trusted Gi
   assert.match(workflow, /MAIN_RELEASE_ACTOR: \$\{\{ github\.actor \}\}/);
   assert.match(workflow, /MAIN_RELEASE_REPOSITORY_OWNER: \$\{\{ github\.repository_owner \}\}/);
 });
+
+test('historical main release audit uses full commit history and cannot replace current release gates', () => {
+  const workflow = readFileSync('.github/workflows/main-release-provenance.yml', 'utf8');
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /node scripts\/verify-main-release-historical-ratification\.mjs/);
+  assert.match(workflow, /node scripts\/verify-main-release-ratification-extension\.mjs/);
+  assert.match(workflow, /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
+});

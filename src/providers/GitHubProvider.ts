@@ -326,6 +326,12 @@ export class GitHubProvider implements RepositoryProvider {
     });
     const baseTreeSha = branchData.data.commit.commit.tree.sha;
     const parentSha = branchData.data.commit.sha;
+    if (patch.expectedHeadSha && (
+      !/^[0-9a-f]{40}$/i.test(patch.expectedHeadSha)
+      || parentSha.toLowerCase() !== patch.expectedHeadSha.toLowerCase()
+    )) {
+      throw new Error('GitHubProvider: staged patch exact branch head changed before commit');
+    }
 
     const treeEntries = await Promise.all(
       patch.changes.map(async (change) => {
