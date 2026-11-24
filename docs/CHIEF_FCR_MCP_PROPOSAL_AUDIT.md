@@ -13,11 +13,13 @@ recorded in [Proof](#proof). This audit changed no code in either repository.
 This audits an externally supplied build proposal recommending that "chief" and "fcr" be wrapped as
 two new MCP servers, starting read-only, adding writes later behind a confirmation step.
 
+## Current status correction — 2026-09-26
+
+The stale-pin finding below is **HISTORICAL / RESOLVED**. The inspected FCR candidate, reconciled against base `main@24a82d0359a0ce20a667844b978b42a2994df167`, pins Chief at `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`, and the focused adapter test asserts the same head. The authoritative current binding lives in `src/founder-os-lab/projectAdapters.ts` and its focused test; do not infer it from this dated audit. The original evidence remains below as audit history and must not be used as an instruction to restore `2fd4fda0…` or any predecessor pin. This correction proves inspected repository state only, not deployed MCP reachability or runtime identity.
+
 **Verdict: do not implement as written.** Both repositories are already MCP servers. The proposal's
 recommended end-state architecture is, in its essentials, what already exists — and the parts it
-would add would weaken controls that are currently stronger. Four gaps it does not mention are in
-[Gaps worth fixing](#gaps-worth-fixing); the most consequential is a stale pin that currently blocks
-Chief AI previews at Chief's live head.
+would add would weaken controls that are currently stronger. Four gaps it did not mention are preserved in [Gaps worth fixing](#gaps-worth-fixing). The first three and FCR's half of the fourth are historical/resolved at the inspected candidate. Chief's served-MCP verification half remains open until proved at an exact Chief head; the historical record below must not be treated as a current task list.
 
 ## Both systems already serve MCP
 
@@ -124,7 +126,7 @@ findings, but it bears on how much of the rest to trust.
 
 ## Gaps worth fixing
 
-### 1. The Chief AI pin is stale, and it currently blocks Chief previews
+### 1. HISTORICAL / RESOLVED — the Chief AI pin was stale
 
 This is the highest-priority finding, and it is only visible with both repositories present.
 
@@ -159,12 +161,11 @@ fail — but the practical result is that the Chief AI adapter does not function
 and the reason is SHA drift rather than any change in substance. This is precisely the distinction
 `CLAUDE.md` draws when it says a hash proves identity, not continued reality.
 
-Refreshing `CHIEF_AI_AUDITED_HEAD` to `2fd4fda0cab12e52ab5096e723884d98bcfe7d10` is a one-line change
-whose safety property is already demonstrated by the blob table above. It is *not* included in this
-change, because moving an audited-head pin is an authority decision for Juss, not an audit finding to
-self-apply.
+The original repair target was `2fd4fda0cab12e52ab5096e723884d98bcfe7d10`. That instruction is now **SUPERSEDED**. The inspected FCR candidate binds the adapter and its focused test to Chief `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`; consult `src/founder-os-lab/projectAdapters.ts` and its focused test for the authoritative current binding, and do not restore the historical target. Any future pin movement still requires exact-head contract review and successor proof.
 
-### 2. The pair-contract CI is path-gated and cannot catch that drift
+### 2. HISTORICAL / RESOLVED — the pair-contract CI path gate omitted the adapter
+
+Resolution at the inspected candidate: `src/founder-os-lab/projectAdapters.ts` is included in the pair-contract workflow trigger paths. The following describes the original finding.
 
 `.github/workflows/founder-chief-pair-contract.yml` does run the real cross-repository check: it
 resolves Chief's SHA, checks Chief out, asserts the exact checkout, and runs with
@@ -176,7 +177,9 @@ is not among them**. The file holding the audited head and contract-blob pins is
 set, so neither Chief moving nor an edit to the pin itself produces any CI signal. Gap 1 went
 unnoticed for exactly this reason. Adding that path to the workflow closes it.
 
-### 3. `/mcp/read` is configured by two environment variables documented nowhere
+### 3. HISTORICAL / RESOLVED — `/mcp/read` variables were undocumented
+
+Resolution at the inspected candidate: `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS` are documented in `.env.example` and `docs/MCP_STACK.md`. The following describes the original finding.
 
 `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS` appear in exactly two files at FCR's
 head — the implementation and its test. They are absent from `.env.example` (which *does* document
@@ -185,7 +188,9 @@ from `README.md`, and from `wrangler.worker.toml`. Without both set the handler 
 permanently. Correct fail-closed behavior; but no operator can discover from documentation how to
 open it.
 
-### 4. No `verify:*` contract covers either repository's served MCP surface
+### 4. PARTIALLY RESOLVED — served MCP lacked a verification contract
+
+Resolution at the inspected FCR candidate: FCR's `verify:mcp` covers FCR's served-MCP contract, including auth, tool annotations, and fail-closed behavior. **Chief's half remains OPEN / UNVERIFIED**: this candidate does not execute Chief's `verify:mcp` or verify `worker/proofmode-mcp.js` at an exact Chief head. The following describes the original finding.
 
 `npm run verify:mcp` in **both** repositories validates only the outbound `.mcp.json` client config.
 Nothing verifies that FCR's three inbound endpoints or Chief's ProofMode endpoint keep their auth
@@ -201,14 +206,10 @@ that FCR serves MCP endpoints at all.
 
 ## What to do instead
 
-1. **Refresh the Chief AI audited head** to `2fd4fda0…` once Juss authorizes it — the blob table
-   above is the evidence that the contract surface did not change.
-2. **Add `src/founder-os-lab/projectAdapters.ts`** to the pair-contract workflow's trigger paths so
-   the next drift is caught by CI rather than by an audit.
-3. **Document `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS`** in `.env.example` and
-   `docs/MCP_STACK.md`, and give `/mcp/read` a doc alongside its two documented siblings.
-4. **Add a served-MCP verification contract** in each repository, pinning auth, tool annotations, and
-   fail-closed behavior, wired into CI like their peers.
+1. **Preserve the resolved Chief pin.** The inspected FCR candidate and its focused adapter test agree on Chief `161cd3af4ffd1d64f5f65b8aed0e7108f021194a`; consult the adapter and test for the authoritative current binding. Treat the former `2fd4fda0…` refresh instruction as historical, and require fresh exact-head contract review before any later movement.
+2. **RESOLVED at the inspected candidate:** `src/founder-os-lab/projectAdapters.ts` is in the pair-contract workflow trigger paths.
+3. **RESOLVED at the inspected candidate:** `FCR_REMOTE_MCP_READ_TOKEN`, `FCR_REMOTE_MCP_READ_PROJECTS`, and `/mcp/read` are documented in `.env.example` and `docs/MCP_STACK.md`.
+4. **PARTIALLY RESOLVED:** FCR's `verify:mcp` covers FCR's served-MCP contract. Chief still needs an exact-head run proving the auth, tool annotations, and fail-closed behavior of `worker/proofmode-mcp.js`.
 5. **Adopt Chief's protocol-version negotiation** in FCR's three endpoints.
 6. **Extend `/mcp/read`'s tool surface** rather than standing up new servers, if more read capability
    is the real need — routing, scoping, evidence, and refusal logic already exist.

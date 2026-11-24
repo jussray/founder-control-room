@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-01",
+  "authority": "identity-only; non-authorizing",
+  "intent": "Track the Juss & Co portfolio across GitHub, Lovable and Base44 without treating every carrier as a separate company.",
+  "identities": [
+    {"slug":"juss-and-co","name":"Juss & Co","role":"umbrella-company","status":"active","carriers":[["github","jussray/jussray","canonical"],["web","jussco.company","domain"]]},
+    {"slug":"founder-control-room","name":"Founder Control Room","role":"core-software-company","status":"active","carriers":[["github","jussray/founder-control-room","canonical"],["base44","6a9213ad92e06cfad8756b2b","internal-truth-cache"]]},
+    {"slug":"chief-ai-machine","name":"Chief AI Machine","role":"fcr-supporting-system","status":"active","carriers":[["github","jussray/chief-ai-machine","canonical"]]},
+    {"slug":"promptos","name":"PromptOS","role":"fcr-supporting-system","status":"active","carriers":[["github","jussray/promptos","canonical"]]},
+    {"slug":"truth-compass","name":"Truth Compass","role":"fcr-supporting-module","status":"external","carriers":[["github","jussray/truth-compass","canonical"],["lovable","0fa1fd0f-9ec2-4bf3-9415-79bbfd4b3917","published-app"]]},
+    {"slug":"truth-weaver","name":"Truth Weaver Counsel","aliases":["Truth Weaver"],"role":"fcr-legal-decision-module","status":"external","carriers":[["github","jussray/truth-weaver","canonical"],["lovable","8ef43cd3-8d93-4494-a685-59ce0f795614","published-app"]]},
+    {"slug":"exact-match-engine","name":"Exact Match Engine","role":"fcr-supporting-module","status":"continuity-only","carriers":[["github","jussray/exact-match-engine","canonical"],["github","jussray/exact-match-engine-","legacy-placeholder"],["lovable","e1436754-7a41-40bb-927c-c9a0e081e70b","published-app"]]},
+    {"slug":"living-truth","name":"Living Truth","role":"commercial-candidate","status":"tracked","carriers":[["base44","6a94a7bfcbb4366d37894ffd","current-app"],["base44","6a94a9bdf1ac72972e1d1470","duplicate-copy"],["web","greedy-truth-trace-flow.base44.app","observed-domain"]]},
+    {"slug":"think-tank","name":"Think Tank","role":"founder-software-acquisition-wedge","status":"external","carriers":[["github","jussray/THINK-TANK","canonical"]]},
+    {"slug":"solcontinuity","name":"SolContinuity","role":"fcr-supporting-system","status":"external","carriers":[["github","jussray/solcontinuity","canonical"]]},
+    {"slug":"sleepwealth-agent","name":"SleepWealth Agent","role":"research-lane","status":"external","carriers":[["github","jussray/SleepWealth-Agent","canonical"]]},
+    {"slug":"storyengine","name":"StoryEngine","aliases":["L99 StoryEngine"],"authorityAliases":["l99"],"role":"core-creator-software-company","status":"active","carriers":[["github","jussray/StoryEngine","canonical"]]},
+    {"slug":"sekret-bip","name":"Se’kret Bip","role":"core-family-product","status":"active","carriers":[["github","jussray/Sekret-Bip","canonical"]]},
+    {"slug":"bip-jr","name":"Bip Jr","parent":"sekret-bip","role":"family-module","status":"continuity-only","carriers":[["github","jussray/Bip-Jr","canonical"]]},
+    {"slug":"juss-beautiful-hair","name":"Juss Beautiful Hair","aliases":["JBH"],"authorityAliases":["juss-beautiful-hair-private"],"role":"core-commerce-business","status":"active","carriers":[["github","jussray/jussbeautifulhair-site","storefront"],["github","jussray/jbh-private","private-ops"],["web","jussbeautifulhair.com","domain"]]},
+    {"slug":"untold-stories","name":"Untold Stories","role":"commerce-brand","status":"active","carriers":[["github","jussray/untold-stories-storefront","canonical"]]},
+    {"slug":"sweats","name":"SWEATS","aliases":["Sweats","SWEAT"],"role":"commerce-brand-prelaunch","status":"external","carriers":[["github","jussray/Sweats","canonical"]]},
+    {"slug":"alexa-commerce-engine","name":"Alexa Commerce Engine","role":"commerce-supporting-system","status":"external","carriers":[["github","jussray/alexa-commerce-engine-","canonical"]]},
+    {"slug":"sync-party","name":"SYNC Party","role":"consumer-experience-product","status":"active","carriers":[["github","jussray/sync-party-game","canonical"],["lovable","06f8665b-2f48-409a-a2d7-ec60362808f2","playtest-signup"]]},
+    {"slug":"ayure","name":"AYURE","role":"emerging-network-product","status":"continuity-only","carriers":[["github","jussray/Ayure-","canonical"]]}
+  ],
+  "quarantinedGithub": ["jussray/do-not-use","jussray/don-t-touch-this-one","jussray/SekretBip_refactor_start","jussray/Se-kretBip","jussray/sekret-bip-demo","jussray/Juss-beautiful-hair-","jussray/jussbeautifulhair1"],
+  "unresolvedCarriers": [
+    ["base44","6a93e49bb1804a2648534bdf","ULTRATHINK prototype; canonical relationship unproven"],
+    ["base44","6a94aed27e712e8fd5058c2f","Untitled reconciliation app; rename/supersession unproven"],
+    ["github","jussray/juss-protect-me","placeholder; product contract unproven"],
+    ["github","jussray/juss-protect-me-2","empty placeholder; relationship unproven"]
+  ]
+}

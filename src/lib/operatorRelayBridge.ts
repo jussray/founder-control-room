@@ -7,11 +7,12 @@ import {
   type RelayCapability,
   type RelayOperatorId,
   type RelaySensitivity,
+  type RelaySourceId,
 } from './operatorRelay.js';
 import { dispatchOperatorRelay, type OperatorRelayAdapters } from './operatorRelayDispatch.js';
 
 export interface RelayBridgeInput {
-  fromOperator: RelayOperatorId;
+  fromOperator: RelaySourceId;
   toOperator: RelayOperatorId;
   capability: RelayCapability;
   goal: string;

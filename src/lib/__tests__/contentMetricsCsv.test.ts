@@ -53,9 +53,9 @@ describe('parseContentMetricsCsv', () => {
       metricValue: 542,
       unit: 'count',
       evidenceState: 'OBSERVED',
-      windowStart: '2026-09-10T00:00:00Z',
-      windowEnd: '2026-09-16T00:00:00Z',
-      observedAt: '2026-09-16T08:30:00Z',
+      windowStart: '2026-09-10T00:00:00.000Z',
+      windowEnd: '2026-09-16T00:00:00.000Z',
+      observedAt: '2026-09-16T08:30:00.000Z',
       provenance: {
         source: 'linkedin_native_export',
         sourceRef: 'export:20260916',
@@ -130,9 +130,9 @@ describe('parseContentMetricsCsv', () => {
 
     expect(receipt.freshnessAuthority).toBe(false);
     expect(receipt.observations[0]).toMatchObject({
-      windowStart: '2025-01-01T00:00:00Z',
-      windowEnd: '2025-01-07T00:00:00Z',
-      observedAt: '2025-01-08T00:00:00Z',
+      windowStart: '2025-01-01T00:00:00.000Z',
+      windowEnd: '2025-01-07T00:00:00.000Z',
+      observedAt: '2025-01-08T00:00:00.000Z',
       provenance: { sourceRef: 'archive:2025-01' },
     });
   });
@@ -161,6 +161,40 @@ describe('parseContentMetricsCsv', () => {
     expect(() => parseContentMetricsCsv(csv(
       impressions.replace(',impressions,542,', ',mystery_metric,542,'),
     ))).toThrow('unsupported metric_name mystery_metric');
+  });
+
+  it('normalizes equivalent offset-aware timestamps before duplicate identity and fingerprinting', () => {
+    const offsetEquivalent = impressions
+      .replace('2026-09-10T00:00:00Z', '2026-09-09T20:00:00-04:00')
+      .replace('2026-09-16T00:00:00Z', '2026-09-15T20:00:00-04:00')
+      .replace('2026-09-16T08:30:00Z', '2026-09-16T04:30:00-04:00');
+
+    const canonical = parseContentMetricsCsv(csv(impressions));
+    const equivalent = parseContentMetricsCsv(csv(offsetEquivalent));
+    const together = parseContentMetricsCsv(csv(impressions, offsetEquivalent));
+
+    expect(equivalent.importFingerprint).toBe(canonical.importFingerprint);
+    expect(together.normalizedRowCount).toBe(1);
+    expect(together.duplicateRowsCollapsed).toBe(1);
+    expect(together.observations[0]?.observedAt).toBe('2026-09-16T08:30:00.000Z');
+  });
+
+  it('rejects invalid calendar/time offsets and malformed quoted-field trailers', () => {
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('2026-09-16T08:30:00Z', '2026-02-31T08:30:00Z'),
+    ))).toThrow(/offset-aware ISO timestamp/);
+
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T25:30:00Z'),
+    ))).toThrow(/offset-aware ISO timestamp/);
+
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('2026-09-16T08:30:00Z', '2026-09-16T08:30:00+14:30'),
+    ))).toThrow(/offset-aware ISO timestamp/);
+
+    expect(() => parseContentMetricsCsv(csv(
+      impressions.replace('"founders,operators"', '"founders,operators"x'),
+    ))).toThrow('quoted field must be followed by');
   });
 
   it('rejects reversed windows, pre-window observations, negative values, and schema drift', () => {

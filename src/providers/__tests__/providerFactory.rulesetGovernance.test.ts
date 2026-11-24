@@ -17,12 +17,7 @@ const baseConfig: RulesetConfig = {
   targetRefs: ["main"],
   requirePullRequest: true,
   requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
-  requiredStatusCheckNames: [
-    "Playwright E2E",
-    "Required Gate",
-    "Verify test-ledger contract",
-    "verify-pair-contract",
-  ],
+  requiredStatusCheckNames: ["Playwright E2E", "Required Gate", "Verify test-ledger contract", "verify-pair-contract"],
   blockForcePushes: true,
   blockDeletion: true,
 };
@@ -33,7 +28,7 @@ const canonicalConfig: RulesetConfig = {
 };
 
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts the current founder-only FCR main constitutional floor", () => {
+  it("accepts founder-selected native Auto-merge without an extra approving reviewer", () => {
     expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(0);
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
   });
@@ -104,7 +99,7 @@ describe("Founder Control Room ruleset governance", () => {
     })).toThrow(/Verify test-ledger contract/);
   });
 
-  it("fails closed when FCR main drops the Founder/Chief pair status check", () => {
+  it("fails closed when FCR main omits live peer verification", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],

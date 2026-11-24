@@ -1,4 +1,10 @@
+import type { GrowthOpportunityAssessment } from '../growth/opportunityIntelligence.js';
+import { assessQuickScanProspectOpportunity } from '../growth/quickScanOpportunityBridge.js';
 import type { QuickScanProspect } from './contracts.js';
+
+export type QuickScanProspectView = QuickScanProspect & {
+  opportunity: GrowthOpportunityAssessment;
+};
 
 const prospects = new Map<string, QuickScanProspect>();
 
@@ -9,8 +15,14 @@ const prospects = new Map<string, QuickScanProspect>();
 // not a webhook-handler concern.
 const processedStripeEventIds = new Set<string>();
 
-export function listQuickScanProspects(): QuickScanProspect[] {
-  return [...prospects.values()].map((item) => structuredClone(item));
+export function listQuickScanProspects(): QuickScanProspectView[] {
+  return [...prospects.values()].map((item) => {
+    const prospect = structuredClone(item);
+    return {
+      ...prospect,
+      opportunity: assessQuickScanProspectOpportunity(prospect),
+    };
+  });
 }
 
 export function getQuickScanProspect(id: string): QuickScanProspect | null {
