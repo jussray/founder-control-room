@@ -10,6 +10,10 @@ import {
   createLinkedInFirstPartyAdapter,
 } from './linkedinFirstPartyAdapter.js';
 import { XFirstPartyAdapterError, createXFirstPartyAdapter } from './xFirstPartyAdapter.js';
+import {
+  FacebookPageFirstPartyAdapterError,
+  createFacebookPageFirstPartyAdapter,
+} from './facebookPageFirstPartyAdapter.js';
 // @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
 import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
@@ -100,6 +104,7 @@ export interface FirstPartyFounderPublishResult {
     | 'EXECUTION_CONTEXT_REQUIRED'
     | 'LINKEDIN_NOT_CONFIGURED'
     | 'X_NOT_CONFIGURED'
+    | 'FACEBOOK_NOT_CONFIGURED'
     | 'SOURCE_PROJECT_UNRESOLVED'
     | 'ACTION_ALREADY_RESERVED'
     | 'ACTION_RESERVATION_FAILED'
@@ -127,7 +132,7 @@ interface ValidatedAuthority {
   approvalId: string;
   text: string;
   proofUrl: string | null;
-  platform: 'linkedin' | 'x';
+  platform: 'linkedin' | 'x' | 'facebook';
   providerAccountId: string;
   accessToken: string;
   apiVersion: string | undefined;
@@ -176,6 +181,17 @@ function linkedinConfig(env: NodeJS.ProcessEnv) {
   };
 }
 
+function facebookPageConfig(env: NodeJS.ProcessEnv) {
+  const rawLimit = text(env.META_FACEBOOK_CHARACTER_LIMIT);
+  const characterLimit = /^[0-9]{1,5}$/.test(rawLimit) ? Number(rawLimit) : 0;
+  return {
+    accessToken: text(env.META_PAGE_ACCESS_TOKEN),
+    providerAccountId: text(env.META_FACEBOOK_PAGE_ID),
+    apiVersion: text(env.META_GRAPH_API_VERSION),
+    characterLimit: characterLimit >= 1 && characterLimit <= 63000 ? characterLimit : 0,
+  };
+}
+
 function xConfig(env: NodeJS.ProcessEnv) {
   return {
     accessToken: text(env.X_USER_ACCESS_TOKEN),
@@ -218,8 +234,16 @@ function validateAuthority(
   const currentObserved = validTime(currentYou.observed_at);
   const approvedObserved = validTime(approvedCurrentYou.observed_at);
   const approvedExpires = validTime(canonicalAuthorization.expires_at);
-  const config = platform === 'x' ? xConfig(env) : linkedinConfig(env);
-  const supportedPlatform: 'linkedin' | 'x' = platform === 'x' ? 'x' : 'linkedin';
+  const supportedPlatform: 'linkedin' | 'x' | 'facebook' =
+    platform === 'x' ? 'x' : platform === 'facebook' ? 'facebook' : 'linkedin';
+  const config = supportedPlatform === 'x'
+    ? xConfig(env)
+    : supportedPlatform === 'facebook'
+      ? facebookPageConfig(env)
+      : linkedinConfig(env);
+  const characterLimit = supportedPlatform === 'facebook'
+    ? facebookPageConfig(env).characterLimit
+    : FIRST_PARTY_PLATFORM_CAPABILITIES[supportedPlatform].safeCharacterLimit!;
 
   if (canonicalAuthorization.kind !== 'fcr/founder-content-publication-authorization') {
     reasons.push('canonical publication authorization kind is invalid');
@@ -231,7 +255,7 @@ function validateAuthority(
   if (!HASH.test(publicPayloadHash)) reasons.push('canonical public_payload_hash is invalid');
   if (!OWNED_REPO.test(sourceRepo)) reasons.push('source repo must be owned by jussray');
   if (!FULL_SHA.test(sourceCommitSha)) reasons.push('source commit must be exact');
-  if (platform !== 'linkedin' && platform !== 'x') reasons.push('first-party direct slice supports LinkedIn or X only');
+  if (platform !== 'linkedin' && platform !== 'x' && platform !== 'facebook') reasons.push('first-party direct slice supports LinkedIn, X, or Facebook Pages only');
   if (!approvedText || canonicalText !== approvedText) {
     reasons.push('canonical approved copy must match the exact Chief public payload');
   }
@@ -242,7 +266,9 @@ function validateAuthority(
     reasons.push('founder-content proof-link policy must remain editorial_optional');
   }
   if (proofUrl && !validHttpsUrl(proofUrl)) reasons.push('optional proof link must be HTTPS');
-  if (approvedText.length > FIRST_PARTY_PLATFORM_CAPABILITIES[supportedPlatform].safeCharacterLimit!) {
+  if (supportedPlatform === 'facebook' && !characterLimit) {
+    reasons.push('META_FACEBOOK_CHARACTER_LIMIT must be an explicitly verified positive limit');
+  } else if (approvedText.length > characterLimit) {
     reasons.push(`approved ${supportedPlatform} copy exceeds the first-party safe character limit`);
   }
 
@@ -286,6 +312,12 @@ function validateAuthority(
   if (supportedPlatform === 'x') {
     if (!config.accessToken) reasons.push('X_USER_ACCESS_TOKEN is not configured server-side');
     if (!X_USER_ID.test(config.providerAccountId)) reasons.push('X_USER_ID is not configured as a numeric user ID');
+  } else if (supportedPlatform === 'facebook') {
+    if (!config.accessToken) reasons.push('META_PAGE_ACCESS_TOKEN is not configured server-side');
+    if (!X_USER_ID.test(config.providerAccountId)) reasons.push('META_FACEBOOK_PAGE_ID must be a numeric Page ID');
+    if (!/^v[0-9]{1,2}\.[0-9]{1,2}$/.test(config.apiVersion ?? '')) {
+      reasons.push('META_GRAPH_API_VERSION must be an explicit vN.N Graph API version');
+    }
   } else {
     if (!config.accessToken) reasons.push('LINKEDIN_ACCESS_TOKEN is not configured server-side');
     if (!LINKEDIN_AUTHOR_URN.test(config.providerAccountId)) {
@@ -318,7 +350,7 @@ function validateAuthority(
   const prepared: PreparedFirstPartyPublication = {
     platform: supportedPlatform,
     accountId: config.providerAccountId,
-    contentField: supportedPlatform === 'x' ? 'x_draft' : 'linkedin_draft',
+    contentField: supportedPlatform === 'x' ? 'x_draft' : supportedPlatform === 'facebook' ? 'facebook_draft' : 'linkedin_draft',
     text: approvedText,
     traction: 'canonical-founder-content-proposal',
     governanceAdvantage: 'exact-current-you-plus-provider-readback',
@@ -331,7 +363,7 @@ function validateAuthority(
     mode: 'publish',
     founderApprovalId: approvalId,
     media: [],
-    characterLimit: FIRST_PARTY_PLATFORM_CAPABILITIES[supportedPlatform].safeCharacterLimit!,
+    characterLimit,
     contentHash,
     idempotencyKey,
     capability: FIRST_PARTY_PLATFORM_CAPABILITIES[supportedPlatform],
@@ -496,9 +528,12 @@ export async function dispatchFirstPartyFounderContentPublishNow(
     const message = error instanceof Error ? error.message : 'invalid founder-content authorization';
     const code = message.includes('X_USER_ACCESS_TOKEN') || message.includes('X_USER_ID')
       ? 'X_NOT_CONFIGURED'
-      : message.includes('LINKEDIN_ACCESS_TOKEN') || message.includes('LINKEDIN_AUTHOR_URN')
-        ? 'LINKEDIN_NOT_CONFIGURED'
-        : 'INVALID_AUTHORIZATION';
+      : message.includes('META_PAGE_ACCESS_TOKEN') || message.includes('META_FACEBOOK_PAGE_ID') ||
+          message.includes('META_GRAPH_API_VERSION') || message.includes('META_FACEBOOK_CHARACTER_LIMIT')
+        ? 'FACEBOOK_NOT_CONFIGURED'
+        : message.includes('LINKEDIN_ACCESS_TOKEN') || message.includes('LINKEDIN_AUTHOR_URN')
+          ? 'LINKEDIN_NOT_CONFIGURED'
+          : 'INVALID_AUTHORIZATION';
     return blocked(code, code.endsWith('NOT_CONFIGURED') ? 503 : 400, [message]);
   }
 
@@ -536,12 +571,19 @@ export async function dispatchFirstPartyFounderContentPublishNow(
         userId: authority.providerAccountId,
         fetchImpl: options.fetchImpl,
       }) }
-    : { linkedin: createLinkedInFirstPartyAdapter({
-        accessToken: authority.accessToken,
-        authorUrn: authority.providerAccountId,
-        apiVersion: authority.apiVersion,
-        fetchImpl: options.fetchImpl,
-      }) };
+    : authority.platform === 'facebook'
+      ? { facebook: createFacebookPageFirstPartyAdapter({
+          accessToken: authority.accessToken,
+          pageId: authority.providerAccountId,
+          apiVersion: authority.apiVersion!,
+          fetchImpl: options.fetchImpl,
+        }) }
+      : { linkedin: createLinkedInFirstPartyAdapter({
+          accessToken: authority.accessToken,
+          authorUrn: authority.providerAccountId,
+          apiVersion: authority.apiVersion,
+          fetchImpl: options.fetchImpl,
+        }) };
 
   try {
     const receipt = await executeFirstPartyPublication(authority.prepared, adapters);
@@ -610,12 +652,13 @@ export async function dispatchFirstPartyFounderContentPublishNow(
   } catch (error) {
     const linkedInError = error instanceof LinkedInFirstPartyAdapterError ? error : null;
     const xError = error instanceof XFirstPartyAdapterError ? error : null;
-    const providerError = linkedInError ?? xError;
+    const facebookError = error instanceof FacebookPageFirstPartyAdapterError ? error : null;
+    const providerError = linkedInError ?? xError ?? facebookError;
     const truthState = providerError?.truthState === 'UNKNOWN' ? 'UNKNOWN' : 'FAILED';
     const providerEvidence: JsonRecord = providerError
       ? {
           phase: providerError.evidence.phase,
-          ...(linkedInError ? { postUrn: linkedInError.evidence.postUrn } : { postId: xError?.evidence.postId ?? null }),
+          ...(linkedInError ? { postUrn: linkedInError.evidence.postUrn } : { postId: xError?.evidence.postId ?? facebookError?.evidence.postId ?? null }),
           permalink: providerError.evidence.permalink,
           httpStatus: providerError.evidence.httpStatus,
           retrySafe: false,
