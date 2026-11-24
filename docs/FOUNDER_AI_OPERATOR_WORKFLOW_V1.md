@@ -36,6 +36,21 @@ If any load-bearing target/base/head/scope/review/provider/runtime identity move
 
 Never defend a previous answer against contradictory live evidence. Re-read first. If the prior conclusion was stale or wrong, correct it explicitly and preserve the former state as historical provenance rather than quietly rewriting history.
 
+## Self-answer and continue contract
+
+**Founder directive (2026-11-24):** After a founder reply, an AI operator should answer its own 5W1H and decision-changing questions using already supplied facts and expressly authorized evidence, rather than repeatedly interrupting the founder. This is a workflow rule, not permission to search across the founder's private accounts or authorize provider actions.
+
+1. Form the minimum internal questions needed to select and falsify the next step: WHO owns the decision, WHAT outcome is requested, WHERE the authoritative target is, WHEN the state was observed, WHY this action is necessary, HOW the smallest proof and rollback work.
+2. Classify each as `ANSWERED`, `AUTHORIZED_LOOKUP`, `SAFE_DEFAULT`, `FOUNDER_GATE`, or `BLOCKED`. Use current conversation evidence first; refresh only the sources explicitly in scope. An available connector or remembered account is not consent.
+3. Resolve `ANSWERED` without asking again. For `AUTHORIZED_LOOKUP`, make the narrow read and reclassify. For `SAFE_DEFAULT`, use a labeled, reversible assumption only if it cannot silently affect permissions, private data, identity, money, publication, or production state.
+4. Run a Devil/Red Team premise attack and a selected-plan attack; identify a falsifier and the strongest contradictory evidence. Re-orient rather than defend stale conclusions.
+5. Continue the authorized implementation through a focused regression check, exact-head CI where applicable, and scoped runtime readback. Preserve separate `AUTHORED`, `OBSERVED`, `INFERRED`, `VERIFIED`, and `BLOCKED` receipts. Do not claim unrun tools or background work.
+6. For a `FOUNDER_GATE`, ask at most one material missing question; never infer new permission or a sensitive recipient. Continue independent authorized tasks while holding only the gated action. For `BLOCKED`, report the smallest verified unblocker and stop that lane.
+
+**Tool and plugin routing:** Use Product Design only for a real design task and in supported Work Mode; pair Frontend Design Premium with Frontend Design when implementing UI; use Codex Material Themes only on a real appearance/theme request and leave manual import to the founder; use Codex Coordinator only under an explicitly enabled shared worktree/active-claim contract; choose the relevant Codex Dev Workflows skill for engineering work. None of these tools inherits authority from its name, and third-party plugin code is unchanged.
+
+**Stop:** When the outcome is verified to its stated scope or a hard gate prevents another authorized step, deliver the current result, source, rollback, and exact next gate. Never spin indefinitely, schedule work implicitly, claim future delivery, or use an agent's self-answer to self-approve a merge, deployment, provider mutation, publication, spend, or destructive action.
+
 ## Challenge / contradiction protocol
 
 When the founder says a conclusion looks wrong, provides newer evidence, or current provider data contradicts the last report:
