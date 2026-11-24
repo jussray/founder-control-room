@@ -48,14 +48,31 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(preflightStep).toContain('npx --yes wrangler@4.110.0 secret list');
     expect(preflightStep).toContain('--config wrangler.worker.toml');
     expect(preflightStep).toContain('--format json');
-    expect(preflightStep).toContain("config.get('secrets', {}).get('required')");
+    expect(preflightStep).toContain("names = config.get('secrets', {}).get('required')");
     expect(preflightStep).toContain("workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}");
-    // Main computes `required = set(names) - workflow_written` before the diff.
+    expect(preflightStep).toContain('len(set(names)) != len(names)');
     expect(preflightStep).toContain('required = set(names) - workflow_written');
     expect(preflightStep).toContain('missing = sorted(required - present)');
+    expect(preflightStep).toContain('contains_stale_cf_api_token(config)');
+    expect(preflightStep).toContain("if not isinstance(observed, list)");
+    expect(preflightStep).toContain('node scripts/verify-worker-binding-types.mjs');
     expect(preflightStep).toContain('sys.exit(1)');
     expect(preflightStep).not.toContain('wrangler secret get');
     expect(preflightStep).not.toContain('wrangler secret put');
+  });
+
+  it('explains exhausted live proof safely without weakening exact-head validation', () => {
+    expect(workflow).toContain('for attempt in $(seq 1 24); do');
+    expect(workflow).toContain('Runtime proof diagnostics (last attempt): health_http=');
+    expect(workflow).toContain('version_http=$version_http');
+    expect(workflow).toContain('health_service_header=$health_service_header');
+    expect(workflow).toContain('version_service_header=$version_service_header');
+    expect(workflow).toContain('live_sha=$live_sha expected_sha=$EXPECTED_HEAD_SHA');
+    expect(workflow).toContain('grant_contract=$grant_contract');
+    expect(workflow).toContain('if [[ ! "$live_sha" =~ ^[0-9a-f]{40}$ ]]');
+    expect(workflow).not.toContain('echo "$candidate_version"');
+    expect(workflow).not.toContain('echo "$candidate_health"');
+    expect(workflow).toContain('api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA');
   });
 
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
