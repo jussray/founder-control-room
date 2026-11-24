@@ -264,3 +264,8 @@ performed. The `2026-07-28` protocol revision was not verified. The Chief clone 
 **Scope:** documentation only. No code, configuration, or served behavior changed in either
 repository, and nothing was pushed to `jussray/chief-ai-machine` (this session has read-only access
 to it).
+
+
+### #883 reconciliation correction — current peer source wins
+
+Historical pin values in the PR #883 candidate are superseded by the live FCR main adapter and its corresponding exact-head test. The current adapter source is the controlling reference, not old prose. This PR's additional live-ref post-check protects the checkout from moving peer state without converting a newer branch SHA into standing authorization. No deployed Chief/FCR MCP reachability is implied.

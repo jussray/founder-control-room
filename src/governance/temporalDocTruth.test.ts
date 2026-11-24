@@ -152,6 +152,7 @@ describe('repository documentation truth control', () => {
     expect(documentationVerifier).toContain('receiptClaimsAtRevision(baseSha)');
     expect(documentationVerifier).toContain('receiptClaimsUnionByPath');
     expect(documentationVerifier).toContain('hasFreshMeaningfulInvariant(');
+    expect(documentationVerifier).toContain('documentationTruthClaimFingerprint\\.js');
     expect(documentationVerifier).toContain('documentation-truth-claim-fingerprint\\.mjs');
     expect(documentationVerifier).toContain('must add or change a meaningful path-bound invariant in the reviewed range');
     expect(documentationVerifier).toContain('must be readable to prove claim freshness');

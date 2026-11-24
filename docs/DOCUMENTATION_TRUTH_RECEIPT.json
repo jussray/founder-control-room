@@ -147,7 +147,8 @@
         "`.github/workflows/playwright.yml` must cancel only superseded pull-request check runs using PR-scoped concurrency, preserve each main-push and workflow-run source identity with a unique non-PR run ID, and continue to enforce exact-head evidence, complete required tests, and original authority boundaries.",
         "`.github/workflows/playwright.yml` must pin StoryEngine `1730f316b74bdb9b638312c57987dc2897953948` only as the new exact peer evidence subject after a forward four-commit, zero-behind transition from `b2397272a37ed5d987f0b71b2a37dc31c9c84cf5` that includes runtime code; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification.",
         "`.github/workflows/playwright.yml` must pin StoryEngine `1a4a581687481b2ec2025539efae02032bef5287` only as the new exact peer evidence subject after a forward one-commit, zero-behind receipt-only transition from `1730f316b74bdb9b638312c57987dc2897953948`; compatibility requires this head's own live-ref equality, immutable checkout, runtime identity, federation receipts and browser verification.",
-        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit."
+        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit.",
+        "`.github/workflows/playwright.yml` must compare checked-out StoryEngine peer SHA to the independently re-observed live peer ref immediately after checkout, preserving the newer exact-head pin from current main; stale historical PR pins must not become authority."
       ]
     },
     {
@@ -442,7 +443,8 @@
         "`scripts/verify-documentation-truth.mjs` must cross-check the FCR GitHubProvider required-deployment ownership boundary against the structured documentation receipt when `src/providers/GitHubProvider.ts` is part of the truth-sensitive diff, using an executable semantic guard that rejects preservation or negated-removal claims for `required_deployments`; unrelated docs-only or test-only changes remain free of a receipt requirement.",
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
         "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
-        "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized."
+        "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized.",
+        "`scripts/verify-documentation-truth.mjs` must preserve current non-vacuous fresh semantic claim enforcement and additionally classify the claimed normalized fingerprint module and project adapter freshness path as truth-sensitive."
       ]
     },
     {
@@ -1011,6 +1013,24 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": ".control-room/ultrathink-attack.contract.json",
+      "claims": [
+        "`.control-room/ultrathink-attack.contract.json` must hold bounded adversarial skill acceptance criteria without granting automatic merge, deploy, provider writes, privileged execution or a completed test state."
+      ]
+    },
+    {
+      "path": "scripts/verify-ultrathink-attack-contract.mjs",
+      "claims": [
+        "`scripts/verify-ultrathink-attack-contract.mjs` must verify the source contract and canonical skill entrypoints on the exact candidate rather than interpreting an authored acceptance fixture as observed runtime proof."
+      ]
+    },
+    {
+      "path": "src/lib/documentationTruthClaimFingerprint.js",
+      "claims": [
+        "`src/lib/documentationTruthClaimFingerprint.js` must normalize atomic claim units so punctuation and adjacent inherited claim text cannot be mistaken for independent current-head proof; the current canonical verifier's fresh semantic safeguards remain authoritative."
       ]
     }
   ]
