@@ -24,7 +24,7 @@ for (const cookie of manifest.cookies ?? []) {
   requireValue(!names.has(cookie.name), `duplicate cookie declaration: ${cookie.name}`);
   names.add(cookie.name);
   requireValue(typeof cookie.purpose === 'string' && cookie.purpose.length > 8, `${cookie.name}: purpose is required`);
-  requireValue(cookie.path === '/', `${cookie.name}: Path must be / unless a narrower path is explicitly reviewed`);
+  requireValue(cookie.path === '/' || cookie.path === '/friend-intake', `${cookie.name}: Path must be / unless an explicitly reviewed narrower path is declared`);
   requireValue(['strict', 'lax'].includes(cookie.sameSite), `${cookie.name}: SameSite must be strict or lax`);
   requireValue(['always', 'production'].includes(cookie.secure), `${cookie.name}: Secure policy must be always or production`);
   requireValue(typeof cookie.deletion === 'string' && cookie.deletion.length > 4, `${cookie.name}: deletion path is required`);
@@ -42,6 +42,7 @@ const writerPatterns = [
   /document\.cookie\s*=/,
   /setHeader\(\s*['"]Set-Cookie['"]/,
   /headers\.append\(\s*['"]Set-Cookie['"]/,
+  /\b\w+\.append\(\s*['"]Set-Cookie['"]/,
   /createCookieSessionStorage\s*</,
   /serializeCookieHeader\s*\(/,
   /\bsetCookie\s*\(/,

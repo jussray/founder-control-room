@@ -1,4 +1,4 @@
-import type { FirstSliceMove, FriendRuntimeProvider } from '../chief/firstSliceContracts.js';
+import type { FirstSliceMove, FriendRuntimeProvider } from '../chief/friendRuntimeContracts.js';
 import type { ModelExecutionState } from '../model/execution.js';
 import {
   MIRROR_INTENT_TAGS,

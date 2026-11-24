@@ -1,4 +1,6 @@
-# Friend Intake v1
+# Friend Runtime Intake v1
+
+This is the provider-backed route at `/mirror/friend-intake`, separate from the deterministic, default-off `/friend-intake` route in PR #774. Model inference and spending remain disabled until separately approved.
 
 Friend Intake is the founder-facing reflection slice inside Founder Control Room.
 

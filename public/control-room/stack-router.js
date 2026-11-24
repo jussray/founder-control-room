@@ -39,18 +39,6 @@ function safeSessionSet(key, value) {
 function safeSessionRemove(key) {
   try { sessionStorage.removeItem(key); } catch { /* no-op */ }
 }
-function installFriendEntry() {
-  const flow = document.querySelector('.stack-lane[data-lane="chat"] .lane-flow');
-  if (!(flow instanceof HTMLElement)) return;
-  if (flow.querySelector('a[href="/control-room/friend.html"]')) return;
-
-  const link = document.createElement('a');
-  link.className = 'stage';
-  link.href = '/control-room/friend.html';
-  link.innerHTML = '<small>Reflect</small>Friend';
-  flow.prepend(link);
-}
-
 function setConveyorReadiness(state, label) {
   const status = document.querySelector('[data-conveyor-readiness]');
   const text = document.querySelector('[data-conveyor-readiness-label]');
@@ -123,6 +111,25 @@ function installCoworkLane() {
   codeLane.after(intoCowork, coworkLane, outOfCowork);
 }
 
+function setFriendIntakeLinkAvailability(link, enabled) {
+  link.hidden = !enabled;
+  link.style.display = enabled ? '' : 'none';
+}
+
+async function refreshFriendIntakeAvailability() {
+  const link = document.querySelector('[data-friend-intake-link]');
+  if (!(link instanceof HTMLAnchorElement)) return;
+  setFriendIntakeLinkAvailability(link, false);
+  try {
+    const response = await fetch('/friend-intake/status', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (!response.ok) return;
+    const body = await response.json();
+    setFriendIntakeLinkAvailability(link, body?.enabled === true);
+  } catch {
+    setFriendIntakeLinkAvailability(link, false);
+  }
+}
+
 function requestedTabFromUrl() {
   const tab = new URL(window.location.href).searchParams.get('tab');
   return tab && ALLOWED_TABS.has(tab) ? tab : null;
@@ -153,12 +160,28 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
     observer.observe(root, { childList: true, subtree: true });
   }
 }
-installFriendEntry();
-
 const launchDock = document.querySelector('.launch-dock');
+function syncFriendEntryVisibility(authenticated) {
+  const flow = document.querySelector('.stack-lane[data-lane="chat"] .lane-flow');
+  if (!(flow instanceof HTMLElement)) return;
+  const existing = flow.querySelector('a[data-friend-runtime-entry]');
+  if (!authenticated) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) return;
+  const link = document.createElement('a');
+  link.className = 'stage';
+  link.dataset.friendRuntimeEntry = 'true';
+  link.href = '/control-room/friend.html';
+  link.innerHTML = '<small>Reflect</small>Friend';
+  flow.prepend(link);
+}
+
 function syncLaunchDockVisibility() {
   if (!(launchDock instanceof HTMLDetailsElement)) return;
   const authenticated = document.querySelector('#root .shell') instanceof HTMLElement;
+  syncFriendEntryVisibility(authenticated);
   if (!authenticated && launchDock.open) launchDock.open = false;
   launchDock.hidden = !authenticated;
   launchDock.setAttribute('aria-hidden', authenticated ? 'false' : 'true');
@@ -172,7 +195,10 @@ if (launchDock instanceof HTMLDetailsElement) {
     authVisibilityObserver.observe(root, { childList: true, subtree: true });
   }
   launchDock.addEventListener('toggle', () => {
-    if (launchDock.open && !launchDock.hidden) void refreshConveyorReadiness();
+    if (launchDock.open && !launchDock.hidden) {
+      void refreshConveyorReadiness();
+      void refreshFriendIntakeAvailability();
+    }
   });
 }
 installCoworkLane();

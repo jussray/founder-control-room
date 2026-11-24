@@ -16,30 +16,33 @@ export interface FounderRequest extends Request {
   founderAuthChannel?: 'bearer' | 'interactive';
 }
 
-interface AuthenticatedIdentity {
+export interface AuthenticatedIdentity {
   email: string;
   userId: string;
 }
 
-function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
+export function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
   const record = user as Record<string, unknown>;
   const email = typeof record.email === 'string'
     ? record.email.trim().toLowerCase()
     : '';
   const userId = typeof record.id === 'string' ? record.id.trim() : '';
-  return email && userId ? { email, userId } : null;
+  // Founder identity requires Supabase-confirmed ownership, not just a typed address.
+  const confirmed = typeof record.email_confirmed_at === 'string' && record.email_confirmed_at.length > 0;
+  return email && userId && confirmed ? { email, userId } : null;
 }
 
-async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
+export async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
-    .select('email')
+    .select('user_id')
     .eq('email', identity.email)
+    .eq('user_id', identity.userId)
     .maybeSingle();
 
   if (allowError) return 'error';
-  return allowRow ? 'allowed' : 'denied';
+  return allowRow?.user_id === identity.userId ? 'allowed' : 'denied';
 }
 
 /**
@@ -48,17 +51,12 @@ async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'all
  * 1. A valid Supabase Auth session, supplied either as a Bearer token for API
  *    clients or resolved server-side from the opaque HttpOnly Control Room
  *    browser session capability.
- * 2. The authenticated email must still exist in the service-role-only
- *    `founder_users` allowlist.
+ * 2. The verified Supabase user ID and email must match the same server-only
+ *    `founder_users` row. An unbound founder email grants no authority.
  *
  * Cookie sessions may refresh once with their server-held refresh token. A
  * successful refresh rotates the opaque browser capability; Bearer sessions
  * never receive implicit refresh behavior so automated clients remain explicit.
- *
- * The validated authentication channel is carried on the current request. That
- * lets downstream high-consequence handlers distinguish a real interactive
- * browser request from bearer automation without re-reading a cookie that may
- * have been rotated during this same authentication pass.
  */
 export async function requireFounder(
   req: FounderRequest,

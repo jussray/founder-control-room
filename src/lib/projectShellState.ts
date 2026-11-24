@@ -80,7 +80,7 @@ export function toProjectShellStateView(raw: {
 export async function readProjectShellState(projectId: string) {
   const [truth, continuity, outcome, resources, recovery] = await Promise.all([
     supabase.from('truth_snapshots').select('classification, observed_at, expires_at, conflicts').eq('project_id', projectId).order('observed_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('continuity_records').select('valid_until, invalidated_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('continuity_records').select('valid_until, invalidated_at').eq('project_id', projectId).is('task_id', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('outcomes').select('classification, observed_at, evidence').eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('resource_budgets').select('resource_type, unit, ceiling, consumed').eq('project_id', projectId).order('updated_at', { ascending: false }),
     supabase.from('recovery_plans').select('status, rollback, retry, reconcile, compensate, abandon').eq('project_id', projectId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),

@@ -1,215 +1,341 @@
-import type { Server } from 'node:http';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
-import { expect, test, type Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-let server: Server;
-let origin = '';
+const FOUNDER_ID = '00000000-0000-4000-8000-000000000111';
+const FOUNDER_EMAIL = 'founder@example.com';
+const PROJECT_ID = '00000000-0000-4000-8000-000000000333';
+const SESSION_ID_HASH = 'a'.repeat(64);
+const PUBLIC_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
+
+let server: ReturnType<ReturnType<typeof express>['listen']> | undefined;
+let baseUrl = '';
+let persistedRuns: Array<Record<string, unknown>> = [];
+let usefulnessReceipts: Array<Record<string, unknown>> = [];
+let persistedIntakeIds = new Set<string>();
+const ownedRuns = new Map<string, string>();
+
+function fakeFounder(req: Request, _res: Response, next: NextFunction) {
+  (req as Request & { founder?: { email: string; userId: string } }).founder = {
+    email: FOUNDER_EMAIL,
+    userId: FOUNDER_ID,
+  };
+  next();
+}
 
 test.beforeAll(async () => {
-  const app = express();
-  const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../public/control-room');
-  app.use('/control-room', express.static(publicDir));
+  process.env.NODE_ENV = 'test';
+  process.env.SUPABASE_ALLOW_LOCAL = 'true';
+  process.env.SUPABASE_URL = 'http://127.0.0.1:9';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'friend-intake-e2e-service-role';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'friend-intake-e2e-publishable';
+  process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+  const { createFriendIntakeRouter } = await import('../dist/http/routes/friendIntake.js');
 
-  await new Promise<void>((resolve, reject) => {
+  const app = express();
+  app.use(express.json());
+  app.get('/auth/me', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ founder: { email: FOUNDER_EMAIL } });
+  });
+  app.use('/control-room', express.static(path.join(PUBLIC_ROOT, 'control-room')));
+  app.use('/friend-intake', createFriendIntakeRouter({
+    enabled: () => true,
+    persistenceEnabled: () => true,
+    authMiddleware: fakeFounder,
+    interactiveAuthMiddleware: fakeFounder,
+    resolveInteractiveSessionIdHash: async () => SESSION_ID_HASH,
+    resolveProjectId: async () => PROJECT_ID,
+    persistRun: async (input) => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (persistedIntakeIds.has(input.intakeId)) {
+        throw new Error('FRIEND_INTAKE_PERSISTENCE_FAILED:duplicate key value violates unique constraint');
+      }
+      persistedIntakeIds.add(input.intakeId);
+      const record = { ...input } as Record<string, unknown>;
+      persistedRuns.push(record);
+      ownedRuns.set(String(record.intakeId), String(record.founderId));
+    },
+    recordUsefulness: async (input) => {
+      if (ownedRuns.get(input.runId) !== input.founderId) {
+        throw new Error('FRIEND_INTAKE_USEFULNESS_FAILED:friend_intake_run_not_owned');
+      }
+      usefulnessReceipts.push({ ...input });
+    },
+  }));
+
+  await new Promise<void>((resolve) => {
     server = app.listen(0, '127.0.0.1', () => resolve());
-    server.once('error', reject);
   });
   const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Friend proof server did not bind');
-  origin = `http://127.0.0.1:${address.port}`;
+  if (!address || typeof address === 'string') throw new Error('Friend Intake proof server did not bind');
+  baseUrl = `http://127.0.0.1:${address.port}`;
 });
 
 test.afterAll(async () => {
   if (!server) return;
-  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  await new Promise<void>((resolve, reject) => {
+    server?.close((error) => error ? reject(error) : resolve());
+  });
 });
 
-async function prepareFriendPage(
-  page: Page,
-  options: {
-    failSecondRun?: boolean;
-    modelFailureState?: 'blocked' | 'provider_unavailable' | 'timed_out' | 'schema_invalid';
-  } = {},
-) {
-  await page.route('**/auth/me', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        founder: { id: 'founder-playwright', email: 'founder@example.com' },
-      }),
-    });
+test.beforeEach(() => {
+  persistedRuns = [];
+  usefulnessReceipts = [];
+  persistedIntakeIds = new Set<string>();
+  ownedRuns.clear();
+});
+
+function captureExternalRequests(page: Page) {
+  const external: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.origin !== baseUrl) external.push(request.url());
   });
-
-  let runCount = 0;
-  await page.route('**/mirror/friend-intake', async (route) => {
-    if (route.request().method() !== 'POST') {
-      await route.continue();
-      return;
-    }
-    runCount += 1;
-    const requestBody = route.request().postDataJSON();
-    expect(requestBody).not.toHaveProperty('relatedMemories');
-
-    if (options.modelFailureState) {
-      const timedOut = options.modelFailureState === 'timed_out';
-      await route.fulfill({
-        status: timedOut ? 504 : 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: timedOut
-            ? 'Friend runtime provider timed out'
-            : 'Friend runtime provider failed',
-          code: timedOut ? 'FRIEND_PROVIDER_TIMEOUT' : 'FRIEND_RUNTIME_FAILED',
-          modelExecutionState: options.modelFailureState,
-        }),
-      });
-      return;
-    }
-
-    if (options.failSecondRun && runCount === 2) {
-      await route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'Friend completion persistence is unavailable',
-          code: 'FRIEND_COMPLETION_PERSISTENCE_FAILED',
-        }),
-      });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        intakeId: '11111111-1111-4111-8111-111111111111',
-        runId: '22222222-2222-4222-8222-222222222222',
-        privacyChoice: requestBody.privacyChoice,
-        inputPersistence: requestBody.privacyChoice === 'save_redacted_summary'
-          ? 'redacted_summary_only'
-          : 'none',
-        mirror: {
-          headline: 'One reflection, one move',
-          summary: 'The build needs one bounded proof, not another planning loop.',
-        },
-        intentTags: ['build', 'people'],
-        move: {
-          kind: 'tiny_move',
-          text: 'Run the focused proof and record the result.',
-          rationale: 'One proof reduces uncertainty.',
-          timeEstimateMinutes: 10,
-          gateWarning: 'No external action is authorized.',
-        },
-        runtimeProvider: requestBody.provider,
-        modelExecutionState: requestBody.provider === 'deterministic' ? 'not_used' : 'succeeded',
-        provenanceId: '33333333-3333-4333-8333-333333333333',
-        timelineEventId: 'timeline-playwright',
-        usefulness: null,
-        provenance: {
-          id: '33333333-3333-4333-8333-333333333333',
-          source: requestBody.provider === 'deterministic' ? 'deterministic' : 'model_inference',
-          provider: requestBody.provider,
-          model: requestBody.provider === 'deterministic' ? 'friend-deterministic-v1' : 'playwright-model',
-          responseId: null,
-          promptVersion: 'friend-intake-v1-2026-09-08',
-          inferenceReservationId: requestBody.provider === 'deterministic' ? null : 'reservation-playwright',
-          providerStorageMode: requestBody.provider === 'deterministic' ? 'local_only' : 'provider_default',
-          webSearchUsed: false,
-          doesNotProve: [
-            'founder approval beyond this Friend run',
-            'external factual truth',
-            'provider write outcome',
-            'provider billing amount',
-            'memory retrieval',
-          ],
-        },
-      }),
-    });
-  });
-
-  await page.route('**/mirror/friend-intake/*/usefulness', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        runId: '22222222-2222-4222-8222-222222222222',
-        usefulness: { response: 'yes', recordedAt: '2026-09-09T03:30:00.000Z' },
-      }),
-    });
-  });
+  return external;
 }
 
-test('Control Room exposes Friend from the normal founder stack', async ({ page }) => {
-  await page.route('**/automation/conveyor/**', async (route) => {
-    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+test('desktop saved-summary flow freezes privacy state, stays model-free, and reports retention truthfully', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const externalRequests = captureExternalRequests(page);
+  const rawText = 'Email founder@example.com about the product build plan and launch step.';
+
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Move one thing forward.' })).toBeVisible();
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await expect(page.locator('#privacy-note')).toContainText('Raw input is not stored');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+
+  await expect(page.locator('#friend-input')).toBeDisabled();
+  await expect(page.locator('input[value="process_without_saving"]')).toBeDisabled();
+  await expect(page.locator('input[value="save_redacted_summary"]')).toBeDisabled();
+
+  const receipt = page.locator('[data-friend-intake-receipt]');
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toContainText('Deterministic FCR rule engine');
+  await expect(receipt).toContainText('External model state: blocked');
+  await expect(receipt).toContainText('Redacted summary + derived labels');
+  await expect(page.locator('[data-one-move]')).toHaveCount(1);
+  await expect(page.locator('[data-intent-tags] input')).toHaveCount(1);
+
+  expect(persistedRuns).toHaveLength(1);
+  const persisted = persistedRuns[0];
+  expect(persisted.privacyChoice).toBe('save_redacted_summary');
+  expect(persisted.modelExecutionState).toBe('blocked');
+  expect(String(persisted.redactedSummary)).not.toContain('founder@example.com');
+  expect(String(persisted.redactedSummary).length).toBeLessThanOrEqual(300);
+  expect(JSON.stringify(persisted)).not.toContain(rawText);
+  expect(externalRequests).toEqual([]);
+
+  await page.getByRole('button', { name: 'Yes, helped' }).click();
+  await expect(page.locator('[data-feedback-status]')).toHaveText('Usefulness receipt recorded.');
+  expect(usefulnessReceipts).toHaveLength(1);
+  expect(usefulnessReceipts[0]).toMatchObject({
+    founderId: FOUNDER_ID,
+    projectId: PROJECT_ID,
+    response: 'yes',
   });
-  await page.goto(`${origin}/control-room/`);
-  await expect(page.locator('a[href="/control-room/friend.html"]')).toHaveCount(1);
-  await expect(page.locator('a[href="/control-room/friend.html"]')).toContainText('Friend');
+  expect(String(usefulnessReceipts[0].eventId)).toMatch(/^[0-9a-f-]{36}$/i);
+
+  await page.screenshot({ path: 'test-results/friend-intake-desktop.png', fullPage: true });
 });
 
-for (const viewport of [
-  { label: 'desktop', width: 1280, height: 900 },
-  { label: 'mobile', width: 390, height: 844 },
-]) {
-  test(`Friend Intake renders exactly one move with provenance and usefulness on ${viewport.label}`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await prepareFriendPage(page);
+test('sensitive saved-summary confirmation reviews every persisted field and is serialized', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const externalRequests = captureExternalRequests(page);
+  const rawText = 'My child is involved in a custody issue.';
 
-    await page.goto(`${origin}/control-room/friend.html`);
-    await expect(page.getByRole('heading', { name: 'One reflection. One move.' })).toBeVisible();
-    await expect(page.getByText('FCR stores no founder content.')).toBeVisible();
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
 
-    await page.getByLabel('What is on your mind?').fill('I need one proof for the build.');
-    await page.getByLabel('Runtime').selectOption('anthropic');
-    await page.getByRole('button', { name: 'Run Friend' }).click();
+  const review = page.locator('[data-sensitive-save-review]');
+  await expect(review).toBeVisible();
+  await expect(review).toContainText('Sensitive content detected.');
+  await expect(review).toContainText('Nothing has been saved yet.');
+  await expect(review.locator('[data-reviewed-sensitive-categories]')).toContainText('teen');
+  await expect(review.locator('[data-reviewed-sensitive-categories]')).toContainText('legal');
+  await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('kids');
+  await expect(review.locator('[data-reviewed-intent-tags]')).toContainText('legal');
+  const reviewedMove = review.locator('[data-reviewed-move-metadata]');
+  await expect(reviewedMove).toContainText('Kind: protective_move');
+  await expect(reviewedMove).toContainText('Policy: protective');
+  await expect(reviewedMove).toContainText('Time estimate: 5 minutes');
+  await expect(reviewedMove).toContainText('Gate warning code: sensitive_protective');
+  await expect(review).not.toContainText(rawText);
+  expect(persistedRuns).toHaveLength(0);
+  expect(externalRequests).toEqual([]);
 
-    await expect(page.getByText('One reflection, one move')).toBeVisible();
-    await expect(page.locator('.move')).toHaveCount(1);
-    await expect(page.locator('.tag-input')).toHaveCount(2);
+  await page.screenshot({ path: 'test-results/friend-intake-sensitive-review.png', fullPage: true });
 
-    await page.getByText('Provenance · what this does and does not prove').click();
-    await expect(page.getByText('model_inference')).toBeVisible();
-    await expect(page.getByText('reservation-playwright')).toBeVisible();
-    await expect(page.getByText('external factual truth')).toBeVisible();
+  await page.getByRole('button', { name: 'Save reviewed summary, labels, and move metadata' }).dblclick();
+  const receipt = page.locator('[data-friend-intake-receipt]');
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toContainText('Redacted summary + derived labels');
+  await expect(page.locator('[data-one-move]')).toContainText('protective_move');
 
-    await page.getByRole('button', { name: 'Yes' }).click();
-    await expect(page.getByText('Usefulness recorded.')).toBeVisible();
-
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-    expect(overflow).toBe(false);
-  });
-}
-
-test('Friend hides the previous receipt before a failed rerun', async ({ page }) => {
-  await prepareFriendPage(page, { failSecondRun: true });
-  await page.goto(`${origin}/control-room/friend.html`);
-
-  await page.getByLabel('What is on your mind?').fill('First run.');
-  await page.getByRole('button', { name: 'Run Friend' }).click();
-  await expect(page.getByText('One reflection, one move')).toBeVisible();
-
-  await page.getByLabel('What is on your mind?').fill('Second run.');
-  await page.getByRole('button', { name: 'Run Friend' }).click();
-
-  await expect(page.getByRole('alert')).toContainText('Friend completion persistence is unavailable');
-  await expect(page.locator('#friend-receipt')).toBeHidden();
-  await expect(page.getByText('One reflection, one move')).toHaveCount(0);
+  expect(persistedRuns).toHaveLength(1);
+  const persisted = persistedRuns[0];
+  expect(persisted.privacyChoice).toBe('save_redacted_summary');
+  expect(persisted.sensitiveCategories).toEqual(expect.arrayContaining(['teen', 'legal']));
+  expect(persisted.intentTagIds).toEqual(expect.arrayContaining(['kids', 'legal']));
+  expect(String(persisted.redactedSummary)).not.toContain(rawText);
+  expect(JSON.stringify(persisted)).not.toContain(rawText);
+  expect(externalRequests).toEqual([]);
 });
 
-test('Friend renders a provider failure execution state distinctly', async ({ page }) => {
-  await prepareFriendPage(page, { modelFailureState: 'timed_out' });
-  await page.goto(`${origin}/control-room/friend.html`);
+test('one sensitive review cannot create two saved rows across concurrent tabs', async ({ page, context }) => {
+  const rawText = 'My child is involved in a custody issue.';
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toBeVisible();
 
-  await page.getByLabel('What is on your mind?').fill('Try one bounded live reflection.');
-  await page.getByLabel('Runtime').selectOption('openai');
-  await page.getByRole('button', { name: 'Run Friend' }).click();
+  const secondPage = await context.newPage();
+  await secondPage.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
 
-  await expect(page.getByRole('alert')).toContainText('Friend runtime provider timed out');
-  await expect(page.getByRole('alert')).toContainText('Model state: timed_out');
-  await expect(page.getByText('No successful receipt was created. Model state: timed_out.')).toBeVisible();
-  await expect(page.locator('#friend-receipt')).toBeHidden();
+  const confirm = (target: Page) => target.evaluate(async (reviewedText) => {
+    const response = await fetch('/friend-intake/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawText: reviewedText,
+        privacyChoice: 'save_redacted_summary',
+        sensitiveSaveConfirmed: true,
+      }),
+    });
+    return response.status;
+  }, rawText);
+
+  const statuses = await Promise.all([confirm(page), confirm(secondPage)]);
+  expect(statuses.sort()).toEqual([200, 409]);
+  expect(persistedRuns).toHaveLength(1);
+  await secondPage.close();
+});
+
+test('cancelling a sensitive review revokes the shared confirmation receipt', async ({ page, context }) => {
+  const rawText = 'My child is involved in a custody issue.';
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toBeVisible();
+
+  const secondPage = await context.newPage();
+  await secondPage.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: 'Cancel and clear' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toHaveCount(0);
+
+  const status = await secondPage.evaluate(async (reviewedText) => {
+    const response = await fetch('/friend-intake/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawText: reviewedText,
+        privacyChoice: 'save_redacted_summary',
+        sensitiveSaveConfirmed: true,
+      }),
+    });
+    return response.status;
+  }, rawText);
+
+  expect(status).toBe(409);
+  expect(persistedRuns).toHaveLength(0);
+  await secondPage.close();
+});
+
+test('changing away from save during sensitive review revokes the shared receipt', async ({ page, context }) => {
+  const rawText = 'My child is involved in a custody issue.';
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await page.check('input[value="save_redacted_summary"]');
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+  await expect(page.locator('[data-sensitive-save-review]')).toBeVisible();
+
+  const secondPage = await context.newPage();
+  await secondPage.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+
+  await page.check('input[value="process_without_saving"]');
+  await expect(page.locator('[data-sensitive-save-review]')).toHaveCount(0);
+  await expect(page.locator('input[value="process_without_saving"]')).toBeChecked();
+
+  const status = await secondPage.evaluate(async (reviewedText) => {
+    const response = await fetch('/friend-intake/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawText: reviewedText,
+        privacyChoice: 'save_redacted_summary',
+        sensitiveSaveConfirmed: true,
+      }),
+    });
+    return response.status;
+  }, rawText);
+
+  expect(status).toBe(409);
+  expect(persistedRuns).toHaveLength(0);
+  await secondPage.close();
+});
+
+test('control room hides Friend Intake navigation when runtime availability is false', async ({ page }) => {
+  await page.route('**/friend-intake/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: false, persistenceEnabled: false }),
+    });
+  });
+
+  await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'networkidle' });
+  const link = page.locator('[data-friend-intake-link]');
+  await expect(link).toBeHidden();
+  await page.locator('.launch-dock summary').click();
+  await expect(link).toBeHidden();
+});
+
+test('mobile process-without-saving protects sensitive input and stores no intake content', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const externalRequests = captureExternalRequests(page);
+  const rawText = 'My child is involved in a custody issue.';
+
+  await page.goto(`${baseUrl}/control-room/friend-intake.html`, { waitUntil: 'networkidle' });
+  await page.fill('#friend-input', rawText);
+  await expect(page.locator('input[value="process_without_saving"]')).toBeChecked();
+  await page.getByRole('button', { name: 'Mirror and give me one move' }).click();
+
+  const receipt = page.locator('[data-friend-intake-receipt]');
+  await expect(receipt).toBeVisible();
+  await expect(page.locator('[data-one-move]')).toContainText('protective_move');
+  await expect(page.locator('[data-one-move]')).not.toContainText('tiny_move');
+  await expect(receipt).toContainText('No intake content saved');
+  await expect(page.locator('[data-one-move]')).toHaveCount(1);
+
+  expect(persistedRuns).toHaveLength(1);
+  const persisted = persistedRuns[0];
+  expect(persisted.privacyChoice).toBe('process_without_saving');
+  expect(persisted.redactedSummary).toBeNull();
+  expect(persisted.sensitiveCategories).toEqual([]);
+  expect(persisted.intentTagIds).toEqual([]);
+  expect(JSON.stringify(persisted)).not.toContain(rawText);
+  expect(externalRequests).toEqual([]);
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByRole('button', { name: 'Wrong time' }).click();
+  await expect(page.locator('[data-feedback-status]')).toHaveText('Usefulness receipt recorded.');
+  expect(usefulnessReceipts).toHaveLength(1);
+  expect(usefulnessReceipts[0]).toMatchObject({ response: 'wrong_time' });
+
+  await page.screenshot({ path: 'test-results/friend-intake-mobile.png', fullPage: true });
 });

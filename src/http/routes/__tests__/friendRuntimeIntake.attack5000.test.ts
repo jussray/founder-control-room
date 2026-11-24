@@ -12,33 +12,25 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
+import { boundFounderRow } from './founderAuthFixture.js';
 import {
-  createFriendIntakeRouter,
+  createFriendRuntimeIntakeRouter,
   detectSensitiveCategories,
   redactFriendSummary,
-} from '../friendIntake.js';
+} from '../friendRuntimeIntake.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer attack-5000-token';
 
-function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
-  };
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
   supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'founder_users') return founderUsersRow();
+    if (table === 'founder_users') return boundFounderRow(FOUNDER_EMAIL, 'founder-user-1');
     return {};
   });
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 });
@@ -52,7 +44,7 @@ describe('Friend ATTACK 5000 privacy membrane', () => {
 
     const app = express();
     app.use(express.json());
-    app.use('/mirror/friend-intake', createFriendIntakeRouter({
+    app.use('/mirror/friend-intake', createFriendRuntimeIntakeRouter({
       runFriendRuntime,
       preflightLiveInference,
       reserveLiveInference,

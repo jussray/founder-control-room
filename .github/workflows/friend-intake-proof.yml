@@ -8,21 +8,21 @@ on:
       - 'src/auth/__tests__/founderSession.integrity.test.ts'
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
-      - 'src/http/routes/friendIntake.ts'
-      - 'src/http/routes/__tests__/friendIntake.integration.test.ts'
-      - 'src/http/routes/__tests__/friendIntake.attack5000.test.ts'
+      - 'src/http/routes/friendRuntimeIntake.ts'
+      - 'src/http/routes/__tests__/friendRuntimeIntake.integration.test.ts'
+      - 'src/http/routes/__tests__/friendRuntimeIntake.attack5000.test.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
       - 'src/mirror/__tests__/friendRuntime.test.ts'
-      - 'src/chief/firstSliceContracts.ts'
+      - 'src/chief/friendRuntimeContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
       - 'public/control-room/index.html'
       - 'public/control-room/stack-router.js'
-      - 'e2e/friend-intake.spec.ts'
+      - 'e2e/friend-runtime.spec.ts'
       - 'supabase/migrations/*friend_intake*'
       - 'wrangler.worker.toml'
-      - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FRIEND_RUNTIME_INTAKE_V1.md'
       - 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md'
       - 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md'
       - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
@@ -34,21 +34,21 @@ on:
       - 'src/auth/__tests__/founderSession.integrity.test.ts'
       - 'src/http/middleware/requireFounder.ts'
       - 'src/http/middleware/__tests__/requireFounder.test.ts'
-      - 'src/http/routes/friendIntake.ts'
-      - 'src/http/routes/__tests__/friendIntake.integration.test.ts'
-      - 'src/http/routes/__tests__/friendIntake.attack5000.test.ts'
+      - 'src/http/routes/friendRuntimeIntake.ts'
+      - 'src/http/routes/__tests__/friendRuntimeIntake.integration.test.ts'
+      - 'src/http/routes/__tests__/friendRuntimeIntake.attack5000.test.ts'
       - 'src/http/routes/mirror.ts'
       - 'src/mirror/friendRuntime.ts'
       - 'src/mirror/__tests__/friendRuntime.test.ts'
-      - 'src/chief/firstSliceContracts.ts'
+      - 'src/chief/friendRuntimeContracts.ts'
       - 'src/model/execution.ts'
       - 'public/control-room/friend.*'
       - 'public/control-room/index.html'
       - 'public/control-room/stack-router.js'
-      - 'e2e/friend-intake.spec.ts'
+      - 'e2e/friend-runtime.spec.ts'
       - 'supabase/migrations/*friend_intake*'
       - 'wrangler.worker.toml'
-      - 'docs/FRIEND_INTAKE_V1.md'
+      - 'docs/FRIEND_RUNTIME_INTAKE_V1.md'
       - 'docs/FCR_MULTI_AGENT_ENABLEMENT_CONTRACT.md'
       - 'docs/DEEPSEEK_INSTRUCTOR_CONTRACT.md'
       - 'docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC_V1_5_ADDENDUM.md'
@@ -94,10 +94,10 @@ jobs:
         run: npm run typecheck
 
       - name: Focused Friend tests
-        run: npx vitest run src/auth/__tests__/founderSession.integrity.test.ts src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendIntake.integration.test.ts src/http/routes/__tests__/friendIntake.attack5000.test.ts src/implant/__tests__/selfAttackContracts.test.ts
+        run: npx vitest run src/auth/__tests__/founderSession.integrity.test.ts src/http/middleware/__tests__/requireFounder.test.ts src/mirror/__tests__/friendRuntime.test.ts src/http/routes/__tests__/friendRuntimeIntake.integration.test.ts src/http/routes/__tests__/friendRuntimeIntake.attack5000.test.ts src/implant/__tests__/selfAttackContracts.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps
 
       - name: Friend desktop and mobile Playwright
-        run: npx playwright test e2e/friend-intake.spec.ts --reporter=list
+        run: npx playwright test e2e/friend-runtime.spec.ts --reporter=list

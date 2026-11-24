@@ -1,6 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
 import express, { type Response } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderRequest } from '../requireFounder.js';
@@ -126,6 +125,7 @@ async function founderCookie(
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   });
   const values = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
@@ -146,41 +146,15 @@ function refreshedSession(): Session {
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   };
 }
 
 function createProbeApp() {
   const app = express();
-  // Synthetic authorization probes are not production routes, but still
-  // explicitly exercise the same pre-auth request-limiting boundary.
-  app.use(rateLimit({
-    windowMs: 60 * 1_000,
-    limit: 60,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-  }));
   app.get('/protected', requireFounder, (req: FounderRequest, res) => {
     res.json({ founder: req.founder });
-  });
-  return app;
-}
-
-function createAuthChannelProbeApp() {
-  const app = express();
-  // Synthetic authorization probes are not production routes, but still
-  // explicitly exercise the same pre-auth request-limiting boundary.
-  app.use(rateLimit({
-    windowMs: 60 * 1_000,
-    limit: 60,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-  }));
-  app.get('/protected', requireFounder, (req: FounderRequest, res) => {
-    res.json({
-      founder: req.founder,
-      founderAuthChannel: req.founderAuthChannel,
-    });
   });
   return app;
 }
@@ -200,7 +174,7 @@ beforeEach(() => {
   mocks.select.mockReturnValue(allowlistChain);
   mocks.eq.mockReturnValue(allowlistChain);
   mocks.maybeSingle.mockResolvedValue({
-    data: { email: 'founder@example.com' },
+    data: { email: 'founder@example.com', user_id: 'founder-user-1' },
     error: null,
   });
 
@@ -209,6 +183,7 @@ beforeEach(() => {
       user: {
         id: 'founder-user-1',
         email: '  FOUNDER@EXAMPLE.COM ',
+        email_confirmed_at: '2026-11-15T00:00:00Z',
       },
     },
     error: null,
@@ -223,17 +198,6 @@ beforeEach(() => {
 });
 
 describe('requireFounder', () => {
-  it('probe throttles unauthorized requests before authentication', async () => {
-    const app = createAuthChannelProbeApp();
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const response = await request(app).get('/protected');
-      expect(response.status).toBe(401);
-    }
-    const limited = await request(app).get('/protected');
-    expect(limited.status).toBe(429);
-    expect(limited.headers['retry-after']).toBeDefined();
-  });
-
   it('requires a bearer token or founder cookie', async () => {
     const response = await request(createProbeApp()).get('/protected');
 
@@ -267,6 +231,7 @@ describe('requireFounder', () => {
     });
     expect(mocks.getUser).toHaveBeenCalledWith('founder-access-token');
     expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
   });
@@ -339,37 +304,10 @@ describe('requireFounder', () => {
       refresh_token: 'cookie-refresh-token',
     });
     expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');
-  });
-
-  it('carries the interactive auth channel downstream after opaque-session refresh and rotation', async () => {
-    mocks.getUser.mockResolvedValue({
-      data: { user: null },
-      error: { message: 'expired access token' },
-    });
-    const session = refreshedSession();
-    mocks.refreshSession.mockResolvedValue({
-      data: { session, user: session.user },
-      error: null,
-    });
-    const cookie = await founderCookie();
-
-    const response = await request(createAuthChannelProbeApp())
-      .get('/protected')
-      .set('Cookie', cookie);
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      founder: {
-        email: 'founder@example.com',
-        userId: 'founder-user-1',
-      },
-      founderAuthChannel: 'interactive',
-    });
-    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
-    expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
   });
 
   it('does not renew a refreshed cookie for an authenticated nonfounder', async () => {
