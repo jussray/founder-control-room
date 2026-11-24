@@ -83,6 +83,23 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('-f "$PREVIEW_ASSERT"');
   });
 
+  it('replays the unchanged Truth Compass registration against the canonical projects dependency', () => {
+    const fixture = readFileSync('supabase/preview-fixtures/20261123222318_register_truth_compass_external_read_identity_20261123.sql', 'utf8');
+    const assertion = readFileSync('supabase/preview-assertions/20261123222318_register_truth_compass_external_read_identity_20261123.sql', 'utf8');
+    const migration = readFileSync('supabase/migrations/20261123222318_register_truth_compass_external_read_identity_20261123.sql', 'utf8');
+    const baseline = readFileSync('supabase/migrations/20260711030127_init_control_room_schema.sql', 'utf8');
+    const ddl = baseline.match(/create table if not exists projects \([\s\S]*?\n\);/i)?.[0];
+    expect(ddl).toBeDefined();
+    expect(fixture).toContain(ddl!.replace('exists projects (', 'exists public.projects ('));
+    expect(fixture).not.toMatch(/insert\s+into/i);
+    expect(migration).toContain('on conflict (slug) do nothing');
+    expect(assertion).toContain("status = 'paused'");
+    expect(assertion).toContain("repo_identifier = 'jussray/truth-compass'");
+    expect(assertion).toContain("risk_level = 'low'");
+    expect(workflow).toContain('-f "$PREVIEW_FIXTURE" -f "$migration"');
+    expect(workflow).toContain('-f "$PREVIEW_ASSERT"');
+  });
+
   it('reconciles close cleanup against the actual Neon preview branch instead of the final PR diff', () => {
     expect(workflow).toContain('target_name="preview/pr-${PR_NUMBER}"');
     expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
