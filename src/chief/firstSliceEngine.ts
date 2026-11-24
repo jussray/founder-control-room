@@ -36,6 +36,7 @@ export interface DeterministicFriendIntakeResult {
 }
 
 const CRISIS_HEALTH_PATTERNS: readonly RegExp[] = [
+  /\b(?:end|take)\s+my\s+(?:own\s+)?life\b(?!\s+(?:insurance|policy|story|sentence|savings)\b)/i,
   /\bself[ -]?harm\b/i,
   /\bsuicid(?:e|al)\b/i,
   /\b(?:kill|hurt|injure)\s+myself\b/i,

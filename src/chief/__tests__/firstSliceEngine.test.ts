@@ -53,6 +53,8 @@ describe('FirstSliceEngine', () => {
       'I am worried about self-harm.',
       'I want to kill myself.',
       'I want to die.',
+      'I want to end my life.',
+      'I intend to take my own life.',
       "I don't want to be alive.",
     ]) {
       const result = engine.run({
@@ -67,6 +69,12 @@ describe('FirstSliceEngine', () => {
       expect(result.move.text).toContain('emergency or crisis support');
       expect(result.move.gateWarning).toContain('human-support lane');
     }
+  });
+
+  it('does not confuse life insurance with a crisis signal', () => {
+    const result = engine.run({rawText:'I want to end my life insurance policy.', privacyChoice:'process_without_saving'});
+    expect(result.sensitiveCategories).not.toContain('health');
+    expect(result.move.text).not.toContain('emergency or crisis support');
   });
 
   it('keeps tiny moves inside the canonical 5-15 minute window', () => {
