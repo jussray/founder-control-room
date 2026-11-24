@@ -1,0 +1,394 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  mockStatus,
+  mockSendGmailReply,
+  mockSendWhatsAppReply,
+  mockGmailReadStatus,
+  mockReadGmailInbox,
+  mockProbeGmailInbox,
+  supabaseMock,
+} = vi.hoisted(() => ({
+  mockStatus: vi.fn(),
+  mockSendGmailReply: vi.fn(),
+  mockSendWhatsAppReply: vi.fn(),
+  mockGmailReadStatus: vi.fn(),
+  mockReadGmailInbox: vi.fn(),
+  mockProbeGmailInbox: vi.fn(),
+  supabaseMock: { from: vi.fn() },
+}));
+
+vi.mock('../../../lib/growthInboxReply.js', () => ({
+  growthInboxReplyStatus: mockStatus,
+  gmailInboxReadStatus: mockGmailReadStatus,
+  readGmailInbox: mockReadGmailInbox,
+  probeGmailInbox: mockProbeGmailInbox,
+  sendGmailReply: mockSendGmailReply,
+  sendWhatsAppReply: mockSendWhatsAppReply,
+}));
+
+vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
+
+vi.mock('../../middleware/requireFounder.js', () => ({
+  requireFounder: (req: Record<string, unknown>, _res: unknown, next: () => void) => {
+    req.founder = { id: 'founder-user-1', email: 'founder@example.com' };
+    next();
+  },
+}));
+
+import express from 'express';
+import request from 'supertest';
+import { pluginCenterMessagingRouter } from '../pluginCenterMessaging.js';
+
+const PROJECT_ID = 'project-uuid-001';
+const PROJECT_SLUG = 'founder-control-room';
+const BRAND_ID = 'founder-control-room';
+
+function app() {
+  const instance = express();
+  instance.use(express.json());
+  instance.use('/plugin-center/messaging', pluginCenterMessagingRouter);
+  return instance;
+}
+
+function projectLookup() {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({
+          data: { id: PROJECT_ID, slug: PROJECT_SLUG, name: 'Founder Control Room' },
+          error: null,
+        }),
+      }),
+    }),
+  };
+}
+
+function approvedEmailRequest(overrides: Record<string, unknown> = {}) {
+  return {
+    channel: 'email',
+    projectSlug: PROJECT_SLUG,
+    brandId: BRAND_ID,
+    purpose: 'support',
+    gmailMessageId: 'gmail-message-1',
+    body: 'Thanks, I can help with that.',
+    idempotencyKey: 'reply-test-002',
+    confirmSend: true,
+    approvalScope: 'single_reply',
+    confirmInboundReplyContext: true,
+    confirmNoOptOut: true,
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockGmailReadStatus.mockReturnValue({ configured: true, expectedAccount: 'founder@example.com', projectSlug: PROJECT_SLUG, labelId: 'Label_business', missing: [] });
+  mockStatus.mockReturnValue({
+    contract: 'fcr/growth-inbox-reply@v1',
+    mode: 'draft_only',
+    replyOnly: true,
+    channels: {
+      email: { configured: true, expectedAccount: 'founder@example.com', fingerprint: 'gmail:founder@example.com', missing: [] },
+      whatsapp: { configured: false, phoneNumberId: null, wabaId: null, graphVersion: null, fingerprint: null, missing: ['FCR_WHATSAPP_ACCESS_TOKEN'] },
+    },
+  });
+});
+
+describe('GET /plugin-center/messaging/status', () => {
+  it('exposes only readiness and account fingerprints, not credentials', async () => {
+    const response = await request(app()).get('/plugin-center/messaging/status');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      contract: 'fcr/growth-inbox-reply@v1',
+      mode: 'draft_only',
+      replyOnly: true,
+      channels: {
+        email: { configured: true, fingerprint: 'gmail:founder@example.com' },
+        whatsapp: { configured: false },
+      },
+    });
+    expect(JSON.stringify(response.body)).not.toContain('test-token');
+  });
+});
+
+describe('POST /plugin-center/messaging/reply', () => {
+  it('fails closed before persistence or provider execution without explicit single-reply approval', async () => {
+    const response = await request(app())
+      .post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ confirmSend: false }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('EXPLICIT_FOUNDER_SEND_APPROVAL_REQUIRED');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+
+  it('requires inbound-context and suppression attestations before persistence or provider execution', async () => {
+    const response = await request(app())
+      .post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ confirmNoOptOut: false }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('REPLY_POLICY_ATTESTATION_REQUIRED');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+
+  it('reserves the exact reply, obtains the canonical dispatch decision, then finalizes a successful email receipt', async () => {
+    const executionId = 'exec-uuid-001';
+    let reservedRequest: Record<string, unknown> | null = null;
+    let finalizedUpdate: Record<string, unknown> | null = null;
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'approval_executions') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          }),
+          insert: (row: Record<string, unknown>) => {
+            reservedRequest = row;
+            return {
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: { id: executionId, action_type: row.action_type, status: 'pending', request: row.request, result: {}, success: null },
+                  error: null,
+                }),
+              }),
+            };
+          },
+          update: (row: Record<string, unknown>) => {
+            finalizedUpdate = row;
+            return {
+              eq: () => ({
+                eq: () => ({
+                  select: () => ({
+                    maybeSingle: () => Promise.resolve({ data: { id: executionId, status: row.status }, error: null }),
+                  }),
+                }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'projects') return projectLookup();
+      return {};
+    });
+
+    mockSendGmailReply.mockResolvedValue({
+      channel: 'email',
+      providerMessageId: 'gmail-sent-1',
+      threadId: 'thread-1',
+      recipient: 'customer@example.net',
+      account: 'founder@example.com',
+    });
+
+    const response = await request(app())
+      .post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockSendGmailReply).toHaveBeenCalledWith({
+      messageId: 'gmail-message-1',
+      body: 'Thanks, I can help with that.',
+    });
+    expect(reservedRequest).toMatchObject({
+      project_id: PROJECT_ID,
+      action_type: 'growth_inbox_reply',
+      idempotency_key: expect.stringMatching(/^growth-reply:v1:[a-f0-9]{64}$/),
+      executed_by: 'founder@example.com',
+      status: 'pending',
+      request: {
+        contract: 'fcr/growth-inbox-reply@v1',
+        mode: 'draft_only',
+        replyOnly: true,
+        channel: 'email',
+        projectSlug: PROJECT_SLUG,
+        brandId: BRAND_ID,
+        purpose: 'support',
+        approval: 'founder_explicit_single_reply',
+        replyTarget: 'gmail-message:gmail-message-1',
+      },
+    });
+    expect(JSON.stringify(reservedRequest)).not.toContain('Thanks, I can help with that.');
+    expect(finalizedUpdate).toMatchObject({ status: 'succeeded', success: true });
+    expect(response.body.dispatchDecision).toMatchObject({
+      decision: 'allow',
+      policyVersion: 'fcr/reply-only-dispatch@v1',
+      denialReasons: [],
+    });
+    expect(response.body.dispatchDecision.checks.every((check: { state: string }) => check.state === 'allow')).toBe(true);
+    expect(response.body).toMatchObject({
+      contract: 'fcr/growth-inbox-reply@v1',
+      status: 'succeeded',
+      executionId,
+      result: { providerMessageId: 'gmail-sent-1', threadId: 'thread-1' },
+    });
+  });
+
+  it('requires an existing WhatsApp message identifier instead of allowing unbound outbound text', async () => {
+    const response = await request(app())
+      .post('/plugin-center/messaging/reply')
+      .send({
+        channel: 'whatsapp',
+        projectSlug: PROJECT_SLUG,
+        brandId: BRAND_ID,
+        purpose: 'support',
+        whatsappRecipientWaId: '15551234567',
+        body: 'Reply body',
+        idempotencyKey: 'reply-test-003',
+        confirmSend: true,
+        approvalScope: 'single_reply',
+        confirmInboundReplyContext: true,
+        confirmNoOptOut: true,
+        confirmWithinProviderReplyWindow: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('whatsappReplyToMessageId');
+    expect(mockSendWhatsAppReply).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('GET /plugin-center/messaging/ai-inbox', () => {
+  it('never reads a mailbox when its label or account has not been explicitly configured', async () => {
+    mockGmailReadStatus.mockReturnValue({ configured: false, missing: ['FCR_GMAIL_INBOX_LABEL_ID'] });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=founder-control-room');
+    expect(response.status).toBe(503);
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+  });
+
+  it('blocks cross-project mailbox reads before provider access', async () => {
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=sekret-bip');
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+  });
+
+  it('returns metadata-only human-review decisions without dispatching an email', async () => {
+    mockReadGmailInbox.mockResolvedValue({
+      accountId: 'founder@example.com', projectSlug: PROJECT_SLUG, nextPageToken: null,
+      messages: [{
+        accountId: 'founder@example.com', projectSlug: PROJECT_SLUG,
+        providerMessageId: 'msg1', receivedAt: '2026-11-07T17:00:00Z',
+        from: 'Client <client@example.net>', subject: 'Re: Project update',
+        replySignal: true, automated: false,
+      }],
+    });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox?projectSlug=founder-control-room&maxResults=5');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      contract: 'fcr/ai-inbox-observe@v1', mode: 'observe_only', readOnly: true,
+      decisions: [{ lane: 'reply_candidate', evidence: 'message_only', requiresHumanReview: true }],
+    });
+    expect(mockReadGmailInbox).toHaveBeenCalledWith({ maxResults: 5 });
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('scoped outbound Gmail replies', () => {
+  it('does not allow a partially configured business Gmail scope to fall back to an arbitrary project', async () => {
+    mockGmailReadStatus.mockReturnValue({
+      configured: false, expectedAccount: 'founder@example.com',
+      projectSlug: null, labelId: 'Label_business',
+      missing: ['FCR_GMAIL_INBOX_PROJECT_SLUG'],
+    });
+    const response = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ projectSlug: 'sekret-bip' }));
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+
+
+  it('rejects an unrelated business project before reserving a send', async () => {
+    const response = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ projectSlug: 'sekret-bip' }));
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('GMAIL_INBOX_PROJECT_SCOPE_MISMATCH');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Gmail API authorization probe endpoint', () => {
+  it('requires an explicitly matching project before any Gmail probe', async () => {
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox/probe?projectSlug=sekret-bip');
+    expect(response.status).toBe(403);
+    expect(mockProbeGmailInbox).not.toHaveBeenCalled();
+  });
+  it('exposes only provider account and custom label readback, not inbox content', async () => {
+    mockProbeGmailInbox.mockResolvedValue({
+      contract: 'fcr/gmail-inbox-probe@v1', mode: 'observe_only',
+      providerObserved: true, accountId: 'founder@example.com',
+      projectSlug: PROJECT_SLUG, labelId: 'Label_business',
+    });
+    const response = await request(app()).get('/plugin-center/messaging/ai-inbox/probe?projectSlug=founder-control-room');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({ providerObserved: true, projectSlug: PROJECT_SLUG });
+    expect(mockProbeGmailInbox).toHaveBeenCalledTimes(1);
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+    expect(mockSendGmailReply).not.toHaveBeenCalled();
+  });
+});
+
+describe('uncertain Gmail send cannot be replayed by the same idempotency key', () => {
+  it('holds the execution pending when provider acceptance or receipt is unknown', async () => {
+    let pending: Record<string, unknown> | null = null;
+    let attemptedFinalization = false;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'projects') return projectLookup();
+      if (table !== 'approval_executions') return {};
+      return {
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: pending, error: null }) }) }),
+        insert: (row: Record<string, unknown>) => {
+          pending = {
+            ...row,
+            id: 'exec-pending-1',
+            result: {},
+            success: null,
+          };
+          return { select: () => ({
+            single: () => Promise.resolve({ data: pending, error: null }),
+          }) };
+        },
+        update: () => {
+          attemptedFinalization = true;
+          throw new Error('must not mark ambiguous send failed');
+        },
+      };
+    });
+    mockSendGmailReply.mockRejectedValue(new Error('GMAIL_SEND_OUTCOME_UNKNOWN'));
+
+    const first = await request(app()).post('/plugin-center/messaging/reply').send(approvedEmailRequest());
+    expect(first.status).toBe(502);
+    expect(first.body).toMatchObject({
+      error: 'GMAIL_SEND_OUTCOME_UNKNOWN',
+      status: 'unknown',
+      replayBlocked: true,
+      executionId: 'exec-pending-1',
+    });
+    expect(attemptedFinalization).toBe(false);
+    expect(pending).toMatchObject({ status: 'pending' });
+    const replay = await request(app()).post('/plugin-center/messaging/reply').send(approvedEmailRequest());
+    expect(replay.status).toBe(409);
+    expect(replay.body.error).toBe('REPLY_EXECUTION_ALREADY_PENDING');
+    const differentClientKey = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ idempotencyKey: 'another-client-key-123' }));
+    expect(differentClientKey.status).toBe(409);
+    expect(differentClientKey.body.error).toBe('REPLY_EXECUTION_ALREADY_PENDING');
+    const changedBody = await request(app()).post('/plugin-center/messaging/reply')
+      .send(approvedEmailRequest({ idempotencyKey: 'third-client-key-123', body: 'A different reply' }));
+    expect(changedBody.status).toBe(409);
+    expect(changedBody.body.error).toBe('IDEMPOTENCY_KEY_SCOPE_MISMATCH');
+    expect(mockSendGmailReply).toHaveBeenCalledTimes(1);
+  });
+});

@@ -1,4 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { ProjectEmailBinding } from "../worker/projectEmail.js";
+import {
+  EXTERNAL_USE_DIGEST_RECIPIENT,
+  EXTERNAL_USE_EMAIL_OUTCOME_UNKNOWN,
+  retryExternalUseDigest,
+  sendExternalUseDigest,
+} from "./digestDelivery.js";
+export { EXTERNAL_USE_DIGEST_RECIPIENT } from "./digestDelivery.js";
 import { PORTFOLIO_PROJECTS } from "../config/portfolio.js";
 import { supabase } from "../lib/supabaseClient.js";
 import { McpHub } from "../mcp/hub.js";
@@ -17,10 +25,7 @@ import type {
   ExternalUseSource,
 } from "./types.js";
 
-export const EXTERNAL_USE_DIGEST_RECIPIENT = "sekretbip@gmail.com";
 const MAX_DIGEST_ITEMS = 200;
-const DIGEST_FAILED_RETRY_MS = 10 * 60_000;
-const DIGEST_STALE_RUNNING_MS = 20 * 60_000;
 const RESEND_TIMEOUT_MS = 15_000;
 
 interface PersistResult {
@@ -75,6 +80,7 @@ interface ExistingDigestRow {
   started_at: unknown;
   updated_at: unknown;
   attempt_count: unknown;
+  error_code: unknown;
 }
 
 function errorCode(error: unknown): string {
@@ -441,12 +447,6 @@ function hourStart(date: Date): string {
   return new Date(Math.floor(date.getTime() / 3_600_000) * 3_600_000).toISOString();
 }
 
-function retryDelay(status: string): number | undefined {
-  if (status === "failed") return DIGEST_FAILED_RETRY_MS;
-  if (status === "running") return DIGEST_STALE_RUNNING_MS;
-  return undefined;
-}
-
 async function reserveDigest(date: Date): Promise<DigestReservation | undefined> {
   const id = randomUUID();
   const digestHour = hourStart(date);
@@ -466,7 +466,7 @@ async function reserveDigest(date: Date): Promise<DigestReservation | undefined>
 
   const { data: existingData, error: existingError } = await supabase
     .from("external_code_use_digest_runs")
-    .select("id,digest_hour,status,started_at,updated_at,attempt_count")
+    .select("id,digest_hour,status,started_at,updated_at,attempt_count,error_code")
     .eq("digest_hour", digestHour)
     .maybeSingle();
   if (existingError) {
@@ -476,7 +476,7 @@ async function reserveDigest(date: Date): Promise<DigestReservation | undefined>
 
   const existing = existingData as ExistingDigestRow;
   const status = String(existing.status);
-  const delay = retryDelay(status);
+  const delay = retryExternalUseDigest(status, existing.error_code);
   if (delay === undefined) return undefined;
   const previousStart = Date.parse(String(existing.started_at));
   if (!Number.isFinite(previousStart) || date.getTime() - previousStart < delay) {
@@ -497,6 +497,7 @@ async function reserveDigest(date: Date): Promise<DigestReservation | undefined>
       source_counts: {},
       warnings: [],
       resend_email_id: null,
+      error_code: null,
     })
     .eq("id", String(existing.id))
     .eq("updated_at", String(existing.updated_at))
@@ -622,10 +623,12 @@ async function sendWithResend(options: {
 
 export async function runExternalUseHourlyCycle(
   now = new Date(),
+  emailBinding?: ProjectEmailBinding,
 ): Promise<{ status: "sent" | "skipped" | "failed"; itemCount?: number; newItemCount?: number }> {
   const reservation = await reserveDigest(now);
   if (!reservation) return { status: "skipped" };
 
+  let sendAttemptedWithCloudflare = false;
   try {
     const discovery = await runExternalUseDiscoveryCycle();
     const items = await digestItems();
@@ -642,10 +645,25 @@ export async function runExternalUseHourlyCycle(
       newItemCount,
       warnings,
     });
-    const resendEmailId = await sendWithResend({
-      digestHour: reservation.digestHour,
-      ...rendered,
-    });
+    // Persist a no-automatic-retry marker BEFORE the Cloudflare email call.
+    // A provider acceptance may be unknowable after a timeout or crash.
+    if (emailBinding) {
+      const { data: sending, error: sendMarkError } = await supabase
+        .from("external_code_use_digest_runs")
+        .update({ error_code: EXTERNAL_USE_EMAIL_OUTCOME_UNKNOWN })
+        .eq("id", reservation.id)
+        .eq("status", "running")
+        .select("id")
+        .maybeSingle();
+      if (sendMarkError) {
+        throw new Error(`external_use_send_marker_failed:${sendMarkError.message}`);
+      }
+      if (!sending) throw new Error("external_use_send_marker_missing_reservation");
+      sendAttemptedWithCloudflare = true;
+    }
+    const resendEmailId = emailBinding
+      ? await sendExternalUseDigest(emailBinding, rendered)
+      : await sendWithResend({ digestHour: reservation.digestHour, ...rendered });
 
     if (items.length) {
       const { error: digestMarkError } = await supabase
@@ -666,6 +684,7 @@ export async function runExternalUseHourlyCycle(
         source_counts: discovery.sourceCounts,
         warnings,
         resend_email_id: resendEmailId,
+        error_code: null,
         completed_at: new Date().toISOString(),
       })
       .eq("id", reservation.id)
@@ -676,14 +695,19 @@ export async function runExternalUseHourlyCycle(
 
     return { status: "sent", itemCount: items.length, newItemCount };
   } catch (error) {
-    await supabase
+    const { error: failedReceiptError } = await supabase
       .from("external_code_use_digest_runs")
       .update({
         status: "failed",
-        error_code: errorCode(error),
+        error_code: sendAttemptedWithCloudflare
+          ? EXTERNAL_USE_EMAIL_OUTCOME_UNKNOWN
+          : errorCode(error),
         completed_at: new Date().toISOString(),
       })
       .eq("id", reservation.id);
+    if (failedReceiptError) {
+      throw new Error(`external_use_failure_receipt_failed:${failedReceiptError.message}`);
+    }
     return { status: "failed" };
   }
 }

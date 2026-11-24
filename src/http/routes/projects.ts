@@ -2,11 +2,17 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { supabase } from "../../lib/supabaseClient.js";
 import { executionScopeMatches } from "../../lib/idempotencyScope.js";
-import { containsRawCredentialMaterial, NON_SECRET_CONFIG_ERROR } from "../../lib/nonSecretConfig.js";
 import { providerForProject } from "../../providers/providerFactory.js";
 import type { RepositoryProvider } from "../../providers/RepositoryProvider.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { AUTHORITY_LEVEL_IDS } from "../../lib/authorityLevels.js";
+import {
+  CONNECTION_CONFIG_SECRET_ERROR,
+  CONNECTION_CONFIG_SECRET_REJECTED,
+  CONNECTION_SECRET_REF_ERROR,
+  connectionConfigSecretViolation,
+  looksLikeRawCredential,
+} from "../../lib/connectionConfigSecrets.js";
 
 export const projectsRouter = Router();
 
@@ -183,17 +189,25 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
     return res.status(400).json({ error: `authorityLevel must be one of: ${[...AUTHORITY_LEVEL_IDS].join(", ")}` });
   }
 
-  const label = typeof body["label"] === "string" ? body["label"] : null;
+  // Reject raw credential material before any project lookup or write. The
+  // response names the offending key path only, never the submitted value.
   const config = typeof body["config"] === "object" && body["config"] !== null ? body["config"] : {};
-  if (containsRawCredentialMaterial(config)) {
-    return res.status(400).json({ error: NON_SECRET_CONFIG_ERROR });
+  const configViolation = connectionConfigSecretViolation(config);
+  if (configViolation) {
+    return res.status(400).json({
+      error: CONNECTION_CONFIG_SECRET_ERROR,
+      code: CONNECTION_CONFIG_SECRET_REJECTED,
+      field: configViolation,
+    });
   }
   const secretRef = typeof body["secretRef"] === "string" ? body["secretRef"] : null;
-  const capabilities = Array.isArray(body["capabilities"]) && body["capabilities"].every((c) => typeof c === "string")
-    ? body["capabilities"]
-    : [];
-  const dataBoundary = typeof body["dataBoundary"] === "string" ? body["dataBoundary"] : null;
-  const requiredApproval = typeof body["requiredApproval"] === "string" ? body["requiredApproval"] : null;
+  if (secretRef !== null && looksLikeRawCredential(secretRef)) {
+    return res.status(400).json({
+      error: CONNECTION_SECRET_REF_ERROR,
+      code: CONNECTION_CONFIG_SECRET_REJECTED,
+      field: "secretRef",
+    });
+  }
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -202,6 +216,13 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
     .maybeSingle();
   if (projectError) return res.status(500).json({ error: projectError.message });
   if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+
+  const label = typeof body["label"] === "string" ? body["label"] : null;
+  const capabilities = Array.isArray(body["capabilities"]) && body["capabilities"].every((c) => typeof c === "string")
+    ? body["capabilities"]
+    : [];
+  const dataBoundary = typeof body["dataBoundary"] === "string" ? body["dataBoundary"] : null;
+  const requiredApproval = typeof body["requiredApproval"] === "string" ? body["requiredApproval"] : null;
 
   const { data: connection, error } = await supabase
     .from("project_connections")

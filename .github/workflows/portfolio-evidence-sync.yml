@@ -1,0 +1,143 @@
+name: Juss & Co portfolio evidence sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-jussco-portfolio-evidence.mjs'
+      - 'scripts/mint-portfolio-github-app-token.mjs'
+      - '.github/workflows/portfolio-evidence-sync.yml'
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jussco-portfolio-evidence-sync
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TARGET_REPOSITORY: jussray/jussray
+  TARGET_BRANCH: main
+  PORTFOLIO_SYNC_RECEIPT: artifacts/portfolio-evidence-sync/receipt.json
+  PORTFOLIO_PROOF_DIR: proof/portfolio-evidence-sync
+
+jobs:
+  sync:
+    name: Observe aggregate portfolio evidence (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out exact FCR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify evidence-only mutation contract
+        run: node scripts/sync-jussco-portfolio-evidence.mjs --self-test
+
+      - name: Normalize key and mint portfolio GitHub App token
+        id: mint
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          GITHUB_APP_OWNER: jussray
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
+        run: node scripts/mint-portfolio-github-app-token.mjs
+
+      - name: Observe canonical repositories and record aggregate evidence (no publication)
+        id: sync
+        env:
+          PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$PORTFOLIO_SYNC_TOKEN_FILE"
+          token="$(tr -d '\r\n' < "$PORTFOLIO_SYNC_TOKEN_FILE")"
+          test -n "$token"
+          echo "::add-mask::$token"
+          PORTFOLIO_SYNC_TOKEN="$token" node scripts/sync-jussco-portfolio-evidence.mjs | tee /tmp/portfolio-sync-output.jsonl
+          unset token
+          rm -f "$PORTFOLIO_SYNC_TOKEN_FILE"
+          test -s "$PORTFOLIO_SYNC_RECEIPT"
+          jq -e '.contract == "juss/fcr-portfolio-evidence@v1"' "$PORTFOLIO_SYNC_RECEIPT" >/dev/null
+          echo "state=$(jq -r '.state' "$PORTFOLIO_SYNC_RECEIPT")" >> "$GITHUB_OUTPUT"
+          echo "target_commit=$(jq -r '.targetCommit' "$PORTFOLIO_SYNC_RECEIPT")" >> "$GITHUB_OUTPUT"
+          echo "worlds_generated_at=$(jq -r '.worldsGeneratedAt' "$PORTFOLIO_SYNC_RECEIPT")" >> "$GITHUB_OUTPUT"
+          echo "systems_generated_at=$(jq -r '.systemsGeneratedAt' "$PORTFOLIO_SYNC_RECEIPT")" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Portfolio evidence sync'
+            echo
+            echo "- State: \`$(jq -r '.state' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Target commit: \`$(jq -r '.targetCommit' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Repositories observed: \`$(jq -r '.observedRepositoryCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Worlds with changed observations: \`$(jq -r '.changedWorldCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Systems with changed observations: \`$(jq -r '.changedSystemCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Unavailable repositories: \`$(jq -r '.unavailableRepositoryCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo '- Mutation boundary: aggregate observations only; no GitHub writes or private artifacts'
+          echo '- Source readback is not production release or founder authorization'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Chromium for deployed proof
+        if: ${{ steps.sync.outputs.state == 'PUBLISHED' }}
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+        shell: bash
+        run: |
+          sudo mkdir -p /opt/pw-browsers
+          sudo chown -R "$USER:$USER" /opt/pw-browsers
+          npx playwright install --with-deps chromium
+
+      - name: Prove deployed evidence in real browsers
+        if: ${{ steps.sync.outputs.state == 'PUBLISHED' }}
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+          EXPECTED_WORLDS_GENERATED_AT: ${{ steps.sync.outputs.worlds_generated_at }}
+          EXPECTED_SYSTEMS_GENERATED_AT: ${{ steps.sync.outputs.systems_generated_at }}
+          JUSSCO_URLS: https://jussco.company,https://www.jussco.company
+        run: node scripts/sync-jussco-portfolio-evidence.mjs --live-proof
+
+      - name: Record blocked workflow-stage evidence without asserting credential revocation
+        if: ${{ failure() }}
+        env:
+          FAILED_JOB_STATUS: ${{ job.status }}
+          MINT_STEP_OUTCOME: ${{ steps.mint.outcome }}
+          FCR_RUN_ID: ${{ github.run_id }}
+          FCR_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -s "$PORTFOLIO_SYNC_RECEIPT"; then
+            echo "Existing evidence receipt preserved."
+            exit 0
+          fi
+          mkdir -p "$(dirname "$PORTFOLIO_SYNC_RECEIPT")"
+          jq -n \
+            --arg run "$FCR_RUN_ID" \
+            --arg sha "$FCR_HEAD_SHA" \
+            --arg status "$FAILED_JOB_STATUS" \
+            --arg mint "$MINT_STEP_OUTCOME" \
+            '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,mintStepOutcome:$mint,bindingOrigin:"UNKNOWN_FROM_WORKFLOW",providerCredentialValidity:"NOT_EVALUATED_BY_THIS_RECEIPT",sourceVerified:false,liveVerified:false}' \
+            > "$PORTFOLIO_SYNC_RECEIPT"
+
+      - name: Upload aggregate observation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: portfolio-evidence-sync-${{ github.run_id }}
+          path: artifacts/portfolio-evidence-sync/receipt.json
+          if-no-files-found: warn
+          retention-days: 30

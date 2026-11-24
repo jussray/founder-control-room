@@ -13,6 +13,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 import express from 'express';
 import request from 'supertest';
 import { projectsRouter } from '../projects.js';
+import { boundFounderRow } from './founderAuthFixture.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
@@ -26,13 +27,11 @@ function app() {
 }
 
 function authSuccess() {
-  mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: FOUNDER_EMAIL } }, error: null });
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } }, error: null });
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }) }) }),
-  };
+  return boundFounderRow(FOUNDER_EMAIL, 'u1');
 }
 
 beforeEach(() => vi.clearAllMocks());

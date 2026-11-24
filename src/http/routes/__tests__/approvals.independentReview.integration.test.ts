@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -115,11 +116,7 @@ function buildApp() {
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'founder-user'),
   };
 }
 
@@ -133,7 +130,7 @@ function twoEqUpdate(error: { message: string } | null = null) {
 
 function authSuccess() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
@@ -141,7 +138,9 @@ function authSuccess() {
 function providerDefaults() {
   mockProviderConfigurationError.mockReturnValue(null);
   mockProviderForProject.mockReturnValue(provider);
-  mockResolveRef.mockResolvedValue(HEAD_SHA);
+  mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+    ref === 'main' ? BASE_SHA : HEAD_SHA
+  ));
   mockGetPullRequestReviewContext.mockResolvedValue({
     number: 470,
     repository: 'jussray/founder-control-room',
@@ -491,6 +490,35 @@ describe('FCR independent review merge membrane', () => {
       founderIdentity: FOUNDER_EMAIL,
     });
     expect(Date.parse(response.body.result.founderFinalReview.approvedAt)).toBeGreaterThanOrEqual(before);
+  });
+
+  it('fails closed when the reviewed base moves before FCR integration', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    const movedBaseSha = 'c'.repeat(40);
+    mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+      ref === 'main' ? movedBaseSha : HEAD_SHA
+    ));
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'founder-final-base-moved',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Base moved after verification/);
+    expect(mockResolveRef).toHaveBeenCalledWith('founder-control-room', 'main');
+    expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
   it('fails closed after deterministic review when founder-final confirmation is missing', async () => {
