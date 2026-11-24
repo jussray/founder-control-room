@@ -1,0 +1,30 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://jussco.company/#organization",
+      "name": "Juss & Co",
+      "url": "https://jussco.company"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://foundercontrolroom.org/#website",
+      "name": "Founder Control Room",
+      "url": "https://foundercontrolroom.org",
+      "publisher": {
+        "@id": "https://jussco.company/#organization"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://foundercontrolroom.org/#application",
+      "name": "Founder Control Room",
+      "url": "https://foundercontrolroom.org",
+      "description": "Standalone founder operating environment for governance and evidence",
+      "publisher": {
+        "@id": "https://jussco.company/#organization"
+      }
+    }
+  ]
+}

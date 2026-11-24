@@ -1,0 +1,15 @@
+{
+  "protocol": "JSC-ADRP",
+  "version": "1.0.0-draft",
+  "project": "founder-control-room",
+  "name": "Founder Control Room",
+  "url": "https://foundercontrolroom.org",
+  "description": "Standalone founder operating environment for governance and evidence",
+  "useCases": [
+    "Governed actions and approvals",
+    "Engineering evidence and release control"
+  ],
+  "publicationStatus": "draft",
+  "verifiedCapabilities": [],
+  "evidence": []
+}
