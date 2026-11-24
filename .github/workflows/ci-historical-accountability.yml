@@ -28,3 +28,11 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/ci-history-audit.mjs
+      - name: Preserve historical CI observation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: historical-ci-observation-${{ github.run_id }}
+          path: artifacts/ci-historical-accountability.json
+          if-no-files-found: warn
+          retention-days: 14

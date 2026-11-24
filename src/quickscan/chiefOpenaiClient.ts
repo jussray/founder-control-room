@@ -1,3 +1,10 @@
+import {
+  runStructuredJson,
+  StructuredProviderError,
+  type StructuredJsonResult,
+  type StructuredProviderConfig,
+  type StructuredProviderName,
+} from '../aiRuntime/structuredProvider.js';
 import type { ChiefQuickScanRecommendation } from './contracts.js';
 import {
   QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
@@ -25,7 +32,7 @@ interface JsonRecord {
   [key: string]: unknown;
 }
 
-export type QuickScanChiefProvider = 'deterministic-kernel' | 'local-ollama' | 'openai';
+export type QuickScanChiefProvider = 'deterministic-kernel' | 'local-ollama' | 'openai' | 'anthropic';
 
 export interface QuickScanChiefProvenance {
   provider: QuickScanChiefProvider;
@@ -439,11 +446,131 @@ async function runLocalOllama(
   };
 }
 
+function providerName(value: string | undefined, fallback: StructuredProviderName): StructuredProviderName {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'openai' || normalized === 'anthropic') return normalized;
+  throw new QuickScanChiefProviderError(`Unsupported QuickScan Chief provider: ${normalized}`, 'MODEL_PROVIDER_INVALID');
+}
+
+function providerConfig(
+  env: NodeJS.ProcessEnv,
+  provider: StructuredProviderName,
+  required: boolean,
+): StructuredProviderConfig | null {
+  if (provider === 'openai') {
+    const apiKey = env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      if (required) {
+        throw new QuickScanChiefProviderError('OPENAI_API_KEY is not configured for QuickScan Chief', 'OPENAI_NOT_CONFIGURED');
+      }
+      return null;
+    }
+    return {
+      provider,
+      apiKey,
+      model: env.QUICKSCAN_CHIEF_MODEL?.trim() || DEFAULT_MODEL,
+      baseUrl: env.OPENAI_API_BASE_URL?.trim(),
+    };
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  const model = env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL?.trim();
+  if (!apiKey || !model) {
+    if (required) {
+      throw new QuickScanChiefProviderError(
+        'ANTHROPIC_API_KEY and QUICKSCAN_CHIEF_ANTHROPIC_MODEL are required for Anthropic QuickScan Chief',
+        'ANTHROPIC_NOT_CONFIGURED',
+      );
+    }
+    return null;
+  }
+  return {
+    provider,
+    apiKey,
+    model,
+    baseUrl: env.ANTHROPIC_API_BASE_URL?.trim(),
+  };
+}
+
+function providerChain(env: NodeJS.ProcessEnv): StructuredProviderConfig[] {
+  const primaryName = providerName(env.QUICKSCAN_CHIEF_PROVIDER, 'openai');
+  const primary = providerConfig(env, primaryName, true);
+  if (!primary) return [];
+
+  const fallbackRaw = env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim();
+  if (!fallbackRaw) return [primary];
+  const fallbackName = providerName(fallbackRaw, primaryName);
+  if (fallbackName === primaryName) return [primary];
+  const fallback = providerConfig(env, fallbackName, false);
+  return fallback ? [primary, fallback] : [primary];
+}
+
+export type QuickScanChiefDataRecipient = 'local-ollama' | 'openai' | 'anthropic';
+
+/** All configured data recipients, including possible retry/failover destinations. */
+export function quickScanChiefDataRecipients(env: NodeJS.ProcessEnv = process.env): QuickScanChiefDataRecipient[] {
+  const explicit = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase();
+  if (explicit === 'anthropic') {
+    const recipients: QuickScanChiefDataRecipient[] = ['anthropic'];
+    if (env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim().toLowerCase() === 'openai'
+      && env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+    return recipients;
+  }
+  if (explicit && explicit !== 'openai') return [];
+  const recipients: QuickScanChiefDataRecipient[] = [];
+  if (selectFreeFirstCapability([localCandidate(env)], qualityRequirements(env))) recipients.push('local-ollama');
+  if (env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+  return recipients;
+}
+
 export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanChiefDependencies = {}) {
   const env = dependencies.env ?? process.env;
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runQuickScanChief(input: QuickScanChiefPromptInput): Promise<QuickScanChiefResult> {
+    // An explicit provider selector is required to opt out of free-first routing.
+    const explicitProvider = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase();
+    if (explicitProvider && explicitProvider !== 'openai' && explicitProvider !== 'anthropic') {
+      throw new QuickScanChiefProviderError('Unsupported QuickScan Chief provider selector', 'MODEL_PROVIDER_INVALID');
+    }
+    if (explicitProvider === 'anthropic') {
+      let structured: StructuredJsonResult;
+      try {
+        structured = await runStructuredJson(
+          providerChain(env),
+          {
+            schemaName: 'quickscan_chief_output',
+            schema: QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
+            systemPrompt: QUICKSCAN_CHIEF_SYSTEM_PROMPT,
+            userPrompt: quickScanChiefUserPrompt(input),
+            maxOutputTokens: 800,
+          },
+          {
+            fetchFn,
+            timeoutMs: timeoutMs(env),
+            maxResponseBytes: MAX_RESPONSE_BYTES,
+          },
+        );
+      } catch (error) {
+        if (error instanceof QuickScanChiefProviderError) throw error;
+        if (error instanceof StructuredProviderError) {
+          throw new QuickScanChiefProviderError(error.message, error.code, error.status);
+        }
+        throw error;
+      }
+      return {
+        recommendation: modelOutput(structured.output),
+        provenance: {
+          provider: structured.provider,
+          model: structured.model,
+          responseId: structured.responseId,
+          promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+          fallbackReason: structured.provider !== 'anthropic' ? 'EXPLICIT_PROVIDER_FAILOVER' : null,
+        },
+      };
+    }
+
     const requirements = qualityRequirements(env);
     let candidates = providerCandidates(env);
     let decisionTrace = traceCapabilityDecision(candidates, requirements);

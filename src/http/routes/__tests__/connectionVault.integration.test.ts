@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -29,18 +30,14 @@ function app() {
 
 function authSuccess() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
 
 function founderUsersRow() {
   return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
+    ...boundFounderRow(FOUNDER_EMAIL, 'founder-user'),
   };
 }
 
@@ -137,6 +134,54 @@ describe('Connection Vault founder administration', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('raw credential values are not accepted');
+  });
+
+  it('rejects a credential-shaped secretRef even when it is syntactically a URI', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+
+    const res = await request(app())
+      .post('/mcp/vault/bindings')
+      .set('Authorization', 'Bearer founder-session')
+      .send({
+        projectSlug: PROJECT_SLUG,
+        connectionId: CONNECTION_ID,
+        environment: 'production',
+        name: 'DATABASE_URL',
+        kind: 'secret',
+        storageProvider: 'cloudflare-secrets-store',
+        secretRef: `postgres://app:${['hun', 'ter', '2'].join('')}@db.example.test:5432/app`,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('opaque reference');
+  });
+
+  it('rejects a raw credential value stored under kind=variable', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+
+    const res = await request(app())
+      .post('/mcp/vault/bindings')
+      .set('Authorization', 'Bearer founder-session')
+      .send({
+        projectSlug: PROJECT_SLUG,
+        connectionId: CONNECTION_ID,
+        environment: 'production',
+        name: 'DEPLOY_REGION',
+        kind: 'variable',
+        storageProvider: 'cloudflare-secrets-store',
+        variableValue: `ghp_${'a'.repeat(36)}`,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('variableValue looks like raw credential material');
   });
 });
 
