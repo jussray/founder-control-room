@@ -65,6 +65,24 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(assertions).not.toContain('CREATE TABLE');
   });
 
+
+  it('executes the unchanged Think Tank vault migration with isolated auth dependencies and forced-RLS readback', () => {
+    const fixture = readFileSync('supabase/preview-fixtures/20261121052703_think_tank_private_idea_records_20261121.sql', 'utf8');
+    const assertions = readFileSync('supabase/preview-assertions/20261121052703_think_tank_private_idea_records_20261121.sql', 'utf8');
+    const migration = readFileSync('supabase/migrations/20261121052703_think_tank_private_idea_records_20261121.sql', 'utf8');
+    expect(fixture).toContain('CREATE TABLE IF NOT EXISTS auth.users');
+    expect(fixture).toContain('auth.uid() RETURNS uuid');
+    expect(fixture).toContain('auth.jwt() RETURNS jsonb');
+    expect(fixture).toContain('CREATE ROLE %I NOLOGIN');
+    expect(migration).toContain('FORCE ROW LEVEL SECURITY');
+    expect(assertions).toContain('relforcerowsecurity');
+    expect(assertions).toContain('has_table_privilege');
+    expect(assertions).toContain('is_anonymous');
+    expect(assertions).toContain("polcmd NOT IN ('r','a','w')");
+    expect(workflow).toContain('-f "$PREVIEW_FIXTURE" -f "$migration"');
+    expect(workflow).toContain('-f "$PREVIEW_ASSERT"');
+  });
+
   it('reconciles close cleanup against the actual Neon preview branch instead of the final PR diff', () => {
     expect(workflow).toContain('target_name="preview/pr-${PR_NUMBER}"');
     expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
