@@ -123,6 +123,12 @@ for (const [label, body] of [
     'Codex Material Themes',
     'Codex Coordinator',
     'Codex Dev Workflows',
+    'Data',
+    'Shopify App Builder',
+    'Stripe',
+    'AWS Core',
+    'Game Development Studio',
+    'Faceless Video Maker',
   ];
   const missing = required.filter((token) => !body.includes(token));
   if (missing.length) {
