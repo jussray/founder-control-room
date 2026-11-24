@@ -42,21 +42,19 @@ function app() {
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({
-          data: {
-            email: FOUNDER_EMAIL,
-            user_id: 'workspace-founder',
-            account_role: 'workspace_owner',
-            workspace_id: '11111111-1111-4111-8111-111111111111',
-          },
-          error: null,
-        }),
-      }),
+  const chain = {
+    eq: (_column: string, _value: unknown): unknown => chain,
+    maybeSingle: () => Promise.resolve({
+      data: {
+        email: FOUNDER_EMAIL,
+        user_id: 'workspace-founder',
+        account_role: 'workspace_owner',
+        workspace_id: '11111111-1111-4111-8111-111111111111',
+      },
+      error: null,
     }),
   };
+  return { select: () => chain };
 }
 
 function emptyProjectLookup() {

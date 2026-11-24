@@ -75,7 +75,10 @@ requireText('ui', 'HubSpot onboarding slot', 'value="hubspot"');
 requireText('ui', 'Playwright onboarding slot', 'value="playwright"');
 requireText('ui', 'workspace bootstrap endpoint', "api('/onboarding/bootstrap'");
 requireText('ui', 'workspace state endpoint', "api('/onboarding/state')");
-requireText('ui', 'composer payload', 'controlRoom:{projectType:');
+if (!/controlRoom\s*:\s*\{\s*projectType\s*:/.test(files.ui)) {
+  errors.push('composer payload: missing structured controlRoom projectType');
+}
+requireText('ui', 'platform/customer session isolation', "customerSurface ? '/workspace/me' : '/auth/me'");
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "api('/auth/password'");

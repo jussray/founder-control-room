@@ -340,7 +340,9 @@ function openOnboarding() {
 }
 
 async function session() {
-  const response = await fetch('/workspace/me', { credentials: 'same-origin', cache: 'no-store' });
+  const customerSurface = location.pathname === '/app' || location.pathname.startsWith('/app/');
+  const response = await fetch(customerSurface ? '/workspace/me' : '/auth/me',
+    { credentials: 'same-origin', cache: 'no-store' });
   if (!response.ok) {
     out.hidden = false;
     inside.hidden = true;

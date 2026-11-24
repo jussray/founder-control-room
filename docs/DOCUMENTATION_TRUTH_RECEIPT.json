@@ -1089,7 +1089,39 @@
     {
       "path": "scripts/verify-founder-onboarding.mjs",
       "claims": [
-        "Original founder enrollment remains preapproved with shouldCreateUser false, while isolated workspace public customer enrollment uses shouldCreateUser true only after verified identity and service-controlled provisioning."
+        "Original founder enrollment remains preapproved with shouldCreateUser false, while isolated workspace public customer enrollment uses shouldCreateUser true only after verified identity and service-controlled provisioning.",
+        "The onboarding verification must accept formatted but semantically equivalent structured Chief Composer payloads while pinning platform/customer session API separation, never weakening confirmed identity or customer-only provisioning."
+      ]
+    },
+    {
+      "path": "src/http/routes/onboardingAssets/controlRoomJs.ts",
+      "claims": [
+        "The platform founder homepage must load /auth/me and only the public customer /app workspace surface may load /workspace/me; the two authority planes must never be silently interchanged."
+      ]
+    },
+    {
+      "path": ".github/workflows/neon-pr-branches.yml",
+      "claims": [
+        "Neon provider preview allocation must require an explicit fixture, contract or assertion, and unfixtured Supabase-owned auth/schema migrations must be labeled NOT_APPLICABLE for Neon while the separate required local Supabase Migration lint continues to verify real migrations.",
+        "When a Neon compatibility contract exists, provider preview must execute the actual SQL migration and check postconditions, not merely run the compatibility fixture or write a synthetic success receipt."
+      ]
+    },
+    {
+      "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
+      "claims": [
+        "Regression tests must distinguish canonical Supabase migration proof from fixture-scoped Neon previews, and fail if the provider-only branch attempts bare-Postgres replay of auth-dependent SQL."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts",
+      "claims": [
+        "A workspace owner authentication fixture must support both chained server-side email and immutable user-id predicates and never force weakening query scoping to make the test pass."
+      ]
+    },
+    {
+      "path": "src/tasks/__tests__/workspaceTaskQueue.contract.test.ts",
+      "claims": [
+        "SQL contract assertions must verify the exact owner, workspace, claimed state and expiry predicates using a working multiline regex, not escaped literals that silently skip the real clause."
       ]
     }
   ]
