@@ -9,13 +9,16 @@
 import { createHash } from 'node:crypto';
 import { relayBetweenOperators } from './operatorRelayBridge.js';
 import type { OperatorRelayAdapters } from './operatorRelayDispatch.js';
-import type {
-  OperatorRelayUsageV1,
-  RelayCapability,
-  RelayOperatorId,
-  RelaySensitivity,
-  RelaySourceId,
-  RelayStatus,
+import {
+  OPERATOR_RELAY_RESPONSE_CONTRACT,
+  operatorRelayResponseHash,
+  type OperatorRelayResponseV1,
+  type OperatorRelayUsageV1,
+  type RelayCapability,
+  type RelayOperatorId,
+  type RelaySensitivity,
+  type RelaySourceId,
+  type RelayStatus,
 } from './operatorRelay.js';
 
 export const COUNCIL_ROUND_CONTRACT = 'fcr.council-round.v1' as const;
@@ -38,6 +41,8 @@ export interface CouncilHop {
   answerSha256: string;
   answer: string;
   evidenceRefs: string[];
+  unresolved: string[];
+  authorityRequested: 'none';
   liveProviderEvidence: boolean;
   /** Provider-reported token usage copied from the hash-bound relay response; measurement only. */
   usage?: OperatorRelayUsageV1;
@@ -49,10 +54,24 @@ export interface CouncilInterruption {
   operator: RelayOperatorId;
   reason: string;
   status: RelayStatus | null;
+  relayId: string | null;
+  fromOperator: RelaySourceId | null;
   requestHash: string | null;
   responseHash: string | null;
+  answer: string | null;
   evidenceRefs: string[];
+  unresolved: string[];
+  authorityRequested: 'none' | null;
+  completedAt: string | null;
   liveProviderEvidence: boolean;
+  /** Provider-reported token usage copied from a hash-bound relay response when one exists. */
+  usage?: OperatorRelayUsageV1;
+}
+
+export interface PersistedRelayResponseRecovery {
+  responses: OperatorRelayResponseV1[];
+  ignoredLegacyProjections: number;
+  rejectedInvalidProjections: number;
 }
 
 export interface CouncilTranscript {
@@ -101,6 +120,104 @@ export function sha256(text: string): string {
 function normalizeSourceRef(value: string | null | undefined): string | null {
   const normalized = value?.trim() ?? '';
   return normalized || null;
+}
+
+
+function completedResponseFromHop(hop: CouncilHop): OperatorRelayResponseV1 | 'legacy' | 'invalid' {
+  const raw = hop as CouncilHop & { unresolved?: unknown; authorityRequested?: unknown };
+  if (!Array.isArray(raw.unresolved) || !raw.unresolved.every((item) => typeof item === 'string') || raw.authorityRequested === undefined) {
+    return 'legacy';
+  }
+  if (raw.authorityRequested !== 'none') return 'invalid';
+
+  const identity: Omit<OperatorRelayResponseV1, 'responseHash'> = {
+    contract: OPERATOR_RELAY_RESPONSE_CONTRACT,
+    relayId: hop.relayId,
+    requestHash: hop.requestHash,
+    fromOperator: hop.toOperator,
+    toOperator: hop.fromOperator,
+    status: 'completed',
+    answer: hop.answer,
+    evidenceRefs: [...hop.evidenceRefs],
+    unresolved: [...raw.unresolved],
+    authorityRequested: 'none',
+    completedAt: hop.completedAt,
+    ...(hop.usage ? { usage: hop.usage } : {}),
+  };
+  if (operatorRelayResponseHash(identity) !== hop.responseHash) return 'invalid';
+  return { ...identity, responseHash: hop.responseHash };
+}
+
+function interruptedResponse(interruption: CouncilInterruption): OperatorRelayResponseV1 | 'legacy' | 'invalid' | null {
+  if (interruption.status !== 'blocked' && interruption.status !== 'failed') return null;
+  const raw = interruption as CouncilInterruption & {
+    relayId?: unknown;
+    fromOperator?: unknown;
+    answer?: unknown;
+    unresolved?: unknown;
+    authorityRequested?: unknown;
+    completedAt?: unknown;
+  };
+  if (
+    typeof raw.relayId !== 'string'
+    || typeof raw.fromOperator !== 'string'
+    || typeof interruption.requestHash !== 'string'
+    || typeof interruption.responseHash !== 'string'
+    || typeof raw.answer !== 'string'
+    || !Array.isArray(raw.unresolved)
+    || !raw.unresolved.every((item) => typeof item === 'string')
+    || raw.authorityRequested === undefined
+    || typeof raw.completedAt !== 'string'
+  ) {
+    return 'legacy';
+  }
+  if (raw.authorityRequested !== 'none') return 'invalid';
+
+  const identity: Omit<OperatorRelayResponseV1, 'responseHash'> = {
+    contract: OPERATOR_RELAY_RESPONSE_CONTRACT,
+    relayId: raw.relayId,
+    requestHash: interruption.requestHash,
+    fromOperator: interruption.operator,
+    toOperator: raw.fromOperator as RelaySourceId,
+    status: interruption.status,
+    answer: raw.answer,
+    evidenceRefs: [...interruption.evidenceRefs],
+    unresolved: [...raw.unresolved],
+    authorityRequested: 'none',
+    completedAt: raw.completedAt,
+    ...(interruption.usage ? { usage: interruption.usage } : {}),
+  };
+  if (operatorRelayResponseHash(identity) !== interruption.responseHash) return 'invalid';
+  return { ...identity, responseHash: interruption.responseHash };
+}
+
+/**
+ * Recover hash-verifiable operator relay outcome receipts from a persisted Council transcript.
+ *
+ * New transcripts persist every response field that participates in the canonical response hash.
+ * Historical Council projections that predate those fields are deliberately excluded instead of
+ * being upgraded into synthetic receipts. Provider exceptions with no response also remain absent.
+ */
+export function recoverPersistedRelayResponses(transcript: CouncilTranscript): PersistedRelayResponseRecovery {
+  const responses: OperatorRelayResponseV1[] = [];
+  let ignoredLegacyProjections = 0;
+  let rejectedInvalidProjections = 0;
+
+  for (const hop of transcript.hops) {
+    const recovered = completedResponseFromHop(hop);
+    if (recovered === 'legacy') ignoredLegacyProjections += 1;
+    else if (recovered === 'invalid') rejectedInvalidProjections += 1;
+    else responses.push(recovered);
+  }
+
+  if (transcript.interruption) {
+    const recovered = interruptedResponse(transcript.interruption);
+    if (recovered === 'legacy') ignoredLegacyProjections += 1;
+    else if (recovered === 'invalid') rejectedInvalidProjections += 1;
+    else if (recovered) responses.push(recovered);
+  }
+
+  return { responses, ignoredLegacyProjections, rejectedInvalidProjections };
 }
 
 function verifyResumeLineage(input: CouncilRoundInput, prior: CouncilTranscript): void {
@@ -169,9 +286,15 @@ export async function runCouncilRound(
         operator: seat.operator,
         reason: error instanceof Error ? error.message.slice(0, 300) : 'relay failed',
         status: null,
+        relayId: null,
+        fromOperator: null,
         requestHash: null,
         responseHash: null,
+        answer: null,
         evidenceRefs: [],
+        unresolved: [],
+        authorityRequested: null,
+        completedAt: null,
         liveProviderEvidence: false,
       };
       break;
@@ -193,10 +316,17 @@ export async function runCouncilRound(
         operator: seat.operator,
         reason: `seat returned ${response.status}`,
         status: response.status,
+        relayId: request.relayId,
+        fromOperator: from,
         requestHash: request.requestHash,
         responseHash: response.responseHash,
+        answer: response.answer,
         evidenceRefs,
+        unresolved: [...response.unresolved],
+        authorityRequested: response.authorityRequested,
+        completedAt: response.completedAt,
         liveProviderEvidence,
+        ...(response.usage ? { usage: response.usage } : {}),
       };
       break;
     }
@@ -214,6 +344,8 @@ export async function runCouncilRound(
       answerSha256: sha256(response.answer),
       answer: response.answer,
       evidenceRefs,
+      unresolved: [...response.unresolved],
+      authorityRequested: response.authorityRequested,
       liveProviderEvidence,
       completedAt: response.completedAt,
       ...(response.usage ? { usage: response.usage } : {}),

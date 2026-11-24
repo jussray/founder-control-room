@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import type { Session } from '@supabase/supabase-js';
 import type { Response } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -51,7 +52,7 @@ const SESSION = {
   access_token: ACCESS_TOKEN,
   refresh_token: REFRESH_TOKEN,
   expires_at: 2_000_000_000,
-  user: { id: '11111111-1111-4111-8111-111111111111', email: EMAIL },
+  user: { id: '11111111-1111-4111-8111-111111111111', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' },
 };
 
 function app() {
@@ -129,11 +130,11 @@ describe('POST /auth/password provider failure', () => {
     vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
     vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY);
     mockGetUser.mockResolvedValue({
-      data: { user: { id: SESSION.user.id, email: EMAIL } },
+      data: { user: { id: SESSION.user.id, email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     mockSetSession.mockResolvedValue({
-      data: { session: SESSION, user: { id: SESSION.user.id, email: EMAIL } },
+      data: { session: SESSION, user: { id: SESSION.user.id, email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
     mockGetSession.mockResolvedValue({ data: { session: SESSION }, error: null });
@@ -141,11 +142,7 @@ describe('POST /auth/password provider failure', () => {
       if (table === 'founder_browser_sessions') return browserSessionTable();
       if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
       return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: { email: EMAIL }, error: null }),
-          }),
-        }),
+        ...boundFounderRow(EMAIL, '11111111-1111-4111-8111-111111111111'),
       };
     });
   });
