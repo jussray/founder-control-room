@@ -998,7 +998,8 @@
     {
       "path": "src/http/routes/projects.ts",
       "claims": [
-        "`POST /projects/:slug/connections` must reject credential-shaped `config` or `secretRef` with a 400 before any project lookup or `project_connections` write, and the response must not echo the submitted value. It does not redact, migrate, or re-validate existing stored rows."
+        "`POST /projects/:slug/connections` must reject credential-shaped `config` or `secretRef` with a 400 before any project lookup or `project_connections` write, and the response must not echo the submitted value. It does not redact, migrate, or re-validate existing stored rows.",
+        "`src/http/routes/projects.ts` must retain the current nested credential detection and reject any raw secret material before a project connection database write; no secret value may appear in rejection responses."
       ]
     },
     {
@@ -1011,6 +1012,36 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/http/runtimeBoundary.ts",
+      "claims": [
+        "`src/http/runtimeBoundary.ts` must classify Cloudflare Worker execution and both production environment markers as founder-protected diagnostic scope; runtime identity itself never grants authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/debug.ts",
+      "claims": [
+        "`src/http/routes/debug.ts` must require a verified current founder session before exposing key-presence booleans from Cloudflare or Node production; diagnostic responses must never reveal secret values."
+      ]
+    },
+    {
+      "path": "src/worker/cf-entry.ts",
+      "claims": [
+        "`src/worker/cf-entry.ts` must publish Cloudflare Worker runtime identity before asynchronously importing Express, without granting privileged authority or weakening the existing worker handler."
+      ]
+    },
+    {
+      "path": "public/control-room/opaque-session-bootstrap.js",
+      "claims": [
+        "`public/control-room/opaque-session-bootstrap.js` must remove the obsolete confirmWrite browser affordance and strip that non-authorizing boolean from terminal run requests; L99 approval receipts remain server verified."
+      ]
+    },
+    {
+      "path": "docs/LOCAL_WORKSPACE.md",
+      "claims": [
+        "`docs/LOCAL_WORKSPACE.md` must state that write and verify terminal commands require fresh exact-action L99 ApprovalReceipt, never a legacy confirmWrite checkbox."
       ]
     }
   ]

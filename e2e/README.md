@@ -134,6 +134,14 @@ harness.
    `state.terminal.selectedCommandId` and `state.terminal.lastRun` and
    rendering the result from state, the same way every other panel in this
    app already has to.
+10. **The legacy terminal UI presented `confirmWrite` as if a checkbox
+    could grant write authority.** The backend had already moved to the L99
+    ApprovalReceipt model, so this was a product-authority mismatch rather
+    than a backend bypass. The authoritative opaque-session compatibility
+    bootstrap now removes that legacy affordance, strips the obsolete field
+    from terminal-run requests, and tells the founder that write/verify
+    execution requires a fresh L99 approval receipt. It does not create or
+    broaden execution authority.
 
 Also surfaced, and worth knowing even though it isn't a bug: **the frontend
 has no live refresh.** A mission that transitions status asynchronously
@@ -146,11 +154,11 @@ this the way a founder would have to: click Refresh, reopen the mission.
 
 Anything requiring a real Supabase or Cloudflare account (production auth,
 deployment, migrations), and the guarded terminal's *write*-risk and
-*verify*-risk command paths (only a read-risk command — `git.head` — is
-exercised here; write-risk additionally requires `confirmWrite: true` and a
-stricter `sandboxed`-only status window, and verify-risk commands like
-`npm test` would need real dependencies installed, which this harness
-doesn't attempt). Real founder credentials and a real production
+*verify*-risk command execution. This harness intentionally exercises only a
+read-risk command (`git.head`). Write/verify commands require a fresh L99
+ApprovalReceipt and the applicable mission/status/exact-head checks; this
+browser harness does not fabricate such authority or pretend that a local
+checkbox can supply it. Real founder credentials and a real production
 environment need the founder's own account access — those cannot be faked
 without pretending to have authority nobody granted.
 

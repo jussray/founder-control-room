@@ -12,8 +12,16 @@
  * - Safe to call from Playwright in CI with real secrets wired
  */
 import { Router } from 'express';
+import { requiresFounderForDebugSurface } from '../runtimeBoundary.js';
+import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const debugRouter = Router();
+
+// Worker and production diagnostics require an authenticated founder session.
+debugRouter.use((req, res, next) => {
+  if (!requiresFounderForDebugSurface()) return next();
+  return requireFounder(req as FounderRequest, res, next);
+});
 
 debugRouter.get('/provider', (_req, res) => {
   const openaiKeyPresent = typeof process.env.OPENAI_API_KEY === 'string' &&
@@ -55,5 +63,6 @@ debugRouter.get('/provider', (_req, res) => {
     perplexityKeyPresent,
     deepseekKeyPresent,
     nodeEnv: process.env.NODE_ENV ?? 'unknown',
+    environment: process.env.ENVIRONMENT ?? 'unknown',
   });
 });

@@ -19,6 +19,7 @@ import { httpServerHandler } from 'cloudflare:node';
 import { env } from 'cloudflare:workers';
 import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
+import { setCloudflareWorkerRuntime } from '../http/runtimeBoundary.js';
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { mountFcrCommerceIngress } from '../http/fcrCommerceIngress.js';
 import {
@@ -35,6 +36,9 @@ import { assertScheduledTaskResults } from './scheduledTaskResults.js';
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
 validateWorkerEnv(env);
+
+// Runtime identity, not authorization. Mark before the Express import.
+setCloudflareWorkerRuntime(true);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
 const app = express();

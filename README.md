@@ -854,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+## PR #841 residual founder security boundaries (source candidate)
+
+The legacy Control Room terminal compatibility layer removes `confirmWrite` as an authority signal. Production/Cloudflare diagnostics require current founder authentication before showing provider key-presence booleans, and the Cloudflare entry marks runtime context before loading Express. The current project-connection secret detector remains stronger than the older duplicated module and rejects raw credentials prior to connection writes. This source-only reconciliation grants no terminal execution, provider mutation, merge, deployment, or CI proof; all privileges remain subject to independently verified exact-action L99 approval and production runtime proof.
