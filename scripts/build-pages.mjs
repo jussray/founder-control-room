@@ -52,6 +52,7 @@ const requiredAssets = [
   'control-room/pa-funding.js',
   'control-room/security.html',
   'control-room/security.js',
+  'control-room/security-skill-catalog.mjs',
   'control-room/security.css',
   'control-room/quickscan.html',
   'control-room/quickscan.js',
