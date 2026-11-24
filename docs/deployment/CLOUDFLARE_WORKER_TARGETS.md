@@ -1,9 +1,5 @@
 # Cloudflare Deployment Targets
 
-## Protect Me security evidence intake — source configuration only
-
-The canonical FCR Worker declares `FCR_PROTECT_EVENT_INGEST_SECRET` as optional for the evidence-only Protect Me event receiver. This does not install the secret, configure an event sender, or establish live delivery. Keep existing startup and deployment authority requirements unchanged.
-
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -189,7 +185,7 @@ That hook makes the repository's production-authority boundary executable before
 
 - native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
 - native builds must retain branch and build UUID evidence;
-- native Workers Builds may run non-promoting local `wrangler types` generation or `wrangler versions upload`; these are the ceilings the hook permits, not what the configured build does — see the November 15, 2026 note: the observed main build trigger runs the verification-only script and uploads no Worker version;
+- native Workers Builds may run only the non-promoting `wrangler versions upload` lane; this is the ceiling the hook permits, not what the configured build does — see the November 15, 2026 note: the observed main build trigger runs the verification-only script and uploads no Worker version;
 - native `wrangler deploy` fails closed before production promotion;
 - GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
 - ordinary CI/local verification does not become production authority.
@@ -335,3 +331,8 @@ The diagnostic workflow may inspect the production deployment credential only af
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Protect Me source registration
+
+A new signed security event ingress may be mounted by the authorized FCR Worker only after exact target deploy and independent Cloudflare readback. Adding a route, optional binding or attack-policy JSON is not a deployed endpoint, protection verification or founder approval.

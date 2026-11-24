@@ -1,9 +1,5 @@
 # Cloudflare Reasoning Contract
 
-## Protect Me security evidence intake — source configuration only
-
-The optional `FCR_PROTECT_EVENT_INGEST_SECRET` is a provider-held credential for redacted, signed Protect Me 2 observations only. Never publish it as a plaintext Worker variable, reuse deployment credentials, or make it a core startup prerequisite. Missing credentials leave the feature unavailable; source wiring is not a provider observation.
-
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -287,7 +283,7 @@ The reconciliation receipt therefore keeps `provider_deploy_succeeded`, `email_t
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits non-promoting `wrangler types` verification and `wrangler versions upload --config wrangler.worker.toml`. Both remain non-promoting; `wrangler types` is not a deployment attempt. A native `wrangler deploy` remains rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` lane. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
@@ -373,3 +369,8 @@ The production Cloudflare credential diagnostic is founder-dispatched only. It c
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Protect Me boundary / Cloudflare runtime
+
+Source-only event ingest must stay isolated from public signup, founder identity, owner-only commands and Cloudflare Access rules. A signed event is evidence requiring independent validation, not a command to mutate a Worker, Access policy or vendor account. Server secrets remain private and activation requires exact deployed Worker readback.

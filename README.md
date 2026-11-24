@@ -1,9 +1,5 @@
 # Founder Control Room
 
-## Protect Me security evidence intake — source configuration only
-
-Protect Me 2 event ingress is a source-level, evidence-only integration. The dedicated `FCR_PROTECT_EVENT_INGEST_SECRET` is declared optional; the receiver stays unavailable without a valid separately provisioned credential. No sender, live event receipt, portfolio coverage, or response authority is established by this declaration.
-
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -858,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Protect Me source security-evidence intake (#979)
+
+The Protect Me HMAC-backed event route and cryptographic coverage proof remain server-only source candidates. Event signatures, bounded body sizes, replay resistance, exact product identifiers and provenance are required before accepting security evidence. Neither event intake nor an ATTACK-48000 policy document authorizes provider operations, account access, public disclosure, merge, deployment, or a claim of completed security coverage. Production ingestion is off unless a separately approved server-side secret and deployment is verified.

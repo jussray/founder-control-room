@@ -1,6 +1,19 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
-`FCR_PROTECT_EVENT_INGEST_SECRET` is an optional server-held credential reserved for the evidence-only Protect Me event receiver. Its absence must not prevent Worker startup. Do not reuse a deployment token, founder session key, or Shield signing key; no value belongs in source, logs, or client configuration.
+## November 2, 2026: prior verification is not revoked by a new input-shape failure
+
+**Founder-reported history:** The GitHub App credential was verified approximately 2–3 months before November 2, 2026. This is preserved as a historical report, not independently reproduced App authentication on the present workflow. An exact dated provider issuer receipt for that prior verification has **not** been recovered in this scoped audit; do not fabricate one.
+
+**Directly observed:** Scheduled FCR portfolio sync run [41399356574](https://github.com/jussray/founder-control-room/actions/runs/41399356574) failed November 2 while normalizing the *effective* `APP_PRIVATE_KEY` with `APP_PRIVATE_KEY_SHAPE_INVALID:unknown`. The key was **present but not recognized as a supported RSA private-key transport**. The job stopped before GitHub App provider authentication; it did not establish that the previously verified App/key was revoked, expired, or rotated incorrectly. The November 1 founder-only shape diagnostic already reported unknown transport, independently of this later run.
+
+**Binding provenance:** The scheduled job specifies `environment: production`, and GitHub Actions uses an environment-scoped secret over a same-named repository secret. Consequently, an old production environment binding could override a more recently updated repository secret; *existence of duplicate secret names and their update dates remain unverified*. The workflow cannot know the originating scope from the injected value, and must not invent one. A syntactically base64-like input alone does not prove valid PEM, DER, issuer identity, or whether it was the key previously verified.
+
+**Action gate:** An authorized GitHub administrator reviews metadata (not secret values) for `APP_ID` and `APP_PRIVATE_KEY` under **Settings → Environments → production → Environment secrets** and **Settings → Secrets and variables → Actions**, including name, update timestamp, and which scope should be authoritative. Do not copy values into code, logs, chat, public issues, or receipts. Do not rotate solely for an input-format failure. Where a fresh secret-safe shape witness is necessary, the existing `.github/workflows/github-app-secret-shape-diagnostic.yml` accepts **only** an actual `jussray` account comment on issue #418, bound to the exact current main SHA and an auditable approval reference; do not simulate that founder identity or trigger it from an untrusted PR.
+
+**Evidence taxonomy:** `historical_user_report` and `observed_current_workflow_shape_failure` are distinct. An unverified secret binding or failed mint leaves provider credential validity **unknown**, not invalid. Candidate PR #988 records `mintStepOutcome`, `bindingOrigin:UNKNOWN_FROM_WORKFLOW`, and `providerCredentialValidity:NOT_EVALUATED_BY_THIS_RECEIPT` when pre-receipt workflow failure occurs.
+
+---
+
 
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
@@ -399,3 +412,8 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 - Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
 - Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
 - Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.
+
+
+### Protect Me ingest secret
+
+`FCR_PROTECT_EVENT_INGEST_SECRET` is an optional server-only HMAC input for a separately deployed, authorized Protect Me event source. Never place the secret in browser code, GitHub source, logs, receipts or public responses. Its registry entry does not enable ingestion, perform any security test or authorize remote provider writes.
