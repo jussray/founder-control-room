@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { receiptClaimsDescribeRequiredDeploymentRemoval } from './documentation-truth-required-deployment-guard.mjs';
+import { hasFreshMeaningfulInvariant } from './documentation-truth-claim-fingerprint.mjs';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -65,6 +66,7 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
   { domain: 'truth-governance', match: /^scripts\/documentation-truth-required-deployment-guard\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/documentation-truth-claim-fingerprint\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^skills\/(?:ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger|urlfix)\/SKILL\.md$/ },
@@ -174,6 +176,38 @@ function meaningfulInvariant(claim, sourcePath) {
     && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
 }
 
+// Union every claim per path: the append-only receipt may name one path in
+// several change entries, and a fresh claim may be appended to any of them.
+function receiptClaimsUnionByPath(changes) {
+  const claimsByPath = new Map();
+  for (const change of Array.isArray(changes) ? changes : []) {
+    if (!change || typeof change !== 'object' || !nonEmptyString(change.path, 300) || !Array.isArray(change.claims)) continue;
+    const claims = claimsByPath.get(change.path) ?? [];
+    claims.push(...change.claims.filter((claim) => nonEmptyString(claim)));
+    claimsByPath.set(change.path, claims);
+  }
+  return claimsByPath;
+}
+
+// Claims already present at the reviewed base. A receipt absent at the base
+// contributes no inherited claims; a base receipt that exists but cannot be
+// read or parsed fails closed because claim freshness cannot be proven.
+function receiptClaimsAtRevision(revision) {
+  try {
+    git('cat-file', '-e', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`);
+  } catch {
+    return new Map();
+  }
+  try {
+    const parsed = JSON.parse(git('show', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid');
+    return receiptClaimsUnionByPath(parsed.changes);
+  } catch {
+    failures.push('documentation truth receipt at the reviewed base must be readable to prove claim freshness');
+    return new Map();
+  }
+}
+
 function documentationReceipt() {
   let parsed;
   try {
@@ -218,6 +252,7 @@ function documentationReceipt() {
   return {
     domains: new Set(Array.isArray(parsed.domains) ? parsed.domains : []),
     claimsByPath,
+    claimsUnionByPath: receiptClaimsUnionByPath(parsed.changes),
   };
 }
 
@@ -236,10 +271,13 @@ if (truthSensitiveChanges.length > 0) {
         failures.push(`documentation truth receipt must name changed domain: ${domain}`);
       }
     }
+    const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
-      const claims = receipt.claimsByPath.get(change.file) ?? [];
+      const claims = receipt.claimsUnionByPath.get(change.file) ?? [];
       if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
         failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
+      } else if (!hasFreshMeaningfulInvariant(claims, baseClaimsByPath.get(change.file) ?? [], (unit) => meaningfulInvariant(unit, change.file))) {
+        failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }
     }
   }

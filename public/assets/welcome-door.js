@@ -6,6 +6,8 @@
   var cfg = {
     sessionUrl: body.dataset.sessionUrl || '/auth/me',
     magicUrl: body.dataset.magicUrl || '/auth/magic-link',
+    memberUrl: body.dataset.memberUrl || '/auth/member/me',
+    memberMagicUrl: body.dataset.memberMagicUrl || '/auth/member/magic-link',
     enterUrl: body.dataset.enterUrl || '/control-room/',
     enabled: body.dataset.enabled !== 'false',
     timeoutMs: 4000
@@ -16,7 +18,7 @@
     checking: 'Checking sign-in service…',
     signed_out: 'Sign-in service: reachable',
     degraded: 'Sign-in service: not reachable',
-    sent: 'Sign-in link sent if the address is on the allowlist'
+    sent: 'If eligible, a sign-in link will arrive in your inbox'
   };
 
   function setState(state) {
@@ -40,7 +42,18 @@
     return withTimeout(fetch(cfg.sessionUrl, {
       credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' }
     }), cfg.timeoutMs).then(function (r) {
-      if (r.status === 401 || r.status === 403) return { state: 'signed_out' };
+      if (r.status === 401 || r.status === 403) {
+        return withTimeout(fetch(cfg.memberUrl, {
+          credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' }
+        }), cfg.timeoutMs).then(function (memberResponse) {
+          if (memberResponse.status === 401 || memberResponse.status === 403) return { state: 'signed_out' };
+          if (!memberResponse.ok) return { state: 'degraded' };
+          return memberResponse.json().then(function (payload) {
+            return payload && payload.success && payload.data && payload.data.member
+              ? { state: 'signed_member' } : { state: 'degraded' };
+          });
+        });
+      }
       if (!r.ok) return { state: 'degraded' };
       return r.json().then(function (j) {
         var founder = j && j.data && j.data.founder;
@@ -52,6 +65,7 @@
   function boot() {
     resolveState().then(function (s) {
       if (s.state === 'signed_in') { location.replace(cfg.enterUrl); return; }
+      if (s.state === 'signed_member') { location.replace('/member/'); return; }
       setState(s.state);
     });
   }
@@ -79,6 +93,31 @@
     });
   });
 
+  $('member-magic').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = $('member-email').value.trim();
+    var err = $('member-formerr');
+    err.hidden = true;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      err.textContent = 'Enter a valid email.'; err.hidden = false; $('member-email').focus(); return;
+    }
+    var btn = $('member-primary'); btn.disabled = true; btn.textContent = 'Sending…';
+    withTimeout(fetch(cfg.memberMagicUrl, {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ email: email })
+    }), cfg.timeoutMs).then(function (r) {
+      if (r.status === 202) {
+        btn.textContent = 'Check your inbox'; $('statusline').textContent = STATUS.sent; return;
+      }
+      btn.disabled = false; btn.textContent = 'Continue to my workspace';
+      if (r.status === 400 || r.status === 429) {
+        err.textContent = r.status === 429 ? 'Too many requests. Try later.' : 'Enter a valid email.';
+        err.hidden = false; return;
+      }
+      setState('degraded');
+    }).catch(function () { btn.disabled = false; setState('degraded'); });
+  });
   $('retry').addEventListener('click', function () { setState('checking'); boot(); });
   boot();
 })();

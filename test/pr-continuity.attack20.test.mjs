@@ -15,6 +15,7 @@ import {
   replaceManagedBlock,
   continuityBlock,
   observedAutoMerge,
+  observedFounderAutoMerge,
   collectRolloverOrder,
   sameRepositoryPull,
   rolloverDeferral,
@@ -93,8 +94,30 @@ test('auto-merge intent distinguishes queued, not queued, and provider-unknown w
     assert.ok(block.includes(`auto_merge_intent: **${autoMergeIntent}**`));
     assert.match(block, /merge_approved: \*\*false\*\*/);
     assert.match(block, /authorizes_merge: \*\*false\*\*/);
-    assert.match(block, /required reviews, tests, checks, and branch protections/);
+    assert.match(block, /configured required checks, tests, review-thread resolution and branch protections/);
   }
+});
+
+test('founder native Auto-merge is read from current provider actor, never promoted to in-app approval', () => {
+  const otherRepo = pr(976, 'main', 'feature');
+  const current = { ...otherRepo, auto_merge: { enabled_by: { login: 'jussray' } } };
+  assert.equal(observedFounderAutoMerge(current, 'jussray/founder-control-room'), 'UNKNOWN');
+  const ownerRepo = { full_name: 'jussray/founder-control-room' };
+  const founderPr = { ...current, head: { ...current.head, repo: ownerRepo }, base: { ...current.base, repo: ownerRepo } };
+  assert.equal(observedFounderAutoMerge(founderPr, 'jussray/founder-control-room'), 'FOUNDER_SELECTED');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: { enabled_by: { login: 'other' } } }, 'jussray/founder-control-room'), 'OTHER_ACTOR');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: null }, 'jussray/founder-control-room'), 'NOT_QUEUED');
+  assert.equal(observedFounderAutoMerge({ ...founderPr, auto_merge: {} }, 'jussray/founder-control-room'), 'UNKNOWN');
+  assert.equal(observedFounderAutoMerge(founderPr, 'jussray/other-repository'), 'NOT_APPLICABLE');
+  const block = continuityBlock({
+    repository: 'jussray/founder-control-room', prNumber: 976, rootBaseRef: 'main',
+    rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'feature', headSha: '2',
+    continuityState: 'CURRENT', proofState: 'SEPARATE', autoMergeIntent: 'QUEUED',
+    founderAutoMergeSelection: 'FOUNDER_SELECTED',
+  });
+  assert.ok(block.includes('founder_auto_merge_selection: **FOUNDER_SELECTED**'));
+  assert.ok(block.includes('merge_approved: **false**'));
+  assert.ok(block.includes('authorizes_merge: **false**'));
 });
 
 test('auto-merge click or cancellation triggers authoritative continuity metadata refresh', () => {
