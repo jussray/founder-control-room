@@ -332,7 +332,9 @@ try {
 
   await page.locator('[data-proposal-json]').fill('{}');
   await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
-  await page.locator('[data-public-payload-hash]').fill(approvedPost.contentHash);
+  const payloadHash = page.locator('[data-public-payload-hash]');
+  assert.equal(await payloadHash.isEditable(), false, 'the selected payload hash must not be editable');
+  assert.equal(await payloadHash.inputValue(), approvedPost.contentHash, 'the selected post binds the exact payload hash');
   await page.locator('[data-publish-confirm]').check();
   await publish.click();
   await page.waitForFunction(() => document.querySelector('[data-console-output]')?.textContent?.includes('PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED'));
