@@ -1,5 +1,9 @@
 # Cloudflare Deployment Targets
 
+## November 20, 2026 — public Pages front door and founder callback release boundary (candidate)
+
+In the PR #837 source candidate, `public/_worker.js` serves `/` from Pages as a public landing page and `/welcome` as the separate login door. `/auth/callback` and API-owned `/assets/auth-callback.js` and `/assets/control-room.css` must be proxied to the canonical identity-checked `FCR_API` binding; they cannot be swallowed by static assets. The founder callback must redirect to `/control-room/` only after the same-origin session handoff succeeds, except for an existing pending OAuth consent flow. CI browser fixtures and source modifications are not evidence of a live Pages/Worker deployment, correct custom-domain routing, authentic Supabase sessions or independent Cloudflare Access enforcement. No deploy or credential change is authorized by this documentation update.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.

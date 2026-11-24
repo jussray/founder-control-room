@@ -39,12 +39,12 @@ afterEach(() => {
 });
 
 describe('Cloudflare Pages edge proxy', () => {
-  it('serves the invitation-only welcome door at the canonical root without exposing public content', async () => {
+  it('serves the existing public homepage at the canonical root without accessing the founder API', async () => {
     const handler = await loadHandler();
     let requestedAsset: Request | undefined;
     const assets = vi.fn(async (request: Request) => {
       requestedAsset = request;
-      return new Response('private welcome', { status: 200 });
+      return new Response('public homepage', { status: 200 });
     });
     const api = vi.fn(async () => identifiedResponse('wrong API'));
 
@@ -54,10 +54,10 @@ describe('Cloudflare Pages edge proxy', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe('private welcome');
+    expect(await response.text()).toBe('public homepage');
     expect(api).not.toHaveBeenCalled();
     expect(requestedAsset).toBeInstanceOf(Request);
-    expect(new URL(requestedAsset!.url).pathname).toBe('/welcome');
+    expect(new URL(requestedAsset!.url).pathname).toBe('/');
   });
 
   it('serves an existing browser asset without calling the API Worker', async () => {

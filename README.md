@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 20, 2026 — public front door and founder callback remain separate (PR #837 candidate)
+
+The candidate Pages routing in `public/_worker.js` serves the public `/` landing page from Pages assets while `/welcome` is the founder sign-in door and `/control-room/` is the founder workspace entry. API-generated `/auth/callback`, `/assets/auth-callback.js` and `/assets/control-room.css` must still pass through the identity-checked API binding, not public static assets. After a successful same-origin `/auth/session` handoff, `src/http/routes/onboardingAssets/callbackJs.ts` routes the founder into `/control-room/` instead of returning them to the public landing page; an active OAuth consent request still takes precedence. The updated Playwright callback proof checks the route and mock session handoff but does not establish a live login, live cookie permissions, Cloudflare Access coverage or production deployment.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
