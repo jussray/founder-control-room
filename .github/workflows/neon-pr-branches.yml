@@ -252,6 +252,15 @@ jobs:
             PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
             PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"
             PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"
+            # A canonical Supabase migration without a Neon compatibility
+            # contract is out of scope for plain PostgreSQL. It must still pass
+            # the separate exact-head local Supabase full-schema replay and lint.
+            if [ ! -f "$PREVIEW_FIXTURE" ] &&
+               [ ! -f "$PREVIEW_CONTRACT" ] &&
+               [ ! -f "$PREVIEW_ASSERT" ]; then
+              echo "Neon NOT_APPLICABLE for Supabase-only migration: $migration (canonical Supabase replay required)"
+              continue
+            fi
             if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then
               echo "::error title=Ambiguous migration preview::Cannot mix an isolated fixture with a substitution contract: $migration"
               exit 1

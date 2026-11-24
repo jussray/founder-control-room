@@ -20,6 +20,16 @@ describe('Neon runs the real Supabase Friend migration instead of skipping it', 
     expect(phase).not.toMatch(/else\s+echo "Applying preview migration atomically/);
   });
 
+  it('does not falsely replay unfixtured Supabase-only migrations on bare Neon', () => {
+    expect(workflow).toContain('Neon NOT_APPLICABLE for Supabase-only migration: $migration');
+    expect(workflow).toContain('[ ! -f "$PREVIEW_FIXTURE" ]');
+    expect(workflow).toContain('[ ! -f "$PREVIEW_CONTRACT" ]');
+    expect(workflow).toContain('[ ! -f "$PREVIEW_ASSERT" ]');
+    expect(workflow).toContain('supabase db lint --local --fail-on error');
+    expect(contract).toContain('CI-only event sink');
+    expect(contract).toContain('CREATE TABLE IF NOT EXISTS public.project_events');
+  });
+
   it('keeps Auth role stubs confined to the Neon compatibility file', () => {
     expect(contract).toContain('CI-ONLY Neon preview compatibility');
     expect(contract).toContain('CREATE SCHEMA IF NOT EXISTS auth;');

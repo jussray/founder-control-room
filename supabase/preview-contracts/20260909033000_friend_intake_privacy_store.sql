@@ -19,6 +19,18 @@ BEGIN
 END;
 $bootstrap$;
 
+-- Minimal CI-only event sink required to compile the unchanged function.
+-- This is not the production project_events schema, and grants no permissions.
+CREATE TABLE IF NOT EXISTS public.project_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL,
+  source_event_id text NOT NULL,
+  event_type text NOT NULL,
+  severity text NOT NULL,
+  screen text NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
 -- Only the JWT role-claim lookup needed by the existing migration policies.
 -- This does not authorize client reads or bypass row-level security.
 CREATE OR REPLACE FUNCTION auth.role()
