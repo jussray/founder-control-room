@@ -9,6 +9,7 @@ Use only the tools advertised by the **public** MCP server after the connected u
 
 ## Allowed workflow
 
+0. For a new user, call `fcr_customer_start` to ask six generic 5W1H questions without importing any founder/company data or consulting the database.
 1. Ask the connected MCP server for available user-owned projects. Do not infer a project grant from its name, a model answer, or repository visibility.
 2. Read only exact project IDs returned for the current authenticated user. Bind any conclusions to returned timestamps and provenance.
 3. Summarize observed evidence and distinguish `source`, `verified`, `deployed`, and `unknown` states. Never promote code presence into live runtime truth.

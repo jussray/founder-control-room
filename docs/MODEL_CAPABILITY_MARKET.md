@@ -46,10 +46,12 @@ Current state, in the repository's own capability vocabulary:
 
 ```text
 contract-capable          market ranking + relay-receipt fold exist as tested source
-configured / allowlisted  not yet — no live route calls the market; no store persists relay responses or observations; no outcome verifier exists
+configured / allowlisted  not yet — no live route calls the market; no store persists relay responses or observations; a repository-repair outcome verifier exists as tested source only (see below)
 adapter-proven            not yet
 provider-outcome-proven   not yet
 ```
+
+Independent outcome verification (`src/lib/capabilityOutcomeVerification.ts`, candidate source): `verifyRepositoryRepairOutcome` issues a non-authorizing receipt only when the relay request is an `implement` request bound to `repository:<owner/name>@<full sha>`, the response is completed, hash-valid, inside the request window, and reports no unresolved work, and exact-head provider evidence shows every required check passed by its declared producer identity. `independentlyVerifiedResponseHashes` turns only runtime-issued, matching receipts into the fold's `verifiedResponseHashes`; deserialized or copied receipts never count. `recoverPersistedRelayResponses` (Council) rebuilds only hash-verifiable responses from transcripts and ignores legacy projections. This proves the observed CI signals for one subject, not deployment, runtime, or other task classes.
 
 Until a live route calls `buildCapabilityRoute` with observations folded from persisted, independently verified relay receipts, the market is advisory source, not enforced routing. Do not describe it in present tense as selecting operators.
 

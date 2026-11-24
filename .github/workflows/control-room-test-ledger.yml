@@ -33,8 +33,8 @@ env:
   CONTROL_ROOM_EXTERNAL_STATE_SOURCE: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.source || inputs.external_state_source || '' }}
 
 concurrency:
-  group: control-room-test-ledger-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: control-room-test-ledger-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ledger-contract:

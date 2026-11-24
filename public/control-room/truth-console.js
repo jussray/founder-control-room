@@ -1,3 +1,4 @@
+import {renderSeoIntelligence,renderEvidenceIntelligence} from './seo-evidence.js';
 const API = '/dashboard/truth';
 
 const TRUTH_TABS = [
@@ -8,6 +9,8 @@ const TRUTH_TABS = [
   ['truth-attacks', 'Attack Center'],
   ['truth-world', 'World Radar'],
   ['truth-continuity', 'Continuity'],
+  ['truth-seo', 'Search Console'],
+  ['truth-ai-review', 'AI Evidence Review'],
 ];
 
 const operationReceipts = new Map();
@@ -498,6 +501,8 @@ async function renderTruthTab(tab) {
   if (tab === 'truth-attacks') return renderAttacks(root);
   if (tab === 'truth-world') return renderWorld(root);
   if (tab === 'truth-continuity') return renderContinuity(root);
+  if (tab === 'truth-seo') return renderSeoIntelligence(root);
+  if (tab === 'truth-ai-review') return renderEvidenceIntelligence(root);
 }
 
 function ensureStylesheet() {

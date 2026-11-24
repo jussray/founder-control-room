@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { intelligenceRouter } from './truthSeoEvidence.js';
 import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { truthContinuityState } from '../../lib/truthConsoleRules.js';
@@ -17,6 +18,7 @@ const rateLimitTruthConsole = rateLimit({
   message: { error: 'Truth console rate limit exceeded.' },
 });
 truthConsoleRouter.use(rateLimitTruthConsole, requireFounder);
+truthConsoleRouter.use('/intelligence', intelligenceRouter);
 
 const CLAIM_LIMIT = 200;
 const EVIDENCE_LIMIT = 300;
@@ -112,7 +114,7 @@ truthConsoleRouter.get('/overview', async (_req: FounderRequest, res) => {
     supabase.from('evidence').select('id, status, created_at').order('created_at', { ascending: false }).limit(EVIDENCE_LIMIT),
     supabase.from('reconciliation_runs').select('id, controller, resource_id, status, message, started_at, completed_at').eq('controller', 'TruthConsole').order('started_at', { ascending: false }).limit(RECEIPT_LIMIT),
     supabase.from('truth_attacks').select('id, status, severity, created_at').order('created_at', { ascending: false }).limit(ATTACK_LIMIT),
-    supabase.from('continuity_records').select('id, proof_cookie, invalidated_at, valid_until, created_at').order('created_at', { ascending: false }).limit(CONTINUITY_LIMIT),
+    supabase.from('continuity_records').select('id, proof_cookie, invalidated_at, valid_until, created_at').is('task_id', null).order('created_at', { ascending: false }).limit(CONTINUITY_LIMIT),
   ]);
   const error = claimsResult.error ?? evidenceResult.error ?? runsResult.error ?? attacksResult.error ?? continuityResult.error;
   if (error) return res.status(500).json({ error: 'Truth console overview unavailable' });
@@ -311,6 +313,7 @@ truthConsoleRouter.get('/continuity', async (_req: FounderRequest, res) => {
   const { data, error } = await supabase
     .from('continuity_records')
     .select('id, project_id, mission_id, subject_fingerprint, proof_cookie, truth_snapshot_id, authority_fingerprint, runtime_fingerprint, evidence_fingerprint, valid_until, invalidated_at, invalidation_reason, created_at')
+    .is('task_id', null) // Task resume pointers are not verified Truth Console proof.
     .order('created_at', { ascending: false })
     .limit(CONTINUITY_LIMIT);
   if (error) return res.status(500).json({ error: 'Continuity unavailable' });

@@ -6,6 +6,15 @@
   <meta name="description" content="Founder Control Room: back founders, build a brighter tomorrow. Public user view and founder view, with proof boundaries stated plainly." />
   <meta name="robots" content="index,follow" />
   <link rel="canonical" href="https://www.foundercontrolroom.org/" />
+  <link rel="alternate" type="application/ld+json" href="https://www.foundercontrolroom.org/site-identity.json" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.foundercontrolroom.org/" />
+  <meta property="og:title" content="Founder Control Room | Public work and verifiable projects" />
+  <meta property="og:description" content="Explore founder work, inspect public evidence, and distinguish shipped features from planned systems." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Founder Control Room | Public work and verifiable projects" />
+  <meta name="twitter:description" content="Public founder work, sources and verification boundaries." />
+  
   <title>Founder Control Room</title>
   <style>
     :root {
@@ -253,8 +262,13 @@
       .quote-card { max-width: none; }
     }
   </style>
+  <link rel="stylesheet" href="/cinematic-direction.css" />
 </head>
-<body data-fcr-visual="approved-mockup-v3">
+<body data-fcr-visual="approved-mockup-v3" itemscope itemtype="https://schema.org/WebPage" itemid="https://www.foundercontrolroom.org/">
+  <meta itemprop="url" content="https://www.foundercontrolroom.org/" />
+  <meta itemprop="name" content="Founder Control Room" />
+  <meta itemprop="description" content="Public founder work, verified project evidence, and delivery limits." />
+  <meta itemprop="inLanguage" content="en-US" />
   <div class="wrap" id="top">
     <header class="topbar">
       <a class="logo" href="#top" aria-label="Founder Control Room home">
@@ -267,7 +281,7 @@
         <a href="#support">Support</a>
         <a href="#community">Community</a>
         <a href="#messages">Messages</a>
-        <a class="avatar" href="/control-room/" aria-label="Founder sign-in">
+        <a class="avatar" href="/welcome" aria-label="Founder sign-in">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <circle cx="12" cy="8.5" r="4" fill="currentColor" />
             <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -280,7 +294,7 @@
         <a href="#proof">Proof</a>
         <a href="#community-f">Community</a>
         <a href="#automations">Automations</a>
-        <a class="avatar" href="/control-room/" aria-label="Founder sign-in">
+        <a class="avatar" href="/welcome" aria-label="Founder sign-in">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <circle cx="12" cy="8.5" r="4" fill="currentColor" />
             <path d="M4.5 21c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -379,10 +393,7 @@
       <div class="fgrid">
         <div class="panel" id="projects">
           <div class="panel-head"><h3>Projects</h3><small>Status after sign-in</small></div>
-          <div class="row"><span class="glyph" aria-hidden="true">FCR</span><div><strong>Founder Control Room</strong><small>Platform · Build the future</small></div><span class="pill">Sign in to view</span></div>
-          <div class="row"><span class="glyph" aria-hidden="true">AI</span><div><strong>Chief AI Prompt Machine</strong><small>AI · Founder Intelligence OS</small></div><span class="pill">Sign in to view</span></div>
-          <div class="row"><span class="glyph" aria-hidden="true">L99</span><div><strong>L99</strong><small>Trust · Verification</small></div><span class="pill">Sign in to view</span></div>
-          <div class="row"><span class="glyph" aria-hidden="true">SE</span><div><strong>StoryEngine</strong><small>Media · Storytelling</small></div><span class="pill">Sign in to view</span></div>
+          <p class="empty">Private projects are not listed on this public page. Sign in with your founder account to open your private Control Room.</p>
         </div>
         <div class="stack">
           <div class="sunrise">
@@ -414,8 +425,8 @@
         </div>
       </div>
 
-      <p class="notes">Founder access still passes through FCR authentication. General member authentication and multi-tenant founder workspaces remain a separate implementation gate. Connection never creates authority by itself.</p>
-      <a class="btn ghost owner-cta" href="/control-room/">Enter authenticated Control Room →</a>
+      <p class="notes">Only verified founders can open private project controls. Other members receive an empty personal workspace, separate from founder records.</p>
+      <a class="btn ghost owner-cta" href="/welcome">Enter authenticated Control Room →</a>
     </section>
     </main>
 
