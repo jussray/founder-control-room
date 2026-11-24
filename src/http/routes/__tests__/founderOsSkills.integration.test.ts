@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { boundFounderRow } from './founderAuthFixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -479,5 +480,42 @@ describe('GET /founder-os/distribution/skills', () => {
     expect(response.status).toBe(502);
     expect(JSON.stringify(response.body)).not.toContain('sensitive');
     expect(JSON.stringify(response.body)).not.toContain(READ_TOKEN);
+  });
+});
+
+
+describe('GET /founder-os/security-skills/catalog', () => {
+  const url = '/founder-os/security-skills/catalog';
+  it('denies unauthenticated access', async () => {
+    const response = await request(buildApp()).get(url);
+    expect(response.status).toBe(401);
+    expect(response.body.records).toBeUndefined();
+  });
+  it('denies an authenticated identity not bound to the founder row', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'other-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } }, error: null });
+    const response = await request(buildApp()).get(url).set('Authorization', BEARER);
+    expect(response.status).toBe(403);
+    expect(response.body.records).toBeUndefined();
+  });
+  it('returns only the pinned metadata snapshot to the founder without fetching external content', async () => {
+    founderSession();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      const response = await request(buildApp()).get(url).set('Authorization', BEARER);
+      expect(response.status).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.body).toEqual(JSON.parse(readFileSync('docs/security-skill-catalog.v1.json', 'utf8')));
+      expect(response.body.execution_enabled).toBe(false);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(supabaseMock.from).toHaveBeenCalledTimes(1);
+      expect(supabaseMock.from).toHaveBeenCalledWith('founder_users');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+  it('does not expose a write method', async () => {
+    founderSession();
+    const response = await request(buildApp()).post(url).set('Authorization', BEARER).send({ execution_enabled: true });
+    expect(response.status).toBe(404);
   });
 });

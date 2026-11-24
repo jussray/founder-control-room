@@ -5,11 +5,17 @@ on:
     paths:
       - 'docs/security-skill-catalog.v1.json'
       - 'scripts/check-security-skill-catalog.cjs'
+      - 'src/founder-os-lab/externalSecuritySkillCatalog.ts'
+      - 'src/http/routes/founderOsSkills.ts'
+      - 'src/http/routes/__tests__/founderOsSkills.integration.test.ts'
       - '.github/workflows/security-skill-catalog.yml'
   pull_request:
     paths:
       - 'docs/security-skill-catalog.v1.json'
       - 'scripts/check-security-skill-catalog.cjs'
+      - 'src/founder-os-lab/externalSecuritySkillCatalog.ts'
+      - 'src/http/routes/founderOsSkills.ts'
+      - 'src/http/routes/__tests__/founderOsSkills.integration.test.ts'
       - '.github/workflows/security-skill-catalog.yml'
 permissions:
   contents: read
@@ -22,3 +28,9 @@ jobs:
         with:
           persist-credentials: false
       - run: node scripts/check-security-skill-catalog.cjs
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install vitest run src/http/routes/__tests__/founderOsSkills.integration.test.ts
