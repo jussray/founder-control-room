@@ -1,8 +1,8 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
-## November 4, 2026: Browser Operator preview scope repair
+## November 17, 2026: silent exclusion is its own truth-decay failure mode
 
-On PR #1006 predecessor `bde14ffef63d62dbb4662636bcff2259aeee14fd`, both preview policies accepted Sync Party requests also naming a foreign `.io` URL, an IP address, or an approved-host suffix lookalike. The successor validates complete explicit origins and hostnames. Its Playwright witness invokes the actual preview policy behind synthetic authentication/transport; this proves local UI/policy behavior only. Historical successful CI cannot certify the successor, live founder authentication, production deployment, or browser execution.
+An excluded fact is not the same as a false one, but a founder-facing read model that drops a load-bearing signal without saying so produces the same practical harm as stale evidence: the founder believes the brief is complete when it is not. `buildMissionControlBrief` (`src/futureyou/missionControl.ts`) already names every other reason evidence is withheld from `priorities` — stale, invalid, or future-dated observation times all surface in `blindSpots` — but a `critical`/`error` activity event aging past 14 days was dropped with no trace. A 20-day-old unresolved critical failure and a never-happened one were indistinguishable in the brief. The fix adds the missing `blindSpots` line; it does not change what counts as stale, does not resurface the event into `priorities`, and does not imply the underlying issue was ever resolved — only that its continued absence from the dashboard is now disclosed rather than silent.
 
 ## Paired hostile-PR repair guidance
 
@@ -55,18 +55,6 @@ An independent GitHub compare of `87501be…499f2d4` returned `ahead_by: 2`, `be
 
 The smallest repair updates only `.github/workflows/playwright.yml`'s `STORYENGINE_PEER_SHA` value to the independently observed successor, preserving the **required** live-ref equality assertion, immutable checkout, runtime SHA identity validation, and subsequent full browser federation receipt loop. All predecessor federation/browser success evidence is historical only, and the successor FCR candidate must earn fresh exact-head CI and StoryEngine runtime/browser results. A further StoryEngine main ref movement would make the refreshed pin stale again. No deployment or merger is implied.
 
-## October 23, 2026: StoryEngine rewritten-ancestry peer accepted by exact tree comparison
-
-StoryEngine `main` moved from the FCR-pinned `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f` to `be4fe1a006fcecdad077d5c3878cd76443274c65`. GitHub history comparison correctly identified divergence (9 ahead, 3 behind), so forward-only ancestry could not justify a new FCR pin. A direct comparison of Git root trees showed that **the existing `.github` workflow tree and entire `story-engine` runtime tree were byte-for-byte identical** between the two commit subjects. The only root-level differences were newly added `.peer-dependencies.json` and an expanded `schemas` tree containing only `portfolio-release.schema.json`; all pre-existing schema entries, including `schemas/validate.ts`, had identical Git object identities. At inspection, the new StoryEngine commit had seven successful check runs with no reported failures. This is source-equality evidence at named paths, not an assertion that the full FCR federation is already green.
-
-FCR's review-branch Playwright workflow now pins the newly observed StoryEngine head while retaining the fail-closed check that StoryEngine `refs/heads/main` resolves to that exact SHA immediately before peer checkout. The rewritten commit graph and added release metadata do not invalidate identical runtime source, but the successor FCR exact-head browser federation still requires its own complete CI result. If StoryEngine `main` advances, the peer pin must be reviewed again; no standing auto-repin or bypass of the freshness check is authorized.
-## October 23, 2026: StoryEngine exact peer-ref repair is not Playwright proof
-
-FCR Browser Operator review PR #1006 initially passed its isolated six browser-policy tests but the existing FCR Playwright E2E job stopped at the independent StoryEngine ref-freshness check. The FCR workflow expected the historical `26b1c34ae7c97c5d1b66a23d6345b3965cfcdc1f`; live StoryEngine `refs/heads/main` resolved to `6b97b78370fbc25d4b4bb88bfeab136eb4c7dc2f`. The GitHub comparison proved the successor was exactly four commits ahead, zero behind, and its observed exact-head checks were 15 of 15 successful. StoryEngine's passing checks do not prove the FCR pair.
-
-The review-branch workflow now selects that verified successor SHA and continues to require the live ref to equal the pin **before** an immutable peer checkout and full end-to-end FCR browser federation witness. The previous FCR Playwright failure is an accurate stale-evidence signal, not a code defect in the new browser operator. A matching pin is an identity prerequisite only; a failed, skipped or pending successor FCR E2E job remains UNKNOWN, not green. Future StoryEngine `main` movement expires the pin again. No merge, deployment, publication, provider-write or production access authority transfers through this change.
-
-FCR's new declarative browser operator is independently source-implemented and its dry-run manifest validation proves only validation. A live public synthetic game run, FCR application UI integration and arbitrary natural-language browser planning require their own distinct evidence and approval gates.
 ## October 28, 2026: PR #1044 second peer movement after main reconciliation
 
 The reconciled FCR head `e35b9ecff7801e2b6d36910a9f40208f9815cfdb` selected StoryEngine `dc79a23ffa8e6e5b0964efccdaee7c961b9b9e1d` but current StoryEngine main was observed at `bffc9f771b673055403f52b29c86b30e5f4dd8c8`, one commit strictly ahead with two governance/instruction files changed and 14 successful observed head checks. The old FCR head's code and browser proof remains historical and must not be promoted to current federation proof for the successor.
@@ -627,6 +615,12 @@ FCR Playwright run #6969 on `897083276b6c775c49ce30be189a50bd610b5d4c` completed
 That failure is dependency-freshness evidence, not a failed FCR browser journey and not evidence that the README repair regressed runtime behavior. Rebinding the peer to `3c1689fe67142e783fe7d18b5ff610640bdc81d6` selects the next evidence subject only. The successor FCR head remains `UNKNOWN` for federation until the complete live-ref check, immutable checkout, exact peer runtime identity, directive/receipt binding, replay protections, and Playwright browser witness succeed. No predecessor green, founder approval, merge, deploy, production, publication, billing, or provider-mutation authority transfers through this pin refresh.
 
 
+## 2026-10-14 StoryEngine dependency freshness during FCR Slack repair PR #975
+
+FCR draft PR #975 at exact head `e8a1acdd165124ac51c2c02e0289178b209b4e03` passed its local/direct browser harness but failed the separate live peer-ref freshness check: `.github/workflows/playwright.yml` expected StoryEngine `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`, while the independently observed `jussray/StoryEngine` protected `refs/heads/main` resolved to `809d30ae2ef57dce6d4fee9a3b6afa24bfa83497`. Comparison establishes a strictly forward 19-commit successor, not a tag or inferred branch. The successor StoryEngine commit's five GitHub Actions workflows (L99 Story Engine CI, Guardrails Playwright, Control Room Test Ledger, L99 Promotion Gates, Agent Contract v1) all completed successfully; a separate `Supabase Preview` check failed and is **not** covered by those greens. The update selects a federation candidate, not proof that the external preview, product production deployment, or live FCR/Chief/Slack runtime works.
+
+The Playwright workflow's immutable `STORYENGINE_PEER_SHA` is now refreshed to the observed successor, retaining the live-ref equality gate, immutable peer checkout, runtime identity check, directive/receipt/replay proofs, and browser tests. FCR browser-federation state for the new pair stays `UNKNOWN` until the full new exact-head witness completes successfully. The earlier 16 workflow successes and any previous FCR/StoryEngine federation receipt are historical after this candidate's head moves. No founder approval, merge, deploy, publishing, billing, provider mutation, or credential authority transfers through the peer-pin update. This change is carried by the existing draft PR #975, not a parallel recovery PR.
+
 ## 2026-10-06 StoryEngine runtime-head-binding peer transition
 
 FCR exact-head Playwright on `ea09b7406eff2b85bde2ba1a4543e765e1f6d135` completed its local/direct browser harness, then failed closed at the separate StoryEngine peer freshness gate because the workflow still expected `91af998c2c7adad0792dd394735ca738b92ab26d` while independently observed StoryEngine `refs/heads/main` resolved to `a6e6a396ed30535af2fd9b1ec2347a84e1a3fbf3`.
@@ -739,3 +733,20 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: URLFIX's destination guard relied on a literal-only URL check, which did not stop DNS names resolving to private addresses or redirects into private space.
 - Now: the snapshot script resolves DNS and checks every request, and the URLFIX contract forbids persisting authenticated state or private artifacts. Routing ignores URL text when reading intent.
 - Historical evidence from earlier heads is superseded for this surface. Re-observe provider CI on the new exact head before any present-tense claim.
+
+## 2026-11-15 — Documentation Truth receipt claims must be fresh for the reviewed range
+
+- Previously current: a changed truth-sensitive path passed Documentation Truth if the receipt contained any meaningful claim naming it, including a claim written for an older change and carried forward unchanged. Once-true receipt text could therefore stand in for a range it never described.
+- Now (candidate): the verifier compares against the receipt at the reviewed base and requires at least one fresh meaningful path-bound invariant per changed truth-sensitive path. Inherited claims remain as provenance; they are classified historical for the new range, not deleted.
+- Not proven: claim truth, provider state, or any merge, deploy, or publication authority. Re-run Documentation Truth on the exact PR head and again on merged `main`.
+
+## 2026-11-17 — Project adapter re-pin after Chief and Se'kret Bip drift
+
+- Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
+- Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
+- Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+
+### Browser Operator preview provenance (#1006)
+
+A source-configured manual Playwright journey is not observed live outcome. Each accepted synthetic test requires verified current founder identity, one exact owned origin, preview readback, explicit run approval, no customer credentials and a reproducible test receipt. Cross-project evidence and unattended publication remain forbidden.

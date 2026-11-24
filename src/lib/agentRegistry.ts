@@ -69,6 +69,18 @@ export const AGENT_REGISTRY: readonly AgentDescriptor[] = [
     },
   },
   {
+    id: 'cursor',
+    label: 'Cursor',
+    role: 'Bounded repository coding operator for focused implementation, review, and Playwright-backed verification; access and proof must be independently established.',
+    operator: {
+      enabled: true,
+      capabilities: ['research', 'propose', 'review', 'implement'],
+      firstSliceRuntimeModel: false,
+      externalWritesRequireBoundAuthority: true,
+      instructionContracts: ['AGENTS.md', 'GLOBAL_AI.md', FCR_V14, MULTI_AGENT, CHANGE_GENEALOGY],
+    },
+  },
+  {
     id: 'muse',
     label: 'Muse',
     role: 'Governed Founder AI Council challenger for cross-provider analysis, repository implementation, and GitHub/Supabase/Cloudflare drift detection under existing founder authority gates.',

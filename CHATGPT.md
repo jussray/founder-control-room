@@ -65,16 +65,6 @@ Reasoning may run in parallel. Writes, merges, deployments, provider mutations, 
 
 **Trust boundary:** Guarded execution exists, but its existence is not blanket authority. Reads, proposals, approvals, terminal runs, repository writes, merges, deploys, migrations, provider actions, publication, and destructive operations keep separate policy/evidence gates.
 
-## Browser execution priority: Opera before TinyFish
-
-For browser-dependent FCR work, follow [the canonical browser capability routing contract](docs/FCR_BROWSER_CAPABILITY_ROUTING_ADDENDUM.md) and [the executable recovery policy](src/capabilities/browserBridgeRecovery.ts):
-
-- Use a sufficient scoped direct provider API/plugin/MCP capability first. Browser automation is not a substitute for an available precise GitHub or provider read.
-- For work requiring authenticated browser-only state or UI interaction, make Opera Browser Connector the first browser choice. Use its current read-only `list_tabs` probe to establish whether the bridge is live; use Opera only when connected, sufficient, and authorized for the bounded task.
-- A `Browser not connected` result means `BLOCKED_CONNECTOR_BRIDGE`, not proof that the target provider is logged out. Preserve earlier provider evidence. Re-probe after a reported setup change rather than repeatedly asserting a setup cause.
-- After Opera is unavailable or insufficient, consider another live authenticated browser bridge. Use generic browser automation, including TinyFish, only as a last sufficient and authorized fallback. A paid fallback must not be assumed usable or required merely because the Opera bridge is blocked.
-- Browser session access does not grant mutation, merge, deploy, spending, or publication authority. Browser readback also does not replace exact-head Playwright proof for changed UI/runtime paths.
-
 ## Change genealogy audit rule
 
 For repository audits, use `docs/AI_CHANGE_GENEALOGY_CONTRACT.md` before assigning causality.
@@ -213,3 +203,8 @@ Do not claim launch merely because the merge loop is moving quickly.
 ## Output format
 
 Return: REALITY · GENEALOGY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved work/history, truth age/superseded state, documentation state, and blocked evidence.
+
+
+### Founder browser operator preview and explicit execution gate (#1006)
+
+The browser operator may preview a bounded test plan but a preview is never browser execution, provider access, merge or deploy authority. Only synthetic owned-site journeys with explicit founder approval and exact target/actor proof may be run. Existing private sessions, payment methods and customer accounts are outside the test lane. Live workflows are manual only; code authorship does not prove any browser journey ran.
