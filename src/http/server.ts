@@ -38,6 +38,7 @@ import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
+import { friendIntakeRouter } from './routes/friendIntake.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
 import { quickScanRouter } from './routes/quickscan.js';
 import { switchboardRouter } from './routes/switchboard.js';
@@ -439,6 +440,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/goalfix', goalfixRouter);
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
+  app.use('/friend-intake', friendIntakeRouter);
   app.use('/missions', missionsRouter);
   app.use('/operator/continuity', operatorContinuationRouter);
   app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));

@@ -893,7 +893,8 @@
     {
       "path": "src/auth/memberSession.ts",
       "claims": [
-        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable."
+        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable.",
+        "The existing member-session writer may emit only its short-lived server-held opaque __Host-fcr_member_session with Path=/, Secure, HttpOnly and SameSite=Strict; member identity is not founder/provider mutation authorization."
       ]
     },
     {
@@ -1024,6 +1025,73 @@
       "path": "src/http/routes/founderContentLifecycle.ts",
       "claims": [
         "`src/http/routes/founderContentLifecycle.ts` must allow only the exact `facebook/facebook` provider/platform pair, require the stored account ID to match the numeric server-owned `META_FACEBOOK_PAGE_ID`, and block nonzero Facebook media before dispatch; a configured Page ID or mocked route test does not prove a live Meta publication."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntake.ts",
+      "claims": [
+        "Friend Intake must default disabled behind FCR_FRIEND_INTAKE_ENABLED and separate FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED flags, require verified immutable founder auth for all runs, require a current interactive opaque session for sensitive persistence, and never call external model providers.",
+        "process_without_saving may record only behavior and policy metadata while save_redacted_summary may store bounded redacted summary/labels only after the associated sensitive review gate passes; fail closed on mismatched token, browser session, payload, or missing persistence authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntakeReviewReceipt.ts",
+      "claims": [
+        "The five-minute review cookie must bind founder ID and opaque session hash to the exact reviewed privacy/summary/labels/move and engine version; a tampered or reused capability must fail closed and the review token must not persist raw input."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260909031700_friend_intake_v1.sql",
+      "claims": [
+        "The intake persistence migration may not store raw founder text, must restrict content tables to service-role-only access, and must enforce reviewed-sensitive one-save identity with database uniqueness."
+      ]
+    },
+    {
+      "path": "public/control-room/stack-router.js",
+      "claims": [
+        "The Friend Intake link remains hidden by default and must be shown only when same-origin Friend Intake status reports explicit enablement inside the existing authenticated founder launch dock."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/friendIntake.integration.test.ts",
+      "claims": [
+        "Friend Intake regression tests must use the current email-confirmed immutable founder identity and two-key founder_users (email+user_id) allowlist mock; unverified authentication and forged sensitive review receipts must fail closed."
+      ]
+    },
+    {
+      "path": "scripts/build-pages.mjs",
+      "claims": [
+        "The Pages packaging contract must include all three Friend Intake browser assets as required files without publishing secrets or weakening existing Cloudflare asset checks."
+      ]
+    },
+    {
+      "path": ".security/cookies.json",
+      "claims": [
+        "The Friend Intake review cookie must be an explicitly declared sensitive HttpOnly, SameSite=Strict five-minute cookie scoped to /friend-intake, written only from the approved server-only review receipt module."
+      ]
+    },
+    {
+      "path": ".github/workflows/neon-pr-branches.yml",
+      "claims": [
+        "Neon preview scope must classify canonical Supabase changes separately from explicitly fixture-backed Neon previews; all Supabase changes must run exact-head local Supabase full migration replay and schema lint, and Neon provider NOT_APPLICABLE may be asserted only after canonical proof succeeds without creating, deleting, or treating provider branch state as authorization."
+      ]
+    },
+    {
+      "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
+      "claims": [
+        "Regression tests must preserve the exact-main ref check, canonical Supabase replay/lint, fixture-specific Neon scope, provider preview write/readback gates, and safe non-applicability semantics."
+      ]
+    },
+    {
+      "path": "src/http/middleware/sessionCookies.ts",
+      "claims": [
+        "Legacy founder bearer and refresh-cookie issuing helpers must remain non-writing and throw on attempted use; no source may re-enable Set-Cookie from this obsolete transport. Current founder browser session transport is the opaque server-held cookie."
+      ]
+    },
+    {
+      "path": "scripts/verify-cookie-contract.mjs",
+      "claims": [
+        "Cookie writers using Response.append('Set-Cookie') must be detected as well as Set-Cookie headers, all active writers must have explicit manifest allowance, and sensitive cookies must remain HttpOnly with no-store and a bounded explicit path."
       ]
     }
   ]

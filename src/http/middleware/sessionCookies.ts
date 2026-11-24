@@ -52,8 +52,11 @@ function serializeCookie(
   return parts.join("; ");
 }
 
-function appendCookie(res: Response, value: string): void {
-  res.append("Set-Cookie", value);
+// This legacy bearer/refresh cookie transport is intentionally disabled.
+// Current FCR founder browser sessions use the server-held opaque __Host-fcr_session
+// capability; accidentally reusing the historical helper must fail closed.
+function appendCookie(_res: Response, _value: string): never {
+  throw new Error("Legacy founder bearer cookie writer is disabled; use opaque founder sessions");
 }
 
 export function readFounderSessionCookies(req: Request): FounderSessionCookies {

@@ -3,7 +3,7 @@
   "repository": "jussray/founder-control-room",
   "defaultPolicy": "deny-undeclared",
   "scanRoots": ["src"],
-  "allowedCookieWriters": ["src/auth/founderSession.ts"],
+  "allowedCookieWriters": ["src/auth/founderSession.ts", "src/auth/memberSession.ts", "src/http/routes/friendIntakeReviewReceipt.ts"],
   "cookies": [
     {
       "name": "__Host-fcr_session",
@@ -38,6 +38,44 @@
       "integrity": "Never accepted for authentication after opaque-session cutover; emitted only with Max-Age=0 to remove historical self-contained token cookies.",
       "csrf": "Not accepted as an authentication or authorization input.",
       "deletion": "Expired whenever a new opaque session is issued or any founder browser session is cleared."
+    },
+    {
+      "name": "__Host-fcr_member_session",
+      "classification": "strictly_necessary",
+      "purpose": "Carry a random opaque member browser session capability whose SHA-256 lookup hash and verified member identity remain in server-only fcr_member_browser_sessions records.",
+      "owner": "backend",
+      "providers": [
+        "supabase"
+      ],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "always",
+      "sameSite": "strict",
+      "path": "/",
+      "maxAgeSeconds": 28800,
+      "cacheControl": "private, no-store",
+      "integrity": "Server-generated 256-bit random opaque capability; only a SHA-256 hash is persisted, scoped to member_user_id and member_email with server-side revocation and expiry. This is not a founder or provider-mutation authorization.",
+      "csrf": "Same-origin browser authentication and downstream role/ownership checks are independently required for sensitive mutations; the member session is only identity, not founder authority.",
+      "deletion": "Cleared by member logout through clearMemberSession and revoked server-side via revokeMemberSession."
+    },
+    {
+      "name": "fcr_friend_intake_review",
+      "classification": "strictly_necessary",
+      "purpose": "Carry a short-lived, server-signed capability proving the interactive founder reviewed the exact sensitive Friend Intake save payload before persistence.",
+      "owner": "backend",
+      "providers": [
+        "cloudflare"
+      ],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "production",
+      "sameSite": "strict",
+      "path": "/friend-intake",
+      "maxAgeSeconds": 300,
+      "cacheControl": "private, no-store",
+      "integrity": "HMAC-SHA256 v2 capability with a fresh nonce, bound to founder identity, the originating opaque browser-session hash, exact raw input, redacted summary, persisted sensitive categories, persisted intent tags, persisted move kind/policy/duration/warning code, blocked model state, engine version, and five-minute expiry. Its token deterministically derives the sensitive intake/timeline UUID pair so database uniqueness enforces one-review/one-save consumption without storing the raw review token.",
+      "csrf": "SameSite=Strict plus the interactive opaque founder-session boundary constrain browser submission; the receipt must verify against the current browser session and exact reviewed persistence payload before storage.",
+      "deletion": "Cleared after successful confirmation, explicit cancellation, invalid confirmation, or expiry; privacy-choice transitions revoke it, and logout/session rotation makes any surviving copy unverifiable because the originating browser-session identity no longer matches."
     }
   ],
   "nonCookieState": [
