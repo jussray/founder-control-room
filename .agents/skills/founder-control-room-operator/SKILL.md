@@ -33,6 +33,17 @@ Repeat `OBSERVE → INTERNAL QUESTION → ANSWER OR AUTHORIZED READ → DEVIL/RE
 
 Apply named plugins only in their proper domain: Product Design's full workflow requires supported Work Mode; Frontend Design Premium must pair with Frontend Design for actual UI work; Codex Material Themes requires an explicit theme request and founder-performed import; Codex Coordinator needs its enabled shared-checkout task board and real parallel work; Codex Dev Workflows uses the focused task workflow. Naming a plugin does not prove invocation or installation, and this contract does not modify third-party plugin code.
 
+Domain-specific routing added by the founder (2026-11-24), applied only when the current scoped task actually involves that domain:
+
+- **Data:** For KPIs, trends, SQL, dashboards, analysis, reporting, forecasts, market sizing, and data-quality questions, load the focused Data skill and preserve input lineage, metric definitions, freshness, assumptions, and reproducible calculations. Never invent source values or turn an analytical recommendation into execution authority.
+- **Shopify App Builder:** For Shopify app development use the relevant authentication, Admin GraphQL, embedded UI, merchant billing, webhook, or accessibility skill. Keep merchant-scoped tokens, customer data, Shopify app billing, storefront checkout, and JussPay/Stripe payments in their distinct trust boundaries. Do not install apps, activate billing, mutate orders, or publish without the applicable approval.
+- **Stripe:** For payments, subscriptions, invoices, or Connect, select the Stripe workflow and, before payment integration code, its implementation planner. Separate test mode from live mode; require exact account authority, confirmed prices, payment/webhook tests, explicit go-live approval, and independent reconciliation. No automatic live charges.
+- **AWS Core:** When an actual AWS workload is in scope, use the AWS service/skill suited to that workload. Scope account, region, roles, security, availability, infrastructure changes, estimated cost, and rollback before changing resources. A configured AWS connector never implies deployment or spend approval.
+- **Game Development Studio:** For 3D assets, textures, game audio, GLB/PBR/USDZ, or Blender workflows, start with capability discovery and the asset-production skill. Preserve original bytes, license, source hashes, validation evidence, and engine import criteria. Paid providers require explicit invocation and spend ceiling; generation alone is not game readiness.
+- **Faceless Video Maker:** For authorized faceless reels or cinematic production, select the relevant script, scene, AI-visual-prompt, or ambient-video workflow. Preserve brand canon, aspect ratio, timings, media licensing, accessible captions, visual consistency, and actual render evidence. A storyboard or provider job is not a finished video; no automatic publishing or paid rendering.
+
+Routing is **conditional**, not blanket invocation of all six plugins on every request. Named skills must actually be available in the current host before use. They provide methods, not new permissions, cross-provider identity, production proof, or a bypass of the founder's review gates.
+
 Canonical cross-agent details: [Founder AI Operator Workflow V1](../../../docs/FOUNDER_AI_OPERATOR_WORKFLOW_V1.md), section **Self-answer and continue contract**. The founder's latest explicit instruction and existing stronger security/release contracts remain authoritative.
 
 ## Repository identity
