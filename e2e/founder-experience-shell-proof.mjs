@@ -115,6 +115,25 @@ async function provePublicFrontDoor(label, viewport) {
   if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: public Explore action must route to the real public work directory`);
   }
+  // Public launch proof must be visible without sign-in; private data stays gated.
+  const publicProof = page.locator('.live-proof');
+  if (!(await publicProof.isVisible())) {
+    throw new Error(`${label}: working public product/source links are missing from the front door`);
+  }
+  for (const [labelText, href] of [
+    ['Product directory', '/work.html'],
+    ['Se’kret Bip', 'https://sekretbip.net/'],
+    ['FCR source', 'https://github.com/jussray/founder-control-room'],
+  ]) {
+    const link = publicProof.getByRole('link', { name: new RegExp(labelText) });
+    if (await link.count() !== 1 || await link.getAttribute('href') !== href) {
+      throw new Error(`${label}: public launch proof link ${labelText} is missing or misrouted`);
+    }
+  }
+  if (/Supporter highlights appear here once|Stories publish as they are verified/i.test(userCopy)) {
+    throw new Error(`${label}: preparatory placeholder copy is still advertised on the launched front door`);
+  }
+
   // Visual cards must preserve real keyboard-accessible public destinations.
   for (const [kind, expectedHref] of [
     ['story', '/juss-rayy/'],

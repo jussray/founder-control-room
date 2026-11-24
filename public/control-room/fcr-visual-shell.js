@@ -20,8 +20,8 @@ function addTopbarSearch() {
   const input = document.createElement('input');
   input.className = 'fcr-nav-search';
   input.type = 'search';
-  input.placeholder = 'Search this Control Room…';
-  input.setAttribute('aria-label', 'Filter Control Room navigation');
+  input.placeholder = 'Find a page…';
+  input.setAttribute('aria-label', 'Find a Control Room page');
   input.dataset.fcrNavSearch = '';
   input.addEventListener('input', () => {
     const q = input.value.trim().toLowerCase();
