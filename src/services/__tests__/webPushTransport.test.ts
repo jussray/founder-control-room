@@ -30,7 +30,7 @@ describe('founder web push', () => {
     expect(() => unsealSubscription(encrypted, storage, 'founder-b')).toThrow();
   });
   it('produces a verifiable VAPID signature scoped to the push origin', () => {
-    const privateKey = key.getPrivateKey().toString('base64url');
+    const privateKey = Buffer.alloc(32, 1).toString('base64url');
     const header = vapidHeader(privateKey, subscription.endpoint, 'https://foundercontrolroom.org', 1700000000);
     const match = /^vapid t=([^,]+), k=(.+)$/.exec(header)!;
     const [head, payload, signature] = match[1].split('.');
