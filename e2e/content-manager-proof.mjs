@@ -332,7 +332,10 @@ try {
 
   await page.locator('[data-proposal-json]').fill('{}');
   await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
-  await page.locator('[data-public-payload-hash]').fill(approvedPost.contentHash);
+  const publicPayloadHash = selected.locator('[data-public-payload-hash]');
+  assert.equal(await publicPayloadHash.isEditable(), false, 'the selected ledger payload hash must remain read-only');
+  assert.equal(await publicPayloadHash.inputValue(), approvedPost.contentHash, 'selection must populate the exact ledger payload hash');
+  assert.equal(await selected.locator('[data-approval-id]').inputValue(), approvedPost.approvalId, 'selection must retain the exact ledger approval ID');
   await page.locator('[data-publish-confirm]').check();
   await publish.click();
   await page.waitForFunction(() => document.querySelector('[data-console-output]')?.textContent?.includes('PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED'));
