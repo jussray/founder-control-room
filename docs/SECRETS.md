@@ -97,6 +97,10 @@ The token check runs `eas whoami` without initiating a native build. An optional
 `APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
 
 
+#### November 4, 2026: parser parity is not credential proof
+
+Trusted GitHub App workflows refer to `secrets.APP_PRIVATE_KEY` in jobs declaring `environment: production`. That source reference does not independently prove whether an environment-level or repository-level value was supplied at execution time; GitHub environment secrets take precedence over same-named repository secrets. PR #1061 adds bounded DER, headerless-PEM and collapsed-PEM parsing without changing the secret's name, value or scope. The read-only diagnostic reported `transport_class=unknown`, `pem_boundary=false`, and `rsa_parse=false` for one effective runtime value. This proves local parsing failed for that invocation, **not** that the originally configured GitHub App key was never installed, became defective, or needs rotation. Verify source/scope provenance and App issuer separately before proposing any credential mutation. Never expose key material in logs, source, issues, artifacts or chat.
+
 #### Secret scope precedence
 
 Set these secrets in the scope the consuming job actually reads. `portfolio-evidence-sync.yml`

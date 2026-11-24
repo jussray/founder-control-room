@@ -125,6 +125,18 @@ describe('GitHub App secret-shape diagnostic contract', () => {
     expect(workflow).not.toContain('console.log(process.env.GITHUB_PRIVATE_KEY');
   });
 
+  it('reports a bounded reason and boolean-only input facts for unknown key transports', () => {
+    expect(workflow).toContain('const inputShape = {');
+    expect(workflow).toContain('const failureReason = !appIdNumeric');
+    expect(workflow).toContain('inputShape,');
+    expect(workflow).toContain('failureReason,');
+    expect(workflow).toContain('console.log(`failure_reason=${failureReason}`);');
+    expect(workflow).toContain('console.log(`input_shape=${JSON.stringify(inputShape)}`);');
+    expect(workflow).toContain("'private-key-transport-unrecognized'");
+    expect(workflow).not.toContain('console.log(trimmed');
+    expect(workflow).not.toContain('console.log(secret');
+  });
+
   it('performs local cryptographic parsing but no provider authentication or mutation', () => {
     expect(workflow).toContain("import { createPrivateKey } from 'node:crypto';");
     expect(workflow).toContain("createPrivateKey({ key: normalized, format: 'pem' })");

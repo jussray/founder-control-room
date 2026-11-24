@@ -390,7 +390,8 @@ function redactCommentBody(value: unknown): string {
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*/g, '[REDACTED_PRIVATE_KEY]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{12,}=*\b/gi, 'Bearer [REDACTED]')
-    .replace(/\bgh[pousr]_[A-Za-z0-9_]{16,}\b/g, '[REDACTED_GITHUB_TOKEN]')
+    // Include JWT separators and URL-safe characters so stateless ghs_ tokens are fully redacted.
+    .replace(/\bgh[pousr]_[A-Za-z0-9_.-]{16,}(?![A-Za-z0-9_.-])/g, '[REDACTED_GITHUB_TOKEN]')
     .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, '[REDACTED_API_KEY]');
   return body.slice(0, 1200);
 }

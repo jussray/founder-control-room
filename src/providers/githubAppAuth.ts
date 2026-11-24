@@ -88,30 +88,68 @@ function decodeRecognizedKeyWrapper(value: string): string {
   return value;
 }
 
+// Match the trusted read-only shape diagnostic: DER and headerless PEM bodies
+// are recoverable only when Node can parse them as private-key DER.
+function decodeDerToPem(value: string): string | null {
+  const compact = value.replace(/\s+/g, "");
+  if (!compact || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(compact)) return null;
+  const standard = compact.replace(/-/g, "+").replace(/_/g, "/");
+  if (standard.length % 4 === 1) return null;
+  const padded = standard.padEnd(
+    standard.length + ((4 - (standard.length % 4)) % 4),
+    "=",
+  );
+  const bytes = Buffer.from(padded, "base64");
+  for (const type of ["pkcs8", "pkcs1"] as const) {
+    try {
+      return createPrivateKey({ key: bytes, format: "der", type })
+        .export({ type: "pkcs8", format: "pem" })
+        .toString()
+        .trim();
+    } catch {
+      // Different DER containers are tested; malformed bytes remain invalid.
+    }
+  }
+  return null;
+}
+
+function rewrapCollapsedPem(value: string): string | null {
+  const match = /^-----BEGIN ((?:RSA )?PRIVATE KEY)-----([\s\S]*?)-----END \1-----$/.exec(
+    value.trim(),
+  );
+  if (!match) return null;
+  const body = match[2].replace(/\s+/g, "");
+  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/.test(body)) return null;
+  const wrapped = body.replace(/(.{64})/g, "$1\n").trim();
+  return `-----BEGIN ${match[1]}-----\n${wrapped}\n-----END ${match[1]}-----`;
+}
+
 function normalizePrivateKey(value: string): string {
-  // Normalize CR-only and CRLF transport before detecting fences or key wrappers.
+  // Keep the same bounded wrappers as the secret-safe GitHub Actions diagnostic.
   let normalized = value.trim().replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   normalized = decodeRecognizedKeyWrapper(normalized);
   normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
+    .replace(/\r\n?/g, "\n")
     .trim();
 
   if (!normalized.includes("-----BEGIN")) {
     normalized = decodeBase64Pem(normalized);
+    if (!normalized.includes("-----BEGIN")) {
+      normalized = decodeDerToPem(normalized) ?? normalized;
+    }
   }
 
-  // Base64-decoded PEM can itself contain CR-only lines: normalize after decode too.
-  return normalized.replace(/\r\n?/g, "\n").trim();
+  normalized = normalized.replace(/\r\n?/g, "\n").trim();
+  return rewrapCollapsedPem(normalized) ?? normalized;
 }
 
 function parseGitHubAppPrivateKey(value: string): KeyObject {
   const normalized = normalizePrivateKey(value);
   if (!/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)) {
     throw new Error(
-      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, base64/base64url-encoded PEM, a matching single-quoted wrapper, a fenced PEM, an APP_PRIVATE_KEY assignment, or an unambiguous JSON key object)",
+      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, base64/base64url-encoded PEM, a matching single-quoted wrapper, a fenced PEM, an APP_PRIVATE_KEY assignment, an unambiguous JSON key object, base64 DER, headerless PEM body, or collapsed PEM)",
     );
   }
 
