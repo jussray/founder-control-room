@@ -142,13 +142,32 @@ async function prepareFriendPage(
   });
 }
 
-test('Control Room exposes Friend from the normal founder stack', async ({ page }) => {
+test('Control Room shows Friend only inside the authenticated founder stack', async ({ page }) => {
   await page.route('**/automation/conveyor/**', async (route) => {
     await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
   });
   await page.goto(`${origin}/control-room/`);
-  await expect(page.locator('a[href="/control-room/friend.html"]')).toHaveCount(1);
-  await expect(page.locator('a[href="/control-room/friend.html"]')).toContainText('Friend');
+  await page.waitForLoadState('networkidle');
+
+  const friendLink = page.locator('a[href="/control-room/friend.html"]');
+  await expect(friendLink).toHaveCount(0);
+
+  // Simulate the already-authenticated shell in the navigation seam.
+  // Actual authentication and session validation have separate route tests.
+  await page.evaluate(() => {
+    const root = document.getElementById('root');
+    if (!root) throw new Error('Missing founder root');
+    const shell = document.createElement('section');
+    shell.className = 'shell';
+    root.append(shell);
+  });
+  await expect(friendLink).toHaveCount(1);
+  await expect(friendLink).toContainText('Friend');
+
+  await page.evaluate(() => {
+    document.querySelector('#root .shell')?.remove();
+  });
+  await expect(friendLink).toHaveCount(0);
 });
 
 for (const viewport of [
