@@ -24,7 +24,8 @@ export interface ProjectAdapterFreshnessAssessment {
   contractPathsMissing: string[];
   contractPathsDrifted: string[];
   founderReviewRequired: true;
-  promotionAllowed: false;
+  /** Read-only candidate eligibility, never authorization to merge, deploy, or mutate a provider. */
+  promotionAllowed: boolean;
   mutationAuthorized: false;
   blocker: string | null;
   nextAction: string;
@@ -43,7 +44,7 @@ function base(
     currentHead: input.currentHead,
     contractPathsRequired,
     founderReviewRequired: true as const,
-    promotionAllowed: false as const,
+    promotionAllowed: false as boolean,
     mutationAuthorized: false as const,
   };
 }
@@ -198,12 +199,14 @@ export function assessProjectAdapterFreshness(
     ...shared,
     state: 'verified',
     freshness: 'fresh',
-    recommendation: 'hold',
+    recommendation: 'candidate-promote',
     sourceHeadMatchesAudited: true,
     contractPathsMissing: [],
     contractPathsDrifted: [],
+    // Promotion here means eligibility for founder review, never write authority.
+    promotionAllowed: true,
     blocker: null,
-    nextAction: 'Keep the adapter read-only and repeat this check whenever authoritative main or a required project contract changes.',
+    nextAction: 'Exact-head adapter evidence qualifies for founder review. No merge, deploy, or provider mutation is authorized; reverify if the source or contract blobs move.',
     reasons: ['Authoritative main and every required project contract blob match the checked-in audited adapter snapshot.'],
   };
 }

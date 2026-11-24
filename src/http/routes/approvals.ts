@@ -37,6 +37,7 @@ import {
   type IssuedCreateBranchAuthority,
 } from '../../founder-os-lab/authorityIssuance.js';
 import { executeAuthorizedCreateBranch } from '../../providers/authorizedRepositoryMutation.js';
+import { isSafeFounderOsStagedPatchPath, validateFounderOsStagedPatch } from '../../founder-os-lab/missionPatchHandoff.js';
 import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   evaluateIndependentReviewGate,
@@ -1190,6 +1191,65 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    // The simulator's receipt is a claim, not permission. Use the same
+    // authenticated mission route and independently reread exact branch/file
+    // truth before reserving an idempotent provider write. Legacy founder UI
+    // edits continue through their existing path without a simulator receipt.
+    const stagedWorkspaceReceipt = (req.body as Record<string, unknown>)['stagedWorkspaceReceipt'];
+    let stagedExpectedHeadSha: string | undefined;
+    if (stagedWorkspaceReceipt !== undefined) {
+      if (changes.length > 3 || changes.some((change) => !isSafeFounderOsStagedPatchPath(change?.path) || (change.delete !== undefined && change.delete !== false))) {
+        return res.status(400).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_UNSAFE_FILES',
+          error: 'A staged workspace supports at most three non-destructive source edits.',
+        });
+      }
+      if (project.repo_provider !== 'github' || provider.name !== 'github') {
+        return res.status(409).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_PROVIDER_UNSUPPORTED',
+          error: 'Staged workspace handoff requires the GitHub mission branch provider.',
+        });
+      }
+
+      try {
+        const liveHeadSha = await provider.resolveRef(project.slug, mission.branch_ref);
+        const stagedChanges = changes as PatchFileChange[];
+        const sourceFiles = await Promise.all(stagedChanges.map(async (change) => ({
+          path: change.path,
+          content: await provider.readFile(project.slug, mission.branch_ref, change.path),
+        })));
+        const missionExpectedHeadSha =
+          typeof mission.policy_snapshot === 'object' && mission.policy_snapshot !== null
+            ? (mission.policy_snapshot as Record<string, unknown>)['expectedHeadSha']
+            : undefined;
+        const errors = validateFounderOsStagedPatch(stagedWorkspaceReceipt, {
+          repository: project.repo_identifier ?? '',
+          branch: mission.branch_ref,
+          liveHeadSha,
+          missionExpectedHeadSha: typeof missionExpectedHeadSha === 'string'
+            ? missionExpectedHeadSha : '',
+          changes: stagedChanges,
+          sourceFiles,
+        });
+        if (errors.length > 0) {
+          return res.status(409).json({
+            ok: false,
+            code: 'STAGED_WORKSPACE_PROOF_REJECTED',
+            errors,
+          });
+        }
+        stagedExpectedHeadSha = liveHeadSha.toLowerCase();
+      } catch {
+        return res.status(409).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_SOURCE_UNAVAILABLE',
+          error: 'Could not independently reread current mission branch or source files.',
+        });
+      }
+    }
+
     // Reserve before the provider mutation. The globally unique idempotency
     // key is the final race barrier if two requests pass the lookup above
     // concurrently.
@@ -1228,10 +1288,14 @@ approvalsRouter.post(
 
     let commitSha: string;
     try {
+      // An exact-head compare-and-swap guard is enforced by GitHubProvider
+      // only for staged simulator handoffs. Unverified head movement blocks
+      // the write rather than silently applying an obsolete proposal.
       commitSha = await provider.commitPatch(project.slug, mission.branch_ref, {
         message,
         changes: changes as PatchFileChange[],
         authorName: 'founder-control-room',
+        ...(stagedExpectedHeadSha ? { expectedHeadSha: stagedExpectedHeadSha } : {}),
       });
     } catch (error) {
       await supabase
