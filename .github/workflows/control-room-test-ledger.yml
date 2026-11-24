@@ -5,9 +5,6 @@ on:
     branches: [main]
   push:
     branches: [main]
-  schedule:
-    # Read-only drift detection even when no Git event occurs.
-    - cron: '19 */6 * * *'
   repository_dispatch:
     types: [runtime_state_changed]
   workflow_dispatch:

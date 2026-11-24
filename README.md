@@ -832,12 +832,6 @@ PR #948 adds an **on-demand, founder-authenticated Gmail metadata reader** pinne
 
 The source-first publisher now includes an X (Twitter) user-context text adapter alongside first-party LinkedIn. X requires server-held `X_USER_ACCESS_TOKEN` and `X_USER_ID`, current authenticated founder approval, a durable one-use execution reservation, exact account verification before posting, and exact author/text/timestamp provider readback afterward. A checked-in adapter is **not** a connected X account or a verified live post; no new credential, deployment, or automatic publication is authorized by this change.
 
-## Cloudflare external-state readback gate
-
-The same workflow now runs a read-only Cloudflare metadata recheck every six hours, including when no Git commit changes, and rejects drift rather than refreshing a false-green source receipt. It is still not a substitute for fresh readback at consequential execution time.
-
-The existing Control Room Test Ledger accepts `runtime_state_changed` invalidations, but an incoming event or caller-provided hash is not evidence of current provider configuration. On Cloudflare external-state revalidation, the workflow now requires a fresh, read-only Cloudflare Worker settings and cron readback before recording `independently-read-back`. The source-declared required secret **names** and cron schedules are compared with provider metadata; provider values are not retained in receipts. Missing provider access, missing bindings, missing cron, a plain-text `CF_API_TOKEN` binding, or stale readback fails closed. This is a scoped source/CI gate, not proof that live provider credentials work, that production matches the current commit, or that every consequential action has a provider recheck. Those remain separate at-use and deployment gates.
-
 ## Founder OS lab adapter promotion eligibility
 
 `assessProjectAdapterFreshness` in `src/founder-os-lab/projectAdapterFreshness.ts` reports `promotionAllowed: true` and `recommendation: 'candidate-promote'` only when the authoritative current head equals the audited exact head and every required contract blob matches. Head movement, drift, missing or invalid blobs, and unknown heads keep it `false`. Eligibility means the evidence may go to founder review; `founderReviewRequired` stays `true` and `mutationAuthorized` stays `false`, so it never grants merge, deploy, publication, or provider authority.
@@ -856,3 +850,12 @@ The existing Control Room Test Ledger accepts `runtime_state_changed` invalidati
 - **FCR** controls trusted approval readback, durable pending reservation, guarded patch execution, exact ref and immutable commit readback, proof verification, and final receipt persistence.
 
 The candidate rejects protected branch writes, noncanonical repository paths, unbound proposal hashes, failed pending-reservation storage, stale commits, absent browser/documentation/pro-vider proof, and unverified target identity. A trusted adapter must atomically validate/consume live approval and compare-and-swap the branch head immediately before mutation. Merely implementing this interface **does not prove** the actual adapter exists or is secure. Any connection to real execution requires a separate scoped review and real-path evidence. Exact-head tests and PR evidence do not grant a merge or deployment. The full proof must be reacquired when PR/base/head changes.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Cloudflare provider readback before external state proof (#985)
+
+Ledger assertions about Cloudflare Worker secrets, bindings, scheduled handlers, deployed code identity or required GitHub check contexts require independent read-only provider readback at the exact target revision. A repository file, job attempt, submitted API call or exit status is not itself live-runtime verification. This source change keeps the workflow's on-demand/push triggers; it does not add PR #985's proposed six-hour recurring GitHub Actions schedule without a separately approved monitoring-cost decision. No Cloudflare write or production deploy was executed.
