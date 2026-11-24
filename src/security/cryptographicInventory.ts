@@ -152,8 +152,8 @@ export const CRYPTOGRAPHIC_REVIEW_REQUIRED: readonly CryptographicReviewRequired
   },
   {
     projectSlug: 'sync-party',
-    reason: 'SYNC is now an authority-bearing portfolio project, but this FCR source pass has not independently proven its runtime authentication, signing, or provider-managed cryptographic boundary.',
-    nextEvidence: 'Inspect the exact deployed SYNC Worker and provider bindings for auth, signing, transport, Durable Object, and secret-dependent cryptography before assigning a migration class.',
+    reason: 'Sync Party entered the active portfolio after the last cryptographic inventory pass, and its multiplayer/runtime cryptographic boundary has not yet been source-proven.',
+    nextEvidence: 'Inspect Sync Party session, multiplayer transport, deployment, and any signed or provider-managed authentication paths before classifying migration exposure.',
   },
 ] as const;
 

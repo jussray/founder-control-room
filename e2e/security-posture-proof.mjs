@@ -91,7 +91,7 @@ const cryptographicReviewRequired = [
   ['chief-ai-machine', 'Canonical runtime public-key boundary not proven.'],
   ['juss-beautiful-hair', 'Provider-owned storefront crypto requires deeper evidence.'],
   ['promptos', 'Canonical runtime auth/signing primitive not proven.'],
-  ['sync-party', 'Canonical runtime crypto boundary not yet proven from the FCR source pass.'],
+  ['sync-party', 'Multiplayer/runtime cryptographic boundary not yet proven.'],
 ].map(([projectSlug, reason]) => ({
   projectSlug,
   reason,
