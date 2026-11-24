@@ -99,6 +99,18 @@ STOP CONDITION:
 
 For a Juss-owned URL, resolve project and repository through current FCR portfolio/control-plane evidence or another authoritative project registry. A hostname resemblance, repo name, chat memory, page metadata, or generated claim is not sufficient ownership proof.
 
+Destination guard (applies to every ownership class, before any browser navigation):
+
+- Allow only `https:` URLs to public hostnames. Reject loopback, private, link-local, unique-local and other non-public addresses, IP literals, credentials in the URL, and bare hostnames.
+- The literal-URL check in `validateTargetUrl` (`scripts/external-site-snapshot.mjs`) is necessary but not sufficient. It does not resolve DNS and does not follow redirects. Resolve the hostname and reject any non-public address. Re-apply the same checks to every redirect hop and to the final URL.
+- If any check fails, stop with `BLOCKED`, name the rejected destination class, and do not load, capture, screenshot or persist responses from that destination.
+
+Artifact hygiene (applies to every URLFIX run, before any screenshot, trace, console, network or receipt is written):
+
+- Use only synthetic or test identities. Never load a real user's or privileged account's authenticated browser state (storage state, cookies, bearer or session tokens) into a URLFIX run.
+- Never persist cookies, `Authorization` or other request headers, request or response bodies, form field values, or private page text. Console and network capture may keep method, status, and the URL with query strings and fragments removed.
+- Redact any token-like or credential-like value that appears in a captured artifact or receipt before it is stored. If redaction cannot be verified, discard the artifact and report `BLOCKED`.
+
 If ownership is `EXTERNAL` or `UNKNOWN`:
 
 ```text
@@ -181,6 +193,12 @@ STATUS: VERIFIED | INFERRED | UNKNOWN | BLOCKED | STALE
 
 Do not convert a suspicion into a defect merely because a console warning exists. Require user-visible or contract-relevant impact, a failing assertion, or another concrete violated expectation.
 
+## Browser state and artifact handling
+
+- Use only synthetic or test identities for authenticated flows. Never reuse a real user's or a privileged account's browser state, storage state, cookies or tokens, and never sign in with a founder or operator credential.
+- Before any screenshot, trace, console or network capture is stored, or copied into a continuity receipt, redact cookies, authorization and other secret headers, request bodies, and private page content. Restrict captures to the minimum needed to show the defect.
+- Rejecting credentials in the URL does not protect browser state or response data. Keep artifacts out of committed files and receipts unless they pass this redaction step.
+
 ## Phase 3: TRACE
 
 For each highest-severity independent issue, map:
@@ -230,9 +248,7 @@ Record the exact candidate SHA for every proof claim.
 
 ## Phase 6: VERIFY THE SAME FAILURE PATH
 
-The original failing reproduction is the regression witness.
-
-Rerun the same failing browser path after the patch, preserving its viewport, route, action, and request boundary.
+The original failing reproduction is the regression witness. The same failing browser path must be rerun after the repair.
 
 If baseline evidence was:
 

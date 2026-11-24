@@ -103,6 +103,16 @@ describe('portable Founder OS registry', () => {
     ]));
   });
 
+
+  it('registers the Attack/Godmode companion as founder-native and non-executing', () => {
+    expect(FOUNDER_OS_LAB_SKILLS).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'ultrathink-attack-godmode',
+        mayExecute: false,
+      }),
+    ]));
+  });
+
   it('contains the complete provider registry as preview-only, side-effect-free descriptors', () => {
     expect(FOUNDER_OS_LAB_PROVIDERS.map((provider) => provider.id)).toEqual(EXPECTED_PROVIDERS);
     expect(Object.keys(FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE)).toEqual(EXPECTED_PROVIDERS);

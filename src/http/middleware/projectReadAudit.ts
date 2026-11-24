@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
+import { connectionRowHasRawCredential } from '../../lib/connectionConfigSecrets.js';
 import type { FounderRequest } from './requireFounder.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -130,6 +131,20 @@ async function projectIdsForRead(
   return [responseProjectId ?? await resolveProjectId(surface.slug)];
 }
 
+/**
+ * Counts returned connection rows whose stored config or secret_ref looks like
+ * raw credential material (e.g. legacy rows written before the write-time
+ * check). Only the count is recorded; paths and values never enter the audit.
+ */
+function credentialShapedConnectionCount(body: unknown): number {
+  const connections = asRecord(body)?.connections;
+  if (!Array.isArray(connections)) return 0;
+  return connections.filter(row => {
+    const record = asRecord(row);
+    return record ? connectionRowHasRawCredential(record) : false;
+  }).length;
+}
+
 async function persistReadAudit(
   req: FounderRequest,
   surface: ReadSurface,
@@ -153,6 +168,9 @@ async function persistReadAudit(
       actor: 'founder',
       founder_user_id: req.founder?.userId ?? null,
       result_project_count: projectIds.length,
+      ...(surface.eventType === 'project_connections_read'
+        ? { credential_shaped_connection_count: credentialShapedConnectionCount(body) }
+        : {}),
     },
   }));
 
