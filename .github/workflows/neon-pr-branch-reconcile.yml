@@ -153,7 +153,7 @@ jobs:
             # A concurrent PR-close event may win the race and delete first.
             # Accept DELETE 404 only if provider readback confirms absence below.
             delete_status="$(curl --silent --show-error --retry 3 -o /dev/null -w '%{http_code}' -X DELETE \
-              -H "$auth_neon" "$fresh_id")"
+              -H "$auth_neon" "$neon_api/$fresh_id")"
             if [[ ! "$delete_status" =~ ^2[0-9][0-9]$ && "$delete_status" != "404" ]]; then
               echo "::error title=Neon delete request failed::Provider returned HTTP $delete_status for $name."
               exit 1
