@@ -116,15 +116,72 @@ export async function storeOperatorExecutionContinuation(
   }
   const projectId = await projectFor(safeRecord.observation.projectSlug, safeRecord.observation.repositoryFullName);
   const existing = await latestFor(projectId, safeRecord.taskId);
+  const incomingState = safeRecord.taskState ?? 'ACTIVE';
+  if (!existing && incomingState !== 'ACTIVE') {
+    throw new OperatorContinuationStoreError('invalid_continuation');
+  }
   if (existing) {
-    const priorObservedAt = Date.parse(existing.record.observation.observedAt);
+    const prior = existing.record;
+    const priorObservedAt = Date.parse(prior.observation.observedAt);
     const incomingObservedAt = Date.parse(safeRecord.observation.observedAt);
     if (priorObservedAt > incomingObservedAt
-      || (priorObservedAt === incomingObservedAt && existing.record.fingerprint !== safeRecord.fingerprint)) {
+      || (priorObservedAt === incomingObservedAt && prior.fingerprint !== safeRecord.fingerprint)) {
       throw new OperatorContinuationStoreError('stale_continuation');
     }
-    if (priorObservedAt === incomingObservedAt && existing.record.fingerprint === safeRecord.fingerprint) {
+    if (existing.invalidatedAt) {
+      const priorRefs = [...prior.observation.evidenceRefs].sort().join('|');
+      const nextRefs = [...safeRecord.observation.evidenceRefs].sort().join('|');
+      if (incomingObservedAt <= priorObservedAt || priorRefs === nextRefs) {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
+    }
+    if (prior.fingerprint === safeRecord.fingerprint && priorObservedAt === incomingObservedAt) {
+      if (existing.invalidatedAt) throw new OperatorContinuationStoreError('stale_continuation');
       return { disposition: 'duplicate', stored: existing };
+    }
+    const priorState = prior.taskState ?? 'ACTIVE';
+    const allowed: Record<string, readonly string[]> = {
+      ACTIVE: ['ACTIVE', 'RESULT_SUBMITTED'],
+      RESULT_SUBMITTED: ['RESULT_SUBMITTED', 'VERIFIED'],
+      VERIFIED: ['VERIFIED', 'CLOSED'],
+      CLOSED: [],
+    };
+    if (!allowed[priorState]?.includes(incomingState)) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (prior.destinationOperator && safeRecord.sourceOperator !== prior.destinationOperator) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (incomingState === 'RESULT_SUBMITTED'
+      && safeRecord.resultSubmittedByOperator !== safeRecord.sourceOperator) {
+      throw new OperatorContinuationStoreError('invalid_continuation');
+    }
+    if (priorState === 'RESULT_SUBMITTED' && incomingState === 'RESULT_SUBMITTED'
+      && (safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator)) {
+      throw new OperatorContinuationStoreError('stale_continuation');
+    }
+    if (incomingState === 'VERIFIED') {
+      if (priorState !== 'RESULT_SUBMITTED' && priorState !== 'VERIFIED') {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
+      if (safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator
+        || safeRecord.verifiedByOperator !== safeRecord.sourceOperator
+        || safeRecord.verifiedByOperator === safeRecord.resultSubmittedByOperator
+        || (priorState === 'VERIFIED' && (safeRecord.verifiedByOperator !== prior.verifiedByOperator
+          || JSON.stringify(safeRecord.verificationRefs ?? []) !== JSON.stringify(prior.verificationRefs ?? [])))) {
+        throw new OperatorContinuationStoreError('invalid_continuation');
+      }
+    }
+    if (incomingState === 'CLOSED') {
+      if (priorState !== 'VERIFIED'
+        || safeRecord.resultRef !== prior.resultRef
+        || safeRecord.resultSubmittedByOperator !== prior.resultSubmittedByOperator
+        || safeRecord.verifiedByOperator !== prior.verifiedByOperator
+        || JSON.stringify(safeRecord.verificationRefs ?? []) !== JSON.stringify(prior.verificationRefs ?? [])) {
+        throw new OperatorContinuationStoreError('stale_continuation');
+      }
     }
   }
 
@@ -171,4 +228,94 @@ export async function readOperatorExecutionContinuation(
   if (!validTaskId(taskId)) throw new OperatorContinuationStoreError('invalid_continuation');
   const projectId = await projectFor(projectSlug, repositoryFullName);
   return latestFor(projectId, taskId);
+}
+
+
+/**
+ * Discovery over the existing founder-only continuity ledger.
+ * The returned items are bounded metadata, never raw transcripts or current
+ * source/CI/deployment proof. Newer rows for one task win within this window.
+ */
+export async function listRecentOperatorExecutionContinuations(
+  projectSlug: string,
+  repositoryFullName: string,
+  limit = 10,
+): Promise<{
+  items: Array<{
+    taskId: string;
+    observedAt: string;
+    sourceMode: 'chat' | 'work';
+    sourceOperator: string | null;
+    destinationOperator: string | null;
+    taskState: 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
+    remainingStepIds: readonly string[];
+    nextActionRef: string | null;
+    fingerprint: string;
+    invalidatedAt: string | null;
+    status: 'PERSISTED_NOT_REVALIDATED' | 'INVALIDATED';
+  }>;
+  scanned: number;
+  boundedWindow: true;
+  currentEvidenceVerified: false;
+  authorizesExecution: false;
+}> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+    throw new OperatorContinuationStoreError('invalid_continuation');
+  }
+  const projectId = await projectFor(projectSlug, repositoryFullName);
+  const { supabase } = await import('./supabaseClient.js');
+  // Bounded scan avoids a new table/index and never claims exhaustive coverage.
+  const { data, error } = await supabase.from('continuity_records')
+    .select('id,task_id,execution_state,subject_fingerprint,proof_cookie,checkpoint_observed_at,invalidated_at,created_at')
+    .eq('project_id', projectId)
+    .not('task_id', 'is', null)
+    .order('checkpoint_observed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error || !Array.isArray(data)) throw new OperatorContinuationStoreError('storage_unavailable');
+  const seen = new Set<string>();
+  const items: Array<{
+    taskId: string;
+    observedAt: string;
+    sourceMode: 'chat' | 'work';
+    sourceOperator: string | null;
+    destinationOperator: string | null;
+    taskState: 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
+    remainingStepIds: readonly string[];
+    nextActionRef: string | null;
+    fingerprint: string;
+    invalidatedAt: string | null;
+    status: 'PERSISTED_NOT_REVALIDATED' | 'INVALIDATED';
+  }> = [];
+  for (const raw of data) {
+    const stored = parsedStoredRow(raw as Record<string, unknown>);
+    if (!stored) throw new OperatorContinuationStoreError('storage_unavailable');
+    const observation = stored.record.observation;
+    if (observation.projectSlug !== projectSlug
+      || observation.repositoryFullName.toLowerCase() !== repositoryFullName.toLowerCase()
+    ) throw new OperatorContinuationStoreError('storage_unavailable');
+    if (seen.has(stored.record.taskId)) continue;
+    seen.add(stored.record.taskId);
+    items.push({
+      taskId: stored.record.taskId,
+      observedAt: observation.observedAt,
+      sourceMode: stored.record.sourceMode,
+      sourceOperator: stored.record.sourceOperator ?? null,
+      destinationOperator: stored.record.destinationOperator ?? null,
+      taskState: stored.record.taskState ?? 'ACTIVE',
+      // The newest row per task stays authoritative even when invalidated,
+      // so an older superseded row is never resurrected. An invalidated
+      // checkpoint is flagged and exposes no actionable next step.
+      remainingStepIds: stored.invalidatedAt ? [] : stored.record.remainingStepIds,
+      nextActionRef: stored.invalidatedAt ? null : stored.record.nextActionRef,
+      fingerprint: stored.record.fingerprint,
+      invalidatedAt: stored.invalidatedAt,
+      status: stored.invalidatedAt ? 'INVALIDATED' : 'PERSISTED_NOT_REVALIDATED',
+    });
+    if (items.length === limit) break;
+  }
+  return {
+    items, scanned: data.length, boundedWindow: true,
+    currentEvidenceVerified: false, authorizesExecution: false,
+  };
 }
