@@ -11,7 +11,8 @@
     "workflow-authority",
     "truth-governance",
     "capability-authority",
-    "founder-permission-authority"
+    "founder-permission-authority",
+    "external-surface-authority"
   ],
   "changes": [
     {
@@ -1011,6 +1012,24 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify both public Lovable surface-binding artifacts under the external-surface-authority domain so a change to either file fails closed without a current documentation receipt naming path-bound invariants for them."
+      ]
+    },
+    {
+      "path": "public/.well-known/lovable-project-surfaces.json",
+      "claims": [
+        "`public/.well-known/lovable-project-surfaces.json` must bind every published Lovable surface to its canonical repository and canonical branch only while truthAuthority, executionAllowed, and externalMutationAllowed remain locked false; a binding entry must never grant truth, execution, or external-mutation authority through this manifest."
+      ]
+    },
+    {
+      "path": "public/.well-known/lovable-project-surfaces.schema.json",
+      "claims": [
+        "`public/.well-known/lovable-project-surfaces.schema.json` must reject any surfaceId that is not a canonical 8-4-4-4-12 UUID behind the lovable: prefix, and must keep truthAuthority, executionAllowed, and externalMutationAllowed constrained to the constant false for every published binding."
       ]
     }
   ]
