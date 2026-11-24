@@ -365,7 +365,7 @@ export function createRemoteReadMcpHandler(
   const toolIsAllowed = (name: string): name is ExternalMcpToolName =>
     isExternalMcpToolName(name) && (!allowedToolNames || allowedToolNames.has(name));
   const instructions = overrides.instructions ??
-    'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool. Checkpoint persistence stores reference metadata only; peer relay is a separate bounded handoff and grants no execution authority.';
+    'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool. Checkpoint persistence stores reference metadata only; peer relay is a separate bounded handoff and grants no execution authority. Dedicated project routes may narrow this catalog further.';
 
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     applyMcpHeaders(res);
