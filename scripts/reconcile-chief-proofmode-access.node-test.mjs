@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyChiefAccessError, ensureChiefProofModeAccessPolicy } from './reconcile-chief-proofmode-access.mjs';
+import {
+  classifyChiefAccessError,
+  createChiefAccessSubjectFingerprint,
+  ensureChiefProofModeAccessPolicy,
+} from './reconcile-chief-proofmode-access.mjs';
 
 const ACCOUNT = 'account-1';
 const READ_TOKEN = 'read-token';
@@ -96,7 +100,10 @@ test('accepts only the configured service token on an existing exact-host Servic
   });
 
   const result = await ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl });
-  assert.deepEqual(result, {
+  assert.match(result.subjectFingerprint, /^sha256:[0-9a-f]{64}$/);
+  const { subjectFingerprint, ...stable } = result;
+  assert.ok(subjectFingerprint);
+  assert.deepEqual(stable, {
     state: 'configured',
     changed: false,
     appId: exactPublicApp.id,
@@ -362,6 +369,116 @@ test('repair creates exactly one specific non-identity service-token policy', as
   });
   assert.notEqual(body.decision, 'bypass');
   assert.equal('any_valid_service_token' in body.include[0], false);
+});
+
+test('repair marks transport failure after policy POST as mutation outcome unknown', async () => {
+  const routed = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const fetchImpl = async (url, init = {}) => {
+    if (init.method === 'POST') {
+      routed.calls.push({ url: String(url), init });
+      throw new Error('socket reset after request write');
+    }
+    return routed.fetchImpl(url, init);
+  };
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      fetchImpl,
+    }),
+    (error) => {
+      assert.equal(error.chiefAccessMutationOutcome, 'unknown');
+      assert.equal(classifyChiefAccessError(error), 'provider-write-outcome-unknown');
+      return true;
+    },
+  );
+  assert.equal(routed.calls.filter(({ init }) => init.method === 'POST').length, 1);
+});
+
+test('repair marks successful POST with invalid returned policy shape as mutation performed', async () => {
+  const routed = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+    createByApp: {
+      [exactPublicApp.id]: { id: 'policy-new', decision: 'allow', include: [] },
+    },
+  });
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      fetchImpl: routed.fetchImpl,
+    }),
+    (error) => {
+      assert.equal(error.chiefAccessMutationOutcome, 'performed');
+      assert.equal(classifyChiefAccessError(error), 'provider-write-verification-failed');
+      return true;
+    },
+  );
+  assert.equal(routed.calls.filter(({ init }) => init.method === 'POST').length, 1);
+});
+
+test('repair bound to a latched subject refuses a swapped subject before any POST', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const swappedSubject = createChiefAccessSubjectFingerprint({
+    targetOrigin: TARGET,
+    applicationId: 'app-swapped-after-latch',
+    serviceTokenId: SERVICE_ID,
+  });
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      expectedSubjectFingerprint: swappedSubject,
+      fetchImpl,
+    }),
+    (error) => {
+      assert.match(error.message, /differs from the latched repair subject/);
+      assert.equal(error.chiefAccessMutationOutcome, undefined);
+      assert.equal(classifyChiefAccessError(error), 'access-application-ambiguous-or-unresolved');
+      return true;
+    },
+  );
+  assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 0);
+});
+
+test('repair bound to the matching latched subject still creates exactly one policy', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  const latchedSubject = createChiefAccessSubjectFingerprint({
+    targetOrigin: TARGET,
+    applicationId: exactPublicApp.id,
+    serviceTokenId: SERVICE_ID,
+  });
+
+  const result = await ensureChiefProofModeAccessPolicy({
+    ...baseArgs,
+    mode: 'repair',
+    apiToken: ADMIN_TOKEN,
+    expectedSubjectFingerprint: latchedSubject,
+    fetchImpl,
+  });
+  assert.equal(result.changed, true);
+  assert.equal(result.subjectFingerprint, latchedSubject);
+  assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 1);
 });
 
 test('provider credential appears only in Authorization header', async () => {

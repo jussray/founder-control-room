@@ -1012,6 +1012,68 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-command-bridge.yml",
+      "claims": [
+        "`.github/workflows/chief-proofmode-access-command-bridge.yml` must keep Chief Access provider mutation reachable only from founder-authored issue #485 commands bound to exact current FCR main and the immutable Chief preview target; it cannot create a second direct provider-mutation authority surface."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-recovery.yml",
+      "claims": [
+        "`.github/workflows/chief-proofmode-access-recovery.yml` must remain a repository-local reusable workflow with no standalone repair dispatch, keep read and repair authority separate, require an auditable repair approval reference, and fail closed on unresolved subject-bound reconciliation state before any provider POST.",
+        "`.github/workflows/chief-proofmode-access-recovery.yml` may recover an orphaned REPAIR_IN_PROGRESS latch only after the original GitHub Actions run is terminal and fresh read-only Cloudflare observation proves the same exact provider-subject fingerprint is currently configured; active, pending, mismatched, or unconfigured subjects remain blocked and recovery performs no provider mutation."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "`README.md` must describe Chief ProofMode Access recovery as founder-bridge-bound, specificity-first, subject-reconciled provider authority and must keep successful Access repair separate from production runtime/Playwright proof."
+      ]
+    },
+    {
+      "path": "docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md",
+      "claims": [
+        "`docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md` must document that terminal same-subject provider readback is required before orphaned Chief Access repair state can be cleared and that reconciliation recovery itself has no Cloudflare mutation authority."
+      ]
+    },
+    {
+      "path": "docs/TRUTH_DECAY_AUDIT.md",
+      "claims": [
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat an ambiguous Chief Access provider-write result as reconciliation-required state bound to the same provider-subject fingerprint and must never allow transport failure or an unrelated v2 marker to become blind retry authority."
+      ]
+    },
+    {
+      "path": "scripts/chief-proofmode-access-reconciliation-state.mjs",
+      "claims": [
+        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must persist REPAIR_IN_PROGRESS and RECONCILE_REQUIRED by provider-subject fingerprint, preserve unresolved legacy reconciliation through the v2 transition, and prevent evidence for a different application/token subject from clearing retry blocking.",
+        "`scripts/chief-proofmode-access-reconciliation-state.mjs` must expose the exact in-progress run plus provider subject for bounded orphan reconciliation while requiring the recovery marker to target that original run; an unrelated run cannot silently clear the latch."
+      ]
+    },
+    {
+      "path": "scripts/reconcile-chief-proofmode-access.mjs",
+      "claims": [
+        "`scripts/reconcile-chief-proofmode-access.mjs` must bind repair to one exact-host provider subject, mark ambiguous provider writes as unknown, and never permit a failed response to imply that no mutation occurred or authorize an unbounded retry."
+      ]
+    },
+    {
+      "path": "scripts/resolve-chief-proofmode-access-selector.mjs",
+      "claims": [
+        "`scripts/resolve-chief-proofmode-access-selector.mjs` must resolve Chief-specific protected identity before the documented generic fallback, reject conflicting or multiline selector values, and expose only non-secret source/fingerprint metadata without treating selector presence as runtime proof."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-runtime-witness.yml",
+      "claims": [
+        "`.github/workflows/chief-proofmode-runtime-witness.yml` must resolve the canonical Chief-specific Access identity through the selector contract before a read-only runtime witness and must never infer successful production Access activation from a source configuration or unobserved provider outcome."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-cloudflare-bridge-contract.yml",
+      "claims": [
+        "`.github/workflows/fcr-cloudflare-bridge-contract.yml` must syntax-check and test the changed Chief Access selector, provider-subject, and reconciliation-state contracts without treating a passing test suite as authority for a Cloudflare policy mutation."
+      ]
     }
   ]
 }

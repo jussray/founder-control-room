@@ -6,13 +6,18 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  issues: write
 
 jobs:
-  dispatch:
-    if: ${{ github.event.issue.number == 485 && github.event.comment.user.login == 'jussray' }}
+  parse:
+    if: ${{ github.repository == 'jussray/founder-control-room' && github.event.issue.number == 485 && github.event.comment.user.login == 'jussray' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.parse.outputs.sha }}
+      mode: ${{ steps.parse.outputs.mode }}
+      target: ${{ steps.parse.outputs.target }}
+      approval_reference: ${{ steps.parse.outputs.approval_reference }}
 
     steps:
       - name: Parse exact founder Chief Access command
@@ -25,7 +30,7 @@ jobs:
           read -r command mode sha target approval extra <<< "$COMMENT_BODY"
 
           if [[ "$command" != '/cloudflare-chief-access' ]]; then
-            echo 'Not a Chief Access command; exiting without dispatch.'
+            echo 'Not a Chief Access command; exiting without recovery authority.'
             exit 0
           fi
           if [[ "$mode" != 'check' && "$mode" != 'repair' ]]; then
@@ -90,35 +95,13 @@ jobs:
           printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
-      - name: Dispatch bounded Chief Access recovery
-        if: steps.parse.outputs.sha != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
-          MODE: ${{ steps.parse.outputs.mode }}
-          TARGET: ${{ steps.parse.outputs.target }}
-          APPROVAL_REFERENCE: ${{ steps.parse.outputs.approval_reference }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          payload="$(jq -n \
-            --arg ref main \
-            --arg sha "$EXPECTED_HEAD_SHA" \
-            --arg mode "$MODE" \
-            --arg target "$TARGET" \
-            --arg approval "$APPROVAL_REFERENCE" \
-            '{ref:$ref, inputs:{expected_head_sha:$sha, mode:$mode, target_url:$target, approval_reference:$approval}}')"
-
-          gh api \
-            --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/chief-proofmode-access-recovery.yml/dispatches" \
-            --input - <<< "$payload"
-
-          {
-            echo '## Chief ProofMode Access command dispatched'
-            echo
-            echo "- Exact FCR current main: \`$EXPECTED_HEAD_SHA\`"
-            echo "- Mode: \`$MODE\`"
-            echo "- Target: \`$TARGET\`"
-            echo '- Scope: one exact immutable Chief preview Service Auth policy only'
-          } >> "$GITHUB_STEP_SUMMARY"
+  recover:
+    needs: parse
+    if: ${{ needs.parse.outputs.sha != '' }}
+    uses: ./.github/workflows/chief-proofmode-access-recovery.yml
+    with:
+      expected_head_sha: ${{ needs.parse.outputs.sha }}
+      mode: ${{ needs.parse.outputs.mode }}
+      target_url: ${{ needs.parse.outputs.target }}
+      approval_reference: ${{ needs.parse.outputs.approval_reference }}
+    secrets: inherit

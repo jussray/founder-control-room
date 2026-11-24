@@ -191,6 +191,18 @@ The corrected rule keeps the authority planes separate. Claude, Claude Code, and
 
 Durable repository changes return through GitHub commit, pull-request, diff, check, and review evidence. The current FCR Cowork lane does **not** have a native Cowork receipt adapter, so generic Activity entries cannot be relabeled as Cowork receipts and FCR must keep that receipt state `UNKNOWN`/unwired until a separately reviewed adapter is implemented and proven. Council membership, model capability, connector availability, or Cowork tools never grant merge, deploy, provider, credential, billing, publication, deletion, or founder authority.
 
+## 2026-09 control correction: Chief Access repair authority and ambiguous writes
+
+The Chief ProofMode recovery lane exposed a provider-mutation version of truth decay. A direct workflow-dispatch surface could bypass the founder command bridge, a generic service-token alias could silently outrank a conflicting Chief-specific selector, and a transport failure after a provider POST could be misread as “nothing happened.” Any of those states can turn truthful source intent into unsafe retry authority.
+
+The corrected authority path is deliberately singular. Founder issue #485 is the only supported mutation entry point; it revalidates the founder identity, exact current FCR main, immutable Chief preview origin, and auditable approval reference before invoking the local reusable recovery workflow. The recovery workflow has no independent `workflow_dispatch` mutation surface. Read-only provider inspection and repair authority remain separate, and a check cannot claim browser/runtime success.
+
+Service-token resolution is specificity-first, conflict-detecting, and line-safe. Chief-specific protected configuration may use the documented generic alias only when those sources agree or the specific source is absent. The chosen non-secret selector is fingerprinted for continuity, but selector presence does not prove credential validity or runtime authentication.
+
+The provider write path binds the exact target application plus service-token identity into a provider-subject fingerprint before mutation. `REPAIR_IN_PROGRESS` is persisted before the POST. If transport or verification leaves the write outcome ambiguous, the subject becomes `RECONCILE_REQUIRED`; the same subject must be read back before retry authority can return, evidence for a different application/token subject cannot clear the latch, and unresolved legacy v1 state remains blocking until an explicit reconciliation migration clears it.
+
+A green recovery check, a successful policy creation, and a green exact-head source suite are still different facts. Chief production runtime remains UNKNOWN/BLOCKED until the exact current Chief release is independently observed through production Playwright/runtime identity after Access recovery.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -543,6 +555,8 @@ The resident Council and Muse relay exposed another version of the same evidence
 The proof lane therefore treats Cloudflare secret enumeration as an observation operation with its own prerequisite credential. If that Cloudflare credential is malformed, rejected, or cannot be placed into the Authorization header, `wrangler secret list` never observes the target Worker secret plane. That failure may prove the observation path is blocked; it does **not** prove `MODEL_API_KEY` is absent. The target secret remains `UNKNOWN`/`BLOCKED` until a valid provider read succeeds.
 
 The same separation applies after secret presence is observed. `MODEL_API_KEY` present is only configuration evidence. A live Muse claim additionally requires the exact deployed FCR runtime and one bounded relay whose returned evidence reference is tied to the actual provider response. Council residency, provider availability, model naming, secret-name declaration, secret presence, deployment identity, and invocation outcome are separate facts with separate freshness.
+
+45. An ambiguous provider-write response cannot be reused as permission to retry; Chief Access repair must reconcile the same provider-subject fingerprint, preserve unresolved legacy state, and prove the exact runtime separately before another mutation can be authorized.
 
 ## Rollback
 
