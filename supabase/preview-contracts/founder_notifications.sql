@@ -9,6 +9,7 @@ create table public.founder_notification_subscriptions (
   encrypted_subscription text not null check (length(encrypted_subscription) between 30 and 5000),
   enrolled_at timestamptz not null default now(),
   revoked_at timestamptz,
+  last_test_at timestamptz,
   unique(user_id, endpoint_hash)
 );
 alter table public.founder_notification_subscriptions enable row level security;
