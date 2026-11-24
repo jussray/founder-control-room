@@ -3,7 +3,7 @@
   "name": "Founder Control Room Notifications",
   "short_name": "FCR Alerts",
   "start_url": "/control-room/notifications",
-  "scope": "/control-room/",
+  "scope": "/control-room/notifications",
   "display": "standalone",
   "background_color": "#111a20",
   "theme_color": "#111a20",
