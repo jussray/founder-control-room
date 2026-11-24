@@ -11,6 +11,19 @@ const LEGACY_SESSION_KEY = 'fcr_session';
 const LEGACY_MISSION_NOTICE = 'Mission created. See the Missions tab.';
 const FOUNDER_MISSION_NOTICE = 'Mission created. Open Control → Work.';
 
+// The Search & Evidence homepage link has a legacy ?tab=truth-seo address.
+// Canonicalize it synchronously, before asynchronous founder identity reads
+// or any tab rendering can expose the SEO panel with a stale URL.
+function canonicalizeLegacySearchEvidenceRoute() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('tab') !== 'truth-seo') return;
+  url.searchParams.delete('tab');
+  url.searchParams.set('screen', 'proof');
+  url.searchParams.set('view', 'truth-seo');
+  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+canonicalizeLegacySearchEvidenceRoute();
+
 function unwrapApiData(value) {
   return value && value.success === true && value.data ? value.data : value;
 }
