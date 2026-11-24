@@ -17,6 +17,24 @@ Before planning, editing, or claiming completion, establish and state:
 
 Inspect repository and runtime truth for unknowns. Ask only when a missing answer materially changes the safe solution or authority. Re-run 5W1H after red-team/OODA findings change the plan. Finish by mapping the result, evidence, remaining blocker, and next owner back to all six questions.
 
+## Internal self-answer and bounded continuation
+
+For each new founder reply, use the existing 5W1H, ULTRATHINK, Devil/Red Team, and OODA sequence as a **decision loop**, not six questions sent back to the founder. Answer your own decision-changing questions first from the current request, already supplied facts, and freshly observed evidence inside the specifically authorized repository/provider scope.
+
+Classify each unresolved question before acting:
+
+- `ANSWERED`: the user has answered it or current scoped evidence settles it; reuse that answer, with provenance and freshness.
+- `AUTHORIZED_LOOKUP`: a narrow read of a source explicitly in this task's scope can settle it; read it, then reclassify. Connector availability alone grants no access permission.
+- `SAFE_DEFAULT`: a low-impact, reversible assumption preserves the user's outcome; label it `INFERRED`, state the falsifier, and verify before broadening.
+- `FOUNDER_GATE`: only the founder can provide a missing recipient, private-source permission, binding preference, credential, or new consequential approval; ask at most one precise question when needed, and continue any independent authorized lane.
+- `BLOCKED`: necessary evidence, tool, access, or mandatory safety/authority gate is absent; report the exact blocker without inventing success.
+
+Repeat `OBSERVE → INTERNAL QUESTION → ANSWER OR AUTHORIZED READ → DEVIL/RED TEAM → SMALLEST AUTHORIZED ACTION → TEST → RE-OBSERVE → CONTINUE OR STOP`. Recheck moving GitHub heads and provider state before consequential actions. Keep the loop bounded to the current response/task: no unattended monitoring, background execution, or implied future delivery. Do not repeat resolved questions, search unrelated private accounts, infer consent from silence, self-approve, or quietly turn an assumption into merge/deploy/publication authority.
+
+Apply named plugins only in their proper domain: Product Design's full workflow requires supported Work Mode; Frontend Design Premium must pair with Frontend Design for actual UI work; Codex Material Themes requires an explicit theme request and founder-performed import; Codex Coordinator needs its enabled shared-checkout task board and real parallel work; Codex Dev Workflows uses the focused task workflow. Naming a plugin does not prove invocation or installation, and this contract does not modify third-party plugin code.
+
+Canonical cross-agent details: [Founder AI Operator Workflow V1](../../../docs/FOUNDER_AI_OPERATOR_WORKFLOW_V1.md), section **Self-answer and continue contract**. The founder's latest explicit instruction and existing stronger security/release contracts remain authoritative.
+
 ## Repository identity
 
 **Repository:** `jussray/founder-control-room`
