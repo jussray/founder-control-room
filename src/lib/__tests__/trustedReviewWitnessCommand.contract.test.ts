@@ -29,6 +29,11 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain("test \"$state\" = 'open'");
     expect(reviewWorkflow).toContain("test \"$base_ref\" = 'main'");
     expect(reviewWorkflow).toContain('test "$base_sha" = "$EXPECTED_MAIN_SHA"');
+    expect(reviewWorkflow).toContain('compare/${EXPECTED_MAIN_SHA}...${head_sha}');
+    expect(reviewWorkflow).toContain('merge_base_commit.sha');
+    expect(reviewWorkflow).toContain('behind_by');
+    expect(reviewWorkflow).toContain("test \"$behind_by\" = '0'");
+    expect(reviewWorkflow).toContain('test "$merge_base_sha" = "$EXPECTED_MAIN_SHA"');
   });
 
   it('scopes workflow-dispatch write authority to the founder command job', () => {

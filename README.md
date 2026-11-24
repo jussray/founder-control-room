@@ -862,3 +862,7 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+## Trusted review-witness live ancestry (source reconciliation)
+
+The founder-only trusted-review command must bind the requested SHA to provider-observed live `main` and reject a candidate whose GitHub compare result is behind that live base or whose merge-base is not exactly live `main`. The PR base SHA remains diagnostic evidence, not authorization. This check grants no merge, deployment, or privileged execution authority; exact-head CI and founder-final review remain separate gates.

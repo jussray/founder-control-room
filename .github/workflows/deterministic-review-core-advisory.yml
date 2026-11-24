@@ -162,6 +162,13 @@ jobs:
           test "$base_sha" = "$EXPECTED_MAIN_SHA"
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
+          # Candidate must descend from live main. PR base SHA is only a snapshot.
+          compare_json="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${EXPECTED_MAIN_SHA}...${head_sha}")"
+          behind_by="$(jq -er '.behind_by' <<< "$compare_json")"
+          merge_base_sha="$(jq -er '.merge_base_commit.sha' <<< "$compare_json")"
+          test "$behind_by" = '0'
+          test "$merge_base_sha" = "$EXPECTED_MAIN_SHA"
+
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch trusted-main witness publisher
