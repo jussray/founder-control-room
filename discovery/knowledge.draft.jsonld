@@ -3,27 +3,27 @@
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://jussco.company/#organization",
+      "@id": "https://www.jussco.company/#organization",
       "name": "Juss & Co",
-      "url": "https://jussco.company"
+      "url": "https://www.jussco.company/"
     },
     {
       "@type": "WebSite",
-      "@id": "https://foundercontrolroom.org/#website",
+      "@id": "https://www.foundercontrolroom.org/#website",
       "name": "Founder Control Room",
-      "url": "https://foundercontrolroom.org",
+      "url": "https://www.foundercontrolroom.org/",
       "publisher": {
-        "@id": "https://jussco.company/#organization"
+        "@id": "https://www.jussco.company/#organization"
       }
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://foundercontrolroom.org/#application",
+      "@id": "https://www.foundercontrolroom.org/#application",
       "name": "Founder Control Room",
-      "url": "https://foundercontrolroom.org",
+      "url": "https://www.foundercontrolroom.org/",
       "description": "Standalone founder operating environment for governance and evidence",
       "publisher": {
-        "@id": "https://jussco.company/#organization"
+        "@id": "https://www.jussco.company/#organization"
       }
     }
   ]
