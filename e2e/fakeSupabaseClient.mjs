@@ -455,7 +455,9 @@ export function makeSupabaseClient() {
 // module is the first thing the loader redirects to, so this runs before
 // the HTTP server accepts any request.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
-  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+  const founderUserId = process.env.E2E_SEED_FOUNDER_USER_ID;
+  if (!founderUserId) throw new Error('E2E founder user ID must be explicitly seeded');
+  table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, user_id: founderUserId, created_at: new Date().toISOString() });
 }
 
 // Isolated product-workspace fixture for Playwright's real served FCR UI.

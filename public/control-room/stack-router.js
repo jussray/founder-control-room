@@ -113,27 +113,16 @@ function installCoworkLane() {
 
 function setFriendIntakeLinkAvailability(link, enabled) {
   link.hidden = !enabled;
-  if (enabled) {
-    link.style.removeProperty('display');
-  } else {
-    link.style.display = 'none';
-  }
+  link.style.display = enabled ? '' : 'none';
 }
 
 async function refreshFriendIntakeAvailability() {
   const link = document.querySelector('[data-friend-intake-link]');
   if (!(link instanceof HTMLAnchorElement)) return;
-
   setFriendIntakeLinkAvailability(link, false);
   try {
-    const response = await fetch('/friend-intake/status', {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-    });
+    const response = await fetch('/friend-intake/status', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
     if (!response.ok) return;
-
     const body = await response.json();
     setFriendIntakeLinkAvailability(link, body?.enabled === true);
   } catch {

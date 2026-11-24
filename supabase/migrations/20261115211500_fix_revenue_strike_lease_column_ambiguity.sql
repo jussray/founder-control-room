@@ -1,18 +1,23 @@
--- Repair the three errors observed in exact-head CI local schema lint.
--- Append-only repair: preserve historical migrations and function privileges.
--- The newer definitions retain SECURITY DEFINER + pg_catalog-only search_path,
--- the permanent send lease, 5-send cap, and no-blind-retry semantics.
--- No provider write, production migration apply, or release is authorized here.
+-- Fix ambiguous column references in the revenue-strike customer-send lease
+-- functions from 20260912191500_revenue_strike_customer_send_gate.sql.
+--
+-- Both functions use RETURNS TABLE, which declares OUT variables with the same
+-- names as table columns (claim_id, run_id, slot, recipient_fingerprint, ...).
+-- Their unqualified column references in WHERE clauses are therefore ambiguous.
+-- `supabase db lint` reports SQLSTATE 42702 for both
+-- (claim: column reference "run_id" is ambiguous; finalize: "claim_id"), and
+-- each function would raise the same error at runtime on its first call.
+--
+-- This migration replaces only the function bodies: every table column in the
+-- SELECT/UPDATE predicates now uses a table alias. Signatures, return shapes,
+-- security definer, search_path, behaviour, grants and comments are unchanged
+-- (CREATE OR REPLACE keeps existing privileges; they are re-asserted below).
+--
+-- Source-only until an explicitly authorized apply; committing it performs no
+-- provider or production database mutation.
 
 begin;
 
--- truth_console_reconcile_claim is SECURITY INVOKER and uses pgcrypto.digest.
--- Supabase may install pgcrypto in extensions rather than public; make that
--- resolution explicit without granting new execution privileges.
-alter function public.truth_console_reconcile_claim(uuid, bigint)
-  set search_path = public, extensions, pg_temp;
-
--- Explicit aliases disambiguate column names from RETURNS TABLE variables.
 create or replace function public.claim_revenue_strike_customer_send_lease(
   p_run_id text,
   p_slot smallint,
@@ -72,8 +77,8 @@ begin
 
   select count(*)
     into run_send_count
-    from public.revenue_strike_customer_send_leases AS lease
-   where lease.run_id = btrim(p_run_id);
+    from public.revenue_strike_customer_send_leases l
+   where l.run_id = btrim(p_run_id);
 
   if run_send_count >= 5 then
     return;
@@ -83,17 +88,17 @@ begin
   -- including when a provider later rejects or returns an ambiguous result.
   if exists (
     select 1
-      from public.revenue_strike_customer_send_leases AS lease
-     where lease.recipient_fingerprint = lower(btrim(p_recipient_fingerprint))
+      from public.revenue_strike_customer_send_leases l
+     where l.recipient_fingerprint = lower(btrim(p_recipient_fingerprint))
   ) then
     return;
   end if;
 
   if exists (
     select 1
-      from public.revenue_strike_customer_send_leases AS lease
-     where lease.run_id = btrim(p_run_id)
-       and lease.slot = p_slot
+      from public.revenue_strike_customer_send_leases l
+     where l.run_id = btrim(p_run_id)
+       and l.slot = p_slot
   ) then
     return;
   end if;
@@ -140,6 +145,24 @@ exception
 end;
 $function$;
 
+revoke all on function public.claim_revenue_strike_customer_send_lease(
+  text, smallint, text, text, text, text, text, text, timestamptz, text, timestamptz
+) from public;
+revoke all on function public.claim_revenue_strike_customer_send_lease(
+  text, smallint, text, text, text, text, text, text, timestamptz, text, timestamptz
+) from anon;
+revoke all on function public.claim_revenue_strike_customer_send_lease(
+  text, smallint, text, text, text, text, text, text, timestamptz, text, timestamptz
+) from authenticated;
+grant execute on function public.claim_revenue_strike_customer_send_lease(
+  text, smallint, text, text, text, text, text, text, timestamptz, text, timestamptz
+) to service_role;
+
+comment on function public.claim_revenue_strike_customer_send_lease(
+  text, smallint, text, text, text, text, text, text, timestamptz, text, timestamptz
+) is
+  'Atomically consumes one cold-customer send lease. Enforces a five-lease run ceiling, one permanent lease per recipient fingerprint, one lease per run slot, and a fresh reply-first observation before any provider call may occur.';
+
 create or replace function public.finalize_revenue_strike_customer_send_lease(
   p_claim_id uuid,
   p_founder_user_id text,
@@ -182,14 +205,14 @@ begin
     return;
   end if;
 
-  update public.revenue_strike_customer_send_leases AS lease
+  update public.revenue_strike_customer_send_leases as l
      set provider_outcome = p_provider_outcome,
          provider_receipt_id = nullif(btrim(p_provider_receipt_id), ''),
          finalized_at = p_finalized_at
-   where lease.claim_id = lease_row.claim_id
-     and lease.provider_outcome = 'claimed'
-     and lease.finalized_at is null
-  returning * into lease_row;
+   where l.claim_id = lease_row.claim_id
+     and l.provider_outcome = 'claimed'
+     and l.finalized_at is null
+  returning l.* into lease_row;
 
   return query
     select
@@ -199,5 +222,23 @@ begin
       lease_row.finalized_at;
 end;
 $function$;
+
+revoke all on function public.finalize_revenue_strike_customer_send_lease(
+  uuid, text, text, text, timestamptz
+) from public;
+revoke all on function public.finalize_revenue_strike_customer_send_lease(
+  uuid, text, text, text, timestamptz
+) from anon;
+revoke all on function public.finalize_revenue_strike_customer_send_lease(
+  uuid, text, text, text, timestamptz
+) from authenticated;
+grant execute on function public.finalize_revenue_strike_customer_send_lease(
+  uuid, text, text, text, timestamptz
+) to service_role;
+
+comment on function public.finalize_revenue_strike_customer_send_lease(
+  uuid, text, text, text, timestamptz
+) is
+  'Records the terminal provider outcome for an already-consumed customer-send lease. It never reopens or recreates send authority; unknown outcomes remain consumed and forbid retry.';
 
 commit;

@@ -14,6 +14,7 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 import express, { type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
 import type { DeterministicFriendIntakeResult } from '../../../chief/firstSliceEngine.js';
+import { boundFounderRow } from './founderAuthFixture.js';
 import {
   createFriendIntakeRouter,
   type FriendIntakeRouteDependencies,
@@ -32,19 +33,9 @@ const REVIEW_KEY = Buffer.alloc(32, 7).toString('base64url');
 type PersistRunInput = Parameters<NonNullable<FriendIntakeRouteDependencies['persistRun']>>[0];
 type RecordUsefulnessInput = Parameters<NonNullable<FriendIntakeRouteDependencies['recordUsefulness']>>[0];
 
-function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
-    }),
-  };
-}
-
 function authenticateFounder() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_ID, email: FOUNDER_EMAIL } },
+    data: { user: { id: FOUNDER_ID, email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }
@@ -81,7 +72,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.FOUNDER_SESSION_ENCRYPTION_KEY = REVIEW_KEY;
   supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'founder_users') return founderUsersRow();
+    if (table === 'founder_users') return boundFounderRow(FOUNDER_EMAIL, FOUNDER_ID);
     return {};
   });
 });
