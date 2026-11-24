@@ -26,7 +26,7 @@ create table public.founder_notification_deliveries (
   next_attempt_at timestamptz not null default now(),
   provider_status integer check (provider_status between 100 and 599),
   provider_accepted_at timestamptz,
-  unique(event_id, subscription_id)
+  constraint founder_notification_delivery_event_subscription_key unique(event_id, subscription_id)
 );
 alter table public.founder_notification_deliveries enable row level security;
 revoke all on public.founder_notification_deliveries from public, anon, authenticated;
@@ -51,7 +51,7 @@ begin
      and not exists (select 1 from public.founder_notification_deliveries d where d.event_id = e.id and d.subscription_id = s.id)
    order by e.created_at, e.id, s.id
    limit 200
-  on conflict (event_id, subscription_id) do nothing;
+  on conflict on constraint founder_notification_delivery_event_subscription_key do nothing;
 
   -- An interrupted final attempt is unknown, never falsely marked delivered.
   update public.founder_notification_deliveries d set state = 'unknown', claim_token = null
