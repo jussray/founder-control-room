@@ -20,6 +20,15 @@ function assess(overrides: Partial<Parameters<typeof assessProjectAdapterFreshne
 }
 
 describe('project adapter freshness', () => {
+  it('fails closed when an adapter has no audited contract paths', () => {
+    const result = assess({ auditedContractBlobs: {}, observedContractBlobs: {} });
+    expect(result.state).toBe('unknown');
+    expect(result.freshness).toBe('missing');
+    expect(result.blocker).toContain('no required contract blobs');
+    expect(result.promotionAllowed).toBe(false);
+    expect(result.mutationAuthorized).toBe(false);
+  });
+
   it('verifies every checked-in adapter only when current main and every required contract blob match', () => {
     for (const adapter of FOUNDER_OS_LAB_PROJECT_ADAPTERS) {
       const result = assessProjectAdapterFreshness({
@@ -33,12 +42,12 @@ describe('project adapter freshness', () => {
       expect(result).toMatchObject({
         state: 'verified',
         freshness: 'fresh',
-        recommendation: 'hold',
+        recommendation: 'candidate-promote',
         sourceHeadMatchesAudited: true,
         contractPathsMissing: [],
         contractPathsDrifted: [],
         founderReviewRequired: true,
-        promotionAllowed: false,
+        promotionAllowed: true,
         mutationAuthorized: false,
         blocker: null,
       });
@@ -55,6 +64,8 @@ describe('project adapter freshness', () => {
     expect(result.state).toBe('verified');
     expect(result.freshness).toBe('fresh');
     expect(result.sourceHeadMatchesAudited).toBe(false);
+    expect(result.promotionAllowed).toBe(false);
+    expect(result.mutationAuthorized).toBe(false);
     expect(result.contractPathsMissing).toEqual([]);
     expect(result.contractPathsDrifted).toEqual([]);
     expect(result.blocker).toBeNull();
@@ -78,6 +89,7 @@ describe('project adapter freshness', () => {
     expect(result.recommendation).toBe('review');
     expect(result.sourceHeadMatchesAudited).toBe(false);
     expect(result.contractPathsDrifted).toEqual(['app/index.tsx']);
+    expect(result.promotionAllowed).toBe(false);
     expect(result.blocker).toContain('Repository main advanced and required project contract blobs drifted');
     expect(result.mutationAuthorized).toBe(false);
   });
@@ -90,6 +102,7 @@ describe('project adapter freshness', () => {
     expect(result.state).toBe('unknown');
     expect(result.freshness).toBe('missing');
     expect(result.contractPathsMissing).toEqual(['screens/WebWelcomeScreen.tsx']);
+    expect(result.promotionAllowed).toBe(false);
   });
 
   it('requires semantic review when a required blob differs at the audited head', () => {
@@ -103,6 +116,14 @@ describe('project adapter freshness', () => {
     expect(result.freshness).toBe('fresh');
     expect(result.recommendation).toBe('review');
     expect(result.contractPathsDrifted).toEqual(['app/index.tsx']);
+    expect(result.promotionAllowed).toBe(false);
+    expect(result.mutationAuthorized).toBe(false);
+  });
+
+  it('does not allow promotion without the audited exact head even when contract blobs match', () => {
+    const result = assess({ auditedHead: 'not-a-sha' });
+    expect(result.state).toBe('unknown');
+    expect(result.promotionAllowed).toBe(false);
     expect(result.mutationAuthorized).toBe(false);
   });
 
@@ -112,5 +133,6 @@ describe('project adapter freshness', () => {
     expect(result.state).toBe('unknown');
     expect(result.freshness).toBe('invalid');
     expect(result.blocker).toContain('current repository head is invalid');
+    expect(result.promotionAllowed).toBe(false);
   });
 });

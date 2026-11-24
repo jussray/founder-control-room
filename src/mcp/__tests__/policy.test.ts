@@ -65,6 +65,43 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "deny" });
   });
 
+  it("keeps Componecat catalog context read-only and authority-bearing projects only", () => {
+    const componecat = DEFAULT_MCP_SERVERS.find((server) => server.id === "componecat");
+    if (!componecat) throw new Error("Componecat MCP definition missing");
+
+    const env = {
+      NODE_ENV: "development",
+      MCP_COMPONECAT_URL: "https://app.componecat.ai/api/mcp",
+      COMPONECAT_MCP_TOKEN: "test-only-token",
+    } as NodeJS.ProcessEnv;
+
+    expect(componecat.role).toBe("portfolio-architecture-context");
+    expect(
+      evaluateMcpPolicy({
+        server: componecat,
+        projectId: "founder-control-room",
+        toolName: "search_catalog",
+        env,
+      }),
+    ).toMatchObject({ decision: "allow", risk: "read" });
+    expect(
+      evaluateMcpPolicy({
+        server: componecat,
+        projectId: "founder-control-room",
+        toolName: "update_component",
+        env,
+      }),
+    ).toMatchObject({ decision: "deny" });
+    expect(
+      evaluateMcpPolicy({
+        server: componecat,
+        projectId: "sleepwealth-agent",
+        toolName: "search_catalog",
+        env,
+      }),
+    ).toMatchObject({ decision: "deny" });
+  });
+
   it("uses the official Cloudflare API MCP and keeps generic execute blocked", () => {
     const cloudflareApi = DEFAULT_MCP_SERVERS.find(
       (server) => server.id === "cloudflare-api",

@@ -1,0 +1,61 @@
+{
+  "contract": "juss/council-model-capability-profile@v1",
+  "repository": "jussray/founder-control-room",
+  "defaultBranch": "main",
+  "preparedAgainstBaseSha": "bec4e0fc99e69538d830e21ff67c270f01a72c92",
+  "authorityHost": "jussray/founder-control-room",
+  "providerExecutionHost": "jussray/founder-control-room",
+  "projectRole": "founder_operating_build_intelligence",
+  "activation": "trial_profile_only",
+  "runtimeActivation": false,
+  "restrictedContextAllowed": false,
+  "lanes": [
+    {
+      "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+      "role": "reasoning_and_adversarial_challenge",
+      "status": "trial",
+      "notes": "Use for bounded Council reasoning; no inherited mutation authority."
+    },
+    {
+      "model": "@cf/cloudflare/clairic",
+      "role": "structured_estimation_and_forecast",
+      "status": "trial",
+      "notes": "Use for typed numeric judgments; outputs are evidence inputs, not truth."
+    },
+    {
+      "model": "@cf/cloudflare/clef-omni",
+      "role": "multimodal_evidence_adjudication",
+      "status": "trial",
+      "notes": "Use for typed multimodal decisions and probability distributions; never self-authorizing."
+    },
+    {
+      "model": "@cf/daily-co/phonellm-mini-alpha-2",
+      "role": "voice_agent_fast_lane",
+      "status": "trial",
+      "notes": "Use only for voice/conversational tasks after project privacy and runtime gates."
+    }
+  ],
+  "authority": {
+    "selectionAuthority": false,
+    "executionAuthority": false,
+    "mergeAuthority": false,
+    "deployAuthority": false,
+    "publishAuthority": false,
+    "spendAuthority": false,
+    "providerMutationAuthority": false
+  },
+  "promotionGate": [
+    "fresh task-specific local receipts",
+    "provider evidence for the exact invocation",
+    "project-local focused tests",
+    "runtime proof for live claims",
+    "Playwright proof for user-facing flows"
+  ],
+  "projectGuards": [
+    "smallest-useful-seat routing",
+    "no restricted context to trial providers",
+    "no model consensus as founder authority",
+    "preserve provider-family dissent"
+  ],
+  "rollback": "Remove this profile and any consumer mapping that references it; no provider secret or deployment state is stored here."
+}

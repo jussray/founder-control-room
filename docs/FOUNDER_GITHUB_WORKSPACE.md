@@ -11,6 +11,27 @@ It is intentionally **not** a direct push-to-main editor. It preserves founder c
 5. The patch route re-pins `policy_snapshot.expectedHeadSha` to the new commit so proof gates and terminal evidence attach to the current head.
 6. Merge to the base branch still requires the separate proof gate and exact-head execution path.
 
+## Integrated Founder Development Cockpit
+
+Use the **Build · GitHub** link in the FCR Control Room sidebar or **Open workspace** on a registered Portfolio project. The `?project=<slug>` query selects that project's workbench but never grants project membership, mission approval, or execution authority. The GitHub Workspace includes the repository file browser/editor, branch-only patch submission, and the authenticated Guarded project terminal on one page.
+
+The embedded terminal probes `GET /terminal/:projectSlug/commands`, displays only commands classified `risk: read`, then submits `POST /terminal/:projectSlug/run` with a real FCR mission ID and the exact HEAD SHA. The server independently rechecks founder authentication, the approved command registry, mission/project identity, state, SHA, and local terminal availability. The UI cannot unlock builds or shell execution. Terminal failure or disabled state remains visible as blocked, not simulated success.
+
+FCR's own Playwright pipeline has an isolated browser journey in `e2e/run.mjs` that exercises a real served FCR server and real Git process, while external GitHub and Supabase are test fakes. That is code/application integration evidence only. Production and separate product control rooms (including Bip) require their own provider/runtime evidence. No application is absorbed into FCR, and neither control room acquires the other's permissions.
+
+## Simulator-to-mission handoff (candidate, not automatic release)
+
+The existing Founder OS virtual workspace may stage a bounded edit from an explicitly labeled `repository-source` snapshot. `buildFounderOsMissionPatchHandoff()` produces a deterministic `POST /approvals/:missionId/patch` request body with a staged receipt, edited file contents, idempotency key, and an authenticated founder-session requirement. It **does not send** that request or acquire GitHub credentials.
+
+The established patch route remains the only branch writer. For a simulator receipt it additionally:
+- requires the existing founder session, sandboxed/in-review mission, and idempotency reservation;
+- restricts edits to at most three non-destructive files in bounded source/documentation/test paths;
+- rereads the exact live mission branch and original source files from the registered GitHub provider;
+- compares the current SHA to the mission's pinned `policy_snapshot.expectedHeadSha` and the staged SHA, then verifies source and edited SHA-256 digests;
+- supplies the expected SHA to GitHub's commit writer, which rejects a moved branch head; native GitHub ref updates remain non-force.
+
+A staged receipt is **not approval**. A route invocation must still produce a real provider commit readback and an FCR ledger event; a response without that proof is not a completed edit. Merge, deployment, production Playwright, and independent review remain separate gates. This does not change Supabase schema or the container's network-denied/read-only L0 execution boundary.
+
 ## What it can do
 
 - Browse a registered project's repository tree at a ref.

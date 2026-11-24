@@ -1,0 +1,5 @@
+-- Provider-history marker only.
+-- Production recorded version 20260916082346 when the already-reviewed
+-- 20260907170000_harden_account_deletion_security_definer_execute.sql was applied.
+-- The real migration SQL remains in that canonical source file; this marker keeps
+-- remote migration history reconcilable without replaying the privilege change.

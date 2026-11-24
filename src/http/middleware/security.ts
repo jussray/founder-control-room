@@ -116,11 +116,38 @@ function appendVary(res: Response, value: string): void {
 // CORS
 // ---------------------------------------------------------------------------
 
+/**
+ * Routes meant to be called directly from a visitor's browser on a
+ * third-party brand site, not the founder admin frontend. These carry no
+ * cookies/credentials and are already project-allowlisted and rate-limited
+ * at the route; the founder-origin allowlist below does not apply to them,
+ * or the advertised "public, cross-origin" ingress could never be reached
+ * from any real browser.
+ */
+const PUBLIC_CROSS_ORIGIN_PATHS = new Set(['/webchat/messages']);
+
 export const corsMiddleware: RequestHandler = (req, res, next): void => {
   const origin = req.get('Origin');
 
   // Server-to-server requests do not carry an Origin header.
   if (!origin) {
+    next();
+    return;
+  }
+
+  if (PUBLIC_CROSS_ORIGIN_PATHS.has(req.path)) {
+    // Literal '*', not a reflected Origin: this path takes no cookies/credentials
+    // and the CORS spec forbids combining '*' with Access-Control-Allow-Credentials,
+    // so this cannot be widened into a credentialed cross-origin hole later.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
     next();
     return;
   }
@@ -219,12 +246,32 @@ export const rateLimitMagicLink = createRateLimiter(
   { error: 'Too many magic-link requests, please try again later.' },
 );
 
-/** 60 requests per minute per process/IP for general API routes. */
-export const rateLimitGeneral = createRateLimiter(
+/**
+ * 120 requests per minute per process/IP for every HTTP request.
+ *
+ * The broad baseline must leave headroom for a normal founder workflow, which
+ * can combine UI navigation, dashboard refreshes, and signed server ingress in
+ * one minute. Sensitive or expensive routes keep their stricter local limits.
+ * requestAudit applies this baseline before server.ts mounts any public route.
+ * Some routes also reference rateLimitGeneral explicitly, so the wrapper is
+ * idempotent for the lifetime of a single Express Request and counts it once.
+ */
+const generalRateLimitCore = createRateLimiter(
   60 * 1_000,
-  60,
+  120,
   { error: 'Rate limit exceeded.' },
 );
+const generalRateLimitedRequests = new WeakSet<Request>();
+
+export const rateLimitGeneral: RequestHandler = (req, res, next): void => {
+  if (generalRateLimitedRequests.has(req)) {
+    next();
+    return;
+  }
+
+  generalRateLimitedRequests.add(req);
+  generalRateLimitCore(req, res, next);
+};
 
 /**
  * 60 founder-permission requests per minute per process/IP.
@@ -269,11 +316,11 @@ export function requestAudit(
     );
   });
 
-  next();
+  rateLimitGeneral(req, res, next);
 }
 
 // ---------------------------------------------------------------------------
-// Centralized error handler — must be last in server.ts
+// Centralized error handler - must be last in server.ts
 // ---------------------------------------------------------------------------
 export function errorHandler(
   err: unknown,

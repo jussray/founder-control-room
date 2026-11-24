@@ -22,12 +22,13 @@ describe('Strategic Security Posture API', () => {
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.body.contract).toBe('juss-v10/security-posture@v1');
-    expect(response.body.summary.totalProjects).toBe(8);
+    expect(response.body.summary.totalProjects).toBe(9);
     expect(response.body.summary.provenProjects).toBe(0);
     expect(response.body.projects.every((project: { assessmentState: string }) => project.assessmentState === 'target_only')).toBe(true);
     expect(response.body.truthBoundaries.targetVersionIsNotCurrentMaturity).toBe(true);
     expect(response.body.truthBoundaries.frameworkMappingIsNotCertification).toBe(true);
     expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
+    expect(response.body.truthBoundaries.providerRoadmapIsNotRuntimeProof).toBe(true);
   });
 
   it('returns cryptographic inventory as migration evidence rather than a quantum-safe claim', async () => {
@@ -36,12 +37,33 @@ describe('Strategic Security Posture API', () => {
     expect(response.status).toBe(200);
     expect(response.body.summary.cryptographicInventoryEntries).toBe(7);
     expect(response.body.summary.publicKeyMigrationEntries).toBe(4);
-    expect(response.body.summary.cryptographicReviewRequiredProjects).toBe(3);
+    expect(response.body.summary.cryptographicReviewRequiredProjects).toBe(4);
     expect(response.body.cryptography.coverage.missingProjectSlugs).toEqual([]);
     expect(response.body.cryptography.coverage.overlappingProjectSlugs).toEqual([]);
     expect(response.body.cryptography.inventory).toHaveLength(7);
-    expect(response.body.cryptography.reviewRequired).toHaveLength(3);
+    expect(response.body.cryptography.reviewRequired).toHaveLength(4);
     expect(response.body.truthBoundaries.cryptographicInventoryIsObservationNotQuantumSafety).toBe(true);
+  });
+
+  it('returns provider PQC capability evidence without promoting roadmaps to runtime truth', async () => {
+    const response = await request(createTestApp()).get('/security-posture');
+
+    expect(response.status).toBe(200);
+    expect(response.body.summary.providerPqcEvidenceEntries).toBe(10);
+    expect(response.body.summary.providerPqcCurrentEntries).toBe(0);
+    expect(response.body.summary.providerPqcPlannedEntries).toBe(2);
+    expect(response.body.summary.providerPqcUnsupportedEntries).toBe(4);
+    expect(response.body.summary.providerPqcUnknownEntries).toBe(4);
+    expect(response.body.cryptography.providerPqcEvidence.entries).toHaveLength(10);
+    expect(response.body.cryptography.providerPqcEvidence.summary).toEqual({
+      entryCount: 10,
+      currentCount: 0,
+      plannedCount: 2,
+      unsupportedCount: 4,
+      unknownCount: 4,
+    });
+    expect(response.body.truthBoundaries.providerClaimsRequireRuntimeEvidence).toBe(true);
+    expect(response.body.truthBoundaries.providerRoadmapIsNotRuntimeProof).toBe(true);
   });
 
   it('publishes defensive Lantern constraints as read-only posture data', async () => {

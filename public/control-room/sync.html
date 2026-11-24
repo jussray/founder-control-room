@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>SYNC · Founder Control Room</title>
+  <link rel="stylesheet" href="/control-room/sync.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a href="/control-room/?tab=projects" class="back">← Founder Control Room</a>
+    <a href="https://sync-party-game.mcgill-raylene.workers.dev/control-room" class="peer">Open SYNC Control Room ↗</a>
+  </header>
+
+  <main class="shell">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow">PROJECT CONTROL RELAY · PRIVACY-SAFE PULL</p>
+        <h1>SYNC <span>CONTROL</span></h1>
+        <p class="lede">Founder-level visibility into SYNC runtime truth while gameplay authority stays inside SYNC.</p>
+      </div>
+      <div class="status-stack">
+        <span id="runtimeState" class="badge warn" data-testid="sync-runtime-state">CHECKING</span>
+        <span id="relayState" class="badge">FCR RELAY</span>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="SYNC project metrics">
+      <article class="panel metric"><span>Active rooms</span><strong id="activeRooms">0</strong><small>rooms with connected players</small></article>
+      <article class="panel metric"><span>Connected players</span><strong id="connectedPlayers">0</strong><small>aggregate only</small></article>
+      <article class="panel metric"><span>Rooms observed</span><strong id="roomsObserved">0</strong><small>lifecycle receipts</small></article>
+      <article class="panel metric"><span>Events recorded</span><strong id="eventsRecorded">0</strong><small>control sequence</small></article>
+    </section>
+
+    <section class="grid">
+      <article class="panel card">
+        <p class="eyebrow">AUTHORITATIVE RUNTIME</p>
+        <h2>Exact deployed identity</h2>
+        <dl>
+          <div><dt>Repository</dt><dd id="repository">jussray/sync-party-game</dd></div>
+          <div><dt>Runtime SHA</dt><dd><code id="runtimeSha">unknown</code></dd></div>
+          <div><dt>Build</dt><dd><code id="runtimeBuild">unknown</code></dd></div>
+          <div><dt>Release gate</dt><dd id="releaseGate">core-proof → exact green SHA → production</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel card">
+        <p class="eyebrow">CONTINUITY</p>
+        <h2>Fingerprint + cookie</h2>
+        <div class="mono"><span>CONTROL FINGERPRINT</span><code id="controlFingerprint">not-issued</code></div>
+        <div class="mono"><span>CONTINUITY COOKIE</span><code id="continuityCookie">not-issued</code></div>
+        <p class="privacy">FCR receives no room codes, player names, resume tokens, or answer choices from this relay.</p>
+      </article>
+    </section>
+
+    <section class="grid wide">
+      <article class="panel card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">RECENT SIGNALS</p>
+            <h2>Operational receipts</h2>
+          </div>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+        <div id="eventFeed" class="events" aria-live="polite">
+          <p class="empty">No SYNC lifecycle signals observed yet.</p>
+        </div>
+      </article>
+
+      <article class="panel card">
+        <p class="eyebrow">AUTHORITY BOUNDARY</p>
+        <h2>Connected, not collapsed</h2>
+        <ul class="authority-list">
+          <li><strong>SYNC</strong><span>Gameplay state, rooms, players, runtime deployment</span></li>
+          <li><strong>FCR</strong><span>Portfolio observation, proof continuity, founder coordination</span></li>
+          <li><strong>Chief / Council</strong><span>Evidence-bound advice and challenge, no implicit mutation</span></li>
+        </ul>
+        <p class="privacy">The relay is read-only. A control signal is evidence, not permission to execute.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer><span>Founder Control Room · SYNC bridge</span><span id="updatedAt">Not refreshed yet</span></footer>
+  <script src="/control-room/sync.js"></script>
+</body>
+</html>

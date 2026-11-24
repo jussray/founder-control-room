@@ -427,33 +427,42 @@ export function parseFederatedAgentRelayEnvelopeV3(value: unknown): FederatedAge
   };
 }
 
+function requireObservedTime(now: Date | undefined): Date {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new FederatedRelayV3Error('relay_observed_time_required');
+  }
+  return now;
+}
+
 export function assertRelayKeyUsableV3(
   key: FederatedRelayPublicKeyV3,
   sourceMember: FederatedRelayMemberV3,
-  now = new Date(),
+  now: Date,
 ): void {
+  const observedAt = requireObservedTime(now);
   if (key.member !== sourceMember) throw new FederatedRelayV3Error('relay_source_key_member_mismatch');
   if (key.state === 'revoked' || key.revokedAt) throw new FederatedRelayV3Error('relay_signing_key_revoked');
   const validFrom = Date.parse(key.validFrom);
   const validUntil = key.validUntil ? Date.parse(key.validUntil) : Number.POSITIVE_INFINITY;
-  if (!Number.isFinite(validFrom) || now.getTime() < validFrom || now.getTime() > validUntil) {
+  if (!Number.isFinite(validFrom) || observedAt.getTime() < validFrom || observedAt.getTime() > validUntil) {
     throw new FederatedRelayV3Error('relay_signing_key_not_current');
   }
 }
 
 export function assertRelayFreshnessV3(
   envelope: FederatedAgentRelayEnvelopeV3,
-  now = new Date(),
+  now: Date,
   options: { maxTtlMs?: number; futureSkewMs?: number } = {},
 ): void {
+  const observedAt = requireObservedTime(now);
   const maxTtlMs = options.maxTtlMs ?? 600_000;
   const futureSkewMs = options.futureSkewMs ?? 120_000;
   const issuedAt = Date.parse(envelope.issuedAt);
   const expiresAt = Date.parse(envelope.expiresAt);
   if (expiresAt <= issuedAt) throw new FederatedRelayV3Error('relay_invalid_expiry');
   if (expiresAt - issuedAt > maxTtlMs) throw new FederatedRelayV3Error('relay_ttl_exceeded');
-  if (issuedAt > now.getTime() + futureSkewMs) throw new FederatedRelayV3Error('relay_issued_in_future');
-  if (expiresAt < now.getTime()) throw new FederatedRelayV3Error('relay_expired');
+  if (issuedAt > observedAt.getTime() + futureSkewMs) throw new FederatedRelayV3Error('relay_issued_in_future');
+  if (expiresAt < observedAt.getTime()) throw new FederatedRelayV3Error('relay_expired');
 }
 
 export function assertRelayTargetV3(
@@ -474,7 +483,7 @@ export async function verifyRelayEnvelopeV3(input: {
   envelope: FederatedAgentRelayEnvelopeV3;
   key: FederatedRelayPublicKeyV3;
   expectedTarget: FederatedRelayIdentityV3;
-  now?: Date;
+  now: Date;
 }): Promise<{
   envelope: FederatedAgentRelayEnvelopeV3;
   messageFingerprint: string;
@@ -482,7 +491,7 @@ export async function verifyRelayEnvelopeV3(input: {
   successorProofCookie: string;
   receipt: FederatedRelayReceiptV3;
 }> {
-  const now = input.now ?? new Date();
+  const now = requireObservedTime(input.now);
   const { envelope, key, expectedTarget } = input;
   assertRelayFreshnessV3(envelope, now);
   assertRelayTargetV3(envelope, expectedTarget);

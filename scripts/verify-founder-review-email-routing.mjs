@@ -11,19 +11,23 @@ const failures = [];
 const fail = message => failures.push(message);
 
 if (!/^name\s*=\s*"founder-control-room-review-email"\s*$/m.test(manifest)) {
-  fail('email trigger must target founder-control-room-review-email');
+  fail('email Worker must target founder-control-room-review-email');
 }
 
 if (!/^main\s*=\s*"src\/worker\/founderSignalReviewEmail\.ts"\s*$/m.test(manifest)) {
-  fail('email trigger must use the canonical founder review email entrypoint');
+  fail('email Worker must use the canonical founder review email entrypoint');
 }
 
-if (!/^addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/m.test(manifest)) {
-  fail('email routing must declare exactly review@foundercontrolroom.org');
-}
+const manifestLines = manifest.split(/\r?\n/);
+const addressLineIndexes = manifestLines
+  .map((line, index) => (/^\s*addresses\s*=\s*\[\s*"review@foundercontrolroom\.org"\s*\]\s*$/.test(line) ? index : -1))
+  .filter(index => index >= 0);
+const firstTableIndex = manifestLines.findIndex(line => /^\s*\[/.test(line));
 
-if (/addresses\s*=\s*\[[^\]]*\*@/m.test(manifest)) {
-  fail('founder review email routing must not declare a catch-all address');
+if (addressLineIndexes.length !== 1) {
+  fail('wrangler.email.toml must declare exactly one literal review@foundercontrolroom.org Email Routing address');
+} else if (firstTableIndex >= 0 && addressLineIndexes[0] > firstTableIndex) {
+  fail('wrangler.email.toml addresses must remain top-level before the first TOML table');
 }
 
 if (/\[\[routes\]\]/.test(manifest)) {
@@ -59,5 +63,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review email routing verified: review@foundercontrolroom.org only, no catch-all, no HTTP route, private FCR service binding preserved, and review+context parsing retained.',
+  'Founder review email Worker source contract verified: canonical identity, literal review@ routing desired state, no HTTP exposure, private FCR service binding, and review+context parsing retained. Provider readback and runtime invocation remain separate evidence.',
 );

@@ -29,6 +29,29 @@ describe('issueCreateBranchAuthority', () => {
     expect(validateAuthorityEnvelope(issued.envelope, issued.context)).toEqual([]);
   });
 
+  it('starts authority lifetime from the observed request time rather than the proof timestamp', () => {
+    const issued = issueCreateBranchAuthority({
+      missionId: 'mission-123',
+      projectId: 'project-456',
+      actor: 'founder@example.com',
+      approvedBy: 'founder@example.com',
+      idempotencyKey: 'idem-789',
+      baseRef: 'main',
+      branchName: 'mission/mission-1',
+      state: { missionStatus: 'proposed', policySnapshot: { required: ['ci'] } },
+      proof: { id: 'proof-1', gateId: 'create_branch', createdAt: '2026-09-11T07:45:01.000Z' },
+      now: NOW,
+      toolCallId: 'tool-call-1',
+    });
+
+    expect(issued.envelope.issuedAt).toBe(NOW);
+    expect(issued.envelope.expiresAt).toBe('2026-09-11T08:15:00.000Z');
+    expect(validateAuthorityEnvelope(issued.envelope, {
+      ...issued.context,
+      now: '2026-09-11T08:14:59.000Z',
+    })).toEqual([]);
+  });
+
   it('rejects changed arguments at execution time', () => {
     const issued = issue();
     expect(validateAuthorityEnvelope(issued.envelope, {

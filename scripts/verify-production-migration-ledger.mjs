@@ -11,12 +11,7 @@ const VERSION_PATTERN = /^\d{14}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_API_BASE = 'https://api.github.com';
-
-// This is the immutable terminal tip of the currently ratified direct-main
-// history. Keep it bound to verify-main-release-ratification-extension.mjs.
-// Everything after this commit must earn live reviewed-PR provenance.
-export const TERMINAL_RATIFIED_MAIN_TIP = '0f8e2efec63eee9f31db6e64c1d9ca1ff6b3c2f8';
-
+const MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH = '.github/workflows/main-release-provenance.yml';
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
 ]);
@@ -100,63 +95,14 @@ async function fetchGithubJson(fetchImpl, url, token) {
   return response.json();
 }
 
-async function observeReviewedFirstParentSuccessors({
+export function classifyTrustedMainReleaseProvenanceRun({
   repository,
   targetSha,
-  terminalRatifiedTip,
-  fetchImpl,
-  token,
-}) {
-  const target = String(targetSha || '').trim().toLowerCase();
-  const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
-
-  if (!FULL_SHA.test(target) || !FULL_SHA.test(terminal)) {
-    throw new Error('Invalid target or terminal ratification SHA');
-  }
-  if (target === terminal) return [];
-
-  const newestFirst = [];
-  const visited = new Set();
-  let cursor = target;
-
-  while (cursor !== terminal) {
-    if (visited.has(cursor)) {
-      throw new Error(`First-parent history cycle detected at ${cursor}`);
-    }
-    visited.add(cursor);
-
-    const [commit, associatedPulls] = await Promise.all([
-      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}`, token),
-      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repository}/commits/${cursor}/pulls`, token),
-    ]);
-
-    const observedSha = String(commit?.sha || '').trim().toLowerCase();
-    if (observedSha !== cursor) {
-      throw new Error(`GitHub commit identity mismatch for ${cursor}`);
-    }
-
-    newestFirst.push({ sha: cursor, associatedPulls });
-
-    const parentSha = String(commit?.parents?.[0]?.sha || '').trim().toLowerCase();
-    if (!FULL_SHA.test(parentSha)) {
-      throw new Error(`First-parent history ended before terminal ratified tip ${terminal}`);
-    }
-    cursor = parentSha;
-  }
-
-  return newestFirst.reverse();
-}
-
-export async function observeMainReleaseProvenance({
-  repository,
-  targetSha,
-  terminalRatifiedTip = TERMINAL_RATIFIED_MAIN_TIP,
-  fetchImpl = globalThis.fetch,
-  token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
+  workflowRuns,
 } = {}) {
   const repo = String(repository || '').trim();
   const target = String(targetSha || '').trim().toLowerCase();
-  const terminal = String(terminalRatifiedTip || '').trim().toLowerCase();
+  const owner = repo.split('/')[0]?.toLowerCase() || '';
 
   if (!REPOSITORY_PATTERN.test(repo)) {
     return { ok: false, reason: 'invalid_repository', targetSha: target || null };
@@ -164,62 +110,110 @@ export async function observeMainReleaseProvenance({
   if (!FULL_SHA.test(target)) {
     return { ok: false, reason: 'invalid_sha', targetSha: target || null };
   }
-  if (!FULL_SHA.test(terminal)) {
-    return { ok: false, reason: 'invalid_terminal_ratified_tip', targetSha: target, terminalRatifiedTip: terminal || null };
+  if (!Array.isArray(workflowRuns)) {
+    return { ok: false, reason: 'provenance_runs_unavailable', targetSha: target };
+  }
+
+  const trusted = workflowRuns
+    .filter((run) => {
+      if (!run || typeof run !== 'object') return false;
+      const actor = String(run.actor?.login || '').trim().toLowerCase();
+      return String(run.path || '').trim() === MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH
+        && String(run.head_sha || '').trim().toLowerCase() === target
+        && String(run.head_branch || '').trim() === 'main'
+        && String(run.event || '').trim() === 'push'
+        && String(run.status || '').trim() === 'completed'
+        && String(run.conclusion || '').trim() === 'success'
+        && actor === owner;
+    })
+    .sort((left, right) => Number(right.id || 0) - Number(left.id || 0));
+
+  if (trusted.length === 0) {
+    return {
+      ok: false,
+      reason: 'missing_trusted_direct_main_provenance_receipt',
+      targetSha: target,
+    };
+  }
+
+  const [run] = trusted;
+  return {
+    ok: true,
+    reason: 'verified_main_release_provenance_workflow',
+    targetSha: target,
+    workflowRunId: run.id,
+    workflowActor: run.actor?.login,
+    workflowPath: MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH,
+  };
+}
+
+export async function observeMainReleaseProvenance({
+  repository,
+  targetSha,
+  fetchImpl = globalThis.fetch,
+  token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
+} = {}) {
+  const repo = String(repository || '').trim();
+  const target = String(targetSha || '').trim().toLowerCase();
+
+  if (!REPOSITORY_PATTERN.test(repo)) {
+    return { ok: false, reason: 'invalid_repository', targetSha: target || null };
+  }
+  if (!FULL_SHA.test(target)) {
+    return { ok: false, reason: 'invalid_sha', targetSha: target || null };
   }
 
   try {
-    const [initialMainBranch, associatedPulls] = await Promise.all([
+    const [mainBranch, associatedPulls] = await Promise.all([
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/branches/main`, token),
       fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
     ]);
 
-    const tipResult = classifyMainReleaseProvenance({
+    const reviewedResult = classifyMainReleaseProvenance({
       targetSha: target,
-      currentMainSha: initialMainBranch?.commit?.sha,
+      currentMainSha: mainBranch?.commit?.sha,
       associatedPulls,
     });
-    if (!tipResult.ok) {
+
+    if (reviewedResult.ok || reviewedResult.reason !== 'direct_or_unproven_main_commit') {
       return {
-        ...tipResult,
+        ...reviewedResult,
         repository: repo,
         provider: 'github',
       };
     }
 
-    const successorCommits = await observeReviewedFirstParentSuccessors({
+    const query = new URLSearchParams({
+      head_sha: target,
+      event: 'push',
+      status: 'success',
+      per_page: '100',
+    });
+    // This repository is public. The provenance run itself is public provider
+    // evidence, so observe it without widening the Deploy token to actions:read.
+    // If the repository or provider visibility changes, this request fails closed.
+    const runs = await fetchGithubJson(
+      fetchImpl,
+      `${GITHUB_API_BASE}/repos/${repo}/actions/runs?${query.toString()}`,
+      '',
+    );
+    const directResult = classifyTrustedMainReleaseProvenanceRun({
       repository: repo,
       targetSha: target,
-      terminalRatifiedTip: terminal,
-      fetchImpl,
-      token,
-    });
-
-    const finalMainBranch = await fetchGithubJson(
-      fetchImpl,
-      `${GITHUB_API_BASE}/repos/${repo}/branches/main`,
-      token,
-    );
-
-    const result = classifyMainReleaseProvenance({
-      targetSha: target,
-      currentMainSha: finalMainBranch?.commit?.sha,
-      associatedPulls,
-      terminalRatifiedTip: terminal,
-      successorCommits,
+      workflowRuns: runs?.workflow_runs,
     });
 
     return {
-      ...result,
+      ...directResult,
       repository: repo,
       provider: 'github',
+      reviewedProvenanceReason: reviewedResult.reason,
     };
   } catch (error) {
     return {
       ok: false,
       reason: 'provider_unavailable',
       targetSha: target,
-      terminalRatifiedTip: terminal,
       repository: repo,
       provider: 'github',
       detail: error instanceof Error ? error.message.slice(0, 200) : 'unknown provider failure',
@@ -267,7 +261,6 @@ export async function main() {
     releaseProvenance = await observeMainReleaseProvenance({
       repository: process.env.GITHUB_REPOSITORY,
       targetSha: checkedOutHeadSha(),
-      terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
     });
   }
 
@@ -307,7 +300,7 @@ export async function main() {
     failures.push(`local migrations absent remotely after push: ${receipt.localOnly.join(', ')}`);
   }
   if (phase === 'post-push' && receipt.missingRequiredRemote.length > 0) {
-    failures.push(`required migrations absent remotely: ${receipt.missingRequiredRemote.join(', ')}`);
+    failures.push(`required migrations absent remotely after push: ${receipt.missingRequiredRemote.join(', ')}`);
   }
 
   if (failures.length > 0) {

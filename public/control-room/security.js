@@ -60,6 +60,7 @@ function truthMarkup(snapshot) {
     <article class="truth-card"><strong>TARGET ≠ PROOF</strong><span>${boundaries.targetVersionIsNotCurrentMaturity ? 'A project target describes required maturity, not maturity already earned.' : 'Truth boundary missing.'}</span></article>
     <article class="truth-card"><strong>FRAMEWORK ≠ CERTIFICATION</strong><span>${boundaries.frameworkMappingIsNotCertification ? 'NIST, OWASP, CIS and other mappings are implementation signals, not certification claims.' : 'Truth boundary missing.'}</span></article>
     <article class="truth-card"><strong>PROVIDER CLAIMS NEED EVIDENCE</strong><span>${boundaries.providerClaimsRequireRuntimeEvidence ? 'Cloud, database, deployment and runtime claims stay unproven until provider evidence exists.' : 'Truth boundary missing.'}</span></article>
+    <article class="truth-card"><strong>ROADMAP ≠ RUNTIME</strong><span>${boundaries.providerRoadmapIsNotRuntimeProof ? 'Provider PQC plans and documented capabilities do not prove a project negotiated or activated them.' : 'Truth boundary missing.'}</span></article>
     <article class="truth-card"><strong>INVENTORY ≠ QUANTUM SAFETY</strong><span>${boundaries.cryptographicInventoryIsObservationNotQuantumSafety ? 'Observed algorithms and provider boundaries map migration work; they do not prove a project quantum-safe.' : 'Truth boundary missing.'}</span></article>
   </section>`;
 }
@@ -134,6 +135,43 @@ function cryptoReviewMarkup(entry) {
   </article>`;
 }
 
+function providerPqcMarkup(entry) {
+  const projects = Array.isArray(entry.projectSlugs) ? entry.projectSlugs : [];
+  const sourceTitles = Array.isArray(entry.sources) ? entry.sources.map(source => source.title) : [];
+  return `<article class="project-card pqc-provider-card" data-pqc-id="${escapeHtml(entry.id)}" data-pqc-state="${escapeHtml(entry.state)}">
+    <div class="project-head">
+      <div>
+        <p class="eyebrow">${escapeHtml(entry.state)} · ${escapeHtml(entry.plane)}</p>
+        <h3>${escapeHtml(entry.provider)} · ${escapeHtml(entry.surface)}</h3>
+        <div class="repo">Observed ${escapeHtml(entry.observedOn || 'unknown')}</div>
+      </div>
+      <div class="target-badge"><strong>${escapeHtml(entry.state)}</strong><span>PROVIDER EVIDENCE</span></div>
+    </div>
+    <div class="project-meta">${projects.map(project => `<span class="chip">${escapeHtml(project)}</span>`).join('')}</div>
+    <div class="detail-block"><h4>Current contract</h4><p>${escapeHtml(entry.currentContract)}</p></div>
+    <div class="detail-block"><h4>PQC evidence</h4><p>${escapeHtml(entry.pqcEvidence)}</p></div>
+    <div class="detail-block"><h4>Provider target</h4><p>${escapeHtml(entry.providerTarget)}</p></div>
+    <div class="detail-block"><h4>Migration authority</h4><p>${escapeHtml(entry.migrationAuthority)}</p></div>
+    <div class="detail-block"><h4>Proof required before any change</h4><p>${escapeHtml(entry.requiredRuntimeEvidenceBeforeChange)}</p></div>
+    <div class="detail-block"><h4>Official sources</h4>${listMarkup(sourceTitles)}</div>
+  </article>`;
+}
+
+function providerPqcPanel(providerPqcEvidence, summary) {
+  const entries = Array.isArray(providerPqcEvidence?.entries) ? providerPqcEvidence.entries : [];
+  return `<section class="crypto-panel provider-pqc-panel" aria-label="Provider post-quantum capability evidence">
+    <div class="section-head"><div><p class="eyebrow">PROVIDER PQC EVIDENCE</p><h3>Current, planned, unsupported, and unknown stay separate</h3></div><p>Provider documentation can guide migration planning. It cannot prove that a project runtime negotiated, activated, or safely migrated to a capability.</p></div>
+    <div class="summary-grid" aria-label="Provider PQC capability summary">
+      ${summaryCard('Provider evidence entries', summary.providerPqcEvidenceEntries ?? entries.length)}
+      ${summaryCard('CURRENT', summary.providerPqcCurrentEntries ?? 0, 'proof')}
+      ${summaryCard('PLANNED', summary.providerPqcPlannedEntries ?? 0)}
+      ${summaryCard('UNSUPPORTED', summary.providerPqcUnsupportedEntries ?? 0, 'v10')}
+      ${summaryCard('UNKNOWN', summary.providerPqcUnknownEntries ?? 0)}
+    </div>
+    <div class="project-grid pqc-provider-grid">${entries.map(providerPqcMarkup).join('')}</div>
+  </section>`;
+}
+
 function cryptographyMarkup(cryptography, summary) {
   const inventory = Array.isArray(cryptography?.inventory) ? cryptography.inventory : [];
   const reviewRequired = Array.isArray(cryptography?.reviewRequired) ? cryptography.reviewRequired : [];
@@ -149,6 +187,7 @@ function cryptographyMarkup(cryptography, summary) {
     <div class="project-grid crypto-entry-grid">${inventory.map(cryptoEntryMarkup).join('')}</div>
     <div class="section-head"><div><p class="eyebrow">UNKNOWN / NEEDS EVIDENCE</p><h3>Review-required projects</h3></div><p>These remain unresolved until source, provider, or runtime evidence is strong enough to classify them.</p></div>
     <div class="project-grid crypto-review-grid">${reviewRequired.map(cryptoReviewMarkup).join('')}</div>
+    ${providerPqcPanel(cryptography?.providerPqcEvidence, summary)}
   </section>`;
 }
 
@@ -185,6 +224,7 @@ function analyticsMarkup(summary) {
     <article class="metric-card"><span>Framework signals</span><strong>${escapeHtml(summary.frameworkSignalCount)}</strong></article>
     <article class="metric-card"><span>Crypto inventory entries</span><strong>${escapeHtml(summary.cryptographicInventoryEntries)}</strong></article>
     <article class="metric-card"><span>Public-key migration entries</span><strong>${escapeHtml(summary.publicKeyMigrationEntries)}</strong></article>
+    <article class="metric-card"><span>Provider PQC evidence</span><strong>${escapeHtml(summary.providerPqcEvidenceEntries)}</strong></article>
     <article class="metric-card"><span>Review-required crypto projects</span><strong>${escapeHtml(summary.cryptographicReviewRequiredProjects)}</strong></article>
     <article class="metric-card"><span>Maturity-proven projects</span><strong>${escapeHtml(summary.provenProjects)}</strong></article>
   </section>`;
