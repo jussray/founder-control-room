@@ -79,6 +79,86 @@
       },
       "productionStatus": "UNKNOWN",
       "verifiedCapabilities": []
+    },
+    {
+      "project": "THINK-TANK",
+      "name": "Think Tank",
+      "publicPage": "https://www.thinktank.jussco.company/",
+      "entityId": "https://github.com/jussray/THINK-TANK#application",
+      "entityIdStatus": "provisional",
+      "sourcePath": "README.md",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "83125a448fde0885d23e71eb36d9d5f8004b151a",
+        "url": "https://github.com/jussray/THINK-TANK/actions/runs/45344268472"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "StoryEngine",
+      "name": "StoryEngine",
+      "publicPage": null,
+      "entityId": "https://github.com/jussray/StoryEngine#application",
+      "entityIdStatus": "provisional",
+      "sourcePath": "README.md",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "2bbb52343b9411a04a739d6502e74dc795624da4",
+        "url": "https://github.com/jussray/StoryEngine/actions/runs/45344276247"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "signal-loop",
+      "name": "SignalLoop",
+      "publicPage": null,
+      "entityId": "https://github.com/jussray/signal-loop#application",
+      "entityIdStatus": "provisional",
+      "sourcePath": "README.md",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "8853e1efbe36e3eca9c7523c9d027cd22fd307a2",
+        "url": "https://github.com/jussray/signal-loop/actions/runs/45344280247"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "sync-party-game",
+      "name": "Sync Party",
+      "publicPage": null,
+      "entityId": "https://github.com/jussray/sync-party-game#application",
+      "entityIdStatus": "provisional",
+      "sourcePath": "README.md",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "3aebca3b33140dedc40bf3ca4d61d1b7b08478f9",
+        "url": "https://github.com/jussray/sync-party-game/actions/runs/45344322436"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "truth-weaver",
+      "name": "Truth Weaver",
+      "publicPage": "https://truthweaver.jussco.company/",
+      "entityId": "https://github.com/jussray/truth-weaver#application",
+      "entityIdStatus": "provisional",
+      "sourcePath": "README.md",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "f1bb6778feee6b81b1fd1d0da59b78d983ba42e6",
+        "url": "https://github.com/jussray/truth-weaver/actions/runs/45344326277"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
     }
   ]
 }
