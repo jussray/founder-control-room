@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'labs/ai-company/process-sandbox/**'
+      - 'src/founder-os-lab/**'
+      - 'test/founder-os-container-bridge.test.ts'
+      - 'vitest.founder-os-container-bridge.config.ts'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ai-company-container-sandbox.yml'
