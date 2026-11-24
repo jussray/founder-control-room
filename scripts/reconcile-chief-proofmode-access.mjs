@@ -454,7 +454,7 @@ export function classifyChiefAccessError(error) {
   if (/No matching Chief Service Auth policy/.test(message)) return 'service-auth-policy-missing';
   if (/ProofMode CI service-auth policy exists for another rule/.test(message)) return 'service-auth-policy-conflict';
   if (/carries an Everyone policy/.test(message)) return 'everyone-policy-present';
-  if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application/.test(message)) {
+  if (/Multiple public Access applications|Multiple preview_worker Access applications|Multiple worker Access applications|Expected exactly one Chief Worker identity|Could not resolve an effective Access application|Resolved Chief Access subject differs from the latched repair subject|Latched Chief Access subject fingerprint is malformed/.test(message)) {
     return 'access-application-ambiguous-or-unresolved';
   }
   if (/configured Chief Access service token is disabled|configured Chief Access service token is expired|configured Chief Access service token has invalid expiry metadata|does not match the configured client ID|Expected exactly one configured Cloudflare Access service token|Expected exactly one Cloudflare Access service token/.test(message)) {
