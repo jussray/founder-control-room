@@ -8,34 +8,110 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('types: [opened, reopened, synchronize, closed]');
     expect(workflow).toContain('group: neon-pr-${{ github.event.pull_request.number }}');
     expect(workflow).toContain('branch_name: preview/pr-${{ github.event.number }}');
-    expect(workflow).toContain('branch: preview/pr-${{ github.event.number }}');
+    expect(workflow).toContain('branch: ${{ steps.neon_branch.outputs.branch_id }}');
     expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
     expect(workflow).toContain('neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c');
     expect(workflow).toContain('neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776');
   });
 
-  it('allocates Neon only for Supabase-changing pull requests while preserving the required job identity', () => {
-    expect(workflow).toContain('name: Create Neon Branch');
-    expect(workflow).toContain('pull-requests: read');
-    expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(2);
-    expect(workflow).toContain('gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100"');
-    expect(workflow).toContain('supabase/*)');
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(2);
-    expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/.');
-    expect(workflow).toContain('Neon cleanup skipped because this PR does not change supabase/.');
+  it('resolves create/migration scope against the live target branch instead of the historical PR file snapshot', () => {
+    expect(workflow).toContain('BASE_REF: ${{ github.event.pull_request.base.ref }}');
+    expect(workflow).toContain('EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
+    expect(workflow).toContain('git ls-remote --heads origin "refs/heads/${BASE_REF}"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$live_base_sha" "$EXPECTED_HEAD_SHA"');
+    expect(workflow).toContain('git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"');
+    expect(workflow).toContain(
+      'git diff --name-status --no-renames "$LIVE_BASE_SHA" "$EXPECTED_HEAD_SHA" -- \'supabase/migrations/*.sql\'',
+    );
+    expect(workflow).toContain('live_base_sha=${live_base_sha}');
+    expect(workflow).toContain('Stale PR ancestry');
+    expect(workflow).toContain('PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"');
+    expect(workflow).toContain('Running migration preview contract: $PREVIEW_CONTRACT');
+    expect(workflow).toContain('Re-running migration preview contract on exact candidate: $PREVIEW_CONTRACT');
   });
 
-  it('keeps Neon credentials behind the database-scope gate and never exports database URLs', () => {
+  it('allocates Neon only for live-base Supabase changes while preserving the required job identity', () => {
+    expect(workflow).toContain('name: Create Neon Branch');
+    expect(workflow).toContain('pull-requests: read');
+    expect(workflow.match(/- name: Classify Neon preview scope/g)).toHaveLength(1);
+    expect(workflow).toContain('supabase/*)');
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(1);
+    expect(workflow).toContain('Neon preview skipped because this PR does not change supabase/ against live base.');
+    expect(workflow).not.toContain('Neon cleanup skipped because this PR does not change supabase/.');
+  });
+
+  it('executes the real Supabase migration with a Neon-only fixture and verifies schema isolation', () => {
+    const fixture = readFileSync('supabase/preview-fixtures/20261103000000_member_browser_sessions.sql', 'utf8');
+    const assertions = readFileSync('supabase/preview-assertions/20261103000000_member_browser_sessions.sql', 'utf8');
+    const migration = readFileSync('supabase/migrations/20261103000000_member_browser_sessions.sql', 'utf8');
+    expect(workflow).toContain('PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"');
+    expect(workflow).toContain('PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"');
+    expect(workflow).toContain('if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then');
+    expect(workflow).toContain('Run compatibility fixture and original migration atomically');
+    expect(workflow).toContain('-f "$PREVIEW_FIXTURE" -f "$migration"');
+    expect(workflow).toContain('-f "$PREVIEW_ASSERT"');
+    expect(fixture).toContain('CREATE SCHEMA IF NOT EXISTS auth');
+    expect(fixture).toContain('CREATE TABLE IF NOT EXISTS auth.users');
+    expect(fixture).toContain('CREATE ROLE %I NOLOGIN');
+    expect(assertions).toContain('relrowsecurity');
+    expect(assertions).toContain('has_table_privilege');
+    expect(assertions).toContain("contype = 'f'");
+    expect(migration).toContain('references auth.users(id)');
+    expect(migration).toContain('enable row level security');
+    expect(migration).toContain('from public, anon, authenticated');
+    expect(migration).toContain('to service_role');
+    expect(fixture).not.toContain('SERVICE_ROLE_KEY');
+    expect(assertions).not.toContain('CREATE TABLE');
+  });
+
+  it('reconciles close cleanup against the actual Neon preview branch instead of the final PR diff', () => {
+    expect(workflow).toContain('target_name="preview/pr-${PR_NUMBER}"');
+    expect(workflow).toContain('https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches');
+    expect(workflow).toContain('--data-urlencode "search=${target_name}"');
+    expect(workflow).toContain('[.branches[] | select(.name == $target_name)]');
+    expect(workflow).toContain('branch_found=false');
+    expect(workflow).toContain('branch_found=true');
+    expect(workflow).toContain('Unsafe Neon cleanup target');
+    expect(workflow).toContain('branch: ${{ steps.neon_branch.outputs.branch_id }}');
+    expect(workflow).toContain('No matching Neon preview branch exists; cleanup completed as a safe no-op.');
+    expect(workflow).not.toContain('pulls/${PR_NUMBER}/files?per_page=100');
+  });
+
+  it('keeps Neon credentials and the private preview URL behind the database-scope gate without exporting it', () => {
     expect(workflow).not.toContain('create_neon_branch_encode');
-    expect(workflow).not.toContain('db_url');
     expect(workflow).not.toContain('db_url_pooled');
     expect(workflow).not.toContain('db_url_with_pooler');
     expect(workflow).toContain("echo 'NEON_API_KEY is not configured' >&2");
+    expect(workflow).toContain('NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}');
+    expect(workflow).toContain("echo 'Neon branch identity and private database URL output are present. URL value was not printed.'");
+    expect(workflow).not.toMatch(/echo .*\$NEON_DB_URL/);
+    expect(workflow).not.toMatch(/NEON_DB_URL=.*>>\s*["']?\$GITHUB_ENV/);
+    expect(workflow).not.toMatch(/NEON_DB_URL=.*>>\s*["']?\$GITHUB_OUTPUT/);
 
     const firstClassifier = workflow.indexOf('- name: Classify Neon preview scope');
     const firstCredentialRead = workflow.indexOf('NEON_API_KEY: ${{ secrets.NEON_API_KEY }}');
+    const firstDatabaseUrlRead = workflow.indexOf('NEON_DB_URL: ${{ steps.create_neon_branch.outputs.db_url }}');
     expect(firstClassifier).toBeGreaterThan(-1);
     expect(firstCredentialRead).toBeGreaterThan(firstClassifier);
+    expect(firstDatabaseUrlRead).toBeGreaterThan(firstClassifier);
   });
+  it('requires bounded provider readback after deletion and fails closed on unresolved state', () => {
+    const deleteAction = workflow.indexOf('- name: Delete Neon Branch');
+    const providerReadback = workflow.indexOf('- name: Verify Neon branch deletion with provider readback');
+    expect(deleteAction).toBeGreaterThan(-1);
+    expect(providerReadback).toBeGreaterThan(deleteAction);
+    expect(workflow).toContain("if: steps.neon_branch.outputs.branch_found == 'true'");
+    expect(workflow).toContain('for attempt in {1..12}; do');
+    expect(workflow).toContain('curl --fail-with-body --silent --show-error --get');
+    expect(workflow).toContain("jq -e '.branches | type == \"array\"'");
+    expect(workflow).toContain('[.branches[] | select(.name == $target_name)] | length');
+    expect(workflow).toContain('Provider readback confirmed exact preview branch is absent: ${target_name}.');
+    expect(workflow).toContain('Neon deletion readback failed');
+    expect(workflow).toContain('Invalid Neon readback response');
+    expect(workflow).toContain('Ambiguous Neon deletion readback');
+    expect(workflow).toContain('Neon branch still exists after deletion');
+    expect(workflow).toContain('sleep 5');
+  });
+
 });

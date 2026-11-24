@@ -17,12 +17,13 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 5. `CURRENT` ancestry is not completion; ordinary exact-head and real-path gates still apply.
 6. The machine-managed PR continuity block is always rendered first. It governs present-tense base/head/proof-subject identity and continuity status. Human prose is preserved below it as historical/contextual text; any SHA or status prose below is historical unless it matches the machine block.
 7. Continuity metadata mutation keeps exactly one start/end marker pair. Duplicate, orphaned, or reversed markers fail closed instead of rewriting the PR body.
-8. `merge_authority: true` means the merge capability/authority class is available. It does **not** approve the current candidate. Continuity receipts remain non-authorizing and must also state that exact-candidate merge approval is required and currently absent unless a separate authenticated approval receipt proves otherwise.
-9. If explicit founder approval for the exact repository, PR number, live base SHA, and live head SHA is absent, ambiguous, or stale, the agent/operator must ask and stop. Approval never carries across base/head movement.
+8. `merge_authority: true` means the merge capability/authority class is available. It does **not** approve the current candidate. Continuity receipts remain non-authorizing for the separate FCR in-app merge executor. A provider-observed founder Auto-merge click is the founder's native GitHub merge instruction, not a formal GitHub `APPROVED` review or an in-app approval receipt.
+9. If in-app FCR merge approval for the exact repository, PR number, live base SHA, and live head SHA is absent, ambiguous, or stale, the agent/operator must stop. Native GitHub Auto-merge does not require a duplicate manual founder approval once the verified founder has queued it; GitHub still enforces its configured current checks, review threads and branch protections.
 10. Continuity receipts never authorize deploy, publish, provider mutation, spend, deletion, or authority expansion.
 11. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
 12. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge-approval, or deploy proof.
 13. Rollover receipts must expose `blockedByState` plus individual `failureReceipts`. When one GitHub response contains multiple repository-rule violations, each material condition gets its own receipt entry so one blocker cannot hide or stand in for another.
+14. A push-level rollover observer may report successful execution after it has durably recorded a known blocked open-PR graph. That operational success means only that the observation and receipt succeeded. The aggregate receipt remains `BLOCKED_PR_DEBT`, and every affected PR remains fail-closed until its own current-head continuity and exact-head proof gates pass. Unknown errors, GitHub API failures, missing/malformed receipts, and unclassified rollover failures still fail the observer.
 
 ## Machine current truth precedence
 
@@ -38,7 +39,8 @@ proof_subject: ...
 continuity: ...
 proof: ...
 merge_authority: true
-merge_approval: REQUIRED_EXACT_CANDIDATE
+founder_auto_merge_selection: FOUNDER_SELECTED (only after trusted provider readback)
+merge_approval: REQUIRED_EXACT_CANDIDATE (FCR in-app executor only)
 merge_approved: false
 authorizes_merge: false
 deploy_authority: false
@@ -59,12 +61,12 @@ This removes the ambiguity where stale prose could visually outrank a fresh mach
 - `BLOCKED_PROVIDER_FORBIDDEN` for other 403 provider refusals; and
 - `BLOCKED_PROVIDER_REJECTED` for otherwise unclassified 422 validation/update rejections.
 
-The aggregate rollover remains blocked while any of those states exist. More precise receipts do not turn a blocker green, weaken repository rules, grant branch-update authority, or erase the provider's original message.
+The aggregate rollover remains blocked while any of those states exist. More precise receipts do not turn a blocker green, weaken repository rules, grant branch-update authority, or erase the provider's original message. On trusted `main`, the push-level observer may still complete successfully after recording that blocked aggregate as `BLOCKED_PR_DEBT`; this distinguishes a truthful blocked PR graph from a broken observer. Individual PR continuity gates remain strict and do not inherit that operational success.
 
 ## Founder Control Room boundary
 
-Founder Control Room remains the authority/evidence boundary. Continuity may roll an eligible same-repository branch forward and record proof expiry, but it does not approve a proposal, grant candidate-specific founder approval, merge, deploy, publish, mutate providers, spend, delete, or convert repository ancestry into runtime truth. After any rollover, FCR must reacquire exact-head CI, review, provider/runtime, artifact, and Playwright evidence. Before any merge execution, it must also reacquire a fresh explicit founder approval bound to the exact current repository, PR, base SHA, and head SHA.
+Founder Control Room remains the authority/evidence boundary. Continuity may roll an eligible same-repository branch forward and record proof expiry, but it does not approve a proposal, grant candidate-specific founder approval, merge, deploy, publish, mutate providers, spend, delete, or convert repository ancestry into runtime truth. After any rollover, FCR must reacquire exact-head CI, review, provider/runtime, artifact, and Playwright evidence. Before an AI-initiated FCR in-app merge, it must also reacquire a fresh authenticated founder-final approval bound to the exact current repository, PR, base SHA, and head SHA. For native GitHub Auto-merge, verified founder selection already supplies the founder's merge instruction; GitHub's own required gates remain decisive.
 
 ## Attack 20
 
-`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority/approval separation, stacked propagation, unrelated stacks, cycles, and provider-failure separation before any write step.
+`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority/approval separation, stacked propagation, unrelated stacks, cycles, and provider-failure separation before any write step. `test/pr-continuity.rollover-observation.test.mjs` separately verifies that known, receipted PR debt can be reported without disguising operational failures or weakening strict per-PR continuity.

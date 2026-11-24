@@ -1,0 +1,137 @@
+/* Approved Founder Control Room direction — public user/founder views.
+   Visual-only layer: existing access, links, panels and truth notices remain. */
+:root{--bg:#050917;--panel:#0b1635;--panel-2:#14254c;--line:rgba(122,164,255,.38);--ink:#f5f8ff;--muted:#cad6f5;--violet:#9870ff;--blue:#51bdff}
+body{background:radial-gradient(ellipse at 50% -12%,rgba(103,83,217,.32),transparent 55%),radial-gradient(ellipse at 92% 18%,rgba(34,100,204,.22),transparent 40%),linear-gradient(#06091c,#050716 65%,#040713)}
+.topbar{position:sticky;top:0;z-index:30;background:rgba(5,10,29,.8);border:1px solid rgba(95,149,255,.2);border-radius:0 0 18px 18px;padding-inline:clamp(14px,2vw,28px);backdrop-filter:blur(24px)}
+.logo-mark{box-shadow:0 0 18px rgba(69,187,255,.5),0 0 35px rgba(153,101,253,.2)}
+.frame{box-shadow:0 20px 70px rgba(0,0,0,.45),0 0 22px rgba(71,136,255,.11);border-color:rgba(85,150,255,.48)}
+.hero{position:relative;isolation:isolate;overflow:hidden;min-height:430px;background:radial-gradient(ellipse at 78% 28%,rgba(255,186,146,.36),transparent 34%),radial-gradient(ellipse at 57% 0,rgba(103,73,218,.36),transparent 50%),linear-gradient(180deg,rgba(9,13,39,.78),rgba(15,25,62,.67) 55%,rgba(6,10,29,.96))}
+.hero::before{content:"";position:absolute;inset:auto 0 0;height:45%;z-index:-1;pointer-events:none;background:linear-gradient(157deg,transparent 33%,rgba(32,46,95,.9) 33.5% 64%,transparent 64.5%),linear-gradient(25deg,transparent 32%,rgba(15,32,78,.95) 32.5% 66%,transparent 66.5%),linear-gradient(180deg,transparent,#07112e);clip-path:polygon(0 100%,0 68%,12% 36%,24% 74%,37% 26%,48% 70%,64% 18%,78% 73%,88% 38%,100% 82%,100% 100%)}
+.hero-copy{position:relative;z-index:2}
+.hero h1{letter-spacing:-.045em;text-shadow:0 3px 34px rgba(2,5,21,.7)}
+.hero .grad{background:linear-gradient(110deg,#a3e7ff 0%,#c7b5ff 52%,#e6a2ff 100%);background-clip:text;-webkit-background-clip:text;color:transparent}
+.hero-art{filter:drop-shadow(0 0 35px rgba(146,105,255,.23))}
+.card,.panel,.stat{background:linear-gradient(145deg,rgba(18,39,78,.7),rgba(7,15,38,.74));border-color:rgba(121,166,255,.3);box-shadow:inset 0 1px rgba(255,255,255,.06)}
+.btn{box-shadow:0 6px 28px rgba(101,91,255,.28);transition:box-shadow .2s ease,transform .2s ease}
+.btn:hover{box-shadow:0 7px 32px rgba(77,162,255,.39)}
+.note-line{color:#c7d4f1}
+@media(min-width:950px){.wrap{width:min(1510px,calc(100% - 2.5rem))}.hero{min-height:510px}}
+@media(max-width:700px){.topbar{position:relative;border-radius:0}.hero{min-height:0}.hero::before{height:38%}.hero-art{opacity:.65}.hero h1{font-size:clamp(2.5rem,10vw,4.3rem)}}
+@media(prefers-reduced-motion:reduce){.btn{transition:none}}
+@media(prefers-reduced-transparency:reduce){.topbar{background:#080e25;backdrop-filter:none}.card,.panel,.stat{background:#111b37}}
+
+/* 2026-11-03: image-reference visual fidelity pass (public views only). */
+.hero {
+  display: flex;
+  align-items: center;
+  min-height: 570px;
+  isolation: isolate;
+  padding: clamp(2rem, 5vw, 4rem);
+  overflow: hidden;
+}
+.hero::before { display: none; }
+.hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  z-index: 0;
+  filter: none;
+  overflow: hidden;
+}
+.hero-art img {
+  object-position: 60% 55%;
+  filter: saturate(1.14) contrast(1.08);
+}
+.hero-art::after {
+  background:
+    linear-gradient(90deg, rgba(5, 7, 27, .95), rgba(5, 8, 28, .79) 45%, rgba(7, 11, 31, .16) 87%),
+    linear-gradient(0deg, rgba(6, 7, 24, .82), transparent 45%);
+}
+.hero-copy {
+  position: relative;
+  z-index: 2;
+  width: min(660px, 70%);
+}
+.hero-tag, .quote-serif { z-index: 2; }
+.quote-serif {
+  top: auto;
+  bottom: 1.5rem;
+  right: 2.5rem;
+  text-shadow: 0 2px 18px #020317;
+}
+.f-head {
+  min-height: 320px;
+  position: relative;
+  align-items: center;
+  padding: 2.7rem 2rem;
+  background:
+    linear-gradient(90deg, rgba(5, 8, 29, .96), rgba(6, 11, 37, .7) 50%, rgba(11, 11, 35, .25)),
+    url('/assets/front-door/hero-peak.jpg') center 56% / cover;
+}
+.f-head h2 {
+  font-size: clamp(2rem, 4.3vw, 4rem);
+  text-shadow: 0 6px 30px #050717;
+}
+.sunrise {
+  background:
+    linear-gradient(90deg, rgba(10, 13, 44, .8), rgba(11, 15, 45, .2)),
+    url('/assets/front-door/hero-peak.jpg') center 65% / cover;
+}
+@media (max-width: 700px) {
+  .hero { min-height: 500px; padding: 2rem 1.3rem; }
+  .hero-copy { width: 100%; }
+  .hero-art { opacity: 1; }
+  .hero-art img { object-position: 60% 50%; }
+  .hero-art::after {
+    background:
+      linear-gradient(90deg, rgba(5, 7, 27, .95), rgba(5, 8, 28, .78) 80%),
+      linear-gradient(0deg, rgba(6, 7, 24, .85), transparent 56%);
+  }
+  .quote-serif { display: none; }
+  .f-head { min-height: 260px; padding: 1.7rem 1.3rem; }
+}
+
+/* Source-image fidelity polish: keep the mountain hero prominent on every viewport. */
+@media (min-width: 981px) {
+  .hero { min-height: clamp(560px, 66vh, 720px); }
+  .hero-art img { object-position: 56% 53%; }
+  .hero-copy { max-width: 620px; }
+  .hero h1 { line-height: 1.04; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  a.card:hover, a.card:focus-visible {
+    transform: translateY(-3px);
+    box-shadow: 0 24px 55px rgba(12, 10, 46, .42), 0 0 26px rgba(115, 104, 255, .16);
+  }
+}
+.f-head { isolation: isolate; overflow: hidden; }
+.f-head::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 78% 23%, rgba(255, 190, 126, .23), transparent 34%);
+}
+.f-head > * { position: relative; z-index: 1; }
+.sunrise { min-height: 165px; display: grid; align-content: end; gap: .3rem; }
+.sunrise strong, .sunrise span { text-shadow: 0 2px 16px rgba(2, 4, 19, .8); }
+@media (max-width: 700px) {
+  .topbar { gap: .65rem; }
+  .navlinks { gap: .2rem; }
+  .hero { min-height: 490px; }
+  .hero h1 { font-size: clamp(2.55rem, 9.5vw, 4rem); line-height: 1.03; }
+  .hero-tag { display: none; }
+  .hero-art img { object-position: 64% 50%; }
+  .sub { max-width: 25ch; }
+  .f-head { min-height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card, a.card:hover, a.card:focus-visible { transition: none; transform: none; }
+}

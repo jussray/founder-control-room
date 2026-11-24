@@ -201,4 +201,22 @@ describe('FutureYou V8 mission control', () => {
     });
     expect(brief.summary.invalidObservationTimes).toBe(1);
   });
+
+  it('flags a blind spot when an unresolved critical event ages out of the activity window instead of silently dropping it', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [],
+      activity: [{
+        id: 'stale-critical',
+        project_id: 'project-1',
+        event_type: 'payment_delivery_failed',
+        severity: 'critical',
+        created_at: '2026-07-01T00:00:00.000Z',
+        project,
+      }],
+    });
+
+    expect(brief.priorities).toHaveLength(0);
+    expect(brief.blindSpots.some((item) => item.includes('critical or error event') && item.includes('older than 14 days'))).toBe(true);
+  });
 });
