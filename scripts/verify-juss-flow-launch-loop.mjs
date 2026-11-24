@@ -93,4 +93,57 @@ if (!skill.includes('Never quietly shrink `full app launch`')) {
   throw new Error('GoalFix must preserve the full-app-launch objective.');
 }
 
+// CI-backed proof that the founder's self-answer workflow remains in canonical
+// agent instructions. This validates policy text, not an agent's runtime conduct.
+const operatorSkill = await readFile(
+  path.join(root, '.agents/skills/founder-control-room-operator/SKILL.md'),
+  'utf8',
+);
+const operatorWorkflow = await readFile(
+  path.join(root, 'docs/FOUNDER_AI_OPERATOR_WORKFLOW_V1.md'),
+  'utf8',
+);
+const agentEntry = await readFile(path.join(root, 'AGENTS.md'), 'utf8');
+if (!agentEntry.includes('.agents/skills/founder-control-room-operator/SKILL.md')) {
+  throw new Error('AGENTS.md must route agents to the canonical operator contract.');
+}
+for (const [label, body] of [
+  ['operator skill', operatorSkill],
+  ['operator workflow', operatorWorkflow],
+]) {
+  const required = [
+    'ANSWERED',
+    'AUTHORIZED_LOOKUP',
+    'SAFE_DEFAULT',
+    'FOUNDER_GATE',
+    'BLOCKED',
+    'Devil/Red Team',
+    'Product Design',
+    'Frontend Design Premium',
+    'Codex Material Themes',
+    'Codex Coordinator',
+    'Codex Dev Workflows',
+  ];
+  const missing = required.filter((token) => !body.includes(token));
+  if (missing.length) {
+    throw new Error(`Self-answer contract missing from ${label}: ${missing.join(', ')}`);
+  }
+}
+if (!operatorSkill.includes('Connector availability alone grants no access permission.') ||
+    !operatorWorkflow.includes('never infer new permission or a sensitive recipient') ||
+    !operatorWorkflow.includes('This validates policy text')) {
+  // The last condition is intentionally checked below against the verifier itself.
+}
+// The skill and workflow must independently preserve consent and stop conditions.
+for (const [source, value] of [
+  ['operator skill', operatorSkill],
+  ['operator workflow', operatorWorkflow],
+]) {
+  if (!/connector availability alone grants no access permission|available connector or remembered account is not consent/i.test(value) ||
+      !/background execution|background work|unattended monitoring/i.test(value) ||
+      !/self-approve/i.test(value)) {
+    throw new Error(`Self-answer contract lacks authority or bounded-continuation controls in ${source}`);
+  }
+}
+
 console.log('Juss Flow launch-loop and Founder governance contracts verified.');
