@@ -23,6 +23,7 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 User-agent: ChatGPT-User
 Disallow: /
@@ -35,6 +36,7 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 User-agent: Claude-SearchBot
 Disallow: /
@@ -47,6 +49,7 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 User-agent: Claude-User
 Disallow: /
@@ -59,6 +62,7 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 User-agent: Googlebot
 Disallow: /
@@ -71,6 +75,7 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 User-agent: *
 Disallow: /
@@ -83,5 +88,6 @@ Allow: /robots.txt$
 Allow: /sitemap.xml$
 Allow: /llms.txt$
 Allow: /crawlers.json$
+Allow: /site-identity.json$
 
 Sitemap: https://www.foundercontrolroom.org/sitemap.xml
