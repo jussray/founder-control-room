@@ -332,7 +332,9 @@ try {
 
   await page.locator('[data-proposal-json]').fill('{}');
   await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
-  await page.locator('[data-public-payload-hash]').fill(approvedPost.contentHash);
+  const publicHash = page.locator('[data-public-payload-hash]');
+  assert.equal(await publicHash.isEditable(), false, 'the selected post hash must remain read-only');
+  assert.equal(await publicHash.inputValue(), approvedPost.contentHash, 'selection must bind the stored post hash without manual entry');
   await page.locator('[data-publish-confirm]').check();
   await publish.click();
   await page.waitForFunction(() => document.querySelector('[data-console-output]')?.textContent?.includes('PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED'));
