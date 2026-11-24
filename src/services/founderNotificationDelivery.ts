@@ -1,14 +1,21 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { sendWebPush, unsealSubscription, vapidPublicKey } from './webPushTransport.js';
 
+export function notificationOwnerId(env = process.env): string | null {
+  const value = env.FCR_WEB_PUSH_FOUNDER_USER_ID ?? '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value.toLowerCase() : null;
+}
+
 export function founderPushConfig(env = process.env) {
   if (env.FCR_WEB_PUSH_ENABLED !== 'true') return null;
   const privateKey = env.FCR_WEB_PUSH_VAPID_PRIVATE_KEY ?? '';
   const storageKey = env.FCR_WEB_PUSH_STORAGE_KEY ?? '';
   const subject = env.FCR_WEB_PUSH_SUBJECT ?? '';
+  const ownerId = notificationOwnerId(env);
+  if (!ownerId) throw new Error('push_owner_unconfigured');
   const publicKey = vapidPublicKey(privateKey);
   if (Buffer.from(storageKey, 'base64url').length !== 32 || Buffer.from(storageKey, 'base64url').toString('base64url') !== storageKey || !(/^mailto:[^\s@]+@[^\s@]+$/.test(subject) || /^https:\/\/[^\s]+$/.test(subject))) throw new Error('push_config_invalid');
-  return { privateKey, storageKey, subject, publicKey };
+  return { privateKey, storageKey, subject, publicKey, ownerId };
 }
 
 type Config = NonNullable<ReturnType<typeof founderPushConfig>>;
@@ -52,7 +59,7 @@ async function dispatch(claim: Claim, config: Config) {
   if (error) throw new Error('subscription_recheck_failed');
   const { data: founder, error: founderError } = await supabase.from('founder_users').select('user_id').eq('user_id', claim.user_id).maybeSingle();
   if (founderError) throw new Error('founder_recheck_failed');
-  if (!founder || !subscription || subscription.revoked_at || subscription.user_id !== claim.user_id ||
+  if (claim.user_id !== config.ownerId || !founder || !subscription || subscription.revoked_at || subscription.user_id !== claim.user_id ||
       subscription.encrypted_subscription !== claim.encrypted_subscription) {
     await finishClaim(claim, 'failed', null);
     return;
@@ -80,7 +87,7 @@ async function dispatch(claim: Claim, config: Config) {
 export async function runFounderNotificationDeliveryCycle() {
   const config = founderPushConfig();
   if (!config) return { state: 'disabled', claimed: 0 };
-  const { data, error } = await supabase.rpc('claim_founder_notification_deliveries', { batch_limit: 20 });
+  const { data, error } = await supabase.rpc('claim_founder_notification_deliveries', { owner_user_id: config.ownerId, batch_limit: 20 });
   if (error) throw new Error('notification_claim_failed');
   const claims = (data ?? []) as Claim[];
   let failed = 0;
