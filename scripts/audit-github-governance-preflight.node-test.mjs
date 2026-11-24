@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   CANONICAL_NATIVE_APPROVAL_COUNT,
   CANONICAL_RULESET_NAME,
+  PRESERVABLE_REVIEW_RULE_TYPES,
   CODEQL_SECURITY_FLOOR,
   buildBlockedReport,
   buildReport,
@@ -45,7 +46,7 @@ function canonicalRuleset(overrides = {}) {
           code_scanning_tools: [{
             tool: 'CodeQL',
             security_alerts_threshold: 'high_or_higher',
-            alerts_threshold: 'errors',
+            alerts_threshold: 'all',
           }],
         },
       },
@@ -103,7 +104,7 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical FCR governance preserves founder-only review and zero-bypass freshness membranes', () => {
+test('canonical FCR founder-selected review policy preserves zero-bypass freshness membranes', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const review = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
@@ -134,7 +135,40 @@ test('canonical FCR governance preserves founder-only review and zero-bypass fre
   assert.equal(freshnessFloorSatisfied(freshness), true);
 });
 
-test('future-team phase is representable without weakening any machine or provider floor', () => {
+test('canonical review membrane permits only the known preservable provider rule classes', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const preserved = canonicalRuleset();
+  preserved.rules.push(
+    { type: 'required_linear_history' },
+    { type: 'required_signatures' },
+    { type: 'code_quality', parameters: { severity: 'errors' } },
+    {
+      type: 'copilot_code_review',
+      parameters: { review_on_push: false, review_draft_pull_requests: false },
+    },
+  );
+  assert.deepEqual(
+    [...PRESERVABLE_REVIEW_RULE_TYPES].sort(),
+    ['code_quality', 'copilot_code_review', 'required_linear_history', 'required_signatures'].sort(),
+  );
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(preserved, 'main', 'main'), expectedBypass), true);
+
+  const unknown = structuredClone(preserved);
+  unknown.rules.push({ type: 'unknown_future_rule' });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(unknown, 'main', 'main'), expectedBypass), false);
+
+  const leakedStatus = structuredClone(preserved);
+  leakedStatus.rules.push({
+    type: 'required_status_checks',
+    parameters: {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'Required Gate' }],
+    },
+  });
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(leakedStatus, 'main', 'main'), expectedBypass), false);
+});
+
+test('independent-review phase preserves every machine and provider floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const future = rulesetSnapshot(futureTeamRuleset(), 'main', 'main');
   assert.equal(future.requiredApprovingReviewCount, 1);
@@ -204,11 +238,12 @@ test('collaborator readiness remains observable and excludes owner and bots', ()
   assert.equal(collaboratorCanReview({ login: 'reviewer', permissions: { push: true } }, 'jussray'), true);
 });
 
-test('founder-only report is READY for exact topology even before a future reviewer exists', () => {
+test('founder-only native phase is READY with no outside native reviewer when other gates pass', () => {
   const ready = readyReport({
     collaborators: [{ login: 'jussray', permissions: { admin: true } }],
   });
   assert.equal(ready.status, 'READY');
+  assert.equal(ready.blocker, null);
   assert.equal(ready.humanReviewPhase, 'founder-only');
   assert.equal(ready.requiredNativeApprovalCount, 0);
   assert.equal(ready.observationComplete, true);
@@ -234,6 +269,31 @@ test('founder-only report is READY for exact topology even before a future revie
   });
   assert.equal(duplicate.status, 'NOT_READY');
   assert.equal(duplicate.activeRulesetCountTargetingRef, 3);
+});
+
+test('optional eligible outside reviewer remains observable but is not a native gate', () => {
+  const ready = readyReport();
+  assert.equal(ready.status, 'READY');
+  assert.equal(ready.blocker, null);
+  assert.equal(ready.humanReviewPhase, 'founder-only');
+  assert.equal(ready.requiredNativeApprovalCount, 0);
+  assert.equal(ready.independentReviewerReady, true);
+  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
+  assert.equal(ready.canonicalFloorSatisfied, true);
+  assert.equal(ready.freshnessFloorSatisfied, true);
+});
+
+test('owner-only and bot-only collaborators do not create an extra native review gate', () => {
+  for (const collaborators of [
+    [{ login: 'jussray', permissions: { admin: true } }],
+    [{ login: 'audit[bot]', type: 'Bot', permissions: { push: true } }],
+    [{ login: 'reader', permissions: { pull: true } }],
+  ]) {
+    const result = readyReport({ collaborators });
+    assert.equal(result.status, 'READY');
+    assert.equal(result.blocker, null);
+    assert.equal(result.independentReviewerReady, false);
+  }
 });
 
 test('legacy monolithic ruleset is NOT_READY and cannot impersonate canonical two-component governance', () => {
@@ -298,9 +358,20 @@ test('freshness companion must have zero bypass actors and only exact strict che
   assert.equal(wrongChecksReport.freshnessFloorSatisfied, false);
 });
 
+test('review membrane rejects legacy pre-merge deployment requirements', () => {
+  const legacyDeployment = canonicalRuleset();
+  legacyDeployment.rules.push({
+    type: 'required_deployments',
+    parameters: { required_deployment_environments: ['founder-signal-engine-review', 'production'] },
+  });
+  const report = readyReport({ fullRulesets: [legacyDeployment, freshnessRuleset()] });
+  assert.equal(report.status, 'NOT_READY');
+  assert.equal(report.canonicalFloorSatisfied, false);
+});
+
 test('review membrane rejects unmodeled extra provider rules', () => {
   const extraRule = canonicalRuleset();
-  extraRule.rules.push({ type: 'copilot_code_review' });
+  extraRule.rules.push({ type: 'creation' });
   const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
   assert.equal(report.status, 'NOT_READY');
   assert.equal(report.canonicalFloorSatisfied, false);

@@ -125,6 +125,11 @@ describe('hard portfolio boundaries', () => {
     expect(verdict.reasons.join(' ')).toContain('explicitly blocks action: live-trade');
   });
 
+  it('keeps SleepWealth pooled funds and cross-account credentials blocked even with a valid-looking request', () => {
+    expect(portfolioHardConstraintViolations('jussray/SleepWealth-Agent', 'accept-pooled-funds')).toContain('project profile explicitly blocks action: accept-pooled-funds');
+    expect(portfolioHardConstraintViolations('jussray/SleepWealth-Agent', 'cross-account-credential-use')).toContain('project profile explicitly blocks action: cross-account-credential-use');
+  });
+
   it('keeps Bip Jr public social and permission escalation blocked', () => {
     expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'enable-public-social')).toContain('project profile explicitly blocks action: enable-public-social');
     expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'expand-child-permissions-without-adult')).toContain('project profile explicitly blocks action: expand-child-permissions-without-adult');

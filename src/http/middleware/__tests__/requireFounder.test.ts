@@ -125,6 +125,7 @@ async function founderCookie(
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   });
   const values = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
@@ -145,6 +146,7 @@ function refreshedSession(): Session {
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   };
 }
@@ -172,7 +174,7 @@ beforeEach(() => {
   mocks.select.mockReturnValue(allowlistChain);
   mocks.eq.mockReturnValue(allowlistChain);
   mocks.maybeSingle.mockResolvedValue({
-    data: { email: 'founder@example.com' },
+    data: { email: 'founder@example.com', user_id: 'founder-user-1' },
     error: null,
   });
 
@@ -181,6 +183,7 @@ beforeEach(() => {
       user: {
         id: 'founder-user-1',
         email: '  FOUNDER@EXAMPLE.COM ',
+        email_confirmed_at: '2026-11-15T00:00:00Z',
       },
     },
     error: null,
@@ -228,6 +231,7 @@ describe('requireFounder', () => {
     });
     expect(mocks.getUser).toHaveBeenCalledWith('founder-access-token');
     expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
   });
@@ -300,6 +304,7 @@ describe('requireFounder', () => {
       refresh_token: 'cookie-refresh-token',
     });
     expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
+    expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
     expect(response.headers['cache-control']).toBe('private, no-store');

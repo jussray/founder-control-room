@@ -1,6 +1,6 @@
 // Cloudflare Worker — edge relay + health
-// Thin on purpose: validate signature, relay to origin, return fast.
-// All business logic lives in Next.js API routes.
+// Thin on purpose: validate signature, relay to the canonical webhook ingress, return fast.
+// All business logic lives in the canonical Express webhook route.
 
 export interface Env {
   ENVIRONMENT: string;
@@ -47,12 +47,13 @@ export default {
         return Response.json({ ok: false, error: 'ORIGIN_URL not configured' }, { status: 500 });
       }
 
-      const forwarded = await fetch(`${origin}/api/webhooks/github`, {
+      const forwarded = await fetch(`${origin}/webhooks/github`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'x-hub-signature-256': sig ?? '',
           'x-github-event': request.headers.get('x-github-event') ?? 'unknown',
+          'x-github-delivery': request.headers.get('x-github-delivery') ?? '',
           'x-forwarded-by': 'cf-worker'
         },
         body

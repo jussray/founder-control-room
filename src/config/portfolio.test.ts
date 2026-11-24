@@ -18,6 +18,9 @@ describe('founder repository index', () => {
       ['solcontinuity', 'jussray/solcontinuity'],
       ['sleepwealth-agent', 'jussray/SleepWealth-Agent'],
       ['sweats', 'jussray/Sweats'],
+      ['truth-compass', 'jussray/truth-compass'],
+      ['truth-weaver', 'jussray/truth-weaver'],
+      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
     ] as const;
 
     for (const [slug, repository] of expectedExternal) {
@@ -33,13 +36,26 @@ describe('founder repository index', () => {
     }
   });
 
+  it('tracks current Truth Weaver product identity without expanding authority', () => {
+    expect(getKnownProject('truth-weaver')).toMatchObject({
+      name: 'Truth Weaver Counsel',
+      repository: 'jussray/truth-weaver',
+      status: 'external',
+    });
+    expect(getKnownProject('truth-weaver')?.capabilities).toEqual([
+      'legal-knowledge',
+      'decision-support',
+      'evidence',
+      'continuity',
+    ]);
+    expect(getPortfolioProject('truth-weaver')).toBeUndefined();
+  });
+
   it('indexes unverified portfolio subjects for continuity without claiming inherited challenge-stack state', () => {
     const expectedContinuityOnly = [
       ['bip-jr', 'jussray/Bip-Jr'],
-      ['truth-compass', 'jussray/truth-compass'],
-      ['truth-weaver', 'jussray/truth-weaver'],
-      ['alexa-commerce-engine', 'jussray/alexa-commerce-engine-'],
-      ['sync-party', 'jussray/sync-party-game'],
+      ['exact-match-engine', 'jussray/exact-match-engine'],
+      ['ayure', 'jussray/Ayure-'],
     ] as const;
 
     for (const [slug, repository] of expectedContinuityOnly) {
@@ -65,42 +81,9 @@ describe('founder repository index', () => {
       'l99',
       'promptos',
       'sekret-bip',
+      'sync-party',
       'untold-stories',
     ]);
-  });
-
-  it('records mobile store intent without promoting repository authority', () => {
-    const intended = {
-      'sekret-bip': 'native-existing',
-      'juss-beautiful-hair': 'hybrid-native-candidate',
-      'juss-beautiful-hair-private': 'native-client-required',
-      l99: 'native-client-required',
-      'chief-ai-machine': 'native-client-required',
-      'untold-stories': 'hybrid-native-candidate',
-      'founder-control-room': 'native-client-required',
-      promptos: 'native-client-required',
-      'think-tank': 'hybrid-native-candidate',
-      'sleepwealth-agent': 'native-client-required',
-      sweats: 'hybrid-native-candidate',
-      'bip-jr': 'canonical-port-required',
-      'truth-compass': 'native-client-required',
-      'truth-weaver': 'native-client-required',
-      'alexa-commerce-engine': 'native-client-required',
-      'sync-party': 'hybrid-native-candidate',
-    } as const;
-
-    for (const [slug, carrierStrategy] of Object.entries(intended)) {
-      expect(getKnownProject(slug)).toMatchObject({
-        mobileDistribution: {
-          targetStores: ['apple-app-store', 'google-play'],
-          carrierStrategy,
-        },
-      });
-    }
-
-    expect(getKnownProject('solcontinuity')?.mobileDistribution).toBeUndefined();
-    expect(getPortfolioProject('truth-compass')).toBeUndefined();
-    expect(getPortfolioProject('sync-party')).toBeUndefined();
   });
 
   it('binds the private hair repository to the database registry slug', () => {
@@ -125,4 +108,34 @@ describe('founder repository index', () => {
       expect(QUARANTINED_REPOSITORIES.has(project.repository)).toBe(false);
     }
   });
+  it('records mobile store intent without promoting repository authority', () => {
+    const expected = {
+      'sekret-bip': 'native-existing',
+      'juss-beautiful-hair': 'hybrid-native-candidate',
+      'juss-beautiful-hair-private': 'native-client-required',
+      l99: 'native-client-required',
+      'chief-ai-machine': 'native-client-required',
+      'untold-stories': 'hybrid-native-candidate',
+      'founder-control-room': 'native-client-required',
+      promptos: 'native-client-required',
+      'think-tank': 'hybrid-native-candidate',
+      'sleepwealth-agent': 'native-client-required',
+      sweats: 'hybrid-native-candidate',
+      'bip-jr': 'canonical-port-required',
+      'truth-compass': 'native-client-required',
+      'truth-weaver': 'native-client-required',
+      'alexa-commerce-engine': 'native-client-required',
+      'sync-party': 'hybrid-native-candidate',
+    } as const;
+    for (const [slug, carrierStrategy] of Object.entries(expected)) {
+      expect(getKnownProject(slug)).toMatchObject({
+        mobileDistribution: { targetStores: ['apple-app-store', 'google-play'], carrierStrategy },
+      });
+    }
+    expect(getKnownProject('solcontinuity')?.mobileDistribution).toBeUndefined();
+    expect(getPortfolioProject('sync-party')).toMatchObject({ status: 'active' });
+    expect(getPortfolioProject('truth-compass')).toBeUndefined();
+  });
+
+
 });

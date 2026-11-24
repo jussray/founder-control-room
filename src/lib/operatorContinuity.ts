@@ -527,3 +527,293 @@ export function evaluateOperatorContinuityReceiptV2(
     continuityMayAuthorizeAction: false,
   };
 }
+
+
+/**
+ * Mode-neutral task pointers accompany the existing operator evidence receipt.
+ * The packet never contains a transcript or private source content: callers
+ * persist those in their existing access-controlled store and supply references.
+ * A mode change is neither a capability downgrade nor an authorization event.
+ */
+export const OPERATOR_EXECUTION_CONTINUATION_CONTRACT =
+  'juss-v10/operator-execution-continuation@v1' as const;
+
+export type OperatorInteractionMode = 'chat' | 'work';
+export type OperatorExecutionTaskState = 'ACTIVE' | 'RESULT_SUBMITTED' | 'VERIFIED' | 'CLOSED';
+
+export interface OperatorExecutionContinuationInput {
+  sourceMode: OperatorInteractionMode;
+  /** Authenticated source and intended destination peer identities; metadata only. */
+  sourceOperator?: string;
+  destinationOperator?: string;
+  /** Append-only lifecycle markers. These describe work state, never grant authority. */
+  taskState?: OperatorExecutionTaskState;
+  resultRef?: string | null;
+  resultSubmittedByOperator?: string | null;
+  verificationRefs?: readonly string[];
+  verifiedByOperator?: string | null;
+  closedAt?: string | null;
+  taskId: string;
+  intentRef: string;
+  contextRefs: readonly string[];
+  completedSteps: readonly { stepId: string; evidenceRefs: readonly string[] }[];
+  remainingStepIds: readonly string[];
+  nextActionRef: string | null;
+  pendingDecisionRefs: readonly string[];
+  observation: OperatorContinuityReceiptV2;
+}
+
+export interface OperatorExecutionContinuation extends OperatorExecutionContinuationInput {
+  contract: typeof OPERATOR_EXECUTION_CONTINUATION_CONTRACT;
+  fingerprint: string;
+  authorizing: false;
+  approvalCarryForward: false;
+  browserCookie: false;
+}
+
+export interface OperatorExecutionResume {
+  state: 'CURRENT' | 'REVALIDATE' | 'INVALID';
+  targetMode: OperatorInteractionMode;
+  conversationMayResume: boolean;
+  toolAccessPolicy: 'current_surface_available_tools';
+  executionAuthorityFromHandoff: false;
+  evidenceReacquisitionRequired: boolean;
+  reasons: readonly string[];
+}
+
+function continuationIdentifier(value: string, field: string): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(normalized)) {
+    throw new Error(field + ' must be a bounded identifier');
+  }
+  return normalized;
+}
+
+function continuationOperator(value: string, field: string): string {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!/^[a-z][a-z0-9-]{0,39}$/.test(normalized)) {
+    throw new Error(field + ' must be a canonical bounded operator identifier');
+  }
+  return normalized;
+}
+
+function continuationRef(value: string, field: string): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (normalized.length > 256 || !/^(?:fcr|chatgpt|work|github|cloudflare|supabase|artifact|council):[A-Za-z0-9_.:/-]+$/i.test(normalized)) {
+    throw new Error(field + ' must be a bounded source reference, not raw conversation content');
+  }
+  return normalized;
+}
+
+function continuationRefs(values: readonly string[], field: string, requireOne = false): string[] {
+  if (!Array.isArray(values) || values.length > 40) {
+    throw new Error(field + ' must be an array of at most 40 references');
+  }
+  const result = [...new Set(values.map((value) => continuationRef(value, field)))].sort();
+  if (requireOne && result.length === 0) throw new Error(field + ' requires a source reference');
+  return result;
+}
+
+function normalizedContinuation(input: OperatorExecutionContinuationInput): OperatorExecutionContinuationInput {
+  if (input.sourceMode !== 'chat' && input.sourceMode !== 'work') {
+    throw new Error('sourceMode must be chat or work');
+  }
+  const observationErrors = validateOperatorContinuityReceiptV2(input.observation);
+  if (observationErrors.length) throw new Error('observation invalid: ' + observationErrors.join('; '));
+  // The generic V2 receipt accepts human-readable date strings and freeform
+  // project labels for historical evidence. Persisted task continuation cannot:
+  // those known fields must not become covert transcript/credential storage.
+  const strictIsoUtc = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/;
+  for (const field of ['observedAt', 'expiresAt'] as const) {
+    const date = input.observation[field];
+    if (typeof date !== 'string' || !strictIsoUtc.test(date) || !Number.isFinite(Date.parse(date))) {
+      throw new Error('observation ' + field + ' must be a strict ISO UTC timestamp');
+    }
+  }
+  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(input.observation.projectSlug)) {
+    throw new Error('observation projectSlug must be a bounded project identifier');
+  }
+  // A v2 observation may describe historic branches freely; task persistence
+  // must be stricter so a forged branch cannot become a transcript field.
+  const branch = input.observation.targetBranch;
+  if (typeof branch !== 'string'
+    || branch.length > 128
+    || !/^[A-Za-z0-9][A-Za-z0-9_./-]*$/.test(branch)
+    || branch.includes('..')
+    || branch.includes('//')
+    || branch.endsWith('/')
+    || branch.endsWith('.')
+    || branch.endsWith('.lock')) {
+    throw new Error('observation branch must be a bounded Git branch name');
+  }
+  // A receipt's historical evidenceRefs can be arbitrary strings, but a
+  // persisted continuation must contain opaque, bounded source pointers only.
+  // Validate in place: reordering would invalidate the observation fingerprint.
+  for (const ref of input.observation.evidenceRefs) {
+    continuationRef(ref, 'observation evidence');
+  }
+  if (!Array.isArray(input.completedSteps) || input.completedSteps.length > 40) {
+    throw new Error('completedSteps must be an array of at most 40 steps');
+  }
+  const completedSteps = input.completedSteps.map((step) => ({
+    stepId: continuationIdentifier(step.stepId, 'completed step'),
+    evidenceRefs: continuationRefs(step.evidenceRefs, 'completed step evidence', true),
+  }));
+  const completedIds = completedSteps.map((step) => step.stepId);
+  if (new Set(completedIds).size !== completedIds.length) {
+    throw new Error('completedSteps must not repeat step identifiers');
+  }
+  if (!Array.isArray(input.remainingStepIds) || input.remainingStepIds.length > 40) {
+    throw new Error('remainingStepIds must be an array of at most 40 steps');
+  }
+  const remainingStepIds = [...new Set(input.remainingStepIds.map((id) =>
+    continuationIdentifier(id, 'remaining step')))];
+  if (remainingStepIds.some((id) => completedIds.includes(id))) {
+    throw new Error('a completed step cannot also be remaining');
+  }
+  if (input.taskState !== undefined) {
+    if (!['ACTIVE', 'RESULT_SUBMITTED', 'VERIFIED', 'CLOSED'].includes(input.taskState)) {
+      throw new Error('taskState must be ACTIVE, RESULT_SUBMITTED, VERIFIED, or CLOSED');
+    }
+    const state = input.taskState;
+    const resultRef = input.resultRef ?? null;
+    const submittedBy = input.resultSubmittedByOperator ?? null;
+    const verificationRefs = input.verificationRefs ?? [];
+    const verifiedBy = input.verifiedByOperator ?? null;
+    const closedAt = input.closedAt ?? null;
+    if (!input.sourceOperator || !input.destinationOperator) {
+      throw new Error('lifecycle checkpoints require sourceOperator and destinationOperator');
+    }
+    if (state === 'ACTIVE' && (resultRef || submittedBy || verificationRefs.length || verifiedBy || closedAt)) {
+      throw new Error('ACTIVE checkpoints cannot contain result, verification, or closure fields');
+    }
+    if (state !== 'ACTIVE' && (!resultRef || !submittedBy)) {
+      throw new Error('submitted and later checkpoints require resultRef and resultSubmittedByOperator');
+    }
+    if (state === 'RESULT_SUBMITTED' && (verificationRefs.length || verifiedBy || closedAt)) {
+      throw new Error('RESULT_SUBMITTED checkpoints cannot contain verification or closure fields');
+    }
+    if (state === 'VERIFIED' || state === 'CLOSED') {
+      if (!verificationRefs.length || !verifiedBy || verifiedBy === submittedBy) {
+        throw new Error('verification requires independent operator identity and evidence references');
+      }
+    }
+    if (state === 'VERIFIED' && closedAt) throw new Error('VERIFIED checkpoints cannot contain closedAt');
+    if (state === 'CLOSED') {
+      const strictClosedAt = typeof closedAt === 'string' && /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/.test(closedAt);
+      if (!strictClosedAt || !Number.isFinite(Date.parse(closedAt))) throw new Error('CLOSED checkpoints require a strict ISO UTC closedAt');
+    }
+  }
+
+  return {
+    sourceMode: input.sourceMode,
+    ...(input.sourceOperator === undefined ? {} : { sourceOperator: continuationOperator(input.sourceOperator, 'sourceOperator') }),
+    ...(input.destinationOperator === undefined ? {} : { destinationOperator: continuationOperator(input.destinationOperator, 'destinationOperator') }),
+    ...(input.taskState === undefined ? {} : { taskState: input.taskState }),
+    ...(input.resultRef === undefined ? {} : { resultRef: input.resultRef === null ? null : continuationRef(input.resultRef, 'resultRef') }),
+    ...(input.resultSubmittedByOperator === undefined ? {} : { resultSubmittedByOperator: input.resultSubmittedByOperator === null ? null : continuationOperator(input.resultSubmittedByOperator, 'resultSubmittedByOperator') }),
+    ...(input.verificationRefs === undefined ? {} : { verificationRefs: continuationRefs(input.verificationRefs, 'verificationRefs') }),
+    ...(input.verifiedByOperator === undefined ? {} : { verifiedByOperator: input.verifiedByOperator === null ? null : continuationOperator(input.verifiedByOperator, 'verifiedByOperator') }),
+    ...(input.closedAt === undefined ? {} : { closedAt: input.closedAt }),
+    taskId: continuationIdentifier(input.taskId, 'taskId'),
+    intentRef: continuationRef(input.intentRef, 'intentRef'),
+    contextRefs: continuationRefs(input.contextRefs, 'contextRefs', true),
+    completedSteps,
+    remainingStepIds,
+    nextActionRef: input.nextActionRef === null ? null : continuationRef(input.nextActionRef, 'nextActionRef'),
+    pendingDecisionRefs: continuationRefs(input.pendingDecisionRefs, 'pendingDecisionRefs'),
+    observation: input.observation,
+  };
+}
+
+export function operatorExecutionContinuationFingerprint(input: OperatorExecutionContinuationInput): string {
+  const normalized = normalizedContinuation(input);
+  // The presentation mode is deliberately excluded: Chat and Work share task identity.
+  return createHash('sha256').update(JSON.stringify([
+    OPERATOR_EXECUTION_CONTINUATION_CONTRACT,
+    ...(normalized.sourceOperator === undefined && normalized.destinationOperator === undefined && normalized.taskState === undefined
+      ? []
+      : [
+        normalized.sourceOperator ?? null,
+        normalized.destinationOperator ?? null,
+        normalized.taskState ?? null,
+        normalized.resultRef ?? null,
+        normalized.resultSubmittedByOperator ?? null,
+        normalized.verificationRefs ?? [],
+        normalized.verifiedByOperator ?? null,
+        normalized.closedAt ?? null,
+      ]),
+    normalized.taskId,
+    normalized.intentRef,
+    normalized.contextRefs,
+    normalized.completedSteps,
+    normalized.remainingStepIds,
+    normalized.nextActionRef,
+    normalized.pendingDecisionRefs,
+    normalized.observation.fingerprint,
+  ])).digest('hex');
+}
+
+export function createOperatorExecutionContinuation(
+  input: OperatorExecutionContinuationInput,
+): OperatorExecutionContinuation {
+  const normalized = normalizedContinuation(input);
+  return {
+    contract: OPERATOR_EXECUTION_CONTINUATION_CONTRACT,
+    ...normalized,
+    fingerprint: operatorExecutionContinuationFingerprint(normalized),
+    authorizing: false,
+    approvalCarryForward: false,
+    browserCookie: false,
+  };
+}
+
+export function validateOperatorExecutionContinuation(record: OperatorExecutionContinuation): string[] {
+  const errors: string[] = [];
+  if (record.contract !== OPERATOR_EXECUTION_CONTINUATION_CONTRACT) {
+    errors.push('execution continuation contract is unsupported');
+  }
+  if (record.authorizing !== false || record.approvalCarryForward !== false || record.browserCookie !== false) {
+    errors.push('execution continuation cannot become an authorization, approval, or browser cookie');
+  }
+  try {
+    if (record.fingerprint !== operatorExecutionContinuationFingerprint(record)) {
+      errors.push('execution continuation fingerprint does not match its state');
+    }
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : 'execution continuation is malformed');
+  }
+  return [...new Set(errors)];
+}
+
+/**
+ * Resume discussion on either surface without promoting yesterday's proof.
+ * Callers must resolve contextRefs in their authenticated store and independently
+ * check the current surface's tools and authority before executing actions.
+ */
+export function evaluateOperatorExecutionContinuation(
+  record: OperatorExecutionContinuation,
+  current: OperatorContinuityInputV2,
+  now: string,
+  targetMode: OperatorInteractionMode,
+): OperatorExecutionResume {
+  const errors = validateOperatorExecutionContinuation(record);
+  if (targetMode !== 'chat' && targetMode !== 'work') errors.push('unsupported target mode');
+  const continuity = errors.length === 0
+    ? evaluateOperatorContinuityReceiptV2(record.observation, current, now)
+    : null;
+  const state = errors.length > 0 || continuity?.state === 'invalid'
+    ? 'INVALID'
+    : continuity?.state === 'stale'
+      ? 'REVALIDATE'
+      : 'CURRENT';
+  return {
+    state,
+    targetMode,
+    conversationMayResume: state !== 'INVALID',
+    toolAccessPolicy: 'current_surface_available_tools',
+    executionAuthorityFromHandoff: false,
+    evidenceReacquisitionRequired: state !== 'CURRENT',
+    reasons: [...errors, ...(continuity?.reasons ?? [])],
+  };
+}
