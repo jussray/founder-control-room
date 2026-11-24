@@ -443,7 +443,8 @@
         "scripts/verify-documentation-truth.mjs must register the Jira live-probe client, authenticated ingress, CLI, and manual workflow as evidence-authority paths so changes cannot pass without substantive README, truth-decay, and path-bound receipt updates.",
         "`scripts/verify-documentation-truth.mjs` must classify founder-permission authority source paths and require current portable approval documentation plus a path-bound documentation truth receipt; an unregistered authority path cannot produce a trusted green.",
         "`scripts/verify-documentation-truth.mjs` must compare receipt claims for each changed truth-sensitive path against the receipt at the reviewed base and require at least one fresh meaningful path-bound invariant unit; claims carried unchanged, cosmetically reformatted, or recombined from the base remain valid history but cannot satisfy the current range, and an unreadable base receipt fails closed. This proves receipt novelty only, never that a claim is true or that any merge, deploy, or provider action is authorized.",
-        "Documentation Truth must classify source under src/authority/ (excluding tests) and security/delegated-agent-authority.json as capability-authority, preventing future authority policy edits from passing with zero truth-sensitive changes."
+        "Documentation Truth must classify source under src/authority/ (excluding tests) and security/delegated-agent-authority.json as capability-authority, preventing future authority policy edits from passing with zero truth-sensitive changes.",
+        "`scripts/verify-documentation-truth.mjs` must treat every non-test policy module under src/authority/ and the delegated authority security manifest as capability-authority changes; it must reject a current documentation receipt lacking a fresh path-bound invariant, rather than reporting a false green."
       ]
     },
     {
@@ -1017,14 +1018,16 @@
     {
       "path": "src/authority/delegatedAgentAuthority.ts",
       "claims": [
-        "The delegated agent policy evaluator must remain policy-only with executionAuthorized=false and completionClaimAllowed=false; server-held principal verification and fresh founder exact-candidate approval remain external execution gates."
+        "The delegated agent policy evaluator must remain policy-only with executionAuthorized=false and completionClaimAllowed=false; server-held principal verification and fresh founder exact-candidate approval remain external execution gates.",
+        "`src/authority/delegatedAgentAuthority.ts` must return executionAuthorized=false and completionClaimAllowed=false for caller-provided eligibility observations and must never transform a caller boolean, historic review or provider acceptance into current merge or deploy authority."
       ]
     },
     {
       "path": "security/delegated-agent-authority.json",
       "claims": [
         "Standing capability for Codex Chat and Claude does not imply standing execution approval; live merge/deploy requires independent review, exact base/head binding, provider preflight, single-use reservation and independent outcome verification.",
-        "Database migrations, secret, identity/RLS, billing, public publication, DNS/provider ownership and destructive operations must remain excluded."
+        "Database migrations, secret, identity/RLS, billing, public publication, DNS/provider ownership and destructive operations must remain excluded.",
+        "`security/delegated-agent-authority.json` must remain policy-only and must never grant standing execution approval or external mutation; every requested merge or deploy requires fresh exact-base/head founder approval, trusted independently reviewed provider evidence and single-use reservation."
       ]
     },
     {
