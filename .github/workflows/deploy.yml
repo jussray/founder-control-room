@@ -183,6 +183,13 @@ jobs:
           )
           PY
 
+          # Fail closed when a plain [vars] name already exists as a Worker
+          # secret (or is also in the [secrets] registry): the first canonical
+          # deploy would fail or leave the runtime binding ambiguous. Names only.
+          node scripts/verify-worker-var-secret-collisions.mjs \
+            --config wrangler.worker.toml \
+            --secret-receipt "$secret_receipt"
+
           # Fail closed if a credential (including CF_API_TOKEN) is bound as plaintext.
           # Inspect name/type only; no credential values enter logs or artifacts.
           node scripts/verify-worker-binding-types.mjs
@@ -198,6 +205,7 @@ jobs:
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
             echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
+            echo "- [vars]/secret name collisions: none observed in the provider secret-name readback (names only)"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -382,7 +390,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.110.0'
-          command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
+          # --tag records the exact approved commit on the provider Worker version;
+          # --message is short space-free provenance (wrangler-action splits args).
+          command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }} --tag ${{ inputs.expected_head_sha }} --message fcr-deploy-run-${{ github.run_id }}.${{ github.run_attempt }}
           secrets: |
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
         env:
@@ -393,6 +403,26 @@ jobs:
           # publication grant below.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
+
+      - name: Read back active Worker version tag (fail closed)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Provider readback, names/ids/annotations only: the newest deployment
+          # must route 100% to one version whose workers/tag equals the exact SHA.
+          deployments_receipt="$RUNNER_TEMP/fcr-worker-deployments.json"
+          version_receipt="$RUNNER_TEMP/fcr-worker-active-version.json"
+          npx --yes wrangler@4.110.0 deployments list \
+            --config wrangler.worker.toml --json > "$deployments_receipt"
+          active_version_id="$(node scripts/worker-deployment-version-tag.mjs active-version "$deployments_receipt")"
+          npx --yes wrangler@4.110.0 versions view "$active_version_id" \
+            --config wrangler.worker.toml --json > "$version_receipt"
+          node scripts/worker-deployment-version-tag.mjs verify \
+            "$deployments_receipt" "$version_receipt" "$EXPECTED_HEAD_SHA"
 
   pages-release:
     name: Cloudflare Pages Production Release
@@ -412,6 +442,28 @@ jobs:
         with:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
+
+      - name: Wait for the edge to serve the exact deployed SHA
+        # Read-only propagation wait. It proves nothing by itself; the checks
+        # below still fail closed on identity, SHA and grant state.
+        run: |
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          for attempt in $(seq 1 24); do
+            live="$(curl --silent --max-time 15 "$DEPLOY_URL/version" | python3 -c 'import json,sys
+          try: print(json.load(sys.stdin).get("gitSha",""))
+          except Exception: print("")' || true)"
+            if [[ "$live" == "$EXPECTED_SHA" ]]; then
+              echo "Edge serves $EXPECTED_SHA after $attempt attempt(s)."
+              exit 0
+            fi
+            echo "Attempt $attempt: edge serves '${live:-unknown}', waiting for $EXPECTED_SHA."
+            sleep 10
+          done
+          echo "::warning title=Edge propagation slow::$DEPLOY_URL did not serve $EXPECTED_SHA within ~4 minutes; the fail-closed checks below decide."
+        env:
+          DEPLOY_URL: https://api.foundercontrolroom.org
+          EXPECTED_SHA: ${{ inputs.expected_head_sha }}
 
       - name: Verify Worker health and identity
         run: |
@@ -1124,6 +1176,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: smoke-test
     timeout-minutes: 15
+    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
