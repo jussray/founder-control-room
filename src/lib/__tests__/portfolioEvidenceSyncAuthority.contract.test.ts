@@ -24,12 +24,16 @@ describe('portfolio evidence sync authority contract', () => {
     expect(workflow).toContain('PORTFOLIO_SYNC_TOKEN="$token" node scripts/sync-jussco-portfolio-evidence.mjs');
     expect(workflow).toContain('rm -f "$PORTFOLIO_SYNC_TOKEN_FILE"');
   });
-  it('proposes evidence instead of pushing to main', () => {
+  it('records aggregate observations without publishing or uploading raw evidence', () => {
     expect(syncSource).not.toContain('publishAtomicRegistryCommit');
-    expect(syncSource).toContain("state: changed ? 'PROPOSED_UNPUBLISHED' : 'NO_CHANGE'");
+    expect(syncSource).toContain("state: 'OBSERVED_UNPUBLISHED'");
     expect(syncSource).toContain('publicationAuthorized: false');
+    expect(syncSource).toContain('published: false');
+    expect(syncSource).toContain('liveVerified: false');
+    expect(syncSource).not.toContain('writeReceipt(proposals.');
+    expect(workflow).toContain('path: artifacts/portfolio-evidence-sync/receipt.json');
+    expect(workflow).not.toContain('artifacts/portfolio-evidence-sync/proposed/');
     expect(workflow).toContain("if: ${{ steps.sync.outputs.state == 'PUBLISHED' }}");
-    expect(workflow).toContain('artifacts/portfolio-evidence-sync/proposed/');
   });
 
   it('mints only read-only portfolio sync credentials', () => {
