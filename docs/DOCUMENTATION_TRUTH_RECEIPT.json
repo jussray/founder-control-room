@@ -1012,6 +1012,24 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "src/http/routes/publicMcp.ts",
+      "claims": [
+        "`src/http/routes/publicMcp.ts` must authenticate exact public-MCP OAuth bearer before reading tenant data; the request-bound Supabase publishable-key client and RLS enforce tenant isolation, never the service-role client."
+      ]
+    },
+    {
+      "path": "src/lib/supabaseAuthClient.ts",
+      "claims": [
+        "`src/lib/supabaseAuthClient.ts` must create a bearer-scoped client only from a nonempty validated token and the publishable/anon key, never falling back to a service-role credential."
+      ]
+    },
+    {
+      "path": "docs/implementation/FCR_PUBLIC_MCP_PHASE1.md",
+      "claims": [
+        "`docs/implementation/FCR_PUBLIC_MCP_PHASE1.md` must keep public MCP default disabled until tenant RLS, OAuth client, migration, deployment, and real user client invocation are independently proven; source-only changes do not establish live security."
+      ]
     }
   ]
 }

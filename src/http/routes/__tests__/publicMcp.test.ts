@@ -6,13 +6,12 @@ const state = vi.hoisted(() => ({
   rows: { memberships: [] as Record<string, unknown>[], projects: [] as Record<string, unknown>[] },
   from: vi.fn(),
   getUser: vi.fn(),
+  createBearerClient: vi.fn(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: state.getUser } },
-}));
-vi.mock('../../../lib/supabaseClient.js', () => ({
-  supabase: { from: state.from },
+  createSupabaseBearerClient: state.createBearerClient,
 }));
 
 import { publicMcpRouter } from '../publicMcp.js';
@@ -64,6 +63,7 @@ beforeEach(() => {
     { id: PROJECT_A, tenant_id: TENANT_A, name: 'A project', status: 'observed', observed_at: null },
     { id: PROJECT_B, tenant_id: TENANT_B, name: 'B project', status: 'observed', observed_at: null },
   ];
+  state.createBearerClient.mockImplementation((_token: string) => ({ from: state.from }));
   state.from.mockImplementation((table: string) => {
     if (table !== 'fcr_public_memberships' && table !== 'fcr_public_projects') {
       throw new Error('Forbidden founder database read');
@@ -163,6 +163,8 @@ describe('public FCR MCP isolation', () => {
     expect(response.body.result.structuredContent.projects).toHaveLength(1);
     expect(response.body.result.structuredContent.projects[0].projectId).toBe(PROJECT_A);
     expect(JSON.stringify(response.body)).not.toContain('B project');
+    expect(state.createBearerClient).toHaveBeenCalledTimes(1);
+    expect(state.createBearerClient).toHaveBeenCalledWith(expect.stringMatching(/\./));
   });
 
   it('does not leak a project by guessing another tenant UUID', async () => {
@@ -209,6 +211,7 @@ describe('public FCR MCP isolation', () => {
       expect(response.status).toBe(401);
     }
     expect(state.getUser).not.toHaveBeenCalled();
+    expect(state.createBearerClient).not.toHaveBeenCalled();
     expect(state.from).not.toHaveBeenCalled();
   });
 
