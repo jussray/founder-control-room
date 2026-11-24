@@ -32,6 +32,7 @@ import {
 } from './handler.js';
 import { assertScheduledTaskResults } from './scheduledTaskResults.js';
 
+export { GovernedExecutionWorkflowV1 } from '../workflows/governedExecutionWorkflow.js';
 export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
 
 validateWorkerEnv(env);

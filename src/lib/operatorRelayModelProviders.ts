@@ -353,6 +353,7 @@ export function createServerOperatorRelayAdapters(
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   const anthropicModel = env.FCR_RELAY_ANTHROPIC_MODEL?.trim();
   const anthropicMcp = anthropicPlaywrightMcpAttachment(env);
+  const anthropicWorkspaceId = env.FCR_RELAY_ANTHROPIC_WORKSPACE_ID?.trim();
   const perplexityKey = env.PERPLEXITY_API_KEY?.trim();
   const perplexityModel = env.FCR_RELAY_PERPLEXITY_MODEL?.trim();
   const deepSeekKey = env.DEEPSEEK_API_KEY?.trim();
@@ -433,6 +434,7 @@ export function createServerOperatorRelayAdapters(
             'x-api-key': anthropicKey,
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
+            ...(anthropicWorkspaceId ? { 'anthropic-workspace-id': anthropicWorkspaceId } : {}),
           },
           body: JSON.stringify({
             ...(anthropicMcp?.body ?? {}),
