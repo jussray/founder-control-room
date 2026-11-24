@@ -77,3 +77,10 @@ optional = [
   assert.deepEqual(registry.required, ['BOOT_REQUIRED']);
   assert.deepEqual(registry.optional, ['LEGACY_COMPAT_TOKEN']);
 });
+
+test('keeps Protect Me event ingress credential optional and out of boot requirements', () => {
+  const wrangler = readFileSync(new URL('../wrangler.worker.toml', import.meta.url), 'utf8');
+  const registry = parseWranglerSecretRegistry(wrangler);
+  assert.equal(registry.optional.filter(name => name === 'FCR_PROTECT_EVENT_INGEST_SECRET').length, 1);
+  assert.equal(registry.required.includes('FCR_PROTECT_EVENT_INGEST_SECRET'), false);
+});

@@ -1,5 +1,9 @@
 # Cloudflare Reasoning Contract
 
+## Protect Me security evidence intake — source configuration only
+
+The optional `FCR_PROTECT_EVENT_INGEST_SECRET` is a provider-held credential for redacted, signed Protect Me 2 observations only. Never publish it as a plaintext Worker variable, reuse deployment credentials, or make it a core startup prerequisite. Missing credentials leave the feature unavailable; source wiring is not a provider observation.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.

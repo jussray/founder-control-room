@@ -1,5 +1,7 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
+`FCR_PROTECT_EVENT_INGEST_SECRET` is an optional server-held credential reserved for the evidence-only Protect Me event receiver. Its absence must not prevent Worker startup. Do not reuse a deployment token, founder session key, or Shield signing key; no value belongs in source, logs, or client configuration.
+
 ## November 1, 2026: bounded GitHub App transport reconciliation
 
 The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.

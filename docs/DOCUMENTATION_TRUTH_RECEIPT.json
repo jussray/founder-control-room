@@ -1036,6 +1036,12 @@
       "claims": [
         "Local wrangler types generation is non-promoting; the observed verification-only build still uploads no Worker version."
       ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`FCR_PROTECT_EVENT_INGEST_SECRET` must be declared exactly once under optional Worker secrets, not boot-required or public variables. The Protect Me event receiver remains disabled without a valid dedicated credential; declaration proves neither provider installation nor live sender delivery."
+      ]
     }
   ]
 }
