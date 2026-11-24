@@ -30,6 +30,25 @@ The state screen is derived from the existing `projects` and
 `project_connections` tables, so the flow resumes without a second onboarding
 truth source.
 
+## Additional verified founder addresses
+
+Founder login never creates an Auth user just because an email appears in the
+founder allowlist. An existing confirmed founder can separately initiate
+`POST /auth/founder/invite` from a current interactive browser session for a
+**preapproved, unbound** founder email. The server rate-limits the action,
+requires the existing founder UUID gate, sends a Supabase Auth invitation,
+and binds only the exact invited UUID to the preapproved email record.
+The invited account remains unauthorized until Supabase reports email
+confirmation. A missing allowlist record, existing binding, invitation error,
+or binding race fails closed; no public member signup grants founder authority.
+
+This is source capability only. No invitation is dispatched from a source
+commit or normal founder magic-link login. Existing Auth accounts that are
+not bound, unapproved new founder addresses, and provider delivery/callback
+misconfiguration require a separate reviewed recovery path. Real email delivery,
+exact callback allowlists, successful invited-user login, independent review,
+and live browser proof remain release gates.
+
 ## Provider status model
 
 Every provider created during onboarding starts as `disconnected`. A connection

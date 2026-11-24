@@ -16,6 +16,7 @@ vi.mock('../../../providers/githubAppAuth.js', () => ({
 import express from 'express';
 import request from 'supertest';
 import { pluginCenterRouter } from '../pluginCenter.js';
+import { boundFounderRow } from './founderAuthFixture.js';
 
 function app() {
   const server = express();
@@ -25,13 +26,11 @@ function app() {
 const url = '/plugin-center/github-installation';
 function founder() {
   getUser.mockResolvedValue({
-    data: { user: { id: 'founder-test-id', email: 'founder@example.com' } }, error: null,
+    data: { user: { id: 'founder-test-id', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } }, error: null,
   });
   from.mockImplementation((table: string) => {
     if (table !== 'founder_users') throw new Error('Unexpected table: ' + table);
-    return { select: () => ({ eq: () => ({
-      maybeSingle: async () => ({ data: { email: 'founder@example.com' }, error: null }),
-    }) }) };
+    return boundFounderRow('founder@example.com', 'founder-test-id');
   });
 }
 const evidence = {

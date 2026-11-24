@@ -1,4 +1,5 @@
 import { GitHubGenealogyProvider } from "./GitHubGenealogyProvider.js";
+import { GitHubGenealogyProvider } from "./GitHubGenealogyProvider.js";
 import {
   getGitHubInstallationToken,
   observeGitHubRepositoryInstallation,
