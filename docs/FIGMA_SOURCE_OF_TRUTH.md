@@ -1,6 +1,6 @@
 # Founder Control Room Figma Source of Truth
 
-Last reviewed: 2026-07-17
+Last truth reconciliation: 2026-09-19
 
 ## Canonical design file
 
@@ -8,18 +8,23 @@ Last reviewed: 2026-07-17
 - File key: `QevLkXHXSzXfEsqsZltGRJ`
 - Canonical URL: `https://www.figma.com/design/QevLkXHXSzXfEsqsZltGRJ`
 - Repository: `jussray/founder-control-room`
-- Active implementation branch: `agent/johnstown-opportunity-command-center`
-- Active pull request: `#37`
-- Current design status: `concept_in_progress`
+- Historical implementation branch: `agent/johnstown-opportunity-command-center`
+- Historical implementation pull request: `#37` (merged 2026-07-22)
+- Design status: `historical_concept_workspace`
 
-This file is the approved editable design workspace for the economic-intelligence and founder-command-center surfaces. It does not replace repository source, API contracts, migrations, runtime evidence, or founder approval gates.
+The Figma file remains an approved editable design workspace for the economic-intelligence and founder-command-center surfaces. The branch/PR above are historical provenance, not an active implementation carrier. Current implementation authority is the repository default branch plus the exact active candidate, if any, observed from GitHub at execution time.
+
+The September 2026 Johnstown AI Center City Hall initiative is a newer execution goal. Its evidence/gate truth belongs to the repository economic-intelligence initiative contract and current external receipts. It must not be inferred from the older Figma concept or PR #37.
+
+This file does not replace repository source, API contracts, migrations, runtime evidence, external City evidence, or founder approval gates.
 
 ## Authority order
 
 1. `GLOBAL_AI.md`, `AGENTS.md`, privacy/security contracts, and founder approvals.
 2. Repository runtime, schemas, API contracts, tests, and exact-head evidence.
-3. Approved Figma nodes and annotations for visual behavior and interaction.
-4. Screenshots, exported assets, and presentation artifacts.
+3. Current authoritative external evidence for a civic initiative, including City/program documents and confirmed communications.
+4. Approved Figma nodes and annotations for visual behavior and interaction.
+5. Screenshots, exported assets, and presentation artifacts.
 
 When these disagree, mark the handoff `drifted`; do not silently choose whichever source is easier to implement.
 
@@ -37,7 +42,7 @@ All runs also load the repository-wide contracts in `GLOBAL_AI.md` and `AGENTS.m
 
 ## Current command-center contract
 
-The design must represent the city-agnostic economic-intelligence primitives already implemented on PR #37:
+The design may represent the city-agnostic economic-intelligence primitives integrated from historical PR #37:
 
 - jurisdiction;
 - organization;
@@ -50,9 +55,20 @@ The design must represent the city-agnostic economic-intelligence primitives alr
 - mission and evidence;
 - separate approval, migration, integration, deployment, and rollback gates.
 
+The current repository contract also supports evidence-bound initiative execution state:
+
+- initiative;
+- evidence receipt and freshness;
+- distinct gate status;
+- distinct blockers;
+- proof required to clear each gate;
+- a non-secret continuity fingerprint that never grants authority.
+
 Johnstown is the reference jurisdiction, not a component type or UI fork. Synthetic portability fixtures must remain visibly labeled.
 
-## Required initial screens
+## Historical proposed screens
+
+These remain optional design work, not launch blockers for the current Johnstown AI Center City Hall initiative:
 
 1. Founder mission overview and proof-gate status.
 2. Jurisdiction and source-health overview.
@@ -67,13 +83,13 @@ Johnstown is the reference jurisdiction, not a component type or UI fork. Synthe
 
 | Surface | Figma page/node | Status | Repository mapping | Proof |
 | --- | --- | --- | --- | --- |
-| Command-center overview | Pending creation | concept_in_progress | Pending implementation | Pending screenshot/metadata review |
-| Opportunity queue | Pending creation | concept_in_progress | `src/economic-intelligence/` contract | Playwright contract proof exists; UI proof pending |
-| Evidence detail | Pending creation | concept_in_progress | Supabase economic-intelligence migration | Rollback-only migration validation passed; UI pending |
-| Approval states | Pending creation | concept_in_progress | Existing approval/proof-gate routes | Pending implementation review |
-| Responsive view | Pending creation | concept_in_progress | Pending implementation | Pending responsive Playwright/design QA |
+| Command-center overview | Pending creation | historical_concept | Pending implementation | No current UI proof |
+| Opportunity queue | Pending creation | historical_concept | `src/economic-intelligence/` contract | Historical Playwright portability proof; UI proof absent |
+| Evidence detail | Pending creation | historical_concept | Economic-intelligence evidence contract | Current UI proof absent |
+| Approval states | Pending creation | historical_concept | Existing approval/proof-gate routes | Current UI proof absent |
+| Responsive view | Pending creation | historical_concept | Pending implementation | Current responsive proof absent |
 
-Update this table after every approved Figma creation, implementation, drift review, or retirement.
+Update this table only when an approved Figma creation, implementation, drift review, or retirement materially changes design truth. Do not hard-code a volatile active PR/head as durable design authority.
 
 ## Privacy and data rules
 
@@ -92,4 +108,4 @@ Use synthetic fixtures and label them.
 
 A completed design requires metadata inspection, screenshots, state coverage, accessibility review, and a red-team pass. A completed implementation additionally requires exact-head typecheck, lint, tests, Playwright, design QA, responsive verification, and production build where applicable.
 
-Design approval does not carry forward to repository integration, database migration, deployment, spending, rollback, or external communication.
+Design approval does not carry forward to repository integration, database migration, deployment, spending, rollback, external communication, City sponsorship, or financing approval.

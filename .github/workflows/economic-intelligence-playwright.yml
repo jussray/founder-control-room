@@ -57,7 +57,7 @@ jobs:
       - name: Typecheck repository source
         run: npm run typecheck
 
-      - name: Run city-agnostic Redteam Playwright proof
+      - name: Run economic-intelligence Redteam Playwright proof
         run: npx playwright test -c playwright.economic-intelligence.config.ts
 
       - name: Upload Playwright evidence

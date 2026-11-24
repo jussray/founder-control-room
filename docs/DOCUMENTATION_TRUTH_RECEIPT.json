@@ -11,7 +11,8 @@
     "workflow-authority",
     "truth-governance",
     "capability-authority",
-    "founder-permission-authority"
+    "founder-permission-authority",
+    "economic-intelligence"
   ],
   "changes": [
     {
@@ -1011,6 +1012,42 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "scripts/pr-continuity.mjs",
+      "claims": [
+        "`scripts/pr-continuity.mjs` must classify provider-observed auto_merge as QUEUED, NOT_QUEUED, or UNKNOWN, include it in non-authorizing continuity receipts, and never infer merge_approved or authorizes_merge from a native auto-merge click. GitHub must remain the only actor performing the eventual merge after configured live required gates, and FCR's exact-candidate founder-final contract must remain separate."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "`scripts/verify-documentation-truth.mjs` must classify production `src/economic-intelligence/` source and `src/http/routes/economicIntelligence.ts` as truth-sensitive so their decision-state changes cannot pass Documentation Truth with zero sensitive files or without current README and path-bound receipt coverage."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/contract.ts",
+      "claims": [
+        "`src/economic-intelligence/contract.ts` must keep Economic Intelligence contract changes inside the truth-sensitive decision surface and cannot let a source-contract change silently bypass current documentation reconciliation."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/initiativeExecution.ts",
+      "claims": [
+        "`src/economic-intelligence/initiativeExecution.ts` must preserve provenance, bounded freshness, explicit supersession, fail-closed dependent gate state, full load-bearing continuity fingerprinting, and non-authorizing civic or financing semantics."
+      ]
+    },
+    {
+      "path": "src/economic-intelligence/types.ts",
+      "claims": [
+        "`src/economic-intelligence/types.ts` must require traceable receipt provenance and bounded validity fields so verified civic or financing evidence cannot remain untraceable or implicitly current forever."
+      ]
+    },
+    {
+      "path": "src/http/routes/economicIntelligence.ts",
+      "claims": [
+        "`src/http/routes/economicIntelligence.ts` must expose only the bounded Economic Intelligence contract and public-safe initiative state; the route cannot manufacture City, lender, property, funding, hiring, merge, deploy, spend, or provider authority."
       ]
     }
   ]
