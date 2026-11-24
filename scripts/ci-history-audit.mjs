@@ -107,7 +107,10 @@ export function verifyRemediation(row, history, index) {
 export function auditAllCommits(rows, history) {
   const errors = [];
   const report = [];
+  const seenShas = new Set();
   for (const [index, { sha, runs }] of history.entries()) {
+    if (!/^[0-9a-f]{40}$/.test(sha) || seenShas.has(sha)) errors.push(`INVALID_OR_DUPLICATE_COMMIT_SHA ${sha}`);
+    seenShas.add(sha);
     const failures = runs.filter(r => ['failure', 'cancelled'].includes(r.conclusion));
     let commitErrors = auditLedger(rows, runs, sha);
     // A cancelled run is superseded when a LATER PR commit has a successful run of the same check.
@@ -120,12 +123,43 @@ export function auditAllCommits(rows, history) {
       const problem = verifyRemediation(row, history, index);
       if (problem) commitErrors.push(`${problem} (run ${row.runId})`);
     }
+    const redRuns = failures.map(run => ({ id: run.id, name: run.name, conclusion: run.conclusion,
+      ledgerRecorded: rows.some(row => row.sha === sha && row.runId === run.id && row.name === run.name && row.outcome === run.conclusion),
+    }));
+    const pending = runs.filter(r => r.status !== 'completed' && !r.conclusion).length;
+    const otherNonSuccess = runs.some(r => r.status === 'completed' && !['success', 'failure', 'cancelled'].includes(r.conclusion));
+    const observation = redRuns.length ? 'RED_OBSERVED' : pending ? 'PENDING_OBSERVED'
+      : !runs.length ? 'UNKNOWN_NO_RUNS' : otherNonSuccess ? 'NON_SUCCESS_UNVERIFIED' : 'ALL_OBSERVED_RUNS_SUCCESS';
     report.push({ sha, runs: runs.length, failures: failures.filter(r => r.conclusion === 'failure').length,
       cancelled: failures.filter(r => r.conclusion === 'cancelled').length,
-      pending: runs.filter(r => r.status !== 'completed').length, errors: commitErrors });
+      pending, observation, redRuns, errors: commitErrors });
     errors.push(...commitErrors.map(error => `${sha.slice(0, 12)} ${error}`));
   }
-  return { report, errors };
+  const current = report.at(-1) ?? null;
+  const historical = report.slice(0, -1);
+  const summary = {
+    scope: 'PR_COMMIT_HISTORY_OBSERVED_WORKFLOW_RUNS_ONLY',
+    currentHeadSha: current?.sha ?? null,
+    currentHeadObservation: current?.observation ?? 'UNKNOWN_NO_COMMITS',
+    historicalRedRuns: historical.flatMap(commit => commit.redRuns.map(run => ({ sha: commit.sha, ...run }))),
+    historicalRedCommitCount: historical.filter(commit => commit.redRuns.length).length,
+    ledgerErrorCount: errors.length,
+    unrecordedHistoricalRuns: historical.flatMap(({ sha, redRuns }) =>
+      redRuns.filter(run => !run.ledgerRecorded).map(run => ({ sha, ...run }))),
+    manualLedgerComplete: errors.length === 0,
+    requiredCheckReadinessProven: false,
+    productionReadinessProven: false,
+  };
+  return { report, errors, summary };
+}
+
+// An unlisted failed/cancelled run is always retained in the machine-generated
+// receipt. It remains untriaged; only a fabricated, contradictory or unverifiable
+// manual claim is an integrity failure of the observation itself.
+export function classifyLedgerIntegrity(errors) {
+  const untriaged = errors.filter(e => /^[0-9a-f]{12} MISSING /.test(e));
+  const invalid = errors.filter(e => !/^[0-9a-f]{12} MISSING /.test(e));
+  return { untriaged, invalid };
 }
 
 
@@ -165,6 +199,7 @@ async function main() {
   const inScope = Number(pr) === ledgerPr;
   const rowErrors = auditRecordedRows(rows);
   let report = [];
+  let summary = { currentHeadSha: null, currentHeadObservation: 'UNKNOWN_NOT_OBSERVED', requiredCheckReadinessProven: false, productionReadinessProven: false };
   let errors = [...rowErrors];
   if (inScope) {
     const pull = await githubGet(`/repos/${repo}/pulls/${pr}`, token);
@@ -180,6 +215,7 @@ async function main() {
     }
     const observed = auditAllCommits(rows, history);
     report = observed.report;
+    summary = observed.summary;
     errors.push(...observed.errors);
   }
   const classification = classifyHistoricalCoverage(errors);
@@ -197,11 +233,13 @@ async function main() {
     authorizesMerge: false,
     authorizesDeployment: false,
     commitObservations: report,
+    summary,
     unrecordedRuns: classification.unrecorded,
     integrityErrors: classification.integrityErrors,
   };
   mkdirSync('artifacts', { recursive: true });
   writeFileSync('artifacts/ci-historical-accountability.json', JSON.stringify(receipt, null, 2) + '\n');
+  console.log(`FCR_CI_HISTORY_VISIBILITY ${JSON.stringify(summary)}`);
   console.log(JSON.stringify({
     contract: receipt.contract, status: receipt.status, commits: report.length,
     ledgerPullRequest: ledgerPr, auditScope: receipt.auditScope,

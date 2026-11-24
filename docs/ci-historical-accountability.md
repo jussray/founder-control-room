@@ -914,3 +914,13 @@ The seven run identities below were independently confirmed via the GitHub Actio
 | `5a282ac140cc0350be1cd30f4a94a2bd25480a1f` | CI (run 42428634668) | cancelled | UNKNOWN: cancellation cause not independently established | UNKNOWN: no independently verified corrective revision | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42428634668); exact SHA/name/outcome observed | OPEN |
 | `5a282ac140cc0350be1cd30f4a94a2bd25480a1f` | Historical CI Accountability (run 42428634736) | failure | Evidence auditor reported missing earlier run entries; no complete upstream defect remediation established | UNKNOWN: no independently verified corrective revision | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42428634736); exact SHA/name/outcome observed | OPEN |
 | `72fa94c4ca8669716df762bab0419f1e9d726d9c` | Historical CI Accountability (run 42429138682) | failure | Evidence auditor reported six missing run entries on this head, including five on 5a282ac and one on 32b918e; cause is incomplete ledger coverage | UNKNOWN: no independently verified corrective revision | [GitHub Actions run](https://github.com/jussray/founder-control-room/actions/runs/42429138682); exact SHA/name/outcome observed | OPEN |
+
+## PR #1076 preserved predecessor observations
+
+These historical rows were carried from the original branch. Each keeps its original outcome; this reconciliation does not diagnose or remediate it. The existing ledger-owner scope and integrity validation remain in force.
+
+| Failed SHA | Check | Observed result | Root cause | Candidate correction | Verification | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+
+
+The per-commit observation summary retains red runs even when a later observed head succeeds, and reports pending, missing and skipped checks without promoting them to readiness. The machine receipt remains scoped to its ledger owner; another PR receives UNKNOWN_NOT_OBSERVED, not a borrowed live history.
