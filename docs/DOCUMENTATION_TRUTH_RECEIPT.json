@@ -316,7 +316,9 @@
       "claims": [
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
-        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false."
+        "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false.",
+        "`TINYFISH_API_KEY` is not declared in the current canonical Worker secret registry. Earlier proposed boot-required TinyFish policy is superseded; this receipt does not authorize a binding, secret transfer, or provider activation.",
+        "`docs/CLOUDFLARE_REASONING.md` must describe `JBH_RECEIPT_INGEST_TOKEN` as a provider-held, optional boot/deploy binding required before receiver feature activation, preserving sender credential, sender/FCR runtime identity, migration state, dispatch, and ledger readback as separate activation evidence."
       ]
     },
     {
@@ -352,7 +354,9 @@
     {
       "path": "docs/SECRETS.md",
       "claims": [
-        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts."
+        "`docs/SECRETS.md` must keep provider-held Worker secrets in the Cloudflare runtime secret plane and never recast secret values as public proof artifacts.",
+        "`docs/SECRETS.md` must keep the TinyFish key in the Cloudflare Worker secret plane and never recast the provider-held value as a GitHub Actions secret or proof artifact.",
+        "`docs/SECRETS.md` must keep `JBH_RECEIPT_INGEST_TOKEN` in the canonical Cloudflare Worker secret plane, document only its binding name and receiver purpose, and keep a successful binding-name check distinct from proof that a JBH receipt reached the ledger."
       ]
     },
     {
@@ -429,8 +433,8 @@
       "claims": [
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin Se’kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` `e3430ef2`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (registry `5b1c6e39`, pair contract `dd008420`) after semantic review of each changed blob; the other nine blobs are unchanged. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement."
+        "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se\u2019kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority.",
+        "`src/founder-os-lab/projectAdapters.ts` must pin Se\u2019kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` `e3430ef2`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (registry `5b1c6e39`, pair contract `dd008420`) after semantic review of each changed blob; the other nine blobs are unchanged. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement."
       ]
     },
     {
@@ -624,7 +628,9 @@
         "`wrangler.worker.toml` must list `FCR_SHOPIFY_WEBHOOK_SECRET` and `FCR_COMMERCE_HASH_SALT` under `[secrets].required`, so canonical exact-main Deploy rejects a missing FCR Shopify runtime binding before Worker mutation while never reading, logging, or re-uploading either provider-held value; this source boundary cannot prove webhook registration, production migration, runtime delivery, or collected revenue.",
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
-        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence."
+        "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence.",
+        "`wrangler.worker.toml` does not declare `TINYFISH_API_KEY` in its current required or optional secret registry; no TinyFish boot/deploy requirement or provider activation is established by this receipt.",
+        "`wrangler.worker.toml` must list `JBH_RECEIPT_INGEST_TOKEN` under `[secrets].optional` under Path B. The receiver fails closed without the credential; its absence does not block boot/deploy. Binding-name presence does not prove the sender, dispatch, migration, or stored receipt outcome."
       ]
     },
     {
@@ -825,19 +831,31 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit."
+        "`.github/workflows/playwright.yml` must require the pinned StoryEngine commit to be equal to or an ancestor of live StoryEngine `main`, fail closed when the pin leaves live history, bind fetched history to the reported live SHA, and keep checkout, runtime and browser/federation proof bound to the exact pinned commit.",
+        "`.github/workflows/playwright.yml` must bind the FCR-to-StoryEngine browser federation witness to a separately verified exact StoryEngine peer SHA and ref; changing that peer identity expires predecessor federation/browser proof and requires the complete exact-head witness to rerun without granting merge, deploy, production, or provider-mutation authority.",
+        "A fresh peer ref/SHA observation may select the successor StoryEngine evidence subject, but the successor FCR federation state remains UNKNOWN until the complete exact-head runtime identity, directive, receipt, and Playwright browser witness succeeds against that peer."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed."
+        "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed.",
+        "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
+        "`README.md` must state that `JBH_RECEIPT_INGEST_TOKEN` is optional for Worker boot/deploy under Path B and required before receiver activation, while keeping Cloudflare binding presence, FCR runtime identity, sender identity, dispatch, migration state, and stored sanitized receipt as separate proof gates.",
+        "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
+        "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
+        "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
+        "`README.md` must describe the authenticated YouTube growth route as an advisory evidence evaluator whose HOLD/ADVANCE result cannot prove publication, YPP eligibility, revenue, provider mutation, or scale execution and whose malformed inputs fail closed.",
+        "`README.md` must describe deterministic founder-content approval reservation and exact active retry recovery without allowing evidence rotation, retry, or a stored reservation to mint new publication authority.",
+        "`README.md` must state that rebinding the StoryEngine Playwright peer resets predecessor browser-federation proof and that a ref/SHA match alone cannot grant merge, deploy, production, or provider-mutation authority."
       ]
     },
     {
       "path": "docs/TRUTH_DECAY_AUDIT.md",
       "claims": [
-        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 12, 2026 move from StoryEngine live-ref equality to ancestry as preserving the pin-disappearance failure mode without widening what the exact-pin witnesses prove."
+        "`docs/TRUTH_DECAY_AUDIT.md` must record the November 12, 2026 move from StoryEngine live-ref equality to ancestry as preserving the pin-disappearance failure mode without widening what the exact-pin witnesses prove.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must treat a StoryEngine peer SHA/ref in FCR Playwright as evidence identity rather than a durable alias for current StoryEngine, and must require complete federation re-proof whenever the peer identity or either repository head moves.",
+        "`docs/TRUTH_DECAY_AUDIT.md` must keep a newly matched StoryEngine ref/SHA in UNKNOWN browser-federation state until the exact successor FCR head completes the runtime, directive, receipt, and browser witness."
       ]
     },
     {
@@ -929,7 +947,9 @@
       "path": "docs/deployment/CLOUDFLARE_WORKER_TARGETS.md",
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit."
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit.",
+        "`TINYFISH_API_KEY` is absent from the current canonical Worker registry; earlier required-binding instructions are superseded. No TinyFish provider availability, Search/Fetch success, or activation is established.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `JBH_RECEIPT_INGEST_TOKEN` as optional for boot/deploy and required before receiver activation, preserving sender credential, sender/FCR runtime identities, migration state, dispatch, and one stored sanitized receipt as separate end-to-end proof."
       ]
     },
     {
@@ -953,7 +973,7 @@
     {
       "path": "scripts/verify-worker-var-secret-collisions.mjs",
       "claims": [
-        "`scripts/verify-worker-var-secret-collisions.mjs`: The collision verifier must compare names only — top-level [vars] names against the [secrets].required/optional registries and against a supplied `wrangler secret list` receipt — exit non-zero naming every collision, fail closed on an unparseable receipt or config, and never read, print or change a value. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
+        "`scripts/verify-worker-var-secret-collisions.mjs`: The collision verifier must compare names only \u2014 top-level [vars] names against the [secrets].required/optional registries and against a supplied `wrangler secret list` receipt \u2014 exit non-zero naming every collision, fail closed on an unparseable receipt or config, and never read, print or change a value. It does not prove credential validity, which value the runtime would use, a deploy, or runtime health."
       ]
     },
     {
@@ -1011,6 +1031,12 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": ".env.example",
+      "claims": [
+        "`.env.example` must declare `JBH_RECEIPT_INGEST_TOKEN` by name only and preserve the distinction between the FCR receiver binding and `jbh-private` sender-side `CONTROL_ROOM_RECEIPT_TOKEN`; no credential value belongs in repository source."
       ]
     }
   ]

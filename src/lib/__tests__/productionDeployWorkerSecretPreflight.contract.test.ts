@@ -7,6 +7,8 @@ const workflow = readFileSync(
 );
 const wrangler = readFileSync(new URL('../../../wrangler.worker.toml', import.meta.url), 'utf8');
 
+const receiptRoute = readFileSync(new URL('../../http/routes/hairCommerceReceipts.ts', import.meta.url), 'utf8');
+
 describe('production Worker secret preflight contract', () => {
   it('reads provider-held secret names before any production mutation can start', () => {
     const authorityStart = workflow.indexOf('  authority-gate:');
@@ -61,6 +63,13 @@ describe('production Worker secret preflight contract', () => {
     expect(wrangler).toContain('"FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",');
     expect(wrangler).toContain('"SUPABASE_SERVICE_ROLE_KEY",');
     expect(wrangler).toContain('"FOUNDER_SESSION_ENCRYPTION_KEY",');
+  });
+
+  it('declares the fail-closed JBH receiver credential as feature-gated under Path B', () => {
+    expect(receiptRoute).toContain('process.env.JBH_RECEIPT_INGEST_TOKEN?.trim()');
+    const optional = wrangler.split('optional = [')[1];
+    expect(optional).toContain('"JBH_RECEIPT_INGEST_TOKEN",');
+    expect(wrangler.split('optional = [')[0]).not.toContain('"JBH_RECEIPT_INGEST_TOKEN",');
   });
 
   it('fails closed on [vars]/secret name collisions inside the authority gate before any deploy', () => {

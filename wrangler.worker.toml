@@ -125,6 +125,7 @@ required = [
 # to deploy or boot. Install on the founder-control-room Worker first, then
 # move the name into [secrets].required in the feature's activation change.
 optional = [
+  "JBH_RECEIPT_INGEST_TOKEN",
   "GITHUB_PRIVATE_KEY",
   "FCR_REMOTE_MCP_READ_TOKEN",
   "FCR_DISTRIBUTION_READ_TOKEN",

@@ -331,3 +331,8 @@ The diagnostic workflow may inspect the production deployment credential only af
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### JBH receipt receiver credential — current integration boundary
+
+`JBH_RECEIPT_INGEST_TOKEN` remains required by the fail-closed `/ingest/hair-commerce-receipts` receiver before feature activation. Under the current Path B secret registry it is optional for Worker boot/deploy. This source declaration cannot prove sender credential parity, a deployed receiver, database readiness or one sanitized sender-to-ledger receipt; those require separate exact-runtime evidence.
