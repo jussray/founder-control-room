@@ -1012,6 +1012,30 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": ".github/workflows/main-release-provenance.yml",
+      "claims": [
+        "The main release provenance contract must check out the exact candidate with full Git history and execute both read-only historical ratification verifiers; neither script may grant direct-main/merge/deploy authorization or skip current exact-head provenance gates."
+      ]
+    },
+    {
+      "path": "scripts/verify-main-release-historical-ratification.mjs",
+      "claims": [
+        "The historical verifier must validate the recorded direct-main incident commit/tree fingerprints, affected paths and ancestry without rewriting provider history or claiming a prior direct push is a reviewed PR."
+      ]
+    },
+    {
+      "path": "scripts/verify-main-release-ratification-extension.mjs",
+      "claims": [
+        "The historical extension must validate immutable successor and incident first-parent ancestry against exact commit/tree fingerprints and leave historicalProvenanceRelabeled, mergeAuthorityGranted and deployAuthorityGranted false."
+      ]
+    },
+    {
+      "path": "scripts/verify-main-release-provenance.node-test.mjs",
+      "claims": [
+        "The main release provenance regression tests must require both historical proof invocations and full history checkout while retaining the current owner/direct-main classifications instead of silently rewriting policy."
+      ]
     }
   ]
 }

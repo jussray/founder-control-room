@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Verify exact checkout
         shell: bash
@@ -46,6 +47,12 @@ jobs:
           node-version: '24'
       - name: Run provenance adversarial tests
         run: node --test scripts/verify-main-release-provenance.node-test.mjs
+
+      - name: Verify immutable historical direct-main incident trees
+        run: node scripts/verify-main-release-historical-ratification.mjs
+
+      - name: Verify first-parent historical ratification extension
+        run: node scripts/verify-main-release-ratification-extension.mjs
 
   provenance:
     name: Main release provenance

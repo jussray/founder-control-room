@@ -854,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+## Main release provenance historical tree witness (PR #775 candidate)
+
+Two read-only historical ratification scripts replay exact Git first-parent ancestry and expected tree/file-set checks for previously recorded direct-main incidents. This source-only candidate does **not** convert those historical incidents into current approval, allow new direct-main pushes, modify the current release classifier, or grant merge/deploy authority. The CI contract checks out full Git history and requires both historical verifiers to succeed before declaring historical provenance proof; the live `main` SHA, required checks, and current founder approval remain separate.
