@@ -20,7 +20,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import type { ProviderKind } from '../../reconciliation/types.js';
 import { storeBuildEvent, type BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 import { sanitizeWebhookPayload } from './sanitize.js';
-import { githubNotificationIntent } from '../../buildEvents/founderNotificationIntent.js';
+import { githubNotificationIntent, recoverWorkflowIntent } from '../../buildEvents/founderNotificationIntent.js';
 import { notificationEventRow } from '../../services/founderNotificationQueue.js';
 
 const SUPPORTED_EVENTS = new Set([
@@ -283,7 +283,21 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
   // Duplicate deliveries are safe because project_events has a stable source identity.
   // Keep the existing reconciliation and failure-alert paths independent.
   try {
-    const notification = githubNotificationIntent(eventType, sanitizedPayload);
+    let notification = githubNotificationIntent(eventType, sanitizedPayload);
+    if (notification?.kind === 'workflow_passed') {
+      const run = sanitizedPayload.workflow_run as Record<string, unknown>;
+      const attempt = run.run_attempt as number;
+      if (attempt > 1) {
+        // Read only a prior authenticated attempt of this same project, run and SHA.
+        const { data: prior, error: priorError } = await supabase.from('provider_events')
+          .select('payload').eq('project_id', projectId).eq('provider', 'github')
+          .eq('event_type', 'workflow_run')
+          .contains('payload', { repository: { full_name: notification.repository }, action: 'completed',
+            workflow_run: { id: run.id, run_attempt: attempt - 1, head_sha: notification.commitSha, status: 'completed' } })
+          .order('received_at', { ascending: false }).limit(1).maybeSingle();
+        if (!priorError && prior?.payload) notification = recoverWorkflowIntent(notification, prior.payload as Record<string, unknown>);
+      }
+    }
     if (notification) {
       const { error } = await supabase.from('project_events').insert(notificationEventRow(projectId, notification));
       if (error && error.code !== '23505') throw new Error('founder_notification_queue_failed');
