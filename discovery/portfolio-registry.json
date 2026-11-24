@@ -1,0 +1,84 @@
+{
+  "protocol": "JSC-ADRP",
+  "version": "1.0.0-draft",
+  "publicationStatus": "draft",
+  "organizationId": "https://www.jussco.company/#organization",
+  "authority": "independent-peer-products",
+  "projects": [
+    {
+      "project": "jussray",
+      "name": "Juss & Co",
+      "publicPage": "https://www.jussco.company/",
+      "entityId": "https://www.jussco.company/#organization",
+      "sourcePath": "site/index.html",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "00073a458e9bc25b143a06a94ee68e77234037f9",
+        "url": "https://github.com/jussray/jussray/actions/runs/45339348475"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "founder-control-room",
+      "name": "Founder Control Room",
+      "publicPage": "https://www.foundercontrolroom.org/",
+      "entityId": "https://www.foundercontrolroom.org/#application",
+      "sourcePath": "public/index.html",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "8671862eee13dbfa2d6662e9b06593d9e32f72a2",
+        "url": "https://github.com/jussray/founder-control-room/actions/runs/45339355164"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "chief-ai-machine",
+      "name": "Chief AI",
+      "publicPage": "https://chief.foundercontrolroom.org/",
+      "entityId": "https://chief.foundercontrolroom.org/#application",
+      "sourcePath": "public-face.html",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "8bc4cc43c3cf8761b980790f1740a0e914381933",
+        "url": "https://github.com/jussray/chief-ai-machine/actions/runs/45339359300"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "solcontinuity",
+      "name": "SolContinuity",
+      "publicPage": "https://sol.foundercontrolroom.org/evidence.html",
+      "entityId": "https://sol.foundercontrolroom.org/#application",
+      "sourcePath": "evidence.html",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "18f51cbf431be9db524aa6c22d82102f1bfb2498",
+        "url": "https://github.com/jussray/solcontinuity/actions/runs/45339364768"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    },
+    {
+      "project": "promptos",
+      "name": "PromptOS",
+      "publicPage": "https://promptos.jussco.company/",
+      "entityId": "https://promptos.jussco.company/#application",
+      "sourcePath": "public-face.html",
+      "initialValidation": {
+        "scope": "draft metadata validation only",
+        "status": "success",
+        "commit": "c8938196bbcf9d3a4d1d4f7f0beb423c53ae4485",
+        "url": "https://github.com/jussray/promptos/actions/runs/45339371165"
+      },
+      "productionStatus": "UNKNOWN",
+      "verifiedCapabilities": []
+    }
+  ]
+}
