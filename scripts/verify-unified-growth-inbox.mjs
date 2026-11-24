@@ -24,14 +24,10 @@ function assert(condition, message) {
 
 const registryPath = 'config/unified-growth-inbox.channels.json';
 const skillPath = '.ai/skills/unified-growth-inbox/SKILL.md';
-const planPath = 'docs/private/UNIFIED_GROWTH_INBOX_PLAN.md';
-const compliancePath = 'docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md';
 const typePath = 'src/types/growthInbox.ts';
 
 const registry = readJson(registryPath);
 const skill = normalizeProse(readText(skillPath));
-const plan = normalizeProse(readText(planPath));
-const compliance = normalizeProse(readText(compliancePath));
 const types = readText(typePath);
 
 assert(registry.defaultAutomationMode === 'draft_only', 'default automation mode must remain draft_only');
@@ -70,24 +66,6 @@ for (const phrase of [
 }
 
 for (const phrase of [
-  'Do not build ten unrelated bots',
-  'A contact for Juss Beautiful Hair is not silently marketed Se’kret Bip',
-  'No unrestricted cold outreach mode exists',
-  'actually collected revenue',
-]) {
-  assert(plan.includes(phrase), `private plan missing phrase: ${phrase}`);
-}
-
-for (const phrase of [
-  'No external message, call, campaign step, or automated reply may be dispatched',
-  'Revenue is real only when collected and attributable',
-  'Pennsylvania registration, bonding, list subscription',
-  'Google discontinued the product on',
-]) {
-  assert(compliance.includes(phrase), `compliance gate missing phrase: ${phrase}`);
-}
-
-for (const phrase of [
   "export interface GrowthChannelAdapter",
   "export interface DispatchDecision",
   "return decision.checks.every((check) => check.state === 'allow')",
@@ -103,3 +81,4 @@ console.log('Default mode: draft_only');
 console.log('Cold outreach: disabled');
 console.log('Outbound voice: disabled');
 console.log('Revenue recognition: payment_collected only');
+console.log('Private founder plans: excluded from public verification inputs');

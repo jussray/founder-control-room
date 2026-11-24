@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { receiptClaimsDescribeRequiredDeploymentRemoval } from './documentation-truth-required-deployment-guard.mjs';
+import { hasFreshMeaningfulInvariant } from './documentation-truth-claim-fingerprint.mjs';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -53,21 +55,35 @@ const truthSensitiveRules = [
   { domain: 'repository-provider', match: /^src\/providers\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'publishing', match: /^src\/lib\/(?:firstPartyFounderContent|temporallyGovernedFounderContent|n8nFounderContent|n8nProviderNeutralFounderContent|founderSignal)/ },
   { domain: 'publishing', match: /^src\/http\/routes\/n8nConveyor\.ts$/ },
+  { domain: 'founder-permission-authority', match: /^src\/http\/routes\/founderPermissions\.ts$/ },
+  { domain: 'founder-permission-authority', match: /^src\/lib\/founderPermission(?:Broker|Execution)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/governance\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/buildEvents\/(?!__tests\/)(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/documentation-truth-required-deployment-guard\.mjs$/ },
+  { domain: 'truth-governance', match: /^scripts\/documentation-truth-claim-fingerprint\.mjs$/ },
   { domain: 'truth-governance', match: /^\.ai\/skills\/goalfix\/SKILL\.md$/ },
   { domain: 'truth-governance', match: /^\.claude\/skills\/goalfix\/SKILL\.md$/ },
+  { domain: 'truth-governance', match: /^skills\/(?:ultrathink-attack-godmode|repair-to-proof|continuity-proof-ledger|urlfix)\/SKILL\.md$/ },
+  { domain: 'truth-governance', match: /^skills\/ultrathink-suite\/README\.md$/ },
   { domain: 'truth-governance', match: /^docs\/(?:FOUNDER_ADAPTIVE_KERNEL_V0|GOALFIX_EXECUTION_WORKFLOW_V2|CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC|PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC)\.md$/ },
   { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
+  { domain: 'evidence-authority', match: /^src\/lib\/jiraWorkAutomationLiveProbe\.ts$/ },
+  { domain: 'evidence-authority', match: /^src\/http\/routes\/jiraWorkAutomationIngress\.ts$/ },
+  { domain: 'evidence-authority', match: /^scripts\/verify-jira-work-automation-live\.ts$/ },
+  { domain: 'evidence-authority', match: /^\.github\/workflows\/jira-work-automation-live-probe\.yml$/ },
   { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
   { domain: 'evidence-authority', match: /^\.github\/workflows\/playwright\.yml$/ },
+  { domain: 'evidence-authority', match: /^src\/founder-os-lab\/projectAdapters\.ts$/ },
+  { domain: 'evidence-authority', match: /^tools\/zapier\/founder-content-outcome-contract\.cjs$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'capability-authority', match: /^src\/authority\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
   { domain: 'capability-authority', match: /^security\/delegated-agent-authority\.json$/ },
+  { domain: 'capability-authority', match: /^src\/lib\/(?:fcrSkillRouter|fcrStandingCommandRegistry)\.ts$/ },
+  { domain: 'capability-authority', match: /^src\/founder-os-lab\/(?:contracts|registry)\.ts$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
@@ -92,6 +108,7 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
   requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
 }
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
+if (domains.has('founder-permission-authority')) requiredDocs.add('docs/PORTABLE_FOUNDER_APPROVALS.md');
 if (domains.has('truth-governance') || domains.has('evidence-authority')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
 if (domains.has('cloudflare-authority')) {
@@ -159,6 +176,38 @@ function meaningfulInvariant(claim, sourcePath) {
     && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
 }
 
+// Union every claim per path: the append-only receipt may name one path in
+// several change entries, and a fresh claim may be appended to any of them.
+function receiptClaimsUnionByPath(changes) {
+  const claimsByPath = new Map();
+  for (const change of Array.isArray(changes) ? changes : []) {
+    if (!change || typeof change !== 'object' || !nonEmptyString(change.path, 300) || !Array.isArray(change.claims)) continue;
+    const claims = claimsByPath.get(change.path) ?? [];
+    claims.push(...change.claims.filter((claim) => nonEmptyString(claim)));
+    claimsByPath.set(change.path, claims);
+  }
+  return claimsByPath;
+}
+
+// Claims already present at the reviewed base. A receipt absent at the base
+// contributes no inherited claims; a base receipt that exists but cannot be
+// read or parsed fails closed because claim freshness cannot be proven.
+function receiptClaimsAtRevision(revision) {
+  try {
+    git('cat-file', '-e', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`);
+  } catch {
+    return new Map();
+  }
+  try {
+    const parsed = JSON.parse(git('show', `${revision}:${DOCUMENTATION_RECEIPT_PATH}`));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid');
+    return receiptClaimsUnionByPath(parsed.changes);
+  } catch {
+    failures.push('documentation truth receipt at the reviewed base must be readable to prove claim freshness');
+    return new Map();
+  }
+}
+
 function documentationReceipt() {
   let parsed;
   try {
@@ -203,6 +252,7 @@ function documentationReceipt() {
   return {
     domains: new Set(Array.isArray(parsed.domains) ? parsed.domains : []),
     claimsByPath,
+    claimsUnionByPath: receiptClaimsUnionByPath(parsed.changes),
   };
 }
 
@@ -221,10 +271,13 @@ if (truthSensitiveChanges.length > 0) {
         failures.push(`documentation truth receipt must name changed domain: ${domain}`);
       }
     }
+    const baseClaimsByPath = receiptClaimsAtRevision(baseSha);
     for (const change of truthSensitiveChanges) {
-      const claims = receipt.claimsByPath.get(change.file) ?? [];
+      const claims = receipt.claimsUnionByPath.get(change.file) ?? [];
       if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
         failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
+      } else if (!hasFreshMeaningfulInvariant(claims, baseClaimsByPath.get(change.file) ?? [], (unit) => meaningfulInvariant(unit, change.file))) {
+        failures.push(`documentation truth receipt must add or change a meaningful path-bound invariant in the reviewed range for: ${change.file}`);
       }
     }
   }
@@ -247,6 +300,7 @@ const claude = read('CLAUDE.md');
 const perplexity = read('PERPLEXITY.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const publicTruth = read('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
+const portableFounderApprovals = read('docs/PORTABLE_FOUNDER_APPROVALS.md');
 const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
 const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const goalfixSkill = read('.ai/skills/goalfix/SKILL.md');
@@ -257,6 +311,7 @@ const claudeMaster = read('docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md
 const perplexityMaster = read('docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
+const githubProviderSource = read('src/providers/GitHubProvider.ts');
 
 const goalfixExecutionPaths = [
   ['portable Goalfix skill', goalfixSkill],
@@ -276,12 +331,38 @@ const goalfixInvariantChecks = goalfixExecutionPaths.flatMap(([label, content]) 
   [content.includes('MERGED_UNVERIFIED'), `${label} must preserve MERGED_UNVERIFIED until required runtime truth exists`],
 ]);
 
+function namedSetBody(source, name) {
+  const marker = `const ${name} = new Set([`;
+  const start = source.indexOf(marker);
+  if (start < 0) return '';
+  const end = source.indexOf(']);', start);
+  return end < 0 ? '' : source.slice(start, end + 3);
+}
+
+const fcrOwnedRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_OWNED_RULE_TYPES');
+const fcrPreservableRuleTypes = namedSetBody(githubProviderSource, 'FCR_REVIEW_PRESERVABLE_RULE_TYPES');
+const githubProviderTruthChanged = truthSensitiveChanges.some(
+  (change) => change.file === 'src/providers/GitHubProvider.ts',
+);
+const githubProviderReceiptClaims = receipt?.claimsByPath.get('src/providers/GitHubProvider.ts') ?? [];
+const ownsLegacyRequiredDeployments = fcrOwnedRuleTypes.includes('"required_deployments"')
+  && !fcrPreservableRuleTypes.includes('"required_deployments"');
+const receiptDescribesRequiredDeploymentRemoval = receiptClaimsDescribeRequiredDeploymentRemoval(
+  githubProviderReceiptClaims,
+);
+
 const consistencyChecks = [
+  [!githubProviderTruthChanged || !ownsLegacyRequiredDeployments || receiptDescribesRequiredDeploymentRemoval, 'documentation truth receipt must describe intentional removal of legacy pre-merge required_deployments when GitHubProvider owns that migration boundary'],
   [!readme.includes('**Last refreshed:**'), 'README must not present a manually refreshed date as durable current repository authority'],
   [readme.includes('Current identity is resolved at use time'), 'README must resolve current repository identity at use time'],
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
   [readme.includes('first-party LinkedIn') && readme.includes('provider-neutral n8n'), 'README must describe the current founder-content execution mesh'],
   [readme.includes('`.control/capability.json`') && readme.includes('canonical capability authority'), 'README must name capability.json as canonical capability authority'],
+  [portableFounderApprovals.includes('PromptOS workflow registry')
+    && portableFounderApprovals.includes('server-side')
+    && portableFounderApprovals.includes('executionAuthorized: false')
+    && portableFounderApprovals.includes('registry content hash'),
+  'portable founder approvals must describe PromptOS action-bound authority and keep public receipts non-authorizing'],
   [mergeAuthority.includes('deterministic independent review') && mergeAuthority.includes('founder-final') && mergeAuthority.includes('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS'), 'merge authority must describe canonical founder-final review plus legacy semantic-review compatibility'],
   [mergeAuthority.includes('live GitHub') && mergeAuthority.includes('separate provider gate'), 'merge authority must distinguish FCR source/runtime enforcement from live GitHub provider enforcement'],
   [mergeAuthority.includes('Documentation truth'), 'merge authority must require documentation truth reconciliation'],
@@ -330,7 +411,7 @@ const changedDocs = changedFiles.filter((file) =>
   || file === 'CLAUDE.md'
   || file === 'PERPLEXITY.md'
   || file === DOCUMENTATION_RECEIPT_PATH
-  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/')),
+  || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/') || file.startsWith('.claude/skills/') || file.startsWith('skills/')),
 );
 
 const report = {

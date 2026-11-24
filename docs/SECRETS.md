@@ -1,12 +1,59 @@
 # GitHub Actions Secrets and Cloudflare Bindings Registry
 
-This repository has three separate configuration planes:
+## November 2, 2026: prior verification is not revoked by a new input-shape failure
+
+**Founder-reported history:** The GitHub App credential was verified approximately 2–3 months before November 2, 2026. This is preserved as a historical report, not independently reproduced App authentication on the present workflow. An exact dated provider issuer receipt for that prior verification has **not** been recovered in this scoped audit; do not fabricate one.
+
+**Directly observed:** Scheduled FCR portfolio sync run [41399356574](https://github.com/jussray/founder-control-room/actions/runs/41399356574) failed November 2 while normalizing the *effective* `APP_PRIVATE_KEY` with `APP_PRIVATE_KEY_SHAPE_INVALID:unknown`. The key was **present but not recognized as a supported RSA private-key transport**. The job stopped before GitHub App provider authentication; it did not establish that the previously verified App/key was revoked, expired, or rotated incorrectly. The November 1 founder-only shape diagnostic already reported unknown transport, independently of this later run.
+
+**Binding provenance:** The scheduled job specifies `environment: production`, and GitHub Actions uses an environment-scoped secret over a same-named repository secret. Consequently, an old production environment binding could override a more recently updated repository secret; *existence of duplicate secret names and their update dates remain unverified*. The workflow cannot know the originating scope from the injected value, and must not invent one. A syntactically base64-like input alone does not prove valid PEM, DER, issuer identity, or whether it was the key previously verified.
+
+**Action gate:** An authorized GitHub administrator reviews metadata (not secret values) for `APP_ID` and `APP_PRIVATE_KEY` under **Settings → Environments → production → Environment secrets** and **Settings → Secrets and variables → Actions**, including name, update timestamp, and which scope should be authoritative. Do not copy values into code, logs, chat, public issues, or receipts. Do not rotate solely for an input-format failure. Where a fresh secret-safe shape witness is necessary, the existing `.github/workflows/github-app-secret-shape-diagnostic.yml` accepts **only** an actual `jussray` account comment on issue #418, bound to the exact current main SHA and an auditable approval reference; do not simulate that founder identity or trigger it from an untrusted PR.
+
+**Evidence taxonomy:** `historical_user_report` and `observed_current_workflow_shape_failure` are distinct. An unverified secret binding or failed mint leaves provider credential validity **unknown**, not invalid. Candidate PR #988 records `mintStepOutcome`, `bindingOrigin:UNKNOWN_FROM_WORKFLOW`, and `providerCredentialValidity:NOT_EVALUATED_BY_THIS_RECEIPT` when pre-receipt workflow failure occurs.
+
+---
+
+
+## November 1, 2026: bounded GitHub App transport reconciliation
+
+The existing PR #986 reconciles bounded private-key wrapper parsing against current main without replacing a protected secret, changing GitHub App installation grants, or asserting production repair. On the November 1 exact-main founder-only diagnostic, the production binding was present and the App ID numeric, but the runtime key transport was classified as unknown; this is evidence of failed parsing, not evidence that the secret was missing or recently replaced. Protected-value scope and provider identity remain independent gates. No inherited historic CI or Playwright result authorizes a merge or release.
+
+
+## Cloudflare Logpush workflow secrets
+
+These names are used only by the founder-gated Logpush workflow. Values must remain in GitHub/Cloudflare secret planes and must never be committed, printed, or copied into documentation.
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_LOGPUSH_READ_TOKEN` | Dedicated Cloudflare credential for non-mutating Logpush job inspection. |
+| `CLOUDFLARE_LOGPUSH_WRITE_TOKEN` | Separate Cloudflare credential allowed to create/update the bounded Logpush job during an approved manual apply. |
+| `CLOUDFLARE_LOGPUSH_DESTINATION_CONF` | Provider-held destination configuration for the Logpush job; treat the entire value as secret because it may contain endpoint credentials. |
+
+`CLOUDFLARE_ACCOUNT_ID` remains the account selector. Secret-name documentation proves only the expected binding names; it does not prove a value is configured, valid, authorized, or currently present in GitHub or Cloudflare.
+
+This repository has four separate configuration planes:
 
 1. **Cloudflare Pages build settings** for the static frontend.
 2. **GitHub Actions secrets** used by repository workflows.
 3. **Cloudflare Worker runtime bindings** used by the surviving `founder-control-room` API Worker.
+4. **GitHub Copilot Agents secrets** available to the Copilot cloud agent development environment, not automatically to ordinary Actions jobs or Cloudflare Workers.
 
 A value configured in one plane does not automatically exist in another. Never copy secret values into repository files, PRs, logs, screenshots, or chat.
+
+### Slack secret scope (candidate integration, not live)
+
+The founder-reported GitHub Agents secret name `slack` becomes environment variable `SLACK` (GitHub secret names are case-insensitive). Its **value, credential type, and repository access have not been independently verified**. Copilot's Agents secret is not a Cloudflare Worker binding and does not provide runtime notification delivery. No production Slack secret has been provisioned by this source change.
+
+`src/security/incidentEscalation.ts` accepts an explicitly provided `SLACK_WEBHOOK_URL`, or a runtime-provided `SLACK` whose content is a Slack incoming-webhook URL or `xoxb-` bot token. Bot delivery additionally requires `FCR_SLACK_CHANNEL_ID` pointing to the authorized FCR channel and checks Slack's JSON `ok` result. Unsupported credential formats, absent channels, and low-severity verdicts fail closed. Webhook destinations are restricted to HTTPS Slack incoming-webhook URLs under `hooks.slack.com/services/` with three path segments; redirects are rejected. This applies to legacy `SLACK_WEBHOOK_URL` as well as the `SLACK` alias, preventing an accidental non-Slack destination from receiving incident details. An HTTP delivery response or a local test does not prove a Slack message appeared in the channel; channel readback is a separate gate. The existing production caller and the actual Cloudflare binding remain unverified. Do not add these as required deployment secrets until the existing runtime path and approved credential are independently proven.
+
+The existing `sauce-source-guard.yml` now includes **Slack agent secret readiness (no message sent)** on trusted `main` manual dispatch only (not on routine pushes while the Actions secret is absent). This job reads the GitHub **Actions** secret `SLACK`, not Copilot Agents credentials. If it is an `xoxb-` bot token, it calls Slack's read-only `auth.test` endpoint and reports only the authorization verdict. If it is a Slack incoming webhook URL, the job checks the exact approved URL structure without contacting the webhook; provider acceptance and channel delivery remain **UNVERIFIED**. A missing/unsupported secret or failed bot authentication is an explicit failing gate. No message is sent, and this diagnostic does not install credentials into the FCR production Worker or authorize security escalations.
+
+### PagerDuty routing key (candidate integration, not live)
+
+The incident adapter in `src/security/incidentEscalation.ts` reads the Events API v2 credential from `PAGERDUTY_ROUTING_KEY`. The legacy `PAGERDUTY_INTEGRATION_KEY` remains a fallback for existing private runtimes; the routing-key name takes precedence when both exist. This is a **PagerDuty Events API integration/routing key**, not a PagerDuty REST API token. Only high/critical meaningful security verdicts qualify for a trigger. Code changes never copy the secret value to source, logs, or test fixtures.
+
+The `founder-control-room` API Worker is the canonical FCR runtime defined in `wrangler.worker.toml`, not the `chief-ai` Worker or the browser Pages frontend. No `wrangler.worker.toml` secret-registry change is needed to read a provider-held Worker secret at runtime. The provider-held binding, authenticated security-event caller, and bounded real delivery must still be independently verified before activation. GitHub Actions secrets are scoped to workflows and do not automatically appear in Workers. The connected Cloudflare account readback on 2026-11-17 found no PagerDuty-named secret binding on either the `founder-control-room` or `chief-ai` Worker. It **did** find a `secret_text` variable on the `founder-control-room` **Pages** project in production, with a name ending in a space: `PAGERDUTY_ROUTING_KEY ` (note the trailing space inside the code span). This Pages secret is not available to the API Worker, and the name also does not exactly match `PAGERDUTY_ROUTING_KEY`. Its value was not retrieved or copied. Keep the Pages secret untouched; install the intended key using the exact name on the `founder-control-room` API Worker through an approved secure channel, then verify name-only binding readback and authenticated event delivery. The saved GitHub Actions secret is not proof of runtime binding or PagerDuty delivery. Do not claim live incident delivery from code tests, secret-name registration, or a successful source build alone.
 
 Cloudflare dashboard token **display names are operator labels, not execution bindings**. A label such as `founder-control-room build token` does not prove which GitHub secret or workflow consumes that credential. For operational truth, use the exact GitHub secret name referenced by the current workflow plus a successful provider verification/readback receipt. If either is missing, the binding is unknown.
 
@@ -32,14 +79,105 @@ GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trus
 
 The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
 
+### Expo mobile robot (`fcr`)
+
+| Secret | Required by | Description |
+|---|---|---|
+| `EXPO_TOKEN` | `mobile-store-readiness.yml` / `expo-robot-readiness` on trusted `main` push or manual dispatch | Expo robot access token for the existing FCR mobile app. The job uses `environment: expo-mobile` and passes this secret only to Expo authentication. Store under GitHub Actions repository secrets or the `expo-mobile` environment as appropriate, not only Copilot Agents; a same-name environment secret takes precedence. Never put the value in source, logs, screenshots, or chat. |
+
+The token check runs `eas whoami` without initiating a native build. An optional manual Android preview additionally requires an existing linked EAS `projectId` and the three public runtime variables (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_FCR_ORIGIN`). A configured secret name or successful JavaScript export is not proof of EAS provider authentication, a signed build, or device readiness.
+
 ### GitHub App authority
 
 | Secret | Required by | Description |
 |---|---|---|
-| `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
-| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+| `APP_ID` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | Numeric GitHub App ID for the installed Founder Control Room App. The portfolio workflows read `secrets.APP_ID` directly; the trusted witness paths map it to `GITHUB_APP_ID`. |
+| `APP_PRIVATE_KEY` | `portfolio-evidence-sync.yml`, `portfolio-actions-audit.yml`, `deterministic-review-core-advisory.yml` trusted witness publication, `github-app-secret-shape-diagnostic.yml` read-only production shape diagnostic, and FCR governance reconciliation | RSA private key for the same GitHub App, in one of the transport shapes accepted below. The portfolio workflows read `secrets.APP_PRIVATE_KEY` directly; the trusted witness paths map it to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
 
-`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. A successful job must prove that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence alone is not provider proof.
+`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. The read-only `github-app-secret-shape-diagnostic.yml` proves only local credential transport/PEM/RSA shape and explicitly performs no provider authentication or issuer readback. For workflows that claim provider proof, success must separately establish that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence or a green shape diagnostic alone is not provider proof.
+
+
+#### Secret scope precedence
+
+Set these secrets in the scope the consuming job actually reads. `portfolio-evidence-sync.yml`
+and `portfolio-actions-audit.yml` both declare `environment: production` and reference
+`secrets.APP_ID` / `secrets.APP_PRIVATE_KEY`. When a name exists both in the `production`
+environment and at repository or organization scope, GitHub supplies the **environment-level**
+value. Replacing a same-named repository secret therefore does not change what those jobs see.
+
+Before attributing a repeated failure to an unchanged value, read back secret **name and
+`updated_at` metadata** — never contents — for both scopes and compare against the failing job's
+start time. Only a replacement in the scope the job reads, made before that job started, can have
+reached it.
+
+#### Portfolio evidence sync: App key not yet recognized
+
+Recorded 2026-10-31; **last re-observed 2026-11-11**. This is a dated observation, not current
+status: re-read the latest scheduled run before relying on it.
+
+`Juss & Co portfolio evidence sync` fails at its `Normalize key and mint portfolio GitHub App
+token` step, so evidence publication and the deployed Playwright proof are skipped and the
+uploaded `BLOCKED` receipt is not live proof. Scheduled runs 131 through 138 all failed, the
+latest at 2026-11-11T06:40Z on `777aa12b`.
+
+The reported shape facts are `begin=false`, `end=false`, `b64charset=true`,
+`escapedNewlines=false`, `multiline=false`.
+
+What that does and does not establish:
+
+- The minting classifier already accepts raw PEM, CRLF PEM, escaped-newline PEM, quoted PEM,
+  base64/base64url PEM, base64 DER (PKCS#1 and PKCS#8), and space-collapsed PEM. The failure is
+  therefore **not** evidence that support for those shapes is missing.
+- `b64charset=true` describes a character set only. It is not proof the stored value is a
+  complete key, or valid DER.
+- The founder reports prior replacements of `APP_PRIVATE_KEY`. A failing run does not prove a
+  replacement never happened. Stored secret values are deliberately unreadable, and neither this
+  repository nor the workflow log establishes the provider-held `updated_at` or which scope was
+  changed.
+- The specific reason remains **UNKNOWN** pending secret-safe provider-side validation. Do not
+  print the value, add a PAT or `GITHUB_TOKEN` fallback, weaken the App-only policy, or treat the
+  skipped downstream stages as passing.
+
+Next diagnostic, before requesting another replacement: compare `updated_at` metadata for the
+`production` environment secret against any repository-scoped secret of the same name, applying
+the precedence rule above. That distinguishes a replacement made after the failing job from a
+lower-scope replacement that never reached it.
+
+A corrected secret shape is only the first gate. An installation-token mint, the cross-repository
+evidence sync, and the deployed browser proof each still require their own successful receipt.
+
+#### Accepted `APP_PRIVATE_KEY` transport shapes
+
+Secret input fields damage PEM text in predictable ways, so the private key is
+normalized before use. `scripts/mint-portfolio-github-app-token.mjs` owns the
+minting classifier. `github-app-secret-shape-diagnostic.yml` intentionally embeds
+an isolated duplicate rather than importing repository code into its secret-bearing
+step. Both implementations must be kept in sync; marker-string contract tests do
+not prove behavioral equivalence, so disagreement remains possible.
+
+Accepted shapes, with the `transport_class` each reports:
+
+| Stored value | `transport_class` |
+|---|---|
+| PKCS#8 or PKCS#1 PEM as issued by GitHub | `raw-pem` |
+| PEM with CRLF line endings or surrounding whitespace | `raw-pem` |
+| PEM with literal `\n` escapes instead of newlines | `escaped-newline-pem` |
+| PEM wrapped in double quotes | `json-quoted-pem` |
+| PEM wrapped in single quotes | `single-quoted-pem` |
+| Base64 or base64url of the whole PEM | `base64-pem` |
+| Base64 of the DER bytes, or a PEM body with its header lines stripped | `base64-der` |
+| PEM whose newlines a single-line field collapsed to spaces | `collapsed-pem` |
+
+An empty, non-key, truncated, or non-RSA value still fails closed. A rejected
+value raises `APP_PRIVATE_KEY_SHAPE_INVALID:<transport_class>` followed by
+boolean shape facts only — whether `-----BEGIN`/`-----END` markers were
+seen, whether the character set looked base64, whether literal `\n` escapes
+were present, and whether the value was multiline. Length and line counts are not emitted. No substring, hash, or other derivation of
+the key material is ever emitted.
+
+A recognized transport proves local parsing only. It is not provider proof: the
+App must still be installed for the owner and the installation token must still
+be issued.
 
 ---
 
@@ -59,7 +197,7 @@ The GitHub App **Client ID is not used** by the current installation-token witne
 
 | Secret | Required by | Description |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker, MCP read proof, or read-only Builds inspection. |
+| `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker, MCP read proof, or read-only Builds inspection. Both workflows read it from the `production` environment, where a same-name environment secret overrides the repository secret; store it at the level that wins. Both verify it with Cloudflare (`scripts/verify-cloudflare-token.sh`) and fail closed before any Wrangler call. To see which value each scope resolves, run the read-only `Cloudflare Credential Resolution Diagnostic` workflow: it prints presence, length, a 12-hex SHA-256 fingerprint (compare with `printf %s "$TOKEN" \| sha256sum \| cut -c1-12`) and Cloudflare's verify verdicts for the repository scope and the production environment, never the token. Every Deploy/Reconcile run and diagnostic records the resolved value's `sha256_12` fingerprint; observations are appended to `docs/CLOUDFLARE_CREDENTIAL_FINGERPRINT_LEDGER.md`. |
 | `CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN` | `review-email-worker-reconcile.yml` | Dedicated mutation credential for `founder-control-room-review-email`. Keep separate from the canonical Worker deploy token. |
 | `FCR_CLOUDFLARE_BUILDS_USER_TOKEN` | `cloudflare-build-diagnostic.yml` | Dedicated user-scoped read credential for FCR Workers Builds/provider-authority diagnostics. Keep separate from deploy tokens. The current workflow maps this exact GitHub secret to `CF_API_TOKEN`. |
 | `FCR_CLOUDFLARE_MCP_READ_TOKEN` | `cloudflare-mcp-read-diagnostic.yml` | Dedicated least-privilege API token for the official Cloudflare API MCP bearer-auth proof. The standing probe performs only a fixed `GET /accounts/{account_id}` request. Do not grant Edit/Write permissions and do not reuse the deploy token. |
@@ -94,7 +232,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
-| `TINYFISH_API_KEY` | secret | Required provider-held credential for live `tinyfish-web-observation-v1` Search/Fetch. Canonical production deploy verifies only binding-name presence before mutation; the value remains in Cloudflare and never becomes a GitHub Actions secret or proof receipt. |
+| `FCR_SHOPIFY_WEBHOOK_SECRET` | secret | Required Shopify `orders/paid` HMAC signing secret for the FCR first-party commerce ingress. Provider-held; never log or copy its value into proof. |
+| `FCR_COMMERCE_HASH_SALT` | secret | Required independent server-only salt for privacy-safe FCR Shopify order-reference HMACs. This marker creates no Shopify authority. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -108,7 +247,6 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 
 The Founder Content n8n source lane is Buffer-only and schedule-only. `N8N_FOUNDER_CONTENT_ENABLED=true` is source intent, not runtime proof. A production claim requires exact-main deployment, provider-held secret-name readback, exact `fcrFounderContentV1` workflow fingerprint and n8n `2.32.6` identity, plus provider-native Buffer readback. n8n acceptance never establishes final publication truth.
 
-The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration. TinyFish remains route-level fail-closed if its provider-held key is later removed.
 
 Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as unpadded base64url, for example:
 
@@ -222,7 +360,8 @@ The client-ID names above are shared recovery/runtime-witness selectors; the cli
 [ ] GITHUB_APP_ID + GITHUB_PRIVATE_KEY
 [ ] FOUNDER_ALLOWED_ORIGINS=https://foundercontrolroom.org
 [ ] FOUNDER_API_URL=https://foundercontrolroom.org
-[ ] TINYFISH_API_KEY (provider-held; required before live TinyFish activation)
+[ ] FCR_SHOPIFY_WEBHOOK_SECRET (provider-held Shopify HMAC secret)
+[ ] FCR_COMMERCE_HASH_SALT (independent server-only order-reference HMAC salt)
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
@@ -246,10 +385,17 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
 | `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
+| `SPRITES_TOKEN` | `bip-sprite-founder-dispatch.yml` | Required only for an explicitly founder-approved `execute=true` read-only proof mission on the fixed existing Se’kret Bip Sprite. Not needed for dry-run contract validation. Keep the bearer server-side; never log or expose it. This credential grants no FCR merge, deployment, or user-data access authority. |
 | `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Provider credential used only by the bounded Claude second-pass repair job in the protected `production` environment. Its presence authorizes no merge, deployment, provider mutation, or publication, and its value must never appear in logs, artifacts, source, or chat. |
 | `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `FCR_PLAYWRIGHT_FOUNDER_BEARER` | `prompt-workflow-router-runtime-proof.yml` | Founder bearer credential used only for authorized deployed-runtime Playwright proof of the prompt workflow router. Keep it workflow-side, never log or expose the value in browser/static assets or receipts. |
+| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` | Dedicated short-lived Supabase OAuth access token for the canonical `POST /mcp` operator-relay witness. It must carry the configured MCP audience, an allowed `client_id`, `mcp:read`, at least one allowed `mcp_projects` grant, and a current founder identity. Do not reuse the founder browser bearer, static `/mcp/read` token, provider API key, deploy token, or service-role credential. Never log or expose the token value in artifacts. |
 | `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
 | `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
+| `FCR_JIRA_AUTOMATION_INGRESS_TOKEN` | `jira-work-automation-live-probe.yml` | Required bearer credential for the bounded FCR Jira automation ingress. Never log or expose the value. |
+| `FCR_JIRA_AUTOMATION_INGRESS_URL` | `jira-work-automation-live-probe.yml` | Required HTTPS URL for the exact `/ingest/jira-work-automation` production route; name presence does not prove reachability. |
+| `JIRA_AUTOMATION_PROBE_ISSUE_KEY` | `jira-work-automation-live-probe.yml` | Protected identifier for the dedicated Jira control issue. It constrains the probe target and is not authority to select arbitrary issues. |
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
@@ -259,3 +405,10 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client secret for the trusted runtime witness. Never log, echo, or copy the value into source or receipts. |
 | `CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-access-recovery.yml`, `chief-proofmode-runtime-witness.yml` | Backward-compatible protected client-ID alias used only if the Chief-specific client-ID name is absent. It is not Access provider-administration authority. |
 | `CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-secret name is absent. Never expose the value; alias presence alone is not runtime proof. |
+| `ANTHROPIC_API_KEY` | `ai-failure-repair.yml` | Required for the workflow's serialized Claude repair pass (`anthropics/claude-code-action`), which runs after Codex's candidate patch and is scoped by the workflow's own STRICT AUTHORITY block to source/product code only — it cannot touch `.github/`, docs, tests, migrations, env files, dependency manifests, provider/deploy authority, secrets, billing, DNS, or auth credentials. |
+
+### `MODEL_API_KEY`
+
+- Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
+- Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
+- Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.

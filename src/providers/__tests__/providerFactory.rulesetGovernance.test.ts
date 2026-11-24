@@ -28,7 +28,7 @@ const canonicalConfig: RulesetConfig = {
 };
 
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts the current founder-only FCR main constitutional floor", () => {
+  it("accepts founder-selected native Auto-merge without an extra approving reviewer", () => {
     expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(0);
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
   });

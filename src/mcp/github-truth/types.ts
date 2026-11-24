@@ -62,6 +62,8 @@ export type AuditFinding =
   | 'pr_identity_changed_during_collection'
   | 'pr_head_changed_during_collection'
   | 'pr_head_sha_malformed'
+  | 'expected_head_sha_malformed'
+  | 'expected_head_sha_mismatch'
   | 'pr_observation_stale'
   | 'pr_observation_time_unknown'
   | 'required_check_visibility_incomplete'
@@ -72,6 +74,7 @@ export type AuditFinding =
   | 'required_check_discovery_response_malformed'
   | 'required_check_discovery_stale'
   | 'required_check_discovery_time_unknown'
+  | 'required_check_policy_changed_during_collection'
   | 'required_check_missing'
   | 'required_check_failed'
   | 'required_check_cancelled'
@@ -83,6 +86,8 @@ export type AuditFinding =
   | 'ci_head_sha_malformed'
   | 'ci_observation_stale'
   | 'ci_observation_time_unknown'
+  | 'ci_evidence_changed_during_collection'
+  | 'review_evidence_changed_during_collection'
   | 'duplicate_current_head_check_conflict'
   | 'collection_truncated'
   | 'provider_timeout'
@@ -100,6 +105,8 @@ export type PullRequestObservation = {
 };
 
 export type EvaluatePrAuditEvidenceInput = {
+  /** Optional caller-bound candidate identity captured before provider observation. */
+  expectedHeadSha?: string;
   initialPr: PullRequestObservation;
   finalPr: PullRequestObservation;
   requiredChecks: RequiredCheckDiscovery;

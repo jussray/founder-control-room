@@ -1,3 +1,10 @@
+import {
+  runStructuredJson,
+  StructuredProviderError,
+  type StructuredJsonResult,
+  type StructuredProviderConfig,
+  type StructuredProviderName,
+} from '../aiRuntime/structuredProvider.js';
 import type { ChiefQuickScanRecommendation } from './contracts.js';
 import {
   QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
@@ -17,7 +24,7 @@ import {
 } from '../capabilities/freeFirstCapabilityPolicy.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
-const DEFAULT_MODEL = 'gpt-5-mini';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TIMEOUT_MS = 25_000;
 const MAX_RESPONSE_BYTES = 128 * 1024;
 
@@ -25,7 +32,7 @@ interface JsonRecord {
   [key: string]: unknown;
 }
 
-export type QuickScanChiefProvider = 'local-ollama' | 'openai';
+export type QuickScanChiefProvider = 'deterministic-kernel' | 'local-ollama' | 'openai' | 'anthropic';
 
 export interface QuickScanChiefProvenance {
   provider: QuickScanChiefProvider;
@@ -84,6 +91,16 @@ const NEXT_ACTIONS = new Set([
 
 const MESSAGE_REQUIRED_ACTIONS = new Set(['approve_outreach', 'send_payment_link', 'prepare_delivery']);
 
+const PROVIDER_AVAILABILITY_FAILURES = new Set([
+  'LOCAL_CHIEF_NOT_CONFIGURED',
+  'LOCAL_CHIEF_TIMEOUT',
+  'LOCAL_CHIEF_REQUEST_FAILED',
+  'OPENAI_NOT_CONFIGURED',
+  'OPENAI_TIMEOUT',
+  'OPENAI_REQUEST_FAILED',
+  'CHIEF_PROVIDER_INELIGIBLE',
+]);
+
 function nextAction(value: unknown): ChiefQuickScanRecommendation['nextAction'] {
   const action = stringValue(value, 'next_action', 40);
   if (!NEXT_ACTIONS.has(action)) {
@@ -117,6 +134,43 @@ function modelOutput(value: unknown): ChiefQuickScanRecommendation {
     messageDraft,
     promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
   };
+}
+
+function deterministicKernelResult(
+  decisionTrace: CapabilityDecisionTrace[],
+  fallbackReason: string,
+): QuickScanChiefResult {
+  return {
+    recommendation: {
+      summary: 'Model reasoning is unavailable, so Chief is running in deterministic fallback mode. Founder Control Room remains operational; capture or review evidence before any send-worthy action.',
+      nextAction: 'capture_more_evidence',
+      promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
+    },
+    provenance: {
+      provider: 'deterministic-kernel',
+      model: 'quickscan-rules-v1',
+      responseId: null,
+      promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+      decisionTrace,
+      fallbackReason,
+    },
+  };
+}
+
+function providerFailureCode(error: unknown): string {
+  return error instanceof QuickScanChiefProviderError ? error.code : 'UNKNOWN_PROVIDER_FAILURE';
+}
+
+function isRecoverableHttpStatus(status: number | null): boolean {
+  return status === 408 || status === 425 || status === 429 || (status !== null && status >= 500);
+}
+
+function isProviderAvailabilityFailure(error: unknown): boolean {
+  if (!(error instanceof QuickScanChiefProviderError)) return false;
+  if (error.code === 'LOCAL_CHIEF_HTTP_ERROR' || error.code === 'OPENAI_HTTP_ERROR') {
+    return isRecoverableHttpStatus(error.status);
+  }
+  return PROVIDER_AVAILABILITY_FAILURES.has(error.code);
 }
 
 function responseText(payload: JsonRecord): string | null {
@@ -392,24 +446,141 @@ async function runLocalOllama(
   };
 }
 
+function providerName(value: string | undefined, fallback: StructuredProviderName): StructuredProviderName {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'openai' || normalized === 'anthropic') return normalized;
+  throw new QuickScanChiefProviderError(`Unsupported QuickScan Chief provider: ${normalized}`, 'MODEL_PROVIDER_INVALID');
+}
+
+function providerConfig(
+  env: NodeJS.ProcessEnv,
+  provider: StructuredProviderName,
+  required: boolean,
+): StructuredProviderConfig | null {
+  if (provider === 'openai') {
+    const apiKey = env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      if (required) {
+        throw new QuickScanChiefProviderError('OPENAI_API_KEY is not configured for QuickScan Chief', 'OPENAI_NOT_CONFIGURED');
+      }
+      return null;
+    }
+    return {
+      provider,
+      apiKey,
+      model: env.QUICKSCAN_CHIEF_MODEL?.trim() || DEFAULT_MODEL,
+      baseUrl: env.OPENAI_API_BASE_URL?.trim(),
+    };
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  const model = env.QUICKSCAN_CHIEF_ANTHROPIC_MODEL?.trim();
+  if (!apiKey || !model) {
+    if (required) {
+      throw new QuickScanChiefProviderError(
+        'ANTHROPIC_API_KEY and QUICKSCAN_CHIEF_ANTHROPIC_MODEL are required for Anthropic QuickScan Chief',
+        'ANTHROPIC_NOT_CONFIGURED',
+      );
+    }
+    return null;
+  }
+  return {
+    provider,
+    apiKey,
+    model,
+    baseUrl: env.ANTHROPIC_API_BASE_URL?.trim(),
+  };
+}
+
+function providerChain(env: NodeJS.ProcessEnv): StructuredProviderConfig[] {
+  const primaryName = providerName(env.QUICKSCAN_CHIEF_PROVIDER, 'openai');
+  const primary = providerConfig(env, primaryName, true);
+  if (!primary) return [];
+
+  const fallbackRaw = env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim();
+  if (!fallbackRaw) return [primary];
+  const fallbackName = providerName(fallbackRaw, primaryName);
+  if (fallbackName === primaryName) return [primary];
+  const fallback = providerConfig(env, fallbackName, false);
+  return fallback ? [primary, fallback] : [primary];
+}
+
+export type QuickScanChiefDataRecipient = 'local-ollama' | 'openai' | 'anthropic';
+
+/** All configured data recipients, including possible retry/failover destinations. */
+export function quickScanChiefDataRecipients(env: NodeJS.ProcessEnv = process.env): QuickScanChiefDataRecipient[] {
+  const explicit = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase();
+  if (explicit === 'anthropic') {
+    const recipients: QuickScanChiefDataRecipient[] = ['anthropic'];
+    if (env.QUICKSCAN_CHIEF_FALLBACK_PROVIDER?.trim().toLowerCase() === 'openai'
+      && env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+    return recipients;
+  }
+  if (explicit && explicit !== 'openai') return [];
+  const recipients: QuickScanChiefDataRecipient[] = [];
+  if (selectFreeFirstCapability([localCandidate(env)], qualityRequirements(env))) recipients.push('local-ollama');
+  if (env.OPENAI_API_KEY?.trim()) recipients.push('openai');
+  return recipients;
+}
+
 export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanChiefDependencies = {}) {
   const env = dependencies.env ?? process.env;
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async function runQuickScanChief(input: QuickScanChiefPromptInput): Promise<QuickScanChiefResult> {
+    // An explicit provider selector is required to opt out of free-first routing.
+    const explicitProvider = env.QUICKSCAN_CHIEF_PROVIDER?.trim().toLowerCase();
+    if (explicitProvider && explicitProvider !== 'openai' && explicitProvider !== 'anthropic') {
+      throw new QuickScanChiefProviderError('Unsupported QuickScan Chief provider selector', 'MODEL_PROVIDER_INVALID');
+    }
+    if (explicitProvider === 'anthropic') {
+      let structured: StructuredJsonResult;
+      try {
+        structured = await runStructuredJson(
+          providerChain(env),
+          {
+            schemaName: 'quickscan_chief_output',
+            schema: QUICKSCAN_CHIEF_OUTPUT_SCHEMA,
+            systemPrompt: QUICKSCAN_CHIEF_SYSTEM_PROMPT,
+            userPrompt: quickScanChiefUserPrompt(input),
+            maxOutputTokens: 800,
+          },
+          {
+            fetchFn,
+            timeoutMs: timeoutMs(env),
+            maxResponseBytes: MAX_RESPONSE_BYTES,
+          },
+        );
+      } catch (error) {
+        if (error instanceof QuickScanChiefProviderError) throw error;
+        if (error instanceof StructuredProviderError) {
+          throw new QuickScanChiefProviderError(error.message, error.code, error.status);
+        }
+        throw error;
+      }
+      return {
+        recommendation: modelOutput(structured.output),
+        provenance: {
+          provider: structured.provider,
+          model: structured.model,
+          responseId: structured.responseId,
+          promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+          fallbackReason: structured.provider !== 'anthropic' ? 'EXPLICIT_PROVIDER_FAILOVER' : null,
+        },
+      };
+    }
+
     const requirements = qualityRequirements(env);
     let candidates = providerCandidates(env);
     let decisionTrace = traceCapabilityDecision(candidates, requirements);
     let selection = selectFreeFirstCapability(candidates, requirements);
 
     if (!selection) {
-      if (!env.OPENAI_API_KEY?.trim() && !localBaseUrl(env)) {
-        throw new QuickScanChiefProviderError('No QuickScan Chief provider is configured', 'OPENAI_NOT_CONFIGURED');
-      }
-      throw new QuickScanChiefProviderError(
-        `No eligible QuickScan Chief provider. ${decisionTrace.map((entry) => `${entry.providerId}:${entry.reasons.join(',') || 'eligible'}`).join('; ')}`,
-        'CHIEF_PROVIDER_INELIGIBLE',
-      );
+      const fallbackReason = !env.OPENAI_API_KEY?.trim() && !localBaseUrl(env)
+        ? 'NO_MODEL_PROVIDER_CONFIGURED'
+        : 'NO_ELIGIBLE_MODEL_PROVIDER';
+      return deterministicKernelResult(decisionTrace, fallbackReason);
     }
 
     let fallbackReason: string | null = null;
@@ -430,28 +601,44 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
           },
         };
       } catch (error) {
-        fallbackReason = error instanceof QuickScanChiefProviderError ? error.code : 'LOCAL_CHIEF_FAILED';
+        fallbackReason = providerFailureCode(error);
         candidates = candidates.map((candidate) => candidate.id === 'local-ollama'
           ? { ...candidate, transportReady: false, transportEvidence: `runtime-failure:${fallbackReason}` }
           : candidate);
         decisionTrace = traceCapabilityDecision(candidates, requirements);
         selection = selectFreeFirstCapability(candidates, requirements);
-        if (!selection) throw error;
+        if (!selection) {
+          if (isProviderAvailabilityFailure(error)) {
+            return deterministicKernelResult(decisionTrace, fallbackReason);
+          }
+          throw error;
+        }
       }
     }
 
-    const paid = await runOpenAi(input, env, fetchFn);
-    return {
-      recommendation: paid.recommendation,
-      provenance: {
-        provider: paid.provider,
-        model: paid.model,
-        responseId: paid.responseId,
-        promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
-        selection,
-        decisionTrace,
-        fallbackReason,
-      },
-    };
+    try {
+      const paid = await runOpenAi(input, env, fetchFn);
+      return {
+        recommendation: paid.recommendation,
+        provenance: {
+          provider: paid.provider,
+          model: paid.model,
+          responseId: paid.responseId,
+          promptVersion: QUICKSCAN_CHIEF_PROMPT_VERSION,
+          selection,
+          decisionTrace,
+          fallbackReason,
+        },
+      };
+    } catch (error) {
+      if (!isProviderAvailabilityFailure(error)) throw error;
+
+      fallbackReason = providerFailureCode(error);
+      candidates = candidates.map((candidate) => candidate.id === 'openai'
+        ? { ...candidate, transportReady: false, transportEvidence: `runtime-failure:${fallbackReason}` }
+        : candidate);
+      decisionTrace = traceCapabilityDecision(candidates, requirements);
+      return deterministicKernelResult(decisionTrace, fallbackReason);
+    }
   };
 }

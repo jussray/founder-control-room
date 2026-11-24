@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "mom8-public-challenge-v1",
+  "status": "approved_nonfinancial_public_demo",
+  "identity": {
+    "name": "MOM OF 8",
+    "shortName": "MOM8",
+    "publicLabel": "MOM8 Founder Challenge"
+  },
+  "challenge": {
+    "days": 8,
+    "receiptRule": "one proof, one receipt",
+    "steps": [
+      "build",
+      "fix",
+      "prove",
+      "ask",
+      "learn",
+      "earn",
+      "teach",
+      "compound"
+    ]
+  },
+  "authorityBoundary": {
+    "mode": "public_nonfinancial_only",
+    "allowed": [
+      "render_public_demo",
+      "draft_founder_content",
+      "record_nonsecret_proof_receipts",
+      "link_verified_build_evidence"
+    ],
+    "prohibited": [
+      "connect_wallet",
+      "request_seed_phrase_or_private_key",
+      "create_or_buy_token",
+      "sell_or_trade_token",
+      "move_funds",
+      "promise_price_returns_ownership_or_revenue_share",
+      "publish_minor_names_faces_or_private_details"
+    ]
+  },
+  "continuity": {
+    "fingerprintSubject": "mom8-public-challenge",
+    "proofCookie": "mom8:public-demo:v1",
+    "markersAreAuthority": false,
+    "invalidateOn": [
+      "identity_change",
+      "authority_change",
+      "challenge_contract_change",
+      "proof_evidence_change"
+    ]
+  },
+  "publication": {
+    "repositoryPath": "public/mom8/index.html",
+    "intendedPublicPath": "/mom8/",
+    "deploymentAuthorityGrantedByThisContract": false,
+    "socialPublishingAuthorityGrantedByThisContract": false
+  }
+}
