@@ -92,6 +92,12 @@ jobs:
           NODE_ENV: test
       - name: Verify site identity, wiring and customer tenancy defaults
         run: node --experimental-strip-types --test tests/command-center-site-access.test.mjs tests/command-center-site-wiring.test.mjs tests/fcr-public-tenancy-migration.test.mjs tests/command-center-neon-preview-contract.test.mjs
+      - name: Verify guarded terminal and AI skill contracts (required)
+        run: |
+          npm run verify:terminal-contract
+          npm run verify:juss-flow
+          npm run verify:production-authority
+          npm run verify:ai-skills
 
   e2e:
     name: Playwright e2e
@@ -286,6 +292,8 @@ jobs:
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+          node --test scripts/verify-worker-var-secret-collisions.node-test.mjs
+          node scripts/verify-worker-var-secret-collisions.mjs --config wrangler.worker.toml
 
   test-discovery:
     name: Test discovery ratchet

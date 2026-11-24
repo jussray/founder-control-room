@@ -12,7 +12,15 @@ owner: Juss
 
 # Juss Flow Launch Loop
 
+## FAST versus guarded simulator write gate
+
+FAST may stage exact text edits and SHA-256 receipts in memory without provider access. A `repository-source` patch must be handed to the existing authenticated FCR mission route, which rereads exact live GitHub branch, mission policy pin and original content before an idempotent branch commit. The exported request must not execute itself or carry credentials. A local focused test is not GitHub Actions, independent review or Playwright proof. Keep full guarded checks on a stable exact head, with separate founder-final merge and release gates.
+
 When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
+
+## Queue economy and required proof
+
+For `main` pull requests, `.github/workflows/ci.yml` must own the load-bearing verification, including terminal and AI-skill contracts through the required `Test` job. `.github/workflows/quality-gate.yml` remains the extended `staging` proof lane rather than running duplicate main checks. The Search Console/evidence gate must check the exact PR head and avoid a second feature-branch push execution. Do not save runner minutes by dropping CodeQL, required test-ledger/CI gates, browser proof, independently reviewed candidate approval, or production provider readback. This source change is a candidate only until the successor exact head is verified.
 
 ## Goal
 
@@ -424,6 +432,12 @@ For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm 
 
 For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.
 
-## Neon exact-head preview gate — FCR pull requests
 
-For any FCR `supabase/` change, inspect `.github/workflows/neon-pr-branches.yml` on the exact PR head. Its live-base scope check must precede provider mutation. New PR-scoped Neon previews use the account-default suspend settings to avoid unsupported overrides, then the pinned Neon Action must resolve the branch ID/private DB connection and execute append-only migrations plus preview contracts. Existing branches are accepted only with the expected name and default parent; provider errors, absent preview identities, missing private URLs or failed SQL checks stop the gate. Never mark a PR green by skipping the Neon job, borrowing a sibling PR's preview, changing a production database or interpreting a successful preview as deployed tenant isolation. Keep rollback isolated to the PR branch; merge still requires exact-head checks and founder-final approval.
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+
+### Public entrance and private site separation (#1002)
+
+Protect public landing, signup and intentionally open routes without gifting private founder access. The Command Center Site bridge is an independently authenticated, read-only resource API. It does not accept owner cookies or authorize provider actions. Exact origin and tenant scope must be verified before any response. Live Cloudflare Access changes require founder approval, identity-aware policies and provider readback; source code alone does not prove live public availability.
