@@ -317,6 +317,23 @@ async function writeReceipt(path, receipt) {
   await writeFile(path, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
 }
 
+// Public CI artifacts are not a protected evidence vault. Publish counts only.
+export function publicObservationReceipt({ targetRepository, branch, targetHead, result, observed, repositoryCount }) {
+  return {
+    contract: CONTRACT,
+    state: 'OBSERVED_UNPUBLISHED',
+    targetRepository, branch, previousTargetHead: targetHead, targetCommit: targetHead,
+    publicationAuthorized: false, published: false, liveVerified: false,
+    worldsGeneratedAt: result.worlds.generatedAt,
+    systemsGeneratedAt: result.systems.generatedAt,
+    observedRepositoryCount: repositoryCount,
+    unavailableRepositoryCount: observed.filter(([, value]) => value.status === 'unavailable').length,
+    changedWorldCount: result.changedWorlds.length,
+    changedSystemCount: result.changedSystems.length,
+    mutationBoundary: 'aggregate observation only; detailed evidence requires a protected store and explicit publication approval',
+  };
+}
+
 async function runSync() {
   const token = requiredEnv('PORTFOLIO_SYNC_TOKEN');
   const targetRepository = process.env.TARGET_REPOSITORY?.trim() || DEFAULT_TARGET;
@@ -338,44 +355,26 @@ async function runSync() {
   const observations = new Map(observed);
   const now = new Date();
   const result = applyEvidence({ worldsRegistry: target.worlds, systemsRegistry: target.systems, observations, now });
-  const changed = result.changedWorlds.length + result.changedSystems.length > 0;
-  const proposals = changed ? {
-    worlds: 'artifacts/portfolio-evidence-sync/proposed/worlds.json',
-    systems: 'artifacts/portfolio-evidence-sync/proposed/systems.json',
-  } : {};
-  // No GitHub mutation authority: save reviewable local artifacts. A separate
-  // authenticated, exact-head founder release gate must authorize publication.
-  if (changed) {
-    await Promise.all([
-      writeReceipt(proposals.worlds, result.worlds),
-      writeReceipt(proposals.systems, result.systems),
-    ]);
-  }
-  const unavailableRepositories = observed.filter(([, value]) => value.status === 'unavailable').map(([repository, value]) => ({ repository, reason: value.reason }));
-  const receipt = {
-    contract: CONTRACT,
-    state: changed ? 'PROPOSED_UNPUBLISHED' : 'NO_CHANGE',
-    targetRepository,
-    branch,
-    previousTargetHead: target.headSha,
-    targetCommit: target.headSha,
-    publicationAuthorized: false,
-    published: false,
-    liveVerified: false,
-    proposals,
-    worldsGeneratedAt: result.worlds.generatedAt,
-    systemsGeneratedAt: result.systems.generatedAt,
-    observedRepositoryCount: repoList.length,
-    unavailableRepositories,
-    changedWorlds: result.changedWorlds,
-    changedSystems: result.changedSystems,
-    mutationBoundary: 'local reviewable evidence proposal; no GitHub mutation',
-  };
+  const receipt = publicObservationReceipt({ targetRepository, branch, targetHead: target.headSha,
+    result, observed, repositoryCount: repoList.length });
   await writeReceipt(receiptPath, receipt);
   console.log(JSON.stringify(receipt));
 }
 
 async function runSelfTest() {
+  const receipt = publicObservationReceipt({
+    targetRepository: DEFAULT_TARGET, branch: DEFAULT_BRANCH, targetHead: 'a'.repeat(40),
+    result: { worlds: { generatedAt: '2026-10-01T00:00:00Z' }, systems: { generatedAt: '2026-10-01T00:00:00Z' }, changedWorlds: ['private-example'], changedSystems: ['internal-example'] },
+    observed: [['private-example', { status: 'unavailable', reason: 'internal-example' }]],
+    repositoryCount: 1,
+  });
+  assert.equal(receipt.state, 'OBSERVED_UNPUBLISHED');
+  assert.equal(receipt.published, false);
+  assert.equal(receipt.liveVerified, false);
+  assert.equal(receipt.unavailableRepositoryCount, 1);
+  assert.equal(receipt.changedWorldCount, 1);
+  assert.doesNotMatch(JSON.stringify(receipt), /private-example|internal-example|proposals/);
+
   const now = new Date('2026-10-01T12:00:00.000Z');
   const baseWorlds = {
     generatedAt: '2026-09-30T00:00:00.000Z',
