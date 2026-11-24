@@ -23,10 +23,10 @@ const env = {
     async fetch(request) {
       const pathname = new URL(request.url).pathname;
       assetPaths.push(pathname);
-      // The canonical root stays in the browser address bar while the Pages
-      // edge serves the private welcome asset. Keep this proof aligned with
-      // that non-public entrypoint rather than restoring a public root.
-      if (pathname === '/welcome') {
+      // After a successful founder session the callback enters the private
+      // Control Room. The canonical root is now public and must not act as
+      // the post-login destination.
+      if (pathname === '/control-room/') {
         return new Response('<!doctype html><html><body><h1>Founder Control Room</h1><p id="proof-complete">Magic-link handoff complete.</p></body></html>', {
           status: 200,
           headers: { 'content-type': 'text/html; charset=utf-8' },
@@ -120,7 +120,7 @@ try {
   await page.goto(`${baseUrl}/auth/callback#access_token=proof-access-token&refresh_token=proof-refresh-token`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.waitForURL(`${baseUrl}/`, { timeout: 10_000 });
+  await page.waitForURL(`${baseUrl}/control-room/`, { timeout: 10_000 });
   await page.waitForSelector('#proof-complete', { timeout: 10_000 });
 
   const requiredApiPaths = [
@@ -140,8 +140,11 @@ try {
     }
   }
 
-  if (!assetPaths.includes('/welcome')) {
-    throw new Error('MAGIC_LINK_EDGE_PROOF_MISSING_PRIVATE_WELCOME');
+  if (!assetPaths.includes('/control-room/')) {
+    throw new Error('MAGIC_LINK_EDGE_PROOF_MISSING_PROTECTED_DESTINATION');
+  }
+  if (assetPaths.includes('/')) {
+    throw new Error('MAGIC_LINK_EDGE_PROOF_PUBLIC_ROOT_REDIRECT');
   }
 
   if (sessionBodies.length !== 1) {
