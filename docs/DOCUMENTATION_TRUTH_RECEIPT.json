@@ -1012,6 +1012,30 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split.mjs",
+      "claims": [
+        "`scripts/fcr-access-public-worker-split.mjs` must separate public website and protected owner routes without creating Include Everyone bypass rules; all Cloudflare provider writes require a fresh exact-target founder authorization, a guarded preflight and independently observed rollback state."
+      ]
+    },
+    {
+      "path": "scripts/fcr-access-public-worker-split-cli.mjs",
+      "claims": [
+        "`scripts/fcr-access-public-worker-split-cli.mjs` must distinguish read-only plan from explicit authorized apply, bind account/zone/worker identity, reject stale receipts and never auto-execute destructive updates."
+      ]
+    },
+    {
+      "path": "scripts/run-fcr-access-public-worker-split.mjs",
+      "claims": [
+        "`scripts/run-fcr-access-public-worker-split.mjs` must require explicit approved action and exact Cloudflare resource identity for any apply or rollback; merely generating a JSON receipt cannot prove provider runtime outcome."
+      ]
+    },
+    {
+      "path": "scripts/verify-fcr-front-door-playwright.mjs",
+      "claims": [
+        "`scripts/verify-fcr-front-door-playwright.mjs` must verify both public entrances and owner-only protection with exact checked routes, and may not treat a login redirect as proof that the public site is available."
+      ]
     }
   ]
 }

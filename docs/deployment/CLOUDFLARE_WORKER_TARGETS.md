@@ -331,3 +331,8 @@ The diagnostic workflow may inspect the production deployment credential only af
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Public Worker target split (#966)
+
+The official public domain and the private owner Control Room must have distinct route guards, approved hostnames, and Access policy identity readbacks. CLI source and tests may describe a split without authorizing it or proving production provider state. Preserve current canonical Worker route identities until a reviewed exact-target provider mutation is authorized.
