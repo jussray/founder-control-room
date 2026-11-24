@@ -35,7 +35,7 @@ function founderUsersRow() {
     select: () => ({
       eq: () => ({
         maybeSingle: () => Promise.resolve({
-          data: { email: FOUNDER_EMAIL },
+          data: { email: FOUNDER_EMAIL, user_id: 'founder-user', account_role: 'platform_owner' },
           error: null,
         }),
       }),
@@ -101,7 +101,7 @@ const controlRoom = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   mockChiefRecommendation.mockResolvedValue(chiefRecommendation());

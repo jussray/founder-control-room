@@ -48,8 +48,9 @@ function founderUsersRow() {
         maybeSingle: () => Promise.resolve({
           data: {
             email: FOUNDER_EMAIL,
+            user_id: 'workspace-founder',
             account_role: 'workspace_owner',
-            workspace_id: 'workspace-1',
+            workspace_id: '11111111-1111-4111-8111-111111111111',
           },
           error: null,
         }),
@@ -112,7 +113,7 @@ function chiefRecommendation(recommendationHash = CHIEF_HASH) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'workspace-founder', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'workspace-founder', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   mockChiefRecommendation.mockResolvedValue(chiefRecommendation());
@@ -171,7 +172,7 @@ describe('workspace Chief onboarding', () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {
         id: 'project-1',
-        workspace_id: 'workspace-1',
+        workspace_id: '11111111-1111-4111-8111-111111111111',
         slug: 'launch-project',
         name: 'Launch Project',
         repo_provider: 'github',
@@ -209,14 +210,14 @@ describe('workspace Chief onboarding', () => {
     const [rpcName, rpcArgs] = supabaseMock.rpc.mock.calls[0];
     expect(rpcName).toBe('create_workspace_project_with_onboarding_event');
     expect(rpcArgs).toMatchObject({
-      p_workspace_id: 'workspace-1',
+      p_workspace_id: '11111111-1111-4111-8111-111111111111',
       p_slug: 'launch-project',
       p_name: 'Launch Project',
       p_repo_provider: 'github',
       p_repo_identifier: 'jussray/launch-project',
       p_stack: 'Cloudflare + Supabase',
       p_event_metadata: {
-        workspaceId: 'workspace-1',
+        workspaceId: '11111111-1111-4111-8111-111111111111',
         chiefRecommendationApproved: true,
         authorityGranted: false,
         credentialsStored: false,

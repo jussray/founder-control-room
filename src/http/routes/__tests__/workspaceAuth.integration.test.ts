@@ -68,7 +68,7 @@ const session = {
   expires_at: 2_000_000_000,
   expires_in: 3600,
   token_type: 'bearer',
-  user: { id: USER_ID, email: EMAIL },
+  user: { id: USER_ID, email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' },
 };
 
 function app() {

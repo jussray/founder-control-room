@@ -47,7 +47,10 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
     ? record.email.trim().toLowerCase()
     : '';
   const userId = typeof record.id === 'string' ? record.id.trim() : '';
-  return email && userId ? { email, userId } : null;
+  const confirmed = typeof record.email_confirmed_at === 'string'
+    && record.email_confirmed_at.length > 0;
+  // A typed email, even with a valid user ID, never grants founder authority.
+  return email && userId && confirmed ? { email, userId } : null;
 }
 
 async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAccessState> {
@@ -59,6 +62,7 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
     .select('*')
+    .eq('email', identity.email)
     .eq('user_id', identity.userId)
     .maybeSingle();
 
@@ -81,7 +85,7 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   if (!rowEmail || rowEmail !== identity.email) {
     return { state: 'denied' };
   }
-  if (boundUserId && boundUserId !== identity.userId) {
+  if (boundUserId !== identity.userId) {
     return { state: 'denied' };
   }
 
@@ -103,6 +107,10 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
   const workspaceId = typeof record.workspace_id === 'string' && record.workspace_id.trim()
     ? record.workspace_id.trim()
     : null;
+  const workspaceUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (rawRole === 'workspace_owner' && (!workspaceId || !workspaceUuid.test(workspaceId))) {
+    return { state: 'denied' };
+  }
 
   return {
     state: 'allowed',

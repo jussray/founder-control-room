@@ -68,7 +68,9 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
 async function provisionWorkspaceFounder(user: Session['user'] | null | undefined): Promise<WorkspaceProvisioningResult> {
   const userId = typeof user?.id === 'string' ? user.id.trim() : '';
   const email = normalizeEmail(user?.email);
-  if (!userId || !email) return { state: 'error' };
+  const verifiedEmail = typeof user?.email_confirmed_at === 'string'
+    && user.email_confirmed_at.length > 0;
+  if (!userId || !email || !verifiedEmail) return { state: 'forbidden' };
 
   const { data, error } = await supabase.rpc('provision_workspace_founder', {
     p_user_id: userId,

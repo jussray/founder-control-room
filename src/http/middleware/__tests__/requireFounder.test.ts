@@ -125,6 +125,7 @@ async function founderCookie(
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   });
   const values = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
@@ -145,6 +146,7 @@ function refreshedSession(): Session {
       aud: 'authenticated',
       created_at: '2026-07-23T00:00:00.000Z',
       email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
     },
   };
 }
@@ -172,7 +174,8 @@ beforeEach(() => {
   mocks.select.mockReturnValue(allowlistChain);
   mocks.eq.mockReturnValue(allowlistChain);
   mocks.maybeSingle.mockResolvedValue({
-    data: { email: 'founder@example.com', user_id: 'founder-user-1' },
+    data: { email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z', user_id: 'founder-user-1' },
     error: null,
   });
 
@@ -181,6 +184,7 @@ beforeEach(() => {
       user: {
         id: 'founder-user-1',
         email: '  FOUNDER@EXAMPLE.COM ',
+        email_confirmed_at: '2026-11-15T00:00:00Z',
       },
     },
     error: null,
@@ -223,10 +227,12 @@ describe('requireFounder', () => {
     expect(response.body).toEqual({
       founder: {
         email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z',
         userId: 'founder-user-1',
       },
     });
     expect(mocks.getUser).toHaveBeenCalledWith('founder-access-token');
+    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
     expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(mocks.createAuthClient).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
@@ -243,12 +249,14 @@ describe('requireFounder', () => {
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ error: 'Not on the founder allowlist' });
+    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
     expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
   });
 
   it('fails closed when a legacy allowlist row is bound to a different immutable user id', async () => {
     mocks.maybeSingle.mockResolvedValue({
-      data: { email: 'founder@example.com', user_id: 'different-founder-user' },
+      data: { email: 'founder@example.com',
+      email_confirmed_at: '2026-11-15T00:00:00Z', user_id: 'different-founder-user' },
       error: null,
     });
 
@@ -327,6 +335,7 @@ describe('requireFounder', () => {
     expect(mocks.refreshSession).toHaveBeenCalledWith({
       refresh_token: 'cookie-refresh-token',
     });
+    expect(mocks.eq).toHaveBeenCalledWith('email', 'founder@example.com');
     expect(mocks.eq).toHaveBeenCalledWith('user_id', 'founder-user-1');
     expect(response.headers['set-cookie']?.[0]).toContain('__Host-fcr_session=');
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
