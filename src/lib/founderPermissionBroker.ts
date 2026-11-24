@@ -1,43 +1,99 @@
 import { createHash } from 'node:crypto';
 import {
-  createFounderControlDecision,
   FOUNDER_CONTROL_SURFACES,
   founderControlProposalBindingErrors,
-  type FounderControlDecision,
   type FounderControlDecisionValue,
   type FounderControlProposalBinding,
   type FounderControlSurface,
 } from './founderControlDecision.js';
 
 export const FOUNDER_PERMISSION_REQUEST_CONTRACT = 'juss-v10/founder-permission-request@v1' as const;
+export const FOUNDER_PERMISSION_DECISION_CONTRACT = 'juss-v10/founder-permission-decision@v1' as const;
 export const FOUNDER_PERMISSION_STATUSES = [
   'pending',
   'approved',
   'rejected',
   'change_requested',
 ] as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_ACTION = 'promptos_workflow_registry_promote' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_REPO = 'jussray/promptos' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_BRANCH = 'main' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_PATH = 'workflows/registry.json' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY = 'promptos-workflow-registry@v1' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_PROVIDER = 'github:jussray/promptos' as const;
+export const PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE = 'CONSEQUENTIAL_WRITE' as const;
 
 export type FounderPermissionStatus = (typeof FOUNDER_PERMISSION_STATUSES)[number];
+
+export interface FounderPermissionMergeTarget {
+  type: 'merge';
+  repo: string;
+  pullRequestNumber: number;
+  baseSha: string;
+  headSha: string;
+}
+
+export interface FounderPermissionPromptOSWorkflowRegistryTarget {
+  type: typeof PROMPTOS_WORKFLOW_REGISTRY_ACTION;
+  repo: string;
+  branch: string;
+  headSha: string;
+  workflowId: string;
+  workflowVersion: string;
+  workflowContentHash: string;
+  registryContentHash: string;
+  registryPath: string;
+  workflowPath: string;
+  providerIdentity: typeof PROMPTOS_WORKFLOW_REGISTRY_PROVIDER;
+  capabilityVersion: typeof PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY;
+  consequence: typeof PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE;
+}
+
+export type FounderPermissionActionTarget =
+  | FounderPermissionMergeTarget
+  | FounderPermissionPromptOSWorkflowRegistryTarget
+  | null;
 
 export interface FounderPermissionRequest {
   contract: typeof FOUNDER_PERMISSION_REQUEST_CONTRACT;
   requestId: string;
   requestedBySurface: FounderControlSurface;
   proposal: FounderControlProposalBinding;
+  actionTarget: FounderPermissionActionTarget;
   requestHash: string;
   note: string | null;
+}
+
+export interface FounderPermissionDecisionRecord {
+  contract: typeof FOUNDER_PERMISSION_DECISION_CONTRACT;
+  requestHash: string;
+  surface: 'fcr';
+  decision: FounderControlDecisionValue;
+  founderExplicit: true;
+  /**
+   * The broker records a founder decision. Exact execution authority belongs to
+   * the separately scoped FounderPermissionReceipt / execution-binding layer.
+   */
+  executionAuthorized: false;
+  decisionHash: string;
 }
 
 export interface FounderPermissionResolution {
   request: FounderPermissionRequest;
   status: Exclude<FounderPermissionStatus, 'pending'>;
-  decision: FounderControlDecision;
-  founderPermissionSatisfied: boolean;
+  decision: FounderPermissionDecisionRecord;
+  /** Becomes true only at the durable fresh/unconsumed row boundary, never here. */
+  founderPermissionSatisfied: false;
   /** Independent review belongs to repository review authority, never this broker. */
   independentReviewSatisfied: null;
 }
 
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{5,199}$/;
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
+const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
+const WORKFLOW_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const WORKFLOW_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -54,10 +110,141 @@ function normalizedProposal(input: FounderControlProposalBinding): FounderContro
   };
 }
 
+function exactSha256(value: unknown, label: string): string {
+  const candidate = text(value).toLowerCase();
+  const match = /^sha256:([0-9a-f]{64})$/i.exec(candidate);
+  if (!match || !SHA256.test(match[1] ?? '')) {
+    throw new Error(`${label} requires a sha256 content hash`);
+  }
+  return `sha256:${match[1]!.toLowerCase()}`;
+}
+
+function normalizedPromptOSWorkflowRegistryTarget(
+  proposal: FounderControlProposalBinding,
+  input: FounderPermissionPromptOSWorkflowRegistryTarget,
+): FounderPermissionPromptOSWorkflowRegistryTarget {
+  const repo = text(input.repo).toLowerCase();
+  const branch = text(input.branch).toLowerCase();
+  const headSha = text(input.headSha).toLowerCase();
+  const workflowId = text(input.workflowId);
+  const workflowVersion = text(input.workflowVersion);
+  const workflowContentHash = exactSha256(input.workflowContentHash, 'PromptOS workflow registry promotion');
+  const registryContentHash = exactSha256(input.registryContentHash, 'PromptOS workflow registry state');
+  const registryPath = text(input.registryPath);
+  const workflowPath = text(input.workflowPath);
+  const providerIdentity = text(input.providerIdentity).toLowerCase();
+  const capabilityVersion = text(input.capabilityVersion);
+  const consequence = text(input.consequence);
+  const workflowDigest = workflowContentHash.slice('sha256:'.length);
+
+  if (proposal.projectSlug !== 'promptos') {
+    throw new Error('PromptOS workflow registry promotion requires projectSlug promptos');
+  }
+  if (repo !== PROMPTOS_WORKFLOW_REGISTRY_REPO) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical PromptOS repository');
+  }
+  if (branch !== PROMPTOS_WORKFLOW_REGISTRY_BRANCH) {
+    throw new Error('PromptOS workflow registry promotion is restricted to main');
+  }
+  if (!FULL_SHA.test(headSha)) {
+    throw new Error('PromptOS workflow registry promotion requires an exact head SHA');
+  }
+  if (!proposal.expectedHeadSha || proposal.expectedHeadSha.toLowerCase() !== headSha) {
+    throw new Error('PromptOS proposal expectedHeadSha must equal actionTarget headSha');
+  }
+  if (!WORKFLOW_ID.test(workflowId)) {
+    throw new Error('PromptOS workflow registry promotion requires a lowercase kebab-case workflow id');
+  }
+  if (!WORKFLOW_VERSION.test(workflowVersion)) {
+    throw new Error('PromptOS workflow registry promotion requires a stable workflow version');
+  }
+  if (proposal.proposalHash.toLowerCase() !== workflowDigest) {
+    throw new Error('PromptOS proposalHash must equal the exact workflow content hash');
+  }
+  if (registryPath !== PROMPTOS_WORKFLOW_REGISTRY_PATH) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical registry path');
+  }
+  const expectedWorkflowPath = `workflows/${workflowId}.workflow.json`;
+  if (workflowPath !== expectedWorkflowPath) {
+    throw new Error('PromptOS workflow registry promotion workflowPath must match the workflow id');
+  }
+  if (providerIdentity !== PROMPTOS_WORKFLOW_REGISTRY_PROVIDER) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical provider identity');
+  }
+  if (capabilityVersion !== PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY) {
+    throw new Error('PromptOS workflow registry promotion requires the canonical capability version');
+  }
+  if (consequence !== PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE) {
+    throw new Error('PromptOS workflow registry promotion requires consequential-write classification');
+  }
+
+  return {
+    type: PROMPTOS_WORKFLOW_REGISTRY_ACTION,
+    repo: PROMPTOS_WORKFLOW_REGISTRY_REPO,
+    branch: PROMPTOS_WORKFLOW_REGISTRY_BRANCH,
+    headSha,
+    workflowId,
+    workflowVersion,
+    workflowContentHash,
+    registryContentHash,
+    registryPath: PROMPTOS_WORKFLOW_REGISTRY_PATH,
+    workflowPath: expectedWorkflowPath,
+    providerIdentity: PROMPTOS_WORKFLOW_REGISTRY_PROVIDER,
+    capabilityVersion: PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY,
+    consequence: PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE,
+  };
+}
+
+function normalizedActionTarget(
+  proposal: FounderControlProposalBinding,
+  input: FounderPermissionActionTarget | undefined,
+): FounderPermissionActionTarget {
+  if (proposal.actionType === PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
+    if (!input || input.type !== PROMPTOS_WORKFLOW_REGISTRY_ACTION) {
+      throw new Error('PromptOS workflow registry promotion requires an exact actionTarget');
+    }
+    return normalizedPromptOSWorkflowRegistryTarget(proposal, input);
+  }
+
+  if (proposal.actionType !== 'merge') {
+    if (input) {
+      throw new Error('actionTarget is only supported for merge and PromptOS workflow registry promotion requests in this broker version');
+    }
+    return null;
+  }
+
+  if (!input || input.type !== 'merge') {
+    throw new Error('merge requests require an exact merge actionTarget');
+  }
+
+  const repo = text(input.repo).toLowerCase();
+  const baseSha = text(input.baseSha).toLowerCase();
+  const headSha = text(input.headSha).toLowerCase();
+  if (!OWNED_REPO.test(repo)) throw new Error('merge actionTarget requires an owned repository identity');
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber <= 0) {
+    throw new Error('merge actionTarget requires a positive pull request number');
+  }
+  if (!FULL_SHA.test(baseSha) || !FULL_SHA.test(headSha)) {
+    throw new Error('merge actionTarget requires exact base and head SHAs');
+  }
+  if (!proposal.expectedHeadSha || proposal.expectedHeadSha.toLowerCase() !== headSha) {
+    throw new Error('merge proposal expectedHeadSha must equal actionTarget headSha');
+  }
+
+  return {
+    type: 'merge',
+    repo,
+    pullRequestNumber: input.pullRequestNumber,
+    baseSha,
+    headSha,
+  };
+}
+
 function canonicalRequestIdentity(input: {
   requestId: string;
   requestedBySurface: FounderControlSurface;
   proposal: FounderControlProposalBinding;
+  actionTarget: FounderPermissionActionTarget;
   note: string | null;
 }): string {
   return JSON.stringify([
@@ -65,6 +252,7 @@ function canonicalRequestIdentity(input: {
     input.requestId,
     input.requestedBySurface,
     normalizedProposal(input.proposal),
+    input.actionTarget,
     input.note,
   ]);
 }
@@ -73,15 +261,31 @@ export function founderPermissionRequestHash(input: {
   requestId: string;
   requestedBySurface: FounderControlSurface;
   proposal: FounderControlProposalBinding;
+  actionTarget: FounderPermissionActionTarget;
   note: string | null;
 }): string {
   return createHash('sha256').update(canonicalRequestIdentity(input)).digest('hex');
+}
+
+export function founderPermissionDecisionHash(input: {
+  requestHash: string;
+  decision: FounderControlDecisionValue;
+}): string {
+  return createHash('sha256').update(JSON.stringify([
+    FOUNDER_PERMISSION_DECISION_CONTRACT,
+    input.requestHash,
+    'fcr',
+    input.decision,
+    true,
+    false,
+  ])).digest('hex');
 }
 
 export function createFounderPermissionRequest(input: {
   requestId: string;
   requestedBySurface: FounderControlSurface;
   proposal: FounderControlProposalBinding;
+  actionTarget?: FounderPermissionActionTarget;
   note?: string | null;
 }): FounderPermissionRequest {
   const requestId = text(input.requestId);
@@ -96,11 +300,13 @@ export function createFounderPermissionRequest(input: {
   if (proposalErrors.length > 0) {
     throw new Error(proposalErrors.join('; '));
   }
+  const actionTarget = normalizedActionTarget(proposal, input.actionTarget);
   const note = text(input.note).slice(0, 1000) || null;
   const requestHash = founderPermissionRequestHash({
     requestId,
     requestedBySurface: input.requestedBySurface,
     proposal,
+    actionTarget,
     note,
   });
   return {
@@ -108,6 +314,7 @@ export function createFounderPermissionRequest(input: {
     requestId,
     requestedBySurface: input.requestedBySurface,
     proposal,
+    actionTarget,
     requestHash,
     note,
   };
@@ -115,7 +322,6 @@ export function createFounderPermissionRequest(input: {
 
 export function resolveFounderPermissionRequest(input: {
   request: FounderPermissionRequest;
-  decisionSurface: FounderControlSurface;
   decision: FounderControlDecisionValue;
 }): FounderPermissionResolution {
   if (input.request.contract !== FOUNDER_PERMISSION_REQUEST_CONTRACT) {
@@ -125,25 +331,39 @@ export function resolveFounderPermissionRequest(input: {
   if (proposalErrors.length > 0) {
     throw new Error(proposalErrors.join('; '));
   }
+  const actionTarget = normalizedActionTarget(input.request.proposal, input.request.actionTarget);
   const expectedHash = founderPermissionRequestHash({
     requestId: input.request.requestId,
     requestedBySurface: input.request.requestedBySurface,
     proposal: input.request.proposal,
+    actionTarget,
     note: input.request.note,
   });
   if (input.request.requestHash !== expectedHash) {
     throw new Error('founder permission request hash does not match canonical identity');
   }
-  const founderDecision = createFounderControlDecision({
-    proposal: input.request.proposal,
-    surface: input.decisionSurface,
+  if (!['approved', 'rejected', 'change_requested'].includes(input.decision)) {
+    throw new Error('unsupported founder decision');
+  }
+
+  const decision: FounderPermissionDecisionRecord = {
+    contract: FOUNDER_PERMISSION_DECISION_CONTRACT,
+    requestHash: expectedHash,
+    surface: 'fcr',
     decision: input.decision,
-  });
+    founderExplicit: true,
+    executionAuthorized: false,
+    decisionHash: founderPermissionDecisionHash({
+      requestHash: expectedHash,
+      decision: input.decision,
+    }),
+  };
+
   return {
     request: input.request,
     status: input.decision,
-    decision: founderDecision,
-    founderPermissionSatisfied: input.decision === 'approved',
+    decision,
+    founderPermissionSatisfied: false,
     independentReviewSatisfied: null,
   };
 }

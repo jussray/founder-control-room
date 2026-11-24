@@ -1,0 +1,502 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+export const START_MARKER = '<!-- pr-continuity:start -->';
+export const END_MARKER = '<!-- pr-continuity:end -->';
+export const SCHEMA = 'juss/pr-continuity@v1';
+
+export const isCurrentCompareStatus = (status) => status === 'ahead' || status === 'identical';
+
+export function classifyCompareStatus(status) {
+  if (isCurrentCompareStatus(status)) return 'CURRENT';
+  if (status === 'behind' || status === 'diverged') return 'STALE_BASE';
+  return 'BLOCKED_UNKNOWN_COMPARE';
+}
+
+export function assertExpectedHead(expected, actual) {
+  if (!expected || expected !== actual) {
+    throw new Error(`HEAD_MOVED: expected ${expected || '<missing>'}, live ${actual || '<missing>'}`);
+  }
+  return true;
+}
+
+export function isStackedUpdateUnsupported(status, message = '') {
+  return status === 403 && /updating a stacked PR's branch via this endpoint is not supported\.?/i.test(message);
+}
+
+export function classifyUpdateBranchFailure(status, message = '') {
+  const providerMessage = String(message || '');
+  if (isStackedUpdateUnsupported(status, providerMessage)) {
+    return {
+      state: 'BLOCKED_STACK_REBASE_REQUIRED',
+      failureReceipts: [{ code: 'STACKED_UPDATE_UNSUPPORTED', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if ((status === 403 || status === 422) && /repository rule violations found/i.test(providerMessage)) {
+    const failureReceipts = [];
+    if (/changes must be made through a pull request/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CHANGES_REQUIRE_PULL_REQUEST', providerStatus: status, evidence: 'Changes must be made through a pull request.' });
+    }
+    const requiredCheck = providerMessage.match(/Required status check "([^"]+)" is expected\.?/i);
+    if (requiredCheck) {
+      failureReceipts.push({ code: 'REQUIRED_STATUS_CHECK_EXPECTED', providerStatus: status, checkName: requiredCheck[1], evidence: requiredCheck[0] });
+    }
+    if (/waiting for code scanning results/i.test(providerMessage)) {
+      failureReceipts.push({ code: 'CODE_SCANNING_PENDING_OR_UNCONFIGURED', providerStatus: status, evidence: 'Waiting for Code Scanning results.' });
+    }
+    if (!failureReceipts.length) {
+      failureReceipts.push({ code: 'REPOSITORY_RULE_VIOLATION', providerStatus: status, evidence: providerMessage });
+    }
+    return { state: 'BLOCKED_REPOSITORY_RULES', failureReceipts };
+  }
+
+  if (status === 422 && /merge conflict between base and head/i.test(providerMessage)) {
+    return {
+      state: 'BLOCKED_MERGE_CONFLICT',
+      failureReceipts: [{ code: 'MERGE_CONFLICT', providerStatus: status, evidence: providerMessage }],
+    };
+  }
+
+  if (status === 403) {
+    return {
+      state: 'BLOCKED_PROVIDER_FORBIDDEN',
+      failureReceipts: [{ code: 'PROVIDER_FORBIDDEN', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  if (status === 422) {
+    return {
+      state: 'BLOCKED_PROVIDER_REJECTED',
+      failureReceipts: [{ code: 'PROVIDER_UPDATE_REJECTED', providerStatus: status, evidence: providerMessage || 'GitHub rejected the branch update.' }],
+    };
+  }
+
+  return null;
+}
+
+export function replaceManagedBlock(body = '', block) {
+  const starts = body.split(START_MARKER).length - 1;
+  const ends = body.split(END_MARKER).length - 1;
+  if (starts !== ends || starts > 1 || ends > 1) {
+    throw new Error('MALFORMED_CONTINUITY_MARKERS');
+  }
+
+  let human = body.trim();
+  if (starts === 1) {
+    const start = body.indexOf(START_MARKER);
+    const end = body.indexOf(END_MARKER);
+    if (start > end) throw new Error('MALFORMED_CONTINUITY_MARKERS');
+    const before = body.slice(0, start).trim();
+    const after = body.slice(end + END_MARKER.length).trim();
+    human = [before, after].filter(Boolean).join('\n\n');
+  }
+
+  return `${block}${human ? `\n\n${human}` : ''}\n`;
+}
+
+// GitHub-native auto-merge is an observed queue preference, not an authority receipt.
+export function observedAutoMerge(pr) {
+  if (!pr || !Object.prototype.hasOwnProperty.call(pr, 'auto_merge')) return 'UNKNOWN';
+  if (pr.auto_merge === null) return 'NOT_QUEUED';
+  if (pr.auto_merge && typeof pr.auto_merge === 'object' && !Array.isArray(pr.auto_merge)) return 'QUEUED';
+  return 'UNKNOWN';
+}
+
+/** A current provider queue observation, not an in-app FCR authority receipt. */
+export function observedFounderAutoMerge(pr, repository) {
+  if (repository !== 'jussray/founder-control-room') return 'NOT_APPLICABLE';
+  if (!pr || pr.state !== 'open' || !Object.prototype.hasOwnProperty.call(pr, 'auto_merge')) return 'UNKNOWN';
+  if (pr.head?.repo?.full_name !== repository || pr.base?.repo?.full_name !== repository) return 'UNKNOWN';
+  if (pr.auto_merge === null) return 'NOT_QUEUED';
+  const login = pr.auto_merge?.enabled_by?.login;
+  if (typeof login !== 'string' || !login.trim()) return 'UNKNOWN';
+  return login.toLowerCase() === 'jussray' ? 'FOUNDER_SELECTED' : 'OTHER_ACTOR';
+}
+
+export function continuityBlock(value) {
+  const autoMergeIntent = ['QUEUED', 'NOT_QUEUED', 'UNKNOWN'].includes(value.autoMergeIntent)
+    ? value.autoMergeIntent
+    : 'UNKNOWN';
+  const founderAutoMergeSelection = ['FOUNDER_SELECTED', 'OTHER_ACTOR', 'NOT_QUEUED', 'UNKNOWN', 'NOT_APPLICABLE'].includes(value.founderAutoMergeSelection)
+    ? value.founderAutoMergeSelection : 'UNKNOWN';
+  return [
+    START_MARKER,
+    '## PR Continuity Receipt',
+    '',
+    '> **MACHINE CURRENT TRUTH:** This block governs present-tense PR identity and continuity status. SHA/status prose below is historical unless it matches this receipt.',
+    '',
+    `- schema: \`${SCHEMA}\``,
+    `- repository: \`${value.repository}\``,
+    `- pull_request: \`#${value.prNumber}\``,
+    `- root_base: \`${value.rootBaseRef}@${value.rootBaseSha}\``,
+    `- live_base: \`${value.baseRef}@${value.baseSha}\``,
+    `- live_head: \`${value.headRef}@${value.headSha}\``,
+    `- proof_subject: \`${value.headSha}\``,
+    `- continuity: **${value.continuityState}**`,
+    `- proof: **${value.proofState}**`,
+    `- auto_merge_intent: **${autoMergeIntent}**`,
+    `- founder_auto_merge_selection: **${founderAutoMergeSelection}**`,
+    '- merge_authority: **true**',
+    '- merge_approval: **REQUIRED_EXACT_CANDIDATE**',
+    '- merge_approved: **false**',
+    '- authorizes_merge: **false**',
+    '- deploy_authority: **false**',
+    '',
+    '> Merge authority means the capability exists, not that an in-app FCR approval token has been issued. For an AI-initiated FCR in-app merge, a fresh founder-final receipt bound to the exact repository, PR, base SHA and head SHA remains required; without it the in-app merge must not execute. The separately observed founder-selected GitHub native Auto-merge queue is already the founder merge instruction. Base/head movement expires prior in-app approvals and exact-head proof.',
+    '> Base/head movement also expires predecessor exact-head CI, review, runtime, and browser proof. A successful rollover preserves history but does not donate green proof to the successor head.',
+    '> A provider-observed FCR Auto-merge selection by the founder is the founder native GitHub merge instruction, not a formal APPROVED review or an in-app FCR execution token. GitHub executes only after the configured required checks, tests, review-thread resolution and branch protections pass. The merge_approved:false field applies to the separate FCR in-app merge route; the founder-only native source policy requires no second human approving reviewer. This receipt never dispatches a merge.',
+    END_MARKER,
+  ].join('\n');
+}
+
+export function collectRolloverOrder(pulls, rootRef = 'main') {
+  const queue = [rootRef];
+  const visitedRefs = new Set();
+  const seenPulls = new Set();
+  const order = [];
+  while (queue.length) {
+    const baseRef = queue.shift();
+    if (visitedRefs.has(baseRef)) continue;
+    visitedRefs.add(baseRef);
+    for (const pr of pulls) {
+      if (pr.state !== 'open' || pr.base?.ref !== baseRef || seenPulls.has(pr.number)) continue;
+      seenPulls.add(pr.number);
+      order.push(pr.number);
+      if (pr.head?.ref) queue.push(pr.head.ref);
+    }
+  }
+  return order;
+}
+
+// Rollover only spends CI on pull requests that can merge soon. Drafts and PRs
+// labelled `stale` (see scripts/pr-hygiene.mjs) are recorded as deferred instead
+// of having main merged into them; every gate still requires current-base
+// ancestry, so a deferred PR cannot merge until it is rolled forward.
+export const ROLLOVER_DEFER_LABEL = 'stale';
+export const DEFERRED_PROOF_STATE = 'REVERIFY_OR_ROLLOVER_REQUIRED';
+
+export function rolloverDeferral(pr) {
+  if (pr?.draft === true) return 'DEFERRED_DRAFT';
+  if ((pr?.labels ?? []).some((label) => label?.name === ROLLOVER_DEFER_LABEL)) return 'DEFERRED_STALE';
+  return null;
+}
+
+export function deferralAlreadyRecorded(body, state) {
+  return String(body || '').includes(`- continuity: **${state}**`);
+}
+
+export const sameRepositoryPull = (pr, repository) =>
+  pr?.head?.repo?.full_name === repository && pr?.base?.repo?.full_name === repository;
+
+const env = (name, fallback = '') => process.env[name] || fallback;
+const artifactPath = () => env('ARTIFACT_PATH', 'artifacts/pr-continuity.json');
+
+const nonAuthorizingMergeState = Object.freeze({
+  mergeAuthorityAvailable: true,
+  mergeApprovalRequired: true,
+  mergeApproved: false,
+  authorizesMerge: false,
+  authorizesDeploy: false,
+});
+
+function writeReceipt(value) {
+  const target = path.resolve(artifactPath());
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function github(pathname, { method = 'GET', body, allow = [] } = {}) {
+  const token = env('GITHUB_TOKEN');
+  if (!token) throw new Error('GITHUB_TOKEN_REQUIRED');
+  const response = await fetch(`https://api.github.com${pathname}`, {
+    method,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'juss-pr-continuity-v1',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = { message: text };
+  }
+  if (!response.ok && !allow.includes(response.status)) {
+    throw new Error(`GITHUB_API_${response.status}: ${payload?.message || pathname}`);
+  }
+  return { status: response.status, payload };
+}
+
+const getPull = async (repository, number) =>
+  (await github(`/repos/${repository}/pulls/${number}`)).payload;
+const branchSha = async (repository, ref) =>
+  (await github(`/repos/${repository}/branches/${encodeURIComponent(ref)}`)).payload.commit.sha;
+const compare = async (repository, base, head) =>
+  (await github(`/repos/${repository}/compare/${base}...${head}`)).payload.status;
+const liveBaseSha = async (repository, pr) => branchSha(repository, pr.base.ref);
+
+async function listOpenPulls(repository) {
+  const all = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const rows = (await github(`/repos/${repository}/pulls?state=open&per_page=100&page=${page}`)).payload;
+    all.push(...rows);
+    if (rows.length < 100) return all;
+  }
+  throw new Error('PULL_PAGINATION_LIMIT_EXCEEDED');
+}
+
+async function patchBody(repository, pr, block) {
+  let next;
+  try {
+    next = replaceManagedBlock(pr.body || '', block);
+  } catch (error) {
+    return { updated: false, blocked: true, reason: error.message };
+  }
+  if (next === (pr.body || '')) return { updated: false, blocked: false };
+  await github(`/repos/${repository}/pulls/${pr.number}`, { method: 'PATCH', body: { body: next } });
+  return { updated: true, blocked: false };
+}
+
+const blockFor = (repository, pr, rootRef, rootSha, baseSha, state, proof) =>
+  continuityBlock({
+    repository,
+    prNumber: pr.number,
+    rootBaseRef: rootRef,
+    rootBaseSha: rootSha,
+    baseRef: pr.base.ref,
+    baseSha,
+    headRef: pr.head.ref,
+    headSha: pr.head.sha,
+    continuityState: state,
+    proofState: proof,
+    autoMergeIntent: observedAutoMerge(pr),
+    founderAutoMergeSelection: observedFounderAutoMerge(pr, repository),
+  });
+
+async function deferOnePull(repository, pr, rootRef, state) {
+  if (deferralAlreadyRecorded(pr.body, state)) {
+    return { number: pr.number, state, headRef: pr.head?.ref, headSha: pr.head?.sha, metadata: { updated: false, blocked: false } };
+  }
+  const rootSha = await branchSha(repository, rootRef);
+  const baseSha = await liveBaseSha(repository, pr);
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, DEFERRED_PROOF_STATE));
+  return {
+    number: pr.number,
+    state: metadata.blocked ? 'BLOCKED_METADATA' : state,
+    headRef: pr.head?.ref,
+    headSha: pr.head?.sha,
+    metadata,
+  };
+}
+
+async function updateOnePull(repository, number, rootRef) {
+  let pr = await getPull(repository, number);
+  const rootSha = await branchSha(repository, rootRef);
+  let baseSha = await liveBaseSha(repository, pr);
+  if (!sameRepositoryPull(pr, repository)) {
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'BLOCKED_FORK', 'BLOCKED'));
+    return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata };
+  }
+
+  let status = await compare(repository, baseSha, pr.head.sha);
+  if (isCurrentCompareStatus(status)) {
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
+    return {
+      number,
+      state: metadata.blocked ? 'BLOCKED_METADATA' : 'CURRENT',
+      headRef: pr.head.ref,
+      headSha: pr.head.sha,
+      metadata,
+    };
+  }
+
+  const before = pr.head.sha;
+  const update = await github(`/repos/${repository}/pulls/${number}/update-branch`, {
+    method: 'PUT',
+    body: { expected_head_sha: before },
+    allow: [202, 403, 422],
+  });
+
+  if (update.status === 403 || update.status === 422) {
+    pr = await getPull(repository, number);
+    baseSha = await liveBaseSha(repository, pr);
+    status = sameRepositoryPull(pr, repository) ? await compare(repository, baseSha, pr.head.sha) : 'fork';
+    if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
+
+    const failure = classifyUpdateBranchFailure(update.status, update.payload?.message || '');
+    if (!failure) {
+      throw new Error(`GITHUB_API_${update.status}: ${update.payload?.message || 'pull request branch update rejected'}`);
+    }
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, failure.state, 'BLOCKED'));
+    return {
+      number,
+      state: failure.state,
+      headRef: pr.head.ref,
+      headSha: pr.head.sha,
+      metadata,
+      providerStatus: update.status,
+      providerMessage: update.payload?.message || null,
+      failureReceipts: failure.failureReceipts.map((receipt) => ({
+        receiptId: `pr-${number}:${receipt.code}`,
+        ...receipt,
+      })),
+    };
+  }
+
+  for (let index = 0; index < 15; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    pr = await getPull(repository, number);
+    baseSha = await liveBaseSha(repository, pr);
+    status = await compare(repository, baseSha, pr.head.sha);
+    if (pr.head.sha !== before && isCurrentCompareStatus(status)) break;
+  }
+
+  baseSha = await liveBaseSha(repository, pr);
+  status = await compare(repository, baseSha, pr.head.sha);
+  let state = isCurrentCompareStatus(status)
+    ? (pr.head.sha !== before ? 'ROLLED_FORWARD' : 'CURRENT_AFTER_RACE')
+    : 'BLOCKED_UPDATE_TIMEOUT';
+  const proof = state === 'ROLLED_FORWARD'
+    ? 'REVERIFY_REQUIRED'
+    : state === 'CURRENT_AFTER_RACE'
+      ? 'EXACT_HEAD_PROOF_SEPARATE'
+      : 'BLOCKED';
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, baseSha, state, proof));
+  if (metadata.blocked) state = 'BLOCKED_METADATA';
+  return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata };
+}
+
+export async function auditMode() {
+  const repository = env('GITHUB_REPOSITORY');
+  const number = Number(env('PR_NUMBER'));
+  const expected = env('EXPECTED_HEAD_SHA');
+  const rootRef = env('ROOT_BASE_REF', 'main');
+  if (!repository || !number) throw new Error('AUDIT_INPUT_REQUIRED');
+
+  const pr = await getPull(repository, number);
+  assertExpectedHead(expected, pr.head.sha);
+  if (!sameRepositoryPull(pr, repository)) {
+    writeReceipt({ schema: SCHEMA, mode: 'audit', repository, prNumber: number, state: 'BLOCKED_FORK', ...nonAuthorizingMergeState });
+    throw new Error('BLOCKED_FORK');
+  }
+
+  const baseSha = await liveBaseSha(repository, pr);
+  const status = await compare(repository, baseSha, pr.head.sha);
+  const state = classifyCompareStatus(status);
+  const receipt = {
+    schema: SCHEMA,
+    mode: 'audit',
+    repository,
+    prNumber: number,
+    rootBaseRef: rootRef,
+    rootBaseSha: await branchSha(repository, rootRef),
+    baseRef: pr.base.ref,
+    baseSha,
+    headRef: pr.head.ref,
+    headSha: pr.head.sha,
+    compareStatus: status,
+    state,
+    proofSubjectSha: pr.head.sha,
+    autoMergeIntent: observedAutoMerge(pr),
+    founderAutoMergeSelection: observedFounderAutoMerge(pr, repository),
+    predecessorProofExpiresOnHeadMove: true,
+    ...nonAuthorizingMergeState,
+  };
+  writeReceipt(receipt);
+  if (state !== 'CURRENT') throw new Error(`${state}: ${baseSha} is not an ancestor of ${pr.head.sha}`);
+  console.log(JSON.stringify(receipt));
+}
+
+export async function metadataMode() {
+  const repository = env('GITHUB_REPOSITORY');
+  const number = Number(env('PR_NUMBER'));
+  const rootRef = env('ROOT_BASE_REF', 'main');
+  if (!repository || !number) throw new Error('METADATA_INPUT_REQUIRED');
+
+  const pr = await getPull(repository, number);
+  const rootSha = await branchSha(repository, rootRef);
+  const baseSha = await liveBaseSha(repository, pr);
+  const state = sameRepositoryPull(pr, repository)
+    ? classifyCompareStatus(await compare(repository, baseSha, pr.head.sha))
+    : 'BLOCKED_FORK';
+  const metadata = await patchBody(
+    repository,
+    pr,
+    blockFor(repository, pr, rootRef, rootSha, baseSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
+  );
+  const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, autoMergeIntent: observedAutoMerge(pr), metadata, ...nonAuthorizingMergeState };
+  writeReceipt(receipt);
+  if (metadata.blocked) throw new Error(`METADATA_BLOCKED: ${metadata.reason}`);
+  console.log(JSON.stringify(receipt));
+}
+
+export async function rolloverMode() {
+  const repository = env('GITHUB_REPOSITORY');
+  const rootRef = env('ROOT_BASE_REF', 'main');
+  if (!repository) throw new Error('GITHUB_REPOSITORY_REQUIRED');
+
+  const pulls = await listOpenPulls(repository);
+  const order = collectRolloverOrder(pulls, rootRef);
+  const byNumber = new Map(pulls.map((pull) => [pull.number, pull]));
+  const results = [];
+  for (const number of order) {
+    const deferral = rolloverDeferral(byNumber.get(number));
+    results.push(deferral
+      ? await deferOnePull(repository, byNumber.get(number), rootRef, deferral)
+      : await updateOnePull(repository, number, rootRef));
+  }
+  const deferred = results.filter((item) => item.state.startsWith('DEFERRED'));
+  const blocked = results.filter((item) => item.state.startsWith('BLOCKED'));
+  const blockedByState = blocked.reduce((counts, item) => {
+    counts[item.state] = (counts[item.state] || 0) + 1;
+    return counts;
+  }, {});
+  const failureReceipts = blocked.flatMap((item) =>
+    item.failureReceipts?.length
+      ? item.failureReceipts.map((receipt) => ({ pullRequest: item.number, state: item.state, ...receipt }))
+      : [{ pullRequest: item.number, state: item.state, receiptId: `pr-${item.number}:${item.state}`, code: item.state }],
+  );
+  const receipt = {
+    schema: SCHEMA,
+    mode: 'rollover',
+    repository,
+    rootBaseRef: rootRef,
+    rootBaseSha: await branchSha(repository, rootRef),
+    order,
+    results,
+    deferredCount: deferred.length,
+    deferredPullRequests: deferred.map((item) => ({ pullRequest: item.number, state: item.state })),
+    blockedCount: blocked.length,
+    blockedByState,
+    failureReceiptCount: failureReceipts.length,
+    failureReceipts,
+    predecessorProofExpiresOnHeadMove: true,
+    ...nonAuthorizingMergeState,
+  };
+  writeReceipt(receipt);
+  console.log(JSON.stringify(receipt));
+  if (blocked.length) {
+    throw new Error(`ROLLOVER_BLOCKED: ${blocked.map((item) => `#${item.number}:${item.state}`).join(',')}`);
+  }
+}
+
+async function main() {
+  const mode = process.argv[2];
+  if (mode === 'audit') return auditMode();
+  if (mode === 'metadata') return metadataMode();
+  if (mode === 'rollover') return rolloverMode();
+  throw new Error('Usage: node scripts/pr-continuity.mjs <audit|metadata|rollover>');
+}
+
+if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  main().catch((error) => {
+    console.error(error.stack || error.message);
+    process.exit(1);
+  });
+}

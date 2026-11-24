@@ -1,8 +1,8 @@
 # Deterministic Review Witness V1
 
-Status: **CORE INTEGRATED ON MAIN / FOUNDER-RUNTIME IGNITION CANDIDATE / BOOTSTRAP REQUIRED / NOT MERGE AUTHORITY**
+Status: **CORE + TRUSTED-MAIN INVOCATION SURFACES PRESENT IN SOURCE / CURRENT LIVE WITNESS NOT PROVEN / NOT MERGE AUTHORITY** (reconciled 2026-10-29)
 
-Milestones A and B are integrated on `main`: the deterministic producer, narrow GitHub-App witness provider, publication/readback logic, and founder-final consumer exist in the trusted source tree. The remaining execution gap is a trusted invocation surface that runs those integrated components from an exact current-`main` FCR release rather than from candidate-controlled pull-request code.
+Milestones A and B are integrated on `main`: the deterministic producer, narrow GitHub-App witness provider, publication/readback logic, and founder-final consumer exist in the trusted source tree. The trusted-main invocation surfaces also exist in source: the issue #418 `/review-witness` command in `.github/workflows/deterministic-review-core-advisory.yml`, and the protected `POST /review/deterministic-witness/:pullRequestNumber` in `src/http/server.ts`. **Their presence in current source does not prove current production deployment, provider credential validity, or successful trusted-App witness publication for any current PR head.**
 
 ## Authority chain
 
@@ -26,7 +26,13 @@ The repository-provider write is deliberately narrow. `publishDeterministicRevie
 
 The full review hash is load-bearing on readback, not audit decoration. `DeterministicReviewGitHubProvider.listVerificationSignals(...)` preserves Check Run `external_id` as `VerificationSignal.evidenceFingerprint`. Both witness publication orchestration and the canonical founder-final independent-review gate require that full fingerprint to equal the exact receipt `reviewHash`, in addition to exact head, receipt-derived signal name, passed status, and trusted numeric GitHub App issuer. A missing fingerprint or a different 64-hex fingerprint that merely shares the displayed hash prefix fails closed.
 
-Provider construction exposes witness publication only when `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
+Provider construction exposes witness publication only when runtime `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
+
+### GitHub Actions credential-name boundary
+
+The GitHub Actions `production` environment stores the trusted App credentials under the legal secret names `APP_ID` and `APP_PRIVATE_KEY`. The trusted witness and governance jobs map those secrets into runtime `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` before invoking provider code. The mapping is intentional: the provider contract keeps its stable runtime names while the Actions secret plane avoids the reserved `GITHUB_` secret-name prefix.
+
+`APP_ID` must be the numeric App ID and `APP_PRIVATE_KEY` must be the matching private-key PEM for the same repository-scoped Founder Control Room GitHub App. The GitHub App Client ID is not consumed by this installation-token path. Secret presence is configuration evidence only; successful installation-token use, exact-head publication, App-issuer readback, and full receipt-fingerprint readback are required before the witness is considered provider-backed.
 
 Witness publication is retry-safe by **reconcile-before-create**. After rederiving the exact receipt and revalidating PR identity, the publisher reads exact-head verification signals before any provider write. If the trusted App already emitted the exact passed signal with the same full receipt fingerprint, that signal is re-used and no new Check Run is created. If the reconciliation read fails, no provider mutation occurs. This allows a retry after a previous post-write/readback interruption to converge on the already-created witness instead of blindly duplicating it.
 
@@ -34,7 +40,7 @@ Witness publication is retry-safe by **reconcile-before-create**. After rederivi
 
 Trusted ignition must execute from code that is already integrated and running as exact current FCR `main`. Candidate-controlled PR workflows, candidate preview deployments, stale production releases, and PAT-only environments are not trusted witness issuers.
 
-The current founder-runtime ignition candidate adds `POST /review/deterministic-witness/:pullRequestNumber` inside the protected FCR server trust root. It is intentionally narrow:
+The implemented founder-runtime source includes `POST /review/deterministic-witness/:pullRequestNumber` inside the protected FCR server trust root. Its live availability requires separately verified deployment identity and provider readiness. It is intentionally narrow:
 
 1. the browser mutation must first pass the existing same-origin membrane;
 2. repository-wide rate limiting applies before the route;
@@ -55,10 +61,10 @@ A default-branch workflow could provide another trusted ignition surface only if
 
 A successful advisory test workflow or successful route source test proves source execution only. It does not itself emit the constitutional independent-review witness, satisfy founder-final authority, authorize merge, or prove that the exact merged release and GitHub App credentials are live in production.
 
-## Bootstrap boundary
+## Historical bootstrap boundary and current provider proof
 
-The candidate that first installs trusted ignition necessarily changes the deterministic-review trust root, so normal deterministic review is expected to report trust-root self-modification and withhold its own constitutional witness. That is the correct fail-closed result, not a defect to suppress.
+The original candidate that first installed trusted ignition changed the deterministic-review trust root, so normal deterministic review was expected to report trust-root self-modification and withhold its own constitutional witness. That was a fail-closed bootstrap requirement, **not proof that current `main` still lacks the code**.
 
 Its integration therefore requires the separately explicit, exact-candidate, durable founder manual-merge override class defined by issue #418 after fresh exact-head machine proof and applicable provider/readback evidence are captured. Ordinary `approved`, `cont`, mergeability, machine green, model review, or bypass capability do not invoke that exception.
 
-After lawful integration, the exact merged release must be deployed and `/version` must re-observe that release identity before the founder-runtime trigger may be treated as available witness-production authority. Once that is proven, later non-trust-root candidates can use the normal deterministic receipt + trusted witness + founder-final path without this bootstrap exception.
+For every currently trusted release, the exact merged release must be deployed and `/version` must re-observe that release identity before the founder-runtime trigger may be treated as live witness-production authority. Later non-trust-root candidates use the normal deterministic receipt + trusted witness + founder-final path. A historical credential-preflight failure must be classified as an **execution receipt**, not an unconditional recommendation to replace a GitHub App private key; use the existing read-only diagnostic and current provider evidence first.

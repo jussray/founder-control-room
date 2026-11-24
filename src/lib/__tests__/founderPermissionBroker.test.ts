@@ -14,19 +14,75 @@ const proposal = {
   capabilityPlanHash: 'c'.repeat(64),
 };
 
+const actionTarget = {
+  type: 'merge' as const,
+  repo: 'jussray/founder-control-room',
+  pullRequestNumber: 727,
+  baseSha: 'd'.repeat(40),
+  headSha: 'b'.repeat(40),
+};
+
+const registryProposal = {
+  proposalId: 'promptos-workflow-repair-production-recovery',
+  proposalHash: 'e'.repeat(64),
+  projectSlug: 'promptos',
+  actionType: 'promptos_workflow_registry_promote',
+  expectedHeadSha: 'f'.repeat(40),
+  capabilityPlanHash: null,
+};
+
+const registryTarget = {
+  type: 'promptos_workflow_registry_promote' as const,
+  repo: 'jussray/promptos',
+  branch: 'main',
+  headSha: 'f'.repeat(40),
+  workflowId: 'repair-production-recovery',
+  workflowVersion: '1.0',
+  workflowContentHash: `sha256:${'e'.repeat(64)}`,
+  registryContentHash: `sha256:${'2'.repeat(64)}`,
+  registryPath: 'workflows/registry.json',
+  workflowPath: 'workflows/repair-production-recovery.workflow.json',
+  providerIdentity: 'github:jussray/promptos' as const,
+  capabilityVersion: 'promptos-workflow-registry@v1' as const,
+  consequence: 'CONSEQUENTIAL_WRITE' as const,
+};
+
 describe('Founder Permission Broker', () => {
-  it('creates a proposal-bound pending request without granting authority', () => {
+  it('creates an exact-target pending request without granting authority', () => {
     const request = createFounderPermissionRequest({
       requestId: 'permission:mission-123',
       requestedBySurface: 'chatgpt',
       proposal,
+      actionTarget,
       note: 'Please approve the exact merge candidate.',
     });
+    expect(request.actionTarget).toEqual(actionTarget);
     expect(request.requestHash).toMatch(/^[0-9a-f]{64}$/);
     expect(request.requestHash).toBe(founderPermissionRequestHash({
       requestId: request.requestId,
       requestedBySurface: request.requestedBySurface,
       proposal: request.proposal,
+      actionTarget: request.actionTarget,
+      note: request.note,
+    }));
+  });
+
+  it('binds a PromptOS workflow registry request to exact source, registry state, provider, capability, and consequence identity', () => {
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:promptos-workflow-001',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: registryTarget,
+      note: 'Promote only this exact workflow draft after founder approval.',
+    });
+
+    expect(request.actionTarget).toEqual(registryTarget);
+    expect(request.requestHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(request.requestHash).toBe(founderPermissionRequestHash({
+      requestId: request.requestId,
+      requestedBySurface: request.requestedBySurface,
+      proposal: request.proposal,
+      actionTarget: request.actionTarget,
       note: request.note,
     }));
   });
@@ -36,33 +92,150 @@ describe('Founder Permission Broker', () => {
       requestId: 'permission:bad-proposal',
       requestedBySurface: 'claude',
       proposal: { ...proposal, proposalHash: 'not-a-hash' },
+      actionTarget,
     })).toThrow(/proposalHash/);
   });
 
-  it('turns explicit founder approval into the canonical founder decision only', () => {
-    const request = createFounderPermissionRequest({ requestId: 'permission:approve-123', requestedBySurface: 'chatgpt', proposal });
-    const resolution = resolveFounderPermissionRequest({ request, decisionSurface: 'chatgpt', decision: 'approved' });
+  it('fails closed when merge scope omits the exact repository and PR target', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:missing-target',
+      requestedBySurface: 'chatgpt',
+      proposal,
+    })).toThrow(/exact merge actionTarget/);
+  });
+
+  it('fails closed when the merge target head disagrees with the proposal head', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:wrong-target-head',
+      requestedBySurface: 'chatgpt',
+      proposal,
+      actionTarget: { ...actionTarget, headSha: 'e'.repeat(40) },
+    })).toThrow(/expectedHeadSha must equal actionTarget headSha/);
+  });
+
+  it('fails closed when PromptOS workflow content identity disagrees with the proposal', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-content',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, workflowContentHash: `sha256:${'1'.repeat(64)}` },
+    })).toThrow(/proposalHash must equal the exact workflow content hash/);
+  });
+
+  it('fails closed when PromptOS registry branch or workflow path widens scope', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-branch',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, branch: 'release' },
+    })).toThrow(/restricted to main/);
+
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-path',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, workflowPath: 'workflows/other.workflow.json' },
+    })).toThrow(/workflowPath must match the workflow id/);
+  });
+
+  it('fails closed when execution context identities are widened or downgraded', () => {
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-provider',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, providerIdentity: 'github:jussray/other' as never },
+    })).toThrow(/canonical provider identity/);
+
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-capability',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, capabilityVersion: 'promptos-workflow-registry@v2' as never },
+    })).toThrow(/canonical capability version/);
+
+    expect(() => createFounderPermissionRequest({
+      requestId: 'permission:promptos-wrong-consequence',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: { ...registryTarget, consequence: 'READ' as never },
+    })).toThrow(/consequential-write classification/);
+  });
+
+  it('records explicit founder approval as FCR provenance without execution authority', () => {
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:approve-123',
+      requestedBySurface: 'chatgpt',
+      proposal,
+      actionTarget,
+    });
+    const resolution = resolveFounderPermissionRequest({ request, decision: 'approved' });
     expect(resolution.status).toBe('approved');
-    expect(resolution.founderPermissionSatisfied).toBe(true);
-    expect(resolution.decision.executionAuthorized).toBe(true);
-    expect(resolution.decision.proposal).toEqual(request.proposal);
+    expect(resolution.founderPermissionSatisfied).toBe(false);
+    expect(resolution.decision.surface).toBe('fcr');
+    expect(resolution.decision.executionAuthorized).toBe(false);
+    expect(resolution.decision.requestHash).toBe(request.requestHash);
     expect(resolution.independentReviewSatisfied).toBeNull();
   });
 
+  it('keeps PromptOS registry approval non-authorizing until execution binding exists', () => {
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:promptos-approve-001',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: registryTarget,
+    });
+    const resolution = resolveFounderPermissionRequest({ request, decision: 'approved' });
+
+    expect(resolution.status).toBe('approved');
+    expect(resolution.founderPermissionSatisfied).toBe(false);
+    expect(resolution.decision.surface).toBe('fcr');
+    expect(resolution.decision.executionAuthorized).toBe(false);
+    expect(resolution.request.actionTarget).toEqual(registryTarget);
+  });
+
   it('does not turn denial into execution authority', () => {
-    const request = createFounderPermissionRequest({ requestId: 'permission:reject-123', requestedBySurface: 'claude', proposal });
-    const resolution = resolveFounderPermissionRequest({ request, decisionSurface: 'claude', decision: 'rejected' });
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:reject-123',
+      requestedBySurface: 'claude',
+      proposal,
+      actionTarget,
+    });
+    const resolution = resolveFounderPermissionRequest({ request, decision: 'rejected' });
     expect(resolution.status).toBe('rejected');
     expect(resolution.founderPermissionSatisfied).toBe(false);
     expect(resolution.decision.executionAuthorized).toBe(false);
     expect(resolution.independentReviewSatisfied).toBeNull();
   });
 
-  it('rejects a tampered request before issuing a decision', () => {
-    const request = createFounderPermissionRequest({ requestId: 'permission:tamper-123', requestedBySurface: 'perplexity', proposal });
+  it('rejects a tampered request target before recording a decision', () => {
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:tamper-123',
+      requestedBySurface: 'perplexity',
+      proposal,
+      actionTarget,
+    });
     expect(() => resolveFounderPermissionRequest({
-      request: { ...request, proposal: { ...request.proposal, expectedHeadSha: 'd'.repeat(40) } },
-      decisionSurface: 'perplexity',
+      request: {
+        ...request,
+        actionTarget: { ...actionTarget, pullRequestNumber: 728 },
+      },
+      decision: 'approved',
+    })).toThrow(/request hash/);
+  });
+
+  it('rejects PromptOS workflow target tampering before recording a decision', () => {
+    const request = createFounderPermissionRequest({
+      requestId: 'permission:promptos-tamper-001',
+      requestedBySurface: 'chatgpt',
+      proposal: registryProposal,
+      actionTarget: registryTarget,
+    });
+
+    expect(() => resolveFounderPermissionRequest({
+      request: {
+        ...request,
+        actionTarget: { ...registryTarget, registryContentHash: `sha256:${'3'.repeat(64)}` },
+      },
       decision: 'approved',
     })).toThrow(/request hash/);
   });

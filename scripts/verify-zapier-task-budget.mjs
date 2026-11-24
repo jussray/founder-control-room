@@ -78,7 +78,7 @@ const requiredOutputFields = [
   'unknown_information', 'recommended_next_action', 'me_reality_now',
   'me_smallest_next_action', 'me_founder_voice', 'future_you_guidance',
   'future_you_what_mattered', 'future_you_what_did_not', 'future_you_valid_fear',
-  'chief_ai_decision', 'social_campaign_angle', 'social_campaign_media_brief',
+  'chief_ai_decision', 'social_campaign_angle', 'social_campaign_media_brief', 'social_post_job',
   'linkedin_rising_floor_ready', 'linkedin_baseline_ref', 'linkedin_growth_hypothesis',
   'linkedin_business_signal', 'linkedin_warm_conversation_action', 'linkedin_visual_brief',
   'linkedin_24h_gate', 'linkedin_48h_gate', 'linkedin_next_mutation',
@@ -98,6 +98,25 @@ if (!outputContract?.future_you?.required_opener) fail('FutureYou must retain it
 if (outputContract?.future_you?.generic_advice_allowed !== false) fail('FutureYou must not allow generic advice');
 requireTrue(outputContract?.me?.must_choose_one_smallest_next_action, 'Me must choose one smallest next action');
 
+const postJob = outputContract?.social_post_job;
+requireTrue(postJob?.required, 'social post job must be required');
+const allowedPostJobs = postJob?.allowed_values ?? [];
+if (
+  !Array.isArray(allowedPostJobs) ||
+  allowedPostJobs.length !== 4 ||
+  !['GROW', 'TRUST', 'SELL', 'PROVE'].every((job) => allowedPostJobs.includes(job))
+) {
+  fail('social post job values must be exactly GROW, TRUST, SELL, and PROVE');
+}
+requireFalse(postJob?.fixed_cadence_allowed, 'social post jobs must not hard-code a posting cadence');
+if (postJob?.measurement_source !== 'native_platform_and_like_for_like_founder_baseline') {
+  fail('social post jobs must measure against native platform evidence and a like-for-like founder baseline');
+}
+if (postJob?.missing_metric_classification !== 'UNKNOWN') {
+  fail('missing post-job metrics must classify as UNKNOWN');
+}
+requireTrue(postJob?.one_material_variable_change_when_practical, 'post-job experiments must prefer one material variable change at a time');
+
 const linkedinRisingFloor = outputContract?.linkedin_rising_floor;
 requireTrue(linkedinRisingFloor?.enabled, 'LinkedIn rising-floor strategy must remain enabled');
 if (linkedinRisingFloor?.goal !== 'steady_or_accelerating_verified_floor') {
@@ -111,6 +130,9 @@ if (linkedinRisingFloor?.baseline_source !== 'latest_verified_linkedin_analytics
 }
 if (linkedinRisingFloor?.partial_window_policy !== 'never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence') {
   fail('LinkedIn partial rolling windows must not be classified as decline without like-for-like evidence');
+}
+if (!(linkedinRisingFloor?.fingerprint_dimensions ?? []).includes('post_job')) {
+  fail('LinkedIn content fingerprints must include post_job');
 }
 const requiredLinkedInPostElements = new Set(linkedinRisingFloor?.required_post_elements ?? []);
 for (const element of [
@@ -275,6 +297,7 @@ const requiredGuardrails = [
   'external_send_or_publish_requires_founder_approval', 'budget_gate_runs_before_billable_actions',
   'stop_new_billable_work_at_operating_ceiling', 'buffer_never_receives_prompt_or_instructions',
   'buffer_content_must_pass_firewall', 'share_now_requires_named_run_authority',
+  'content_post_job_required_in_every_fingerprint',
   'linkedin_rising_floor_gate_before_schedule', 'partial_rolling_windows_never_define_decline',
   'warm_linkedin_conversations_are_conversion_signals', 'linkedin_winner_mechanics_compound_into_next_post',
 ];
@@ -291,5 +314,5 @@ console.log(
   `Founder Signal planning envelope verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
   `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve, ` +
   `${bufferDistribution.parallel_channel_slots} Buffer schedules plus one Gmail digest per campaign; ` +
-  'LinkedIn rising-floor strategy is fail-closed and live plan capability plus instant reply ingress remain explicit activation gates.',
+  'LinkedIn rising-floor strategy and social post-job fingerprints are fail-closed while live plan capability plus instant reply ingress remain explicit activation gates.',
 );

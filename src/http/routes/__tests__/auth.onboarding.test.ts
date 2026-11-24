@@ -9,7 +9,10 @@ const {
   mockVerifyOtp,
   mockGetUser,
   mockRefreshSession,
+  mockInviteFounder,
+  founderState,
   supabaseMock,
+  browserSessions,
 } = vi.hoisted(() => ({
   mockSignInWithOAuth: vi.fn(),
   mockSignInWithOtp: vi.fn(),
@@ -17,7 +20,10 @@ const {
   mockVerifyOtp: vi.fn(),
   mockGetUser: vi.fn(),
   mockRefreshSession: vi.fn(),
+  mockInviteFounder: vi.fn(),
+  founderState: { aliasUserId: null as string | null },
   supabaseMock: { from: vi.fn() },
+  browserSessions: new Map<string, Record<string, unknown>>(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -37,18 +43,21 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   }),
 }));
 
-vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
+vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: { ...supabaseMock, auth: { admin: { inviteUserByEmail: mockInviteFounder } } } }));
 
 import express from 'express';
 import request from 'supertest';
 import { writeFounderSession } from '../../../auth/founderSession.js';
+import { FOUNDER_API_URL } from '../../middleware/security.js';
 import { authRouter } from '../auth.js';
 import { onboardingRouter } from '../onboarding.js';
 
 const EMAIL = 'sekretbip@gmail.com';
+const ALIAS = 'alias@example.com';
+const ALIAS_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
-const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
+const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
 function app() {
   const instance = express();
@@ -58,19 +67,99 @@ function app() {
   return instance;
 }
 
+function browserSessionTable() {
+  let operation: 'read' | 'update' = 'read';
+  let updatePayload: Record<string, unknown> = {};
+  let sessionHash = '';
+  let requireUnrevoked = false;
+  let expiresAfter = '';
+  const chain: any = {
+    select: () => chain,
+    eq: (field: string, value: unknown) => {
+      if (field === 'session_id_hash') sessionHash = String(value);
+      return chain;
+    },
+    is: (field: string, value: unknown) => {
+      if (field === 'revoked_at' && value === null) requireUnrevoked = true;
+      return chain;
+    },
+    gt: (field: string, value: unknown) => {
+      if (field === 'expires_at') expiresAfter = String(value);
+      return chain;
+    },
+    insert: async (value: Record<string, unknown>) => {
+      browserSessions.set(String(value.session_id_hash), { ...value, revoked_at: null, revoke_reason: null });
+      return { data: null, error: null };
+    },
+    update: (value: Record<string, unknown>) => {
+      operation = 'update';
+      updatePayload = value;
+      return chain;
+    },
+    maybeSingle: async () => {
+      const row = browserSessions.get(sessionHash) ?? null;
+      if (!row) return { data: null, error: null };
+      if (requireUnrevoked && row.revoked_at != null) return { data: null, error: null };
+      if (expiresAfter && String(row.expires_at ?? '') <= expiresAfter) return { data: null, error: null };
+      return { data: row, error: null };
+    },
+    then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
+      if (operation === 'update') {
+        const row = browserSessions.get(sessionHash);
+        if (row && (!requireUnrevoked || row.revoked_at == null)) {
+          browserSessions.set(sessionHash, { ...row, ...updatePayload });
+        }
+      }
+      return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+    },
+  };
+  return chain;
+}
+
 function setAllowlist(allowed: boolean) {
   supabaseMock.from.mockImplementation((table: string) => {
-    if (table !== 'founder_users') return {};
-    return {
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({
-            data: allowed ? { email: EMAIL } : null,
-            error: null,
-          }),
-        }),
-      }),
+    if (table === 'founder_browser_sessions') return browserSessionTable();
+    if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
+    let requestedUserId = '';
+    let requestedEmail = '';
+    let requiredUnbound = false;
+    let updatedFields: Record<string, unknown> | null = null;
+    const query: any = {
+      select: () => query,
+      eq: (field: string, value: unknown) => {
+        if (field === 'user_id') requestedUserId = String(value);
+        if (field === 'email') requestedEmail = String(value);
+        return query;
+      },
+      is: (field: string, value: unknown) => {
+        if (field === 'user_id' && value === null) requiredUnbound = true;
+        return query;
+      },
+      update: (fields: Record<string, unknown>) => { updatedFields = fields; return query; },
+      not: () => query,
+      maybeSingle: () => {
+        if (!allowed) return Promise.resolve({ data: null, error: null });
+        if (updatedFields) {
+          if (requestedEmail !== ALIAS || !requiredUnbound || founderState.aliasUserId) {
+            return Promise.resolve({ data: null, error: null });
+          }
+          founderState.aliasUserId = String(updatedFields.user_id);
+          return Promise.resolve({ data: { user_id: founderState.aliasUserId }, error: null });
+        }
+        if (requestedEmail === ALIAS) return Promise.resolve({
+          data: { email: ALIAS, user_id: founderState.aliasUserId }, error: null,
+        });
+        if (requestedEmail && requestedEmail !== EMAIL) {
+          return Promise.resolve({ data: null, error: null });
+        }
+        return Promise.resolve({
+          data: !requestedUserId || requestedUserId === 'founder-user'
+            ? { email: EMAIL, user_id: 'founder-user' } : null,
+          error: null,
+        });
+      },
     };
+    return { select: () => query, update: query.update };
   });
 }
 
@@ -81,28 +170,32 @@ function validSession() {
     expires_at: 2_000_000_000,
     expires_in: 3600,
     token_type: 'bearer',
-    user: { id: 'founder-user', email: EMAIL },
+    user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' },
   };
 }
 
-function browserCookie() {
-  let setCookie = '';
+async function browserCookie() {
+  let setCookie: unknown = '';
   const res = {
     setHeader(name: string, value: unknown) {
-      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      if (name.toLowerCase() === 'set-cookie') setCookie = value;
       return res;
     },
   } as unknown as Response;
-  writeFounderSession(res, validSession() as unknown as Session);
-  return setCookie.split(';', 1)[0] ?? '';
+  await writeFounderSession(res, validSession() as unknown as Session);
+  const cookies = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
+  return (cookies[0] ?? '').split(';', 1)[0] ?? '';
 }
 
 describe('founder browser onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserSessions.clear();
+    founderState.aliasUserId = null;
+    mockInviteFounder.mockResolvedValue({ data: { user: { id: ALIAS_USER_ID, email: ALIAS } }, error: null });
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
-    vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
+    vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY);
     setAllowlist(true);
     mockSignInWithOAuth.mockResolvedValue({
       data: { provider: 'google', url: 'https://supabase.example/authorize/google' },
@@ -110,7 +203,7 @@ describe('founder browser onboarding', () => {
     });
     mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user', email: EMAIL } },
+      data: { user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
   });
@@ -143,7 +236,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {
-        redirectTo: expect.stringMatching(/\/auth\/callback$/),
+      redirectTo: expect.stringContaining('/auth/callback'),
         skipBrowserRedirect: true,
       },
     });
@@ -163,7 +256,7 @@ describe('founder browser onboarding', () => {
     expect(response.body.error.details).toEqual([]);
   });
 
-  it('sends a first-login magic link only for the allowlisted email', async () => {
+  it('sends a magic link only for a pre-provisioned founder account', async () => {
     const response = await request(app())
       .post('/auth/magic-link')
       .send({ email: `  ${EMAIL.toUpperCase()}  ` });
@@ -172,7 +265,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
       email: EMAIL,
       options: expect.objectContaining({
-        shouldCreateUser: true,
+        shouldCreateUser: false,
         emailRedirectTo: expect.stringMatching(/\/auth\/callback$/),
       }),
     });
@@ -190,9 +283,77 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
-  it('verifies fragment credentials and establishes one strict secure HttpOnly session cookie', async () => {
+  it('only the interactive verified founder can send an invitation to a preapproved, unbound address', async () => {
+    const blocked = await request(app()).post('/auth/founder/invite')
+      .set('Origin', FOUNDER_API_URL).send({ email: ALIAS });
+    expect(blocked.status).toBe(401);
+    expect(mockInviteFounder).not.toHaveBeenCalled();
+
+    const invited = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL).send({ email: ALIAS });
+    expect(invited.status).toBe(202);
+    expect(invited.body.data.status).toBe('invited_pending_email_verification');
+    expect(invited.headers['cache-control']).toBe('private, no-store');
+    expect(mockInviteFounder).toHaveBeenCalledWith(ALIAS, {
+      redirectTo: expect.stringContaining('/auth/callback'),
+    });
+    expect(founderState.aliasUserId).toBe(ALIAS_USER_ID);
+
+    const unapproved = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .send({ email: 'stranger@example.com' });
+    expect(unapproved.status).toBe(403);
+    const malformed = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .send({ email: 'ali as@example.com' });
+    expect(malformed.status).toBe(400);
+    expect(mockInviteFounder).toHaveBeenCalledTimes(1);
+
+    const foreignOrigin = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', 'https://attacker.example')
+      .send({ email: ALIAS });
+    expect(foreignOrigin.status).toBe(403);
+    const missingOrigin = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).send({ email: ALIAS });
+    expect(missingOrigin.status).toBe(403);
+    const bearerBypass = await request(app()).post('/auth/founder/invite')
+      .set('Cookie', await browserCookie()).set('Origin', FOUNDER_API_URL)
+      .set('Authorization', 'Bearer attacker-token').send({ email: ALIAS });
+    expect(bearerBypass.status).toBe(400);
+    expect(mockInviteFounder).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not treat an invited but unconfirmed email as authenticated founder', async () => {
+    founderState.aliasUserId = ALIAS_USER_ID;
+    mockVerifyOtp.mockResolvedValue({
+      data: {
+        session: validSession(),
+        user: { id: ALIAS_USER_ID, email: ALIAS, email_confirmed_at: null },
+      },
+      error: null,
+    });
+    const unconfirmed = await request(app()).get('/auth/callback')
+      .query({ token_hash: 'pending-invite', type: 'invite' });
+    expect(unconfirmed.status).toBe(401);
+    expect(unconfirmed.headers['set-cookie']).toBeUndefined();
+    expect(mockVerifyOtp).toHaveBeenCalledWith({ token_hash: 'pending-invite', type: 'invite' });
+
+    mockVerifyOtp.mockResolvedValue({
+      data: {
+        session: validSession(),
+        user: { id: ALIAS_USER_ID, email: ALIAS, email_confirmed_at: '2026-11-15T00:00:00Z' },
+      },
+      error: null,
+    });
+    const confirmed = await request(app()).get('/auth/callback')
+      .query({ token_hash: 'verified-invite', type: 'invite' });
+    expect(confirmed.status).toBe(303);
+    expect(confirmed.headers.location).toBe('/');
+  });
+
+  it('verifies fragment credentials and establishes one strict opaque secure HttpOnly session cookie', async () => {
     mockSetSession.mockResolvedValue({
-      data: { session: validSession(), user: { id: 'founder-user', email: EMAIL } },
+      data: { session: validSession(), user: { id: 'founder-user', email: EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
       error: null,
     });
 
@@ -207,15 +368,18 @@ describe('founder browser onboarding', () => {
       meta: {},
     });
     const cookie = response.headers['set-cookie']?.[0] ?? '';
-    expect(cookie).toContain('fcr_session=');
+    expect(cookie).toContain('__Host-fcr_session=');
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
     expect(cookie).toContain('Secure');
     expect(cookie).not.toContain(ACCESS_TOKEN);
+    expect(cookie).not.toContain(REFRESH_TOKEN);
     expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(browserSessions.size).toBe(1);
   });
 
-  it('rejects a valid Supabase session when the email is not allowlisted', async () => {
+  it('rejects a valid Supabase session when the email is not allowlisted without erasing the existing founder capability', async () => {
+    const existingCookie = await browserCookie();
     setAllowlist(false);
     mockSetSession.mockResolvedValue({
       data: { session: validSession(), user: { id: 'outsider', email: 'outsider@example.com' } },
@@ -224,18 +388,19 @@ describe('founder browser onboarding', () => {
 
     const response = await request(app())
       .post('/auth/session')
+      .set('Cookie', existingCookie)
       .send({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
-    expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+    expect(response.headers['set-cookie']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
-  it('authenticates browser requests from the HttpOnly session cookie', async () => {
+  it('authenticates browser requests by resolving the opaque capability server-side', async () => {
     const response = await request(app())
       .get('/auth/me')
-      .set('Cookie', browserCookie());
+      .set('Cookie', await browserCookie());
 
     expect(response.status).toBe(200);
     expect(response.body.data.founder).toEqual({ email: EMAIL, userId: 'founder-user' });

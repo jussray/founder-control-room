@@ -15,11 +15,13 @@ import {
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_BASE_REF = "main";
 const TRUSTED_APP_ENV = "GITHUB_APP_ID";
+const FULL_SHA = /^[0-9a-f]{40}$/i;
 
 export interface DeterministicReviewWitnessInput {
   provider: RepositoryProvider;
   projectId: string;
   pullRequestNumber: number;
+  expectedHeadSha?: string;
 }
 
 export interface DeterministicReviewWitnessResult {
@@ -41,6 +43,22 @@ function trustedAppId(): string {
     throw new Error(`Deterministic review witness publishing requires numeric server-owned ${TRUSTED_APP_ENV}`);
   }
   return value;
+}
+
+function assertFounderBoundExpectedHead(
+  receipt: IndependentReviewReceipt,
+  expectedHeadSha: string | undefined,
+): void {
+  if (expectedHeadSha === undefined) return;
+  const expected = lower(expectedHeadSha);
+  if (!FULL_SHA.test(expected)) {
+    throw new Error("Deterministic review witness founder-bound expected head must be a full commit SHA");
+  }
+  if (lower(receipt.headSha) !== expected) {
+    throw new Error(
+      "Deterministic review PR identity moved before witness publication; founder-bound expected head does not match provider review head",
+    );
+  }
 }
 
 function assertContextStillMatches(
@@ -90,15 +108,21 @@ function matchingTrustedSignal(
  * success only from provider readback under the server-owned GitHub App
  * identity and the full provider evidence fingerprint.
  *
+ * When a founder-bound expected head is supplied, the derived provider receipt
+ * must match that exact head before any Check Run publication can occur. This
+ * closes the dispatch-to-publisher race without allowing caller-supplied review
+ * content, verdicts, check names, or publisher identity.
+ *
  * Reconcile-before-create is load-bearing for retry safety: if a prior request
  * created the Check Run but failed during later readback, a retry rederives the
  * same receipt and reuses the trusted exact witness instead of posting a
  * duplicate. A failed pre-publication readback performs no provider mutation.
  *
  * This function never accepts a caller-supplied receipt, reviewer identity,
- * verdict, check name, conclusion, head SHA, publisher, or trusted App identity.
- * It remains proposal-only and does not grant merge, execution, deployment, or
- * founder authority.
+ * verdict, check name, conclusion, publisher, or trusted App identity. The
+ * optional expected head is only an equality constraint on provider-derived
+ * identity. It remains proposal-only and does not grant merge, execution,
+ * deployment, or founder authority.
  */
 export async function publishDeterministicReviewWitness(
   input: DeterministicReviewWitnessInput,
@@ -117,6 +141,8 @@ export async function publishDeterministicReviewWitness(
     pullRequestNumber: input.pullRequestNumber,
   });
   const { receipt } = production;
+
+  assertFounderBoundExpectedHead(receipt, input.expectedHeadSha);
 
   if (!production.publishable || receipt.verdict !== "clear" || receipt.findings.some((finding) => finding.severity !== "P3")) {
     throw new Error(

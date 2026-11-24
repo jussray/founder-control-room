@@ -46,7 +46,7 @@ describe("provider and schema truth", () => {
     expect(providerFactory).toContain("GITHUB_TOKEN remains a local/development fallback only");
     expect(appAuth).toContain("apps.getRepoInstallation");
     expect(appAuth).toContain("apps.createInstallationAccessToken");
-    expect(appAuth).toContain("repositories: [repo]");
+    expect(appAuth).toContain("repositories: [repository.repo]");
   });
 
   it("observes projects through the live registry instead of obsolete connection columns", () => {

@@ -27,7 +27,9 @@ export function matchesFilters(row, filters) {
     const actual = getPath(row, col);
     switch (op) {
       case 'eq': return actual === val;
+      case 'is': return val === null ? actual == null : actual === val;
       case 'in': return Array.isArray(val) && val.includes(actual);
+      case 'gt': return actual !== undefined && actual > val;
       case 'gte': return actual !== undefined && actual >= val;
       case 'lt': return actual !== undefined && actual < val;
       default: return true;

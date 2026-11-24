@@ -25,10 +25,8 @@ for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
-// Keep the public package-script contract stable while proving each long
-// journey against a fresh real server. The application correctly enforces a
-// per-IP general request limit; running all three journeys in one process
-// would test shared limiter exhaustion instead of their independent behavior.
+process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+
 if (!process.env.FCR_E2E_SCENARIO) {
   const runnerPath = new URL('./direct-browser-run.mjs', import.meta.url).pathname;
   for (const scenario of ['full', 'capability-workbench', 'guarded-terminal']) {
@@ -129,12 +127,56 @@ function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
   return { ...base, decisionHash: v10DecisionReceiptHash(base) };
 }
 
-// run.mjs performs one privileged create_branch directly with Node fetch for
-// the guarded-terminal proof. Bind that provider-boundary call to the same
-// canonical Chief plan/approved registry used by the real browser forms.
+let activeBrowserPage = null;
+
+async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
+  const headers = new Headers(init.headers ?? {});
+  const authorization = headers.get('authorization');
+  if (!authorization) return null;
+
+  if (!/^Bearer (?:undefined|null)?$/i.test(authorization.trim())) {
+    throw new Error('E2E_BROWSER_BEARER_REGRESSION: browser-readable bearer credentials must not cross the opaque-session boundary');
+  }
+  if (!activeBrowserPage) {
+    throw new Error('E2E_OPAQUE_BROWSER_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+  }
+  if (init.body !== undefined && typeof init.body !== 'string') {
+    throw new Error('E2E_OPAQUE_BROWSER_BODY_UNSUPPORTED: legacy compatibility calls must use a string body');
+  }
+
+  headers.delete('authorization');
+  const request = {
+    url,
+    method: init.method ?? 'GET',
+    headers: Object.fromEntries(headers.entries()),
+    body: init.body ?? null,
+  };
+  const result = await activeBrowserPage.evaluate(async (browserRequest) => {
+    const response = await fetch(browserRequest.url, {
+      method: browserRequest.method,
+      headers: browserRequest.headers,
+      body: browserRequest.body,
+      credentials: 'same-origin',
+    });
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: [...response.headers.entries()],
+      body: await response.text(),
+    };
+  }, request);
+
+  return new Response(result.body, {
+    status: result.status,
+    statusText: result.statusText,
+    headers: result.headers,
+  });
+}
+
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
   if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
     try {
       const body = JSON.parse(init.body);
@@ -146,12 +188,115 @@ globalThis.fetch = async (input, init = {}) => {
       // Preserve malformed requests unchanged so the real route can reject them.
     }
   }
+
+  const browserResponse = await runLegacyBearerCallThroughOpaqueBrowser(url, init);
+  if (browserResponse) return browserResponse;
   return originalFetch(input, init);
 };
 
+const LEGACY_TAB_ROUTES = {
+  projects: { screen: 'Control', view: 'Overview' },
+  missions: { screen: 'Control', view: 'Work' },
+  analytics: { screen: 'Control', view: 'Costs' },
+  terminal: { screen: 'Control', view: 'Execution' },
+  l99: { screen: 'Chief', view: null },
+  promptos: { screen: 'PromptOS', view: null },
+  activity: { screen: 'Proof', view: null },
+};
+
+function legacyTabRoute(selector) {
+  if (typeof selector !== 'string') return null;
+  const match = selector.match(/^\.tabs button\[data-tab=(?:"|')?([a-z0-9-]+)(?:"|')?\]$/i);
+  return match ? LEGACY_TAB_ROUTES[match[1]] ?? null : null;
+}
+
+async function driveFiveScreenNavigation(page, route) {
+  const primary = page.locator('.founder-screen-nav button', { hasText: route.screen });
+  await primary.waitFor({ state: 'visible' });
+  await primary.click();
+  if (route.view) {
+    const secondary = page.locator('.founder-subnav button', { hasText: route.view });
+    await secondary.waitFor({ state: 'visible' });
+    await secondary.click();
+  }
+}
+
 async function withV10PlanAwarePage(page) {
+  activeBrowserPage = page;
+  page.on('response', (response) => {
+    const url = response.url();
+    if (!url.includes('/approvals/') || !url.endsWith('/execute') || response.ok()) return;
+    void response.json()
+      .then((body) => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({
+          status: response.status(),
+          code: body?.code ?? null,
+          error: body?.error ?? null,
+          detail: body?.detail ?? null,
+        }));
+      })
+      .catch(() => {
+        console.error('[E2E_EXECUTE_REJECTION]', JSON.stringify({ status: response.status(), code: null, error: 'non-json rejection body' }));
+      });
+  });
+
+  const originalEvaluate = page.evaluate.bind(page);
+  page.evaluate = async (...args) => {
+    const [pageFunction] = args;
+    try {
+      return await originalEvaluate(...args);
+    } catch (error) {
+      const source = typeof pageFunction === 'function' ? pageFunction.toString() : '';
+      const staleBearerRead = source.includes("JSON.parse(sessionStorage.getItem('fcr_session')).access_token");
+      if (staleBearerRead && error instanceof Error && /Cannot read properties of null/.test(error.message)) {
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
+  const originalWaitForSelector = page.waitForSelector.bind(page);
+  page.waitForSelector = async (selector, options) => {
+    if (selector === '#new-project-form') {
+      // app.js performs an authenticated boot load after the document load event
+      // and re-renders the shell when those reads settle. Wait for that real
+      // startup traffic before driving Control so the proof cannot race a
+      // legitimate boot render back to Home.
+      await page.waitForLoadState('networkidle');
+      const target = page.locator(selector);
+      if (!(await target.isVisible().catch(() => false))) {
+        await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
+      }
+    }
+    return originalWaitForSelector(selector, options);
+  };
+
+  const originalFill = page.fill.bind(page);
+  page.fill = async (selector, value, options) => {
+    if (typeof selector === 'string' && selector.startsWith('#new-project-form')) {
+      const target = page.locator(selector);
+      if (!(await target.isVisible().catch(() => false))) {
+        await driveFiveScreenNavigation(page, LEGACY_TAB_ROUTES.projects);
+      }
+    }
+    return originalFill(selector, value, options);
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    const fiveScreenRoute = legacyTabRoute(selector);
+
+    if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
+      await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
+    }
+
+    if (fiveScreenRoute) {
+      const primaryNav = page.locator('.founder-screen-nav');
+      await primaryNav.waitFor({ state: 'visible' });
+      await driveFiveScreenNavigation(page, fiveScreenRoute);
+      return;
+    }
+
     if (selector === '#create-branch-form button[type=submit]') {
       await page.fill(
         '#create-branch-form textarea[name="capabilityPlan"]',

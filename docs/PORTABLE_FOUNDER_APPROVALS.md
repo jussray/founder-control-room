@@ -15,7 +15,54 @@ Juss decides in an approved console
 → immutable decision and execution receipts remain in Founder Control Room
 ```
 
-This contract removes manual-only approval bottlenecks without turning model output, copied chat text, or a provider session into unlimited authority.
+This contract removes manual-screen-only approval bottlenecks without turning model output, copied chat text, provider sessions, or standing merge capability into unlimited authority.
+
+## Ask-Founder broker boundary
+
+The `/mcp/founder-permissions` Ask-Founder broker is an interim decision-capture boundary, not a substitute for the portable approval packet above.
+
+- Bearer-authenticated agents may create an exact pending request, but a decision write requires an independently authenticated current `__Host-fcr_session` browser identity plus a browser `Origin` already accepted by the global `FOUNDER_ALLOWED_ORIGINS` CORS boundary.
+- The historical `fcr_session` name is deletion-only after the opaque-session cutover and must never be accepted as authentication or authority.
+- `requestedBySurface` records where the request came from. It is audit metadata only and cannot authenticate the founder or name the authoritative decision surface.
+- Until a registered console adapter supplies the attestation required by this document, the authoritative broker decision surface is derived server-side as `fcr`. A caller cannot label an FCR-browser decision as `chatgpt`, `claude`, or `perplexity`.
+- A merge request must bind the exact owned repository, pull-request number, base SHA, and head SHA. The target is included in the request hash and the proposal `expectedHeadSha` must equal the target head.
+- A recorded broker decision is deliberately non-authorizing: its decision record carries `executionAuthorized: false`. Exact action authority is still issued only inside the separately scoped server-side execution membrane.
+- Approved broker rows receive a bounded 20-minute decision window. Expired, revoked, or already-consumed rows do not satisfy founder permission.
+- Consumption is an atomic one-time ledger transition bound to both the exact request hash and exact decision hash. Generic broker consumption does not itself imply an external effect; only a registered action-specific server-side executor may act after successful exact consumption.
+- Founder revocation is a separate interactive transition from an approved browser origin. Revoked decisions cannot become satisfiable again.
+- Founder permission and Independent Review remain separate gates. Neither one implies the other.
+
+This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, stored `approved` row, fingerprint, continuity receipt, or `merge_authority: true` manufacture reusable execution authority.
+
+## Browser cookie, continuity fingerprint, and proof cookie
+
+Founder Control Room deliberately uses the word **cookie** for two different continuity concepts and keeps them technically separate.
+
+### Browser session cookie
+
+`__Host-fcr_session` is the only active founder browser-session cookie. It is a strictly necessary, server-issued opaque capability with `Secure`, `HttpOnly`, `SameSite=Strict`, and `Path=/`. The browser never receives Supabase access or refresh tokens inside this cookie. Only the opaque capability's SHA-256 lookup hash is persisted, and active server-side session state remains required before the cookie can authenticate the founder.
+
+### Session continuity fingerprint
+
+`continuity_fingerprint` is deterministic server-state integrity evidence over the active opaque-session hash, founder identity, normalized founder email, issuance time, expiry time, and session version. It is **not** a probabilistic browser/device fingerprint and must exclude IP address, ASN, country, JA4, user-agent identity, hardware entropy, cross-site identifiers, and similar tracking surfaces.
+
+A continuity fingerprint detects unexpected mutation of the server-owned session record. It does not authenticate a different browser, authorize an action, approve a merge, grant provider authority, or replace the active session lookup.
+
+### Proof cookie / continuity receipt
+
+A portfolio **proof cookie** or **continuity receipt** is audit metadata, not an HTTP cookie. It may bind an exact repository/target/base/head fingerprint, bounded scope, evidence state, predecessor/successor relation, freshness window, and next gate so another verifier can resume from the same evidence boundary without pretending old state is current.
+
+Proof cookies must preserve these invariants:
+
+```text
+browserCookie = false
+actionAuthority = false
+fingerprint = exact bound state
+continuity = bounded evidence only
+authority = separately authenticated decision
+```
+
+A proof cookie must never be emitted with `Set-Cookie`, stored as a browser authentication capability, contain raw session/provider credentials, or be accepted as Founder Final, merge, deployment, provider mutation, database migration, publication, billing, destructive-action, or external-effect authority. Any material movement in its bound repository/base/head/diff/review/provider/runtime fingerprint invalidates the prior proof cookie for present-tense use and converts it to historical evidence.
 
 ## Approved source consoles
 
@@ -107,7 +154,8 @@ A valid founder decision authorizes only its exact scope. It does not make evide
 ChatGPT and Claude may:
 
 - present the exact proposed action and evidence to Juss;
-- capture Juss’s approve or deny decision through a registered authenticated adapter;
+- ask Juss for an explicit approve or deny decision for that exact action;
+- capture that decision through a registered authenticated adapter;
 - transmit the resulting packet to Founder Control Room;
 - request execution through the existing Approval Engine or Command Bridge;
 - report the immutable decision and execution receipts.
@@ -115,21 +163,29 @@ ChatGPT and Claude may:
 They may not:
 
 - self-approve based on their own recommendation;
-- forge `founderId`, conversation references, hashes, signatures, or provider receipts;
-- treat “continue,” a prior broad approval, or model memory as authorization for unrelated scope;
+- forge `founderId`, conversation references, hashes, signatures, provider receipts, continuity fingerprints, or proof cookies;
+- treat “continue,” “approved” without an exact merge target, a review request, a prior broad approval, model memory, a browser cookie, or a continuity receipt as merge authorization;
+- turn `merge_authority: true` into `merge_approved: true`;
 - turn a merge approval into deployment, publication, deletion, credential, or billing authority;
 - bypass exact-head, evidence, rollback, idempotency, or audit requirements.
 
-## Merge authority
+## Merge authority and exact approval
 
-The standing evidence-based merge decision in `docs/FOUNDER_MERGE_AUTHORITY.md` remains valid. Portable approval packets add a provider-independent way for Juss to give a new exact decision when a repository or mission requires one. They do not re-lock merge authority to a manual Founder Control Room screen.
+`docs/FOUNDER_MERGE_AUTHORITY.md` defines merge capability and merge approval as separate concepts.
 
-A repository merge may proceed when either:
+- `merge_authority: true` means the governed merge capability/authority class exists.
+- A repository merge still requires a fresh explicit founder approval for the exact repository, pull request, current base SHA, and current head SHA.
+- If that approval is missing, ambiguous, or stale, the console or operator must ask and stop.
+- Any base/head movement invalidates the prior merge approval and requires a new founder decision.
 
-1. standing Founder Merge Authority applies and every listed evidence condition is satisfied; or
-2. a valid exact-scope portable approval packet authorizes the merge and every evidence condition is satisfied.
+Portable approval packets provide a provider-independent authenticated carrier for that required exact founder decision. They do **not** provide an alternate standing path that can skip asking Juss.
 
-Evidence is the lock. The approved conversational console is a command surface.
+A repository merge may proceed only when:
+
+1. current evidence satisfies the applicable merge conditions; and
+2. a fresh exact-candidate founder approval is present through the repository's authenticated founder-final mechanism or an equivalent valid exact-scope portable approval packet.
+
+Evidence is the lock. Exact founder approval turns the key. The approved conversational console is only a command surface.
 
 ## Command Bridge integration
 
@@ -164,10 +220,24 @@ Until registration is complete:
 
 Store the minimum decision evidence needed for authority and dispute resolution. Prefer hashes and stable references over entire private conversations.
 
-Never place raw API keys, session tokens, private teen content, journals, voice recordings, family addresses, legal records, or unrelated conversation history inside approval packets, GitHub comments, public logs, or provider-visible metadata.
+Never place raw API keys, session tokens, private teen content, journals, voice recordings, family addresses, legal records, or unrelated conversation history inside approval packets, GitHub comments, public logs, provider-visible metadata, or proof cookies.
 
 ## Rollback
 
 A consumed decision cannot be erased from history. Rollback creates a new auditable action that reverses the affected system state when possible.
 
 For an unmerged repository patch, rollback is a revert commit or branch abandonment. Branch deletion remains a separate explicit deletion decision.
+
+### PromptOS workflow registry action-bound execution
+
+The `promptos_workflow_registry_promote` target is a deliberately narrow extension of the same broker. It must bind the canonical `jussray/promptos` repository, `main`, an exact 40-character head SHA, workflow id and version, exact workflow content hash, exact registry content hash, canonical registry/workflow paths, provider identity `github:jussray/promptos`, capability version `promptos-workflow-registry@v1`, and consequential-write classification. Any mismatch rejects the request instead of widening it.
+
+A recorded approval still carries `executionAuthorized: false`. Before one-shot consumption, the server-side execution membrane independently resolves current PromptOS `main` through the trusted repository provider and rereads both the workflow artifact and registry from the approved head. The observed head, workflow content hash, registry content hash, workflow id, and workflow version must exactly equal the approved subject. Caller-supplied “live” state is not accepted as proof.
+
+After the ledger atomically consumes the exact approved request once, the registered PromptOS executor revalidates provider state at the effect boundary and performs the registry promotion only inside the server process. The writer creates a commit whose parent is the exact founder-approved pre-head and advances `main` with a non-forced ref update. A concurrent branch move therefore fails instead of being silently absorbed. Ambiguous provider responses are reconciled only by authoritative branch readback.
+
+Success requires provider-native readback proving both that PromptOS `main` equals the newly created commit and that `workflows/registry.json` contains the exact intended approved workflow entry. Head movement, workflow drift, registry drift, binding tamper, expiry, revocation, replay, consumption race, non-fast-forward update, ambiguous unverified outcome, or readback mismatch fails closed. If the approval was already consumed, the system reports `retryAuthorized: false`; a new approval is required rather than blindly repeating a consequential write.
+
+The public consume response is evidence only. It continues to report `executionAuthorized: false` and returns a bounded effect receipt rather than the internal decision-bound execution permit. A public receipt, continuity receipt, copied JSON response, binding fingerprint, or prior approval cannot be replayed into provider-write authority.
+
+This source contract proves that the governed execution path exists in the repository. It does **not** prove that any live PromptOS registry promotion has occurred. A live promotion claim requires an actual approved request to traverse the runtime path plus its provider-native outcome receipt. Provider acceptance without exact readback is not completion truth.

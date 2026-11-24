@@ -32,6 +32,13 @@ import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import {
+  createBranchAuthorityContext,
+  issueCreateBranchAuthority,
+  type IssuedCreateBranchAuthority,
+} from '../../founder-os-lab/authorityIssuance.js';
+import { executeAuthorizedCreateBranch } from '../../providers/authorizedRepositoryMutation.js';
+import { isSafeFounderOsStagedPatchPath, validateFounderOsStagedPatch } from '../../founder-os-lab/missionPatchHandoff.js';
+import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   evaluateIndependentReviewGate,
   independentReviewDiffHash,
@@ -571,6 +578,7 @@ approvalsRouter.post(
 approvalsRouter.post(
   '/:missionId/execute',
   async (req: FounderRequest, res: Response) => {
+    const observedRequestTime = new Date().toISOString();
     const { missionId } = req.params as { missionId: string };
     const { actionType, idempotencyKey, payload = {} } = req.body as {
       actionType: string;
@@ -676,6 +684,48 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    let createBranchAuthority: IssuedCreateBranchAuthority | null = null;
+    let createBranchArgs: { branchName: string; baseRef: string } | null = null;
+    if (actionType === 'create_branch') {
+      if (mission.status !== 'proposed') {
+        return res.status(409).json({
+          ok: false,
+          code: 'MISSION_NOT_PROPOSED',
+          error: `Mission must be proposed before branch creation; current status is ${mission.status}.`,
+        });
+      }
+      const branchName = text(payload['branchName']) || `mission/${missionId.slice(0, 8)}`;
+      const baseRef = text(payload['baseRef']) || 'main';
+      createBranchArgs = { branchName, baseRef };
+      try {
+        createBranchAuthority = issueCreateBranchAuthority({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef,
+          branchName,
+          state: {
+            missionStatus: mission.status,
+            policySnapshot: (mission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+          now: observedRequestTime,
+        });
+      } catch (error) {
+        return res.status(409).json({
+          ok: false,
+          code: 'AUTHORITY_ISSUANCE_FAILED',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Reserve before external mutation. The unique idempotency key is the final
     // race barrier if two requests pass the preceding lookup concurrently.
     const { data: reservation, error: reservationError } = await supabase
@@ -687,7 +737,9 @@ approvalsRouter.post(
         idempotency_key: idempotencyKey,
         executed_by: req.founder!.email,
         status: 'pending',
-        request: payload,
+        request: createBranchAuthority
+          ? { ...payload, authorityEnvelope: createBranchAuthority.envelope }
+          : payload,
         result: {},
         success: null,
         started_at: new Date().toISOString(),
@@ -728,32 +780,72 @@ approvalsRouter.post(
 
     try {
       if (actionType === 'create_branch') {
-        if (mission.status !== 'proposed') {
-          throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
+        if (!createBranchAuthority || !createBranchArgs) {
+          throw new Error('Create-branch authority was not issued for this execution.');
         }
-        const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
-        const baseRef = (payload['baseRef'] as string) ?? 'main';
-        await provider.createBranch(project.slug, baseRef, branchName);
+
+        const { data: freshMission, error: freshMissionError } = await supabase
+          .from('missions')
+          .select('status, policy_snapshot')
+          .eq('id', missionId)
+          .single();
+        if (freshMissionError || !freshMission) {
+          throw new Error('Create-branch authority could not reacquire current mission state.');
+        }
+
+        const freshContext = createBranchAuthorityContext({
+          missionId,
+          projectId: project.slug,
+          actor: req.founder!.email,
+          approvedBy: req.founder!.email,
+          idempotencyKey,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          state: {
+            missionStatus: freshMission.status,
+            policySnapshot: (freshMission.policy_snapshot as Record<string, unknown> | null) ?? null,
+          },
+          proof: {
+            id: String(proofRecord.id),
+            gateId: String(proofRecord.gate_id),
+            createdAt: String(proofRecord.created_at),
+          },
+          now: new Date().toISOString(),
+          toolCallId: createBranchAuthority.envelope.toolCallId,
+        });
+
+        await executeAuthorizedCreateBranch(provider, {
+          projectId: project.slug,
+          baseRef: createBranchArgs.baseRef,
+          branchName: createBranchArgs.branchName,
+          idempotencyKey,
+          envelope: createBranchAuthority.envelope,
+          context: freshContext,
+        });
 
         let expectedHeadSha: string | null = null;
         try {
-          expectedHeadSha = await provider.resolveRef(project.slug, branchName);
+          expectedHeadSha = await provider.resolveRef(project.slug, createBranchArgs.branchName);
         } catch (resolveError) {
           warnings.push(
             `Branch was created, but its head commit could not be resolved and pinned: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
           );
         }
 
-        executionResult = { branchName, baseRef, ...(expectedHeadSha ? { expectedHeadSha } : {}) };
+        executionResult = {
+          branchName: createBranchArgs.branchName,
+          baseRef: createBranchArgs.baseRef,
+          ...(expectedHeadSha ? { expectedHeadSha } : {}),
+        };
 
         const { error: missionUpdateError } = await supabase
           .from('missions')
           .update({
-            branch_ref: branchName,
+            branch_ref: createBranchArgs.branchName,
             status: 'sandboxed',
             updated_at: new Date().toISOString(),
             ...(expectedHeadSha
-              ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+              ? { policy_snapshot: { ...(freshMission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
               : {}),
           })
           .eq('id', missionId)
@@ -794,12 +886,14 @@ approvalsRouter.post(
 
         let independentReviewEvidence: Record<string, unknown> | null = null;
         let founderFinalReviewEvidence: Record<string, unknown> | null = null;
+        let reviewedBaseSha: string | null = null;
         if (isFounderControlRoomRepository(projectRow)) {
           const pinnedResult = readPinnedIndependentReview(mission.policy_snapshot?.independentReview);
           if (!pinnedResult.ok) {
             throw new Error(`Independent review gate blocked: ${pinnedResult.error}`);
           }
           const pinned = pinnedResult.review;
+          reviewedBaseSha = pinned.baseSha;
           const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
 
           if (typeof provider.getPullRequestReviewContext !== 'function') {
@@ -887,8 +981,21 @@ approvalsRouter.post(
         }
 
         // This is deliberately after review/founder-final validation. Provider
-        // reads may take time; the mutable head must still equal the approved
-        // SHA at the last possible moment before integration.
+        // reads may take time; the mutable head and, for FCR, the mutable base
+        // must still equal the reviewed candidate at the last possible moment
+        // before integration. Otherwise the merge lands on a base nobody reviewed.
+        if (isFounderControlRoomRepository(projectRow)) {
+          if (!reviewedBaseSha) {
+            throw new Error('Independent review gate blocked: reviewed base SHA is unavailable before integration');
+          }
+          const currentBaseSha = await provider.resolveRef(project.slug, base);
+          if (lower(currentBaseSha) !== reviewedBaseSha) {
+            throw new Error(
+              `Base moved after verification: current ${currentBaseSha}, reviewed ${reviewedBaseSha}.`,
+            );
+          }
+        }
+
         const currentHeadSha = await provider.resolveRef(project.slug, head);
         if (currentHeadSha !== expectedHeadSha) {
           throw new Error(
@@ -1019,6 +1126,51 @@ approvalsRouter.post(
       });
     }
 
+    // Patch-path ledger: same idempotency contract as the execute route.
+    // A patch commit is a provider mutation; it must not execute twice.
+    const idempotencyKey = text((req.body as Record<string, unknown>)['idempotencyKey']);
+    if (!idempotencyKey) {
+      return res.status(400).json({ ok: false, code: 'IDEMPOTENCY_KEY_REQUIRED', error: 'idempotencyKey is required for patch commits.' });
+    }
+    const patchScope = {
+      missionId,
+      projectId: mission.project_id as string,
+      actionType: 'patch',
+    };
+    const existingPatch = await findExecution(idempotencyKey);
+    if (existingPatch.error) {
+      return res.status(500).json({
+        error: 'Unable to inspect the action idempotency ledger.',
+        detail: existingPatch.error.message,
+      });
+    }
+    if (existingPatch.data) {
+      if (!executionScopeMatches(existingPatch.data, patchScope)) {
+        return res.status(409).json({
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          error: 'This idempotency key belongs to a different mission, project, or action.',
+        });
+      }
+      if (existingPatch.data.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, idempotencyKey, result: existingPatch.data.result });
+      }
+      if (existingPatch.data.status === 'pending') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'This patch action is already reserved or may have executed. Reconcile it before retrying.',
+          executionId: existingPatch.data.id,
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        code: 'ACTION_PREVIOUSLY_FAILED',
+        error: 'This idempotency key is bound to a prior failed patch. Use a new key after review.',
+        result: existingPatch.data.result,
+      });
+    }
+
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, slug, repo_provider, repo_identifier')
@@ -1039,18 +1191,136 @@ approvalsRouter.post(
     }
     const provider = configured.provider;
 
+    // The simulator's receipt is a claim, not permission. Use the same
+    // authenticated mission route and independently reread exact branch/file
+    // truth before reserving an idempotent provider write. Legacy founder UI
+    // edits continue through their existing path without a simulator receipt.
+    const stagedWorkspaceReceipt = (req.body as Record<string, unknown>)['stagedWorkspaceReceipt'];
+    let stagedExpectedHeadSha: string | undefined;
+    if (stagedWorkspaceReceipt !== undefined) {
+      if (changes.length > 3 || changes.some((change) => !isSafeFounderOsStagedPatchPath(change?.path) || (change.delete !== undefined && change.delete !== false))) {
+        return res.status(400).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_UNSAFE_FILES',
+          error: 'A staged workspace supports at most three non-destructive source edits.',
+        });
+      }
+      if (project.repo_provider !== 'github' || provider.name !== 'github') {
+        return res.status(409).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_PROVIDER_UNSUPPORTED',
+          error: 'Staged workspace handoff requires the GitHub mission branch provider.',
+        });
+      }
+
+      try {
+        const liveHeadSha = await provider.resolveRef(project.slug, mission.branch_ref);
+        const stagedChanges = changes as PatchFileChange[];
+        const sourceFiles = await Promise.all(stagedChanges.map(async (change) => ({
+          path: change.path,
+          content: await provider.readFile(project.slug, mission.branch_ref, change.path),
+        })));
+        const missionExpectedHeadSha =
+          typeof mission.policy_snapshot === 'object' && mission.policy_snapshot !== null
+            ? (mission.policy_snapshot as Record<string, unknown>)['expectedHeadSha']
+            : undefined;
+        const errors = validateFounderOsStagedPatch(stagedWorkspaceReceipt, {
+          repository: project.repo_identifier ?? '',
+          branch: mission.branch_ref,
+          liveHeadSha,
+          missionExpectedHeadSha: typeof missionExpectedHeadSha === 'string'
+            ? missionExpectedHeadSha : '',
+          changes: stagedChanges,
+          sourceFiles,
+        });
+        if (errors.length > 0) {
+          return res.status(409).json({
+            ok: false,
+            code: 'STAGED_WORKSPACE_PROOF_REJECTED',
+            errors,
+          });
+        }
+        stagedExpectedHeadSha = liveHeadSha.toLowerCase();
+      } catch {
+        return res.status(409).json({
+          ok: false,
+          code: 'STAGED_WORKSPACE_SOURCE_UNAVAILABLE',
+          error: 'Could not independently reread current mission branch or source files.',
+        });
+      }
+    }
+
+    // Reserve before the provider mutation. The globally unique idempotency
+    // key is the final race barrier if two requests pass the lookup above
+    // concurrently.
+    const { data: patchReservation, error: patchReservationError } = await supabase
+      .from('approval_executions')
+      .insert({
+        mission_id: missionId,
+        project_id: mission.project_id,
+        action_type: 'patch',
+        idempotency_key: idempotencyKey,
+        executed_by: req.founder!.email,
+        status: 'pending',
+        request: { message, changes, branch: mission.branch_ref },
+        result: {},
+        success: null,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (patchReservationError || !patchReservation) {
+      if ((patchReservationError as { code?: string } | null)?.code === '23505') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'A concurrent request reserved this patch action first. Reconcile it before retrying.',
+        });
+      }
+      return res.status(500).json({
+        ok: false,
+        code: 'PATCH_RESERVATION_FAILED',
+        error: 'Unable to reserve the patch action.',
+        detail: patchReservationError?.message ?? 'Reservation insert returned no record.',
+      });
+    }
+
     let commitSha: string;
     try {
+      // An exact-head compare-and-swap guard is enforced by GitHubProvider
+      // only for staged simulator handoffs. Unverified head movement blocks
+      // the write rather than silently applying an obsolete proposal.
       commitSha = await provider.commitPatch(project.slug, mission.branch_ref, {
         message,
         changes: changes as PatchFileChange[],
         authorName: 'founder-control-room',
+        ...(stagedExpectedHeadSha ? { expectedHeadSha: stagedExpectedHeadSha } : {}),
       });
     } catch (error) {
+      await supabase
+        .from('approval_executions')
+        .update({ status: 'failed', result: { error: error instanceof Error ? error.message : String(error) }, success: false, executed_at: new Date().toISOString() })
+        .eq('id', patchReservation.id)
+        .eq('status', 'pending');
       return res.status(502).json({
         error: error instanceof Error ? error.message : 'Patch commit failed',
         code: 'PATCH_COMMIT_FAILED',
       });
+    }
+
+    const { error: finalizeError } = await supabase
+      .from('approval_executions')
+      .update({
+        status: 'succeeded',
+        result: { commitSha, branch: mission.branch_ref },
+        success: true,
+        executed_at: new Date().toISOString(),
+      })
+      .eq('id', patchReservation.id)
+      .eq('status', 'pending');
+    if (finalizeError) {
+      console.error('patch ledger finalize failed; row left pending for reconciliation', { executionId: patchReservation.id, commitSha, error: finalizeError.message });
     }
 
     await supabase.from('project_events').insert({
@@ -1087,6 +1357,6 @@ approvalsRouter.post(
       warning = `Commit succeeded, but expectedHeadSha could not be re-pinned: ${pinUpdateError.message}`;
     }
 
-    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
+    return res.status(201).json({ ok: true, idempotencyKey, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
   },
 );

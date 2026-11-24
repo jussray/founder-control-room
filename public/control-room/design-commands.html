@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Founder Control Room · 23 Design Commands</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07101d;
+      --panel: #0f1b2d;
+      --panel-2: #13243b;
+      --line: #2a405f;
+      --text: #eef6ff;
+      --muted: #9db0ca;
+      --accent: #9f8cff;
+      --ok: #72e6a7;
+      --warn: #ffd166;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 85% 0%, #243964 0, transparent 30rem), var(--bg);
+      color: var(--text);
+    }
+    main { width: min(1180px, 100%); margin: 0 auto; padding: clamp(1rem, 3vw, 2rem); }
+    a { color: #b9d8ff; }
+    h1 { margin: .25rem 0; font-size: clamp(2.2rem, 7vw, 5rem); letter-spacing: -.055em; line-height: .95; }
+    h2 { margin: 0; font-size: 1.1rem; }
+    p { line-height: 1.5; }
+    .eyebrow { margin: 0; color: var(--accent); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: .76rem; }
+    .muted { color: var(--muted); }
+    .hero { display: grid; gap: 1rem; margin-bottom: 1.25rem; }
+    .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .law { padding: .9rem 1rem; border: 1px solid rgba(159,140,255,.42); border-radius: 1rem; background: rgba(159,140,255,.08); }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: .8rem;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 1.2rem;
+      background: rgba(15,27,45,.9);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(16px);
+    }
+    label { display: grid; gap: .35rem; min-width: 0; color: var(--muted); font-size: .78rem; font-weight: 750; }
+    input, select {
+      width: 100%; min-width: 0; padding: .72rem .8rem; border: 1px solid var(--line); border-radius: .75rem;
+      background: #081525; color: var(--text); font: inherit;
+    }
+    .phase { margin-top: 1.4rem; }
+    .phase-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
+    .phase-count { color: var(--muted); font-size: .78rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: .8rem; }
+    .design-command-card {
+      min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem;
+      background: linear-gradient(160deg, rgba(19,36,59,.96), rgba(10,22,38,.96));
+      display: grid; gap: .75rem;
+    }
+    .command-head { display: flex; justify-content: space-between; gap: .75rem; align-items: start; }
+    code { color: #d9d3ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .slash { font-size: 1.15rem; font-weight: 850; }
+    .badges { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: flex-end; }
+    .badge { border: 1px solid var(--line); border-radius: 999px; padding: .2rem .48rem; color: var(--muted); font-size: .68rem; }
+    .badge.approval { color: var(--warn); border-color: rgba(255,209,102,.42); }
+    .badge.proof { color: var(--ok); border-color: rgba(114,230,167,.42); }
+    .detail { padding-top: .6rem; border-top: 1px solid rgba(42,64,95,.7); }
+    .detail strong { display: block; margin-bottom: .15rem; color: #dbeafe; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+    .detail span { color: var(--muted); font-size: .82rem; line-height: 1.45; overflow-wrap: anywhere; }
+    button {
+      width: max-content; max-width: 100%; border: 1px solid rgba(159,140,255,.55); border-radius: .75rem;
+      background: rgba(159,140,255,.14); color: var(--text); padding: .58rem .72rem; font: inherit; font-weight: 800; cursor: pointer;
+    }
+    button:hover { background: rgba(159,140,255,.22); }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #d8d2ff; outline-offset: 3px; }
+    .prepared {
+      display: grid;
+      gap: .25rem;
+      margin-top: 1rem; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 1rem; background: #081525;
+      overflow-wrap: anywhere;
+    }
+    .prepared code { display: block; margin-top: .1rem; color: #fff; }
+    .empty { padding: 2rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 1rem; }
+    .error { color: #ff9aab; }
+    [hidden] { display: none !important; }
+    @media (max-width: 760px) {
+      .toolbar { position: static; grid-template-columns: 1fr; }
+      .hero-top { display: grid; }
+      .command-head { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow">Founder Control Room · Projects</p>
+          <h1>23 design commands</h1>
+          <p class="muted">One design capability. Twenty-three bounded operations. Use only the command chain the evidence requires.</p>
+        </div>
+        <a href="/control-room/?tab=projects">← Projects Control Room</a>
+      </div>
+      <div class="law" id="contract-law">
+        Preparing a command does not authorize code changes. Mutating commands still require founder approval, and UI/runtime completion claims close with exact-head Playwright proof.
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="Design command controls">
+      <label>
+        Project
+        <select id="project-select" aria-label="Project"></select>
+      </label>
+      <label>
+        Find command
+        <input id="command-search" type="search" placeholder="layout, recovery, accessibility…" autocomplete="off" />
+      </label>
+      <label>
+        Target surface
+        <input id="command-target" placeholder="welcome screen, checkout, onboarding…" autocomplete="off" />
+      </label>
+    </section>
+
+    <div class="prepared" id="prepared-wrap" role="status" aria-live="polite">
+      <strong>Prepared command</strong>
+      <span class="muted" id="prepared-status">Choose an operation below. This creates a bounded handoff string only.</span>
+      <code id="prepared-command">No command prepared yet.</code>
+    </div>
+
+    <div id="command-root" aria-live="polite"></div>
+  </main>
+
+  <script>
+    const phaseOrder = ['understand', 'structure', 'expression', 'interaction', 'resilience', 'finish'];
+    const nodes = {
+      root: document.getElementById('command-root'),
+      project: document.getElementById('project-select'),
+      search: document.getElementById('command-search'),
+      target: document.getElementById('command-target'),
+      prepared: document.getElementById('prepared-command'),
+      status: document.getElementById('prepared-status'),
+      law: document.getElementById('contract-law'),
+    };
+    const requestedProject = new URLSearchParams(window.location.search).get('project');
+    let commands = [];
+    let projects = [];
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
+    function filteredCommands() {
+      const needle = nodes.search.value.trim().toLowerCase();
+      if (!needle) return commands;
+      return commands.filter((command) => [
+        command.id, command.slash, command.label, command.phase, command.mode,
+        command.purpose, command.owns, command.forbids,
+      ].some((value) => String(value).toLowerCase().includes(needle)));
+    }
+
+    function render() {
+      const visible = filteredCommands();
+      if (visible.length === 0) {
+        nodes.root.innerHTML = '<div class="empty">No design command matches that filter.</div>';
+        return;
+      }
+
+      nodes.root.innerHTML = phaseOrder.map((phase) => {
+        const entries = visible.filter((command) => command.phase === phase);
+        if (entries.length === 0) return '';
+        return `
+          <section class="phase" data-phase="${escapeHtml(phase)}">
+            <div class="phase-heading">
+              <h2>${escapeHtml(phase[0].toUpperCase() + phase.slice(1))}</h2>
+              <span class="phase-count">${entries.length} operation${entries.length === 1 ? '' : 's'}</span>
+            </div>
+            <div class="grid">
+              ${entries.map((command) => `
+                <article class="design-command-card" data-command-id="${escapeHtml(command.id)}">
+                  <div class="command-head">
+                    <div>
+                      <code class="slash">${escapeHtml(command.slash)}</code>
+                      <div class="muted">${escapeHtml(command.label)}</div>
+                    </div>
+                    <div class="badges">
+                      <span class="badge">${escapeHtml(command.mode)}</span>
+                      ${command.requiresFounderApproval ? '<span class="badge approval">approval</span>' : ''}
+                      ${command.requiresPlaywright ? '<span class="badge proof">Playwright</span>' : ''}
+                    </div>
+                  </div>
+                  <p>${escapeHtml(command.purpose)}</p>
+                  <div class="detail"><strong>Owns</strong><span>${escapeHtml(command.owns)}</span></div>
+                  <div class="detail"><strong>Must not</strong><span>${escapeHtml(command.forbids)}</span></div>
+                  <button type="button" data-prepare-command="${escapeHtml(command.id)}">Prepare command</button>
+                </article>
+              `).join('')}
+            </div>
+          </section>
+        `;
+      }).join('');
+
+      nodes.root.querySelectorAll('[data-prepare-command]').forEach((button) => {
+        button.addEventListener('click', () => prepare(button.dataset.prepareCommand));
+      });
+    }
+
+    async function prepare(id) {
+      const command = commands.find((entry) => entry.id === id);
+      if (!command) return;
+      const project = nodes.project.value || projects[0]?.slug || 'project';
+      const target = nodes.target.value.trim();
+      const prepared = `${command.slash} project:${project}${target ? ` target:${target}` : ''}`;
+      nodes.prepared.textContent = prepared;
+      nodes.status.textContent = 'Prepared. Copy the command below.';
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(prepared);
+          nodes.status.textContent = 'Prepared and copied to clipboard.';
+        }
+      } catch {
+        /* The visible prepared string remains authoritative when clipboard access is unavailable. */
+      }
+    }
+
+    async function load() {
+      try {
+        const response = await fetch('/design-os', { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`Design OS request failed (${response.status})`);
+        const data = await response.json();
+        commands = data.commands ?? [];
+        projects = data.projects ?? [];
+        if (commands.length !== 23) throw new Error(`Expected 23 design commands, received ${commands.length}`);
+        nodes.project.innerHTML = projects.map((project) => `<option value="${escapeHtml(project.slug)}">${escapeHtml(project.name)}</option>`).join('');
+        if (requestedProject && projects.some((project) => project.slug === requestedProject)) {
+          nodes.project.value = requestedProject;
+        }
+        if (data.commandContract?.sharedCapability) {
+          nodes.law.textContent = `Shared capability: ${data.commandContract.sharedCapability}. Preparing a command does not authorize code changes. Mutating commands require founder approval; UI/runtime completion claims require exact-head Playwright proof.`;
+        }
+        render();
+      } catch (error) {
+        nodes.root.innerHTML = `<p class="error">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`;
+      }
+    }
+
+    nodes.search.addEventListener('input', render);
+    load();
+  </script>
+</body>
+</html>

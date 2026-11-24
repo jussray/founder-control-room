@@ -5,12 +5,22 @@ description: >
   release, documentation truth, and full-app-launch work. Converts ULTRATHINK,
   Product Design, Data Analytics, Redteam, Lindy, L99, OODA, Hormozi, Bill Gates,
   Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
-version: 1.1
+version: 1.2
 visibility: private
 owner: Juss
 ---
 
 # Juss Flow Launch Loop
+
+## FAST versus guarded simulator write gate
+
+FAST may stage exact text edits and SHA-256 receipts in memory without provider access. A `repository-source` patch must be handed to the existing authenticated FCR mission route, which rereads exact live GitHub branch, mission policy pin and original content before an idempotent branch commit. The exported request must not execute itself or carry credentials. A local focused test is not GitHub Actions, independent review or Playwright proof. Keep full guarded checks on a stable exact head, with separate founder-final merge and release gates.
+
+When verifying pull-request Documentation Truth or test discovery, resolve the live target branch, fetch its full SHA, and require it to be an ancestor of the exact checked-out candidate before computing the reviewed range. Stored event-base identity is historical context; default-branch push verification instead uses the exact before SHA. Invalid refs, unavailable fetches, malformed identities, and stale candidate ancestry fail closed without becoming product-regression or merge-approval claims.
+
+## Queue economy and required proof
+
+For `main` pull requests, `.github/workflows/ci.yml` must own the load-bearing verification, including terminal and AI-skill contracts through the required `Test` job. `.github/workflows/quality-gate.yml` remains the extended `staging` proof lane rather than running duplicate main checks. The Search Console/evidence gate must check the exact PR head and avoid a second feature-branch push execution. Do not save runner minutes by dropping CodeQL, required test-ledger/CI gates, browser proof, independently reviewed candidate approval, or production provider readback. This source change is a candidate only until the successor exact head is verified.
 
 ## Goal
 
@@ -255,6 +265,12 @@ verified product progress
 
 Public-safe story may explain what changed, why it matters, what was learned, and approved public proof. Keep private prompts, raw diffs, credentials, customer/security data, internal proof references, unreleased roadmap, private metrics, provider payloads, and proprietary mechanics behind the curtain.
 
+## Governed repository mutation gate
+
+Operational branch creation is not ambient repository power. For the FCR `create_branch` path, the authenticated founder execute request plus a fresh proof record must produce a server-owned `AuthorityEnvelopeV1` bound to `github.repository.create_branch`, the exact repository scope, branch arguments, current mission-state fingerprint, tool-call identity, expiry, founder identity, and idempotency key. The envelope's lifetime must begin at the server-observed execute request time rather than the proof receipt timestamp; proof freshness and authority expiry are separate fail-closed windows.
+
+The execution must be reserved before provider mutation. Immediately before `RepositoryProvider.createBranch(...)`, FCR must reacquire mission state, re-derive the execution context, and validate the original envelope through `executeAuthorizedCreateBranch()`. Any state, argument, scope, idempotency, tool-call, capability, expiry, or integrity drift must fail closed. A pending or ambiguous provider outcome requires reconciliation before another mutation attempt. Branch authority never inherits merge, deploy, publication, credential, database, spend, or destructive authority.
+
 ## Implementation contract
 
 Before mutation record:
@@ -312,6 +328,10 @@ A deterministic witness must be produced from provider-observed PR/base/head/dif
 
 Trusted witness ignition must execute from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflows, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once integrated and exact-release-proven: it accepts only a positive PR number behind same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; derives repository/provider/PR/base/head/diff/verdict/hash/App identity from server/provider state; requires full runtime `GIT_SHA` to equal provider-resolved current `main` before and after witness publication or reconciliation; performs reconcile-before-create; and returns the complete deterministic receipt without granting merge authority. A default-branch dispatch is only an equivalent ignition surface when it preserves the same invariants. Any ignition surface, its credential boundary, producer/publisher, workflow, or runner is a deterministic-review trust root; changing it must P1-block normal self-certification and require the separately explicit exact-candidate bootstrap/constitutional path.
 
+### Founder-selected native Auto-merge
+
+If the founder clicks GitHub **Enable auto-merge** for an exact PR, leave the PR queued for GitHub to merge **only after** configured required status checks, tests, review/approval policies, and branch protections have passed. All intended load-bearing gates must be required in live provider settings; optional green/red jobs alone are not native merge requirements. PR Continuity only observes the queue status from GitHub's readback; it never merges, creates founder-final approval, or relaxes a ruleset. Conflicts, draft status, changing base/head, missing exact-candidate founder authority, or stale review block the merge. Do not call `merge_pull_request` as a substitute for waiting for native Auto-merge or claim GitHub's eventual merge proves the FCR in-app founder-final route. An explicit Auto-merge click is the queue request, not a new independent review or production deployment authorization.
+
 ## Merge gate
 
 Standing founder intent allows a merge only when all repository merge-authority conditions are satisfied. It does not waive them.
@@ -332,9 +352,15 @@ Merge only when:
 - rollback is understood; and
 - the PR does not mix unrelated risky work.
 
-Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness.
+Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness. Last-moment freshness covers both refs: FCR re-resolves the live base and the mutable head immediately before provider integration, and a base that moved after review fails closed with `Base moved after verification`.
 
 FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
+
+### Chief candidate-proof producer trust
+
+A Chief pre-merge required-check name plus GitHub Actions integration `15368` does not authenticate the exact workflow file or event that produced that check. A PR-authored workflow can otherwise counterfeit the expected context under the same GitHub Actions App.
+
+When reconciling Chief governance, fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that PR-authored Chief Actions cannot mint. Also reject `Cloudflare Production` as a pre-merge required deployment because it is a post-merge production plane. Do not mutate the live rulesets, grant merge authority, or call the candidate proof trusted while either producer provenance or deployment-phase separation is unresolved.
 
 Use expected-head protection when supported. If `main` or the candidate head moves, prior green becomes historical and the candidate must be re-observed/reacquired.
 
@@ -390,3 +416,23 @@ Release state:
 Next exact action:
 Next founder gate:
 ```
+
+## Load-bearing regression execution
+
+A committed regression test is source evidence only until the exact-head workflow that feeds the applicable gate actually executes it. For LinkedIn analytics continuity, `.github/workflows/ci.yml` must keep `scripts.test_linkedin_analytics_continuity` inside the load-bearing `python-tests` job, and `Required Gate` must continue to depend on that job. Missing LinkedIn activity rows must remain `UNKNOWN_NO_EVIDENCE` with null metrics, never synthetic zero impressions or engagements.
+
+For runtime-kernel receipts, `.github/workflows/ci.yml` must keep the `test_check_receipt.py` discovery step inside the load-bearing `python-tests` job. A kernel receipt must prove prospective authority before PERMIT, and a receipt whose executor or verifier is a status word (`UNKNOWN`, `CANDIDATE`, `PROVEN`) is a violation rather than a verified actor. A passing checker run is evidence for receipt consistency only and never substitutes for founder approval or provider readback.
+
+For public crawler and work-directory behavior, `.github/workflows/ci.yml` must keep `e2e/pages-api-recovery.spec.ts` and `e2e/public-work-directory.spec.ts` inside the load-bearing `Playwright e2e` job that feeds `Required Gate`. The specialized Pages workflow remains useful evidence, but it cannot substitute for this required exact-head browser execution or authorize merge by itself.
+
+
+## CI lockfile determinism — current exact-head source contract
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must use `npm ci --no-audit --no-fund` in its Type check, Lint, Unit Tests, and Playwright e2e jobs to bind the dependency tree to the committed lockfile. Keep the test-discovery ratchet, Documentation Truth, Required Gate and systematic review intact. CI pass is exact-head evidence only, never founder-final approval, cloud-provider state, deploy success or an automatic merge permission. When stale docs or gates are observed, repair the current source under the existing authority gates and preserve the predecessor receipt.
+
+For workflow-authority source changes, `.github/workflows/ci.yml` must also keep the `scripts/verify_workflow_yaml.py` parse step in its `python-tests` job, so a workflow file that GitHub would reject cannot merge behind green checks. That step proves YAML syntax only.
+
+
+## November 15, 2026 — Worker `[vars]`/secret collision gate
+
+Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.

@@ -40,8 +40,10 @@ describe("deterministic review witness execution trust root", () => {
     );
     expect(workflow).toContain("environment: production");
     expect(workflow).toContain("EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}");
-    expect(workflow).toContain("GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}");
-    expect(workflow).toContain("GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}");
+    expect(workflow).toContain("GITHUB_APP_ID: ${{ secrets.APP_ID }}");
+    expect(workflow).toContain("GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}");
+    expect(workflow).not.toContain("secrets.GITHUB_APP_ID");
+    expect(workflow).not.toContain("secrets.GITHUB_PRIVATE_KEY");
     expect(workflow).toContain("ref: ${{ env.EXPECTED_TRUSTED_MAIN_SHA }}");
     expect(workflow).toContain("test \"$GITHUB_REF\" = 'refs/heads/main'");
     expect(workflow).toContain("test \"$EXPECTED_TRUSTED_MAIN_SHA\" = \"$current_main\"");

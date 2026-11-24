@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PORTFOLIO_PROJECTS } from '../config/portfolio.js';
 import {
   DEFAULT_LANTERN_POLICY,
+  STRATEGIC_SECURITY_INVARIANTS,
   STRATEGIC_SECURITY_STAGES,
   auditPortfolioStrategicSecurity,
   strategicSecurityDecision,
@@ -11,6 +12,15 @@ import {
 } from './strategicSecurity.js';
 
 describe('strategic security v10', () => {
+  it('rejects omitted or non-boolean Lantern safeguards', () => {
+    for (const key of Object.keys(DEFAULT_LANTERN_POLICY)) {
+      for (const invalid of [undefined, null, 0, 1, 'false', 'true']) {
+        const candidate = { ...DEFAULT_LANTERN_POLICY, [key]: invalid };
+        expect(validateLanternPolicy(candidate as typeof DEFAULT_LANTERN_POLICY).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('defines one ordered, cumulative V1 through V10 security ladder', () => {
     expect(STRATEGIC_SECURITY_STAGES).toHaveLength(10);
     expect(STRATEGIC_SECURITY_STAGES.map((stage) => stage.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -18,6 +28,30 @@ describe('strategic security v10', () => {
     expect(STRATEGIC_SECURITY_STAGES[6]?.controls).toContain('artifact-attestation');
     expect(STRATEGIC_SECURITY_STAGES[7]?.controls).toContain('lantern-decoy');
     expect(STRATEGIC_SECURITY_STAGES[9]?.controls).toContain('approval-binding');
+  });
+
+  it('makes post-quantum readiness an inventory and crypto-agility obligation without claiming runtime safety', () => {
+    expect(STRATEGIC_SECURITY_STAGES[0]?.controls).toEqual(expect.arrayContaining([
+      'cryptographic-inventory',
+      'quantum-vulnerable-public-key-inventory',
+    ]));
+    expect(STRATEGIC_SECURITY_STAGES[6]?.controls).toEqual(expect.arrayContaining([
+      'cryptographic-agility',
+      'provider-cryptography-ownership',
+      'post-quantum-migration-readiness',
+    ]));
+    expect(STRATEGIC_SECURITY_INVARIANTS).toMatchObject({
+      cryptographicInventoryRequired: true,
+      cryptographicAgilityRequired: true,
+      quantumSafeClaimRequiresRuntimeEvidence: true,
+    });
+
+    const target = strategicSecurityTargetForProject(PORTFOLIO_PROJECTS.find((project) => project.slug === 'founder-control-room')!);
+    expect(target.requiredProof).toEqual(expect.arrayContaining([
+      'cryptographic inventory for security-relevant dependencies',
+      'provider ownership and migration path for quantum-vulnerable public-key cryptography',
+      'runtime or provider evidence before any quantum-safe claim',
+    ]));
   });
 
   it('audits every active portfolio project without importing quarantined repositories', () => {

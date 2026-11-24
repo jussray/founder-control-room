@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "provider": "google-cloud",
+  "displayName": "Google Cloud",
+  "connectionType": "other",
+  "connectionLabel": "Google Cloud",
+  "cli": {
+    "name": "gcloud",
+    "version": "584.0.0",
+    "supportedPython": ">=3.10 <=3.14",
+    "linuxX8664Sha256": "309a8fd47df8d4d5694c798b9d0d8968ae736a58f5dceba60eb2cf520b541460"
+  },
+  "identity": {
+    "broker": "supabase-google-oauth",
+    "rule": "Do not replace FCR Google sign-in with a second application login authority."
+  },
+  "oauth": {
+    "consentRequired": true,
+    "defaultAudience": "external-test-until-reviewed",
+    "scopePolicy": "least-privilege",
+    "broadScopesAllowedByDefault": false,
+    "credentialsInRepository": false,
+    "recommendedInitialScopes": [
+      "openid",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ],
+    "workspaceScopes": "Add only when a named capability requires them; evaluate sensitive/restricted review before enabling."
+  },
+  "authority": {
+    "read": "L3",
+    "reversibleWrite": "fresh-founder-approval",
+    "consequentialWrite": "fresh-founder-approval-plus-live-authority-recheck",
+    "billingIamSecretsDelete": "never-implicit"
+  },
+  "assistantUse": {
+    "allowed": true,
+    "rule": "Assistant and FCR may use the same Google capability only through live provider authorization and the shared capability runtime.",
+    "discoveryIsAuthority": false,
+    "providerAcceptanceIsVerifiedOutcome": false
+  },
+  "continuity": {
+    "bidirectionalFingerprints": true,
+    "bidirectionalProofCookies": true,
+    "markersAreAuthority": false,
+    "invalidateOn": ["project", "account", "scope", "credential", "runtime", "evidence", "outcome", "authority-revision"]
+  }
+}

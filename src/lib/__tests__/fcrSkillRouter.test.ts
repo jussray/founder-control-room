@@ -7,6 +7,7 @@ import {
   type V10CapabilityPlan,
 } from '../../founder-os-lab/capabilityKernel.js';
 import {
+  FCR_AUTOMATIC_COUNCIL_LENSES,
   FCR_REQUIRED_PARALLEL_LENSES,
   FCR_SKILL_ROUTER_CONTRACT,
   routeFcrSkills,
@@ -60,7 +61,7 @@ function route(goal: string, action: FcrSkillRouterAction, capabilityIds: string
 }
 
 describe('FCR skill router trust gate', () => {
-  it('fails closed until Chief AI supplies a hash-bound capability plan', () => {
+  it('fails closed without a Chief plan while keeping the Founder Council automatic', () => {
     const decision = routeFcrSkills({
       goal: 'Repair the repository.',
       action: 'write',
@@ -73,13 +74,14 @@ describe('FCR skill router trust gate', () => {
     expect(decision.contract).toBe(FCR_SKILL_ROUTER_CONTRACT);
     expect(decision.status).toBe('blocked');
     expect(decision.plannedCapabilityIds).toEqual([]);
+    expect(decision.automaticCouncilLenses).toEqual([...FCR_AUTOMATIC_COUNCIL_LENSES]);
     expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
-    expect(decision.missingParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
+    expect(decision.missingParallelLenses).toEqual([]);
     expect(decision.errors).toContain('Chief AI capability plan is required before FCR may accept a skill route');
     expect(decision.executionAllowed).toBe(false);
   });
 
-  it('requires Product Design, Data Analytics, and Deep Research on every routed plan', () => {
+  it('applies the Founder Council even when Chief does not repeat the lenses or the user invokes no slash commands', () => {
     const goal = 'Plan the next smallest build.';
     const decision = routeFcrSkills({
       goal,
@@ -87,17 +89,41 @@ describe('FCR skill router trust gate', () => {
       projectSlug: 'founder-control-room',
       expectedHeadSha: HEAD,
       expectedRegistryHash: REGISTRY_HASH,
-      capabilityPlan: plan(goal, ['juss-chief-ai'], { strategicLenses: ['futureyou', 'truthmode', 'redteam'] }),
+      capabilityPlan: plan(goal, ['juss-chief-ai'], { strategicLenses: ['truthmode'] }),
     });
 
-    expect(decision.status).toBe('blocked');
-    expect(decision.requiredParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
-    expect(decision.missingParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
-    expect(decision.errors).toEqual(expect.arrayContaining([
-      'Chief AI capability plan is missing required RayOS parallel lens: product-design',
-      'Chief AI capability plan is missing required RayOS parallel lens: data-analytics',
-      'Chief AI capability plan is missing required RayOS parallel lens: deep-research',
+    expect(decision.status).toBe('ready_for_runtime_discovery');
+    expect(decision.automaticCouncilLenses).toEqual([
+      'human',
+      'futureyou',
+      'truthmode',
+      'confess',
+      'ultrathink',
+      'steal',
+      'redteam',
+      'lindymode',
+      'l99',
+      'ooda',
+      'hormozi',
+      'billgates',
+      'elonmusk',
+      'firstprinciples',
+      'socrates',
+      'antiadvice',
+      'unlearn',
+      'loop',
+      'product-design',
+      'data-analytics',
+      'deep-research',
+    ]);
+    expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
+    expect(decision.missingParallelLenses).toEqual([]);
+    expect(decision.errors).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/missing required RayOS lens/),
     ]));
+    expect(decision.requiredProof.join(' ')).toMatch(/Founder Council is applied automatically in code/);
+    expect(decision.requiredProof.join(' ')).toMatch(/two separate passes/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Steal adapts principles/);
   });
 
   it('accepts Chief AI capability selection without reconstructing the stack from prompt keywords', () => {
@@ -167,6 +193,34 @@ describe('FCR skill router trust gate', () => {
     expect(decision.executionAllowed).toBe(false);
   });
 
+  it('routes every explicit project design command through one shared bounded capability', () => {
+    const goal = '/layout tighten the project control room.';
+    const blocked = route(goal, 'write', ['juss-chief-ai']);
+
+    expect(blocked.designCommandIds).toEqual(['layout']);
+    expect(blocked.policyRequiredCapabilityIds).toContain('control-room-design-implementation');
+    expect(blocked.missingPolicyCapabilityIds).toContain('control-room-design-implementation');
+    expect(blocked.requiredTools).toContain('playwright');
+    expect(blocked.requiredProof.join(' ')).toContain('/layout');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['control-room-design-implementation']);
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.designCommandIds).toEqual(['layout']);
+    expect(ready.requiredProof).toContain('exact-head Playwright evidence for UI/runtime claims');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('deduplicates the shared capability while preserving the ordered design command chain', () => {
+    const goal = '/typeset /spacing tune the control room.';
+    const decision = route(goal, 'write', ['control-room-design-implementation']);
+
+    expect(decision.designCommandIds).toEqual(['typeset', 'spacing']);
+    expect(decision.policyRequiredCapabilityIds.filter((id) => id === 'control-room-design-implementation')).toHaveLength(1);
+    expect(decision.requiredTools).toContain('playwright');
+    expect(decision.status).toBe('ready_for_runtime_discovery');
+  });
+
   it('does not add merge-review gates to ordinary UI review language', () => {
     const goal = 'Review the mobile UI in Playwright.';
     const decision = route(goal, 'review', ['control-room-design-implementation']);
@@ -185,6 +239,125 @@ describe('FCR skill router trust gate', () => {
 
     expect(decision.requiredProof).toContain('exact-head checks and unresolved review-thread state');
     expect(decision.requiredTools).toContain('github');
+  });
+
+
+  it('binds explicit Attack/godmode to the non-authorizing companion skill', () => {
+    const goal = 'Attack/godmode repair this repository and prove the exact result.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.missingPolicyCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['ultrathink-attack-godmode'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.policyRequiredCapabilityIds).toContain('ultrathink-attack-godmode');
+    expect(ready.requiredProof).toContain('action-specific authority, approval, rollback, and execution receipt');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+
+  it('makes natural-language URL repair intent policy-required before Chief plan validation', () => {
+    const goal = 'Test this website URL in the browser, find issues, and repair verified defects.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('urlfix');
+    expect(blocked.missingPolicyCapabilityIds).toContain('urlfix');
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['urlfix'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(ready.requiredProof.join(' ')).toMatch(/ownership and live runtime identity/);
+    expect(ready.requiredProof.join(' ')).toMatch(/same failing browser path/);
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context before a mutating GODMODE repair can reach runtime discovery', () => {
+    const goal = '/godmode fix this';
+
+    const withoutRepository = route(goal, 'write', ['ultrathink-attack-godmode']);
+    expect(withoutRepository.status).not.toBe('ready_for_runtime_discovery');
+    expect(withoutRepository.executionAllowed).toBe(false);
+
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+    const withRepository = route(goal, 'write', ['ultrathink-attack-godmode'], { repository });
+    expect(withRepository.executionAllowed).toBe(false);
+  });
+
+  it('routes /urlfix through Playwright, ownership proof, and same-path regression proof', () => {
+    const goal = '/urlfix https://foundercontrolroom.org repair verified browser defects.';
+    const repository = { projectId: 'founder-control-room', provider: 'github' };
+
+    const blocked = route(goal, 'write', ['goalfix'], { repository });
+    expect(blocked.policyRequiredCapabilityIds).toContain('urlfix');
+    expect(blocked.missingPolicyCapabilityIds).toContain('urlfix');
+    expect(blocked.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(blocked.status).toBe('blocked');
+
+    const ready = route(goal, 'write', ['urlfix'], { repository });
+    expect(ready.status).toBe('ready_for_runtime_discovery');
+    expect(ready.requiredTools).toEqual(expect.arrayContaining(['github', 'playwright']));
+    expect(ready.requiredProof.join(' ')).toMatch(/ownership and live runtime identity/);
+    expect(ready.requiredProof.join(' ')).toMatch(/same failing browser path/);
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('does not read command aliases inside URL path segments', () => {
+    const decision = route('Test https://example.com/receipt in the browser and repair verified defects.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('continuity-proof-ledger');
+  });
+
+  it('ignores GODMODE and other markers that appear only inside URLs', () => {
+    const decision = route('Test https://example.com/godmode and repair the issue in the browser.', 'write', ['urlfix'], {
+      repository: { projectId: 'founder-control-room', provider: 'github' },
+    });
+    expect(decision.policyRequiredCapabilityIds).not.toContain('ultrathink-attack-godmode');
+  });
+
+  it('requires repository context for GODMODE regardless of action', () => {
+    const review = route('/godmode audit this implementation.', 'review', ['ultrathink-attack-godmode']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context for repair-to-proof regardless of action', () => {
+    const review = route('/repair-to-proof release proof.', 'review', ['repair-to-proof']);
+    expect(review.status).not.toBe('ready_for_runtime_discovery');
+    expect(review.executionAllowed).toBe(false);
+  });
+
+  it('requires repository context before a mutating repair-to-proof route is accepted', () => {
+    const ready = route('repair-to-proof confirm the exact head.', 'write', ['repair-to-proof']);
+    expect(ready.status).not.toBe('ready_for_runtime_discovery');
+    expect(ready.executionAllowed).toBe(false);
+  });
+
+  it('requires the proof and continuity companions when they are explicitly named', () => {
+    for (const [goal, skill] of [
+      ['/repair-to-proof confirm the exact head.', 'repair-to-proof'],
+      ['/continuity record the handoff state.', 'continuity-proof-ledger'],
+      ['/receipt record the handoff state.', 'continuity-proof-ledger'],
+    ] as const) {
+      const decision = route(goal, 'write', ['juss-chief-ai']);
+      expect(decision.policyRequiredCapabilityIds).toContain(skill);
+      expect(decision.missingPolicyCapabilityIds).toContain(skill);
+      expect(decision.status).toBe('blocked');
+    }
+  });
+
+  it('honors a leading unprefixed repair-to-proof but not prose mentions', () => {
+    const blocked = route('repair-to-proof confirm the exact head.', 'write', ['juss-chief-ai']);
+    expect(blocked.policyRequiredCapabilityIds).toContain('repair-to-proof');
+    expect(blocked.status).toBe('blocked');
+
+    const prose = route('Yesterday the repair-to-proof run was discussed in the review notes.', 'write', ['juss-chief-ai']);
+    expect(prose.policyRequiredCapabilityIds).not.toContain('repair-to-proof');
   });
 
   it('requires explicitly named skills to be present in the Chief AI plan', () => {

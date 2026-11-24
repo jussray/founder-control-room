@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+
+const relayOperators = ['gemini', 'codex', 'claude-code', 'perplexity', 'deepseek'];
+const instructorOnly = 'deepseek-instructor';
+
+function relayEnvelope(fromOperator, toOperator) {
+  assert(relayOperators.includes(fromOperator), 'source must be a peer operator');
+  assert(relayOperators.includes(toOperator), 'target must be a peer operator');
+  assert.notEqual(fromOperator, toOperator, 'relay requires distinct operators');
+  return {
+    fromOperator,
+    toOperator,
+    authority: {
+      externalWrite: false,
+      merge: false,
+      deploy: false,
+      publish: false,
+      providerMutation: false,
+    },
+  };
+}
+
+const gemini = relayEnvelope('codex', 'gemini');
+assert.equal(gemini.toOperator, 'gemini');
+assert.deepEqual(Object.values(gemini.authority), [false, false, false, false, false]);
+
+const perplexity = relayEnvelope('gemini', 'perplexity');
+assert.equal(perplexity.toOperator, 'perplexity');
+assert.deepEqual(Object.values(perplexity.authority), [false, false, false, false, false]);
+
+const claude = relayEnvelope('perplexity', 'claude-code');
+assert.equal(claude.toOperator, 'claude-code');
+
+const deepseek = relayEnvelope('codex', 'deepseek');
+assert.equal(deepseek.toOperator, 'deepseek');
+assert.deepEqual(Object.values(deepseek.authority), [false, false, false, false, false]);
+
+assert.throws(() => relayEnvelope('codex', instructorOnly), /target must be a peer operator/);
+
+console.log(JSON.stringify({
+  contract: 'fcr/operator-relay-playwright-preflight@v1',
+  peerOperators: relayOperators,
+  instructorLane: instructorOnly,
+  authorityEscalation: false,
+  status: 'CONTRACT_ONLY',
+  nextGate: 'authenticated endpoint + real provider dispatch + browser round-trip',
+}, null, 2));

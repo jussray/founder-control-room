@@ -109,7 +109,6 @@
   </main>
 
   <script>
-    const STORAGE_KEY = 'fcr_session';
     const FCR_MAIN_RULESET_NAME = 'Founder Control Room main exact-head gate';
     const nodes = {
       form: document.getElementById('ruleset-form'),
@@ -117,15 +116,9 @@
       result: document.getElementById('result'),
     };
 
-    function session() {
-      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
-    }
-
     async function api(path, opts = {}) {
-      const current = session();
-      if (!current?.access_token) throw new Error('No founder session found. Sign in through the main Control Room first.');
-      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${current.access_token}`, ...(opts.headers || {}) };
-      const res = await fetch(path, { ...opts, headers });
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      const res = await fetch(path, { ...opts, credentials: 'same-origin', headers });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
       return body;

@@ -30,7 +30,7 @@ const config = {
   enforcement: "active" as const,
   targetRefs: ["main"],
   requirePullRequest: true,
-  requiredApprovingReviewCount: 1,
+  requiredApprovingReviewCount: 0,
   requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
@@ -39,24 +39,51 @@ const config = {
 
 type TestConfig = typeof config;
 
+type TestRule = { type: string; parameters?: Record<string, unknown> };
+
+function preservedProviderRules(): TestRule[] {
+  return [
+    { type: "required_linear_history" },
+    { type: "required_signatures" },
+    { type: "code_quality", parameters: { severity: "errors" } },
+    {
+      type: "copilot_code_review",
+      parameters: { review_on_push: false, review_draft_pull_requests: false },
+    },
+  ];
+}
+
 function freshnessName(request: TestConfig = config) {
   return `${request.name} [strict freshness]`;
 }
 
-function reviewReadback(request: TestConfig = config) {
+function reviewReadback(request: TestConfig = config, preserved: TestRule[] = []) {
+  const requireNativeHumanReview = request.requiredApprovingReviewCount > 0;
   const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
     {
       type: "pull_request",
       parameters: {
         required_approving_review_count: request.requiredApprovingReviewCount,
         dismiss_stale_reviews_on_push: true,
-        require_last_push_approval: true,
+        require_code_owner_review: requireNativeHumanReview,
+        require_last_push_approval: requireNativeHumanReview,
         required_review_thread_resolution: true,
+      },
+    },
+    {
+      type: "code_scanning",
+      parameters: {
+        code_scanning_tools: [{
+          tool: "CodeQL",
+          security_alerts_threshold: "high_or_higher",
+          alerts_threshold: "all",
+        }],
       },
     },
   ];
   if (request.blockForcePushes) rules.push({ type: "non_fast_forward" });
   if (request.blockDeletion) rules.push({ type: "deletion" });
+  rules.push(...preserved.map((rule) => structuredClone(rule)));
 
   return {
     id: 1,
@@ -142,7 +169,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     installStrongProviderMocks();
   });
 
-  it("separates no-bypass strict freshness from the pull-request-only review membrane", async () => {
+  it("separates no-bypass strict freshness from the founder-only review membrane", async () => {
     const provider = buildProvider();
     const result = await provider.applyBranchRuleset("founder-control-room", config);
 
@@ -176,22 +203,50 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(reviewPayload.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
     expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
       .toMatchObject({
-        required_approving_review_count: 1,
+        required_approving_review_count: 0,
         dismiss_stale_reviews_on_push: true,
-        require_last_push_approval: true,
+        require_code_owner_review: false,
+        require_last_push_approval: false,
         required_review_thread_resolution: true,
+      });
+    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "code_scanning")?.parameters)
+      .toEqual({
+        code_scanning_tools: [{
+          tool: "CodeQL",
+          security_alerts_threshold: "high_or_higher",
+          alerts_threshold: "all",
+        }],
       });
 
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
   });
 
-  it("rejects weak FCR main policy before any provider mutation", async () => {
+  it("restores Code Owner and last-push review automatically in a future-team phase", async () => {
+    const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
+    installStrongProviderMocks(futureConfig);
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", futureConfig)).resolves.toMatchObject({
+      name: futureConfig.name,
+      enforcement: "active",
+    });
+
+    const reviewPayload = mockCreateRepoRuleset.mock.calls.find((call) => call[0].name === futureConfig.name)?.[0];
+    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
+      .toMatchObject({
+        required_approving_review_count: 1,
+        require_code_owner_review: true,
+        require_last_push_approval: true,
+      });
+  });
+
+  it("rejects invalid FCR main policy before any provider mutation", async () => {
     const provider = buildProvider();
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
-      requiredApprovingReviewCount: 0,
-    })).rejects.toThrow("at least one approving review is required");
+      requiredApprovingReviewCount: -1,
+    })).rejects.toThrow("approving review count must be a non-negative integer");
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
@@ -277,6 +332,47 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
+  it("fails closed when founder-only readback unexpectedly requires Code Owner review", async () => {
+    const weakened = reviewReadback();
+    const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
+    if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
+    pullRequestRule.parameters.require_code_owner_review = true;
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback() : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
+  });
+
+  it("fails closed when future-team readback drops Code Owner review", async () => {
+    const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
+    const weakened = reviewReadback(futureConfig);
+    const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
+    if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
+    pullRequestRule.parameters.require_code_owner_review = false;
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback(futureConfig) : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", futureConfig))
+      .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
+  });
+
+  it("fails closed when review readback drops the CodeQL floor", async () => {
+    const weakened = reviewReadback();
+    weakened.rules = weakened.rules.filter((rule) => rule.type !== "code_scanning");
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback() : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("exactly one CodeQL code-scanning rule");
+  });
+
   it("surfaces the verified freshness identity when the review mutation fails", async () => {
     mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => {
       if (payload.name === freshnessName()) {
@@ -321,6 +417,77 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
   });
 
+  it("preserves signed commits and unrelated provider security rules when splitting the live review membrane", async () => {
+    const preserved = preservedProviderRules();
+    mockGetRepoRulesets.mockResolvedValue({
+      data: [
+        { id: 11, name: config.name },
+        { id: 22, name: freshnessName() },
+      ],
+    });
+    mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string; ruleset_id: number }) => ({
+      data: { id: payload.ruleset_id, name: payload.name, enforcement: payload.enforcement },
+    }));
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 22
+        ? { ...freshnessReadback(), id: 22 }
+        : { ...reviewReadback(config, preserved), id: 11 },
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+
+    const reviewUpdate = mockUpdateRepoRuleset.mock.calls.find((call) => call[0].ruleset_id === 11)?.[0];
+    expect(reviewUpdate.rules).toEqual(expect.arrayContaining(preserved));
+    expect(reviewUpdate.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
+    expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([11, 22, 11]);
+  });
+
+  it("removes legacy pre-merge required deployments instead of preserving a circular production gate", async () => {
+    const legacyDeployment: TestRule = {
+      type: "required_deployments",
+      parameters: { required_deployment_environments: ["founder-signal-engine-review", "production"] },
+    };
+    mockGetRepoRulesets.mockResolvedValue({
+      data: [
+        { id: 11, name: config.name },
+        { id: 22, name: freshnessName() },
+      ],
+    });
+    mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string; ruleset_id: number }) => ({
+      data: { id: payload.ruleset_id, name: payload.name, enforcement: payload.enforcement },
+    }));
+    mockGetRepoRuleset
+      .mockResolvedValueOnce({ data: reviewReadback(config, [legacyDeployment]) })
+      .mockResolvedValueOnce({ data: { ...freshnessReadback(), id: 22 } })
+      .mockResolvedValueOnce({ data: { ...reviewReadback(config), id: 11 } });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+
+    const reviewUpdate = mockUpdateRepoRuleset.mock.calls.find((call) => call[0].ruleset_id === 11)?.[0];
+    expect(reviewUpdate.rules.some((rule: { type: string }) => rule.type === "required_deployments")).toBe(false);
+  });
+
+  it("fails before provider mutation when the live review membrane contains an unknown unowned rule", async () => {
+    mockGetRepoRulesets.mockResolvedValue({ data: [{ id: 11, name: config.name }] });
+    mockGetRepoRuleset.mockResolvedValue({
+      data: reviewReadback(config, [{ type: "creation" }]),
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("unowned rule types that cannot be safely preserved: creation");
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
   it("accepts renamed policy and additional protected refs when both membranes round-trip", async () => {
     const flexible = {
       ...config,
@@ -345,9 +512,11 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(payload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
       .toMatchObject({
         dismiss_stale_reviews_on_push: false,
+        require_code_owner_review: false,
         require_last_push_approval: false,
         required_review_thread_resolution: true,
       });
+    expect(payload.rules.find((rule: { type: string }) => rule.type === "code_scanning")).toBeUndefined();
     expect(payload.rules.find((rule: { type: string }) => rule.type === "required_status_checks")).toBeTruthy();
     expect(payload.bypass_actors).toEqual([
       { actor_type: "Integration", actor_id: 123, bypass_mode: "always" },

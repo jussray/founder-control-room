@@ -17,6 +17,7 @@ export type StandingFounderAction =
   | 'authority_change';
 
 export type StandingFounderMode = 'autonomous' | 'proof-gated' | 'founder-required';
+export type NecessaryFixDisposition = 'not-necessary' | 'execute-now' | 'proof-gated' | 'founder-required';
 
 export interface StandingFounderRule {
   action: StandingFounderAction;
@@ -30,6 +31,18 @@ export interface StandingFounderRule {
   providerTypes: readonly string[];
   capabilityIds: readonly string[];
   reason: string;
+}
+
+export interface NecessaryFixPolicyInput {
+  action: StandingFounderAction;
+  necessary: boolean;
+  withinApprovedScope: boolean;
+  widensScope?: boolean;
+  externalPublication?: boolean;
+  spendsMoney?: boolean;
+  destructive?: boolean;
+  irreversible?: boolean;
+  authorityExpansion?: boolean;
 }
 
 const RULES: Readonly<Record<StandingFounderAction, StandingFounderRule>> = Object.freeze({
@@ -123,15 +136,56 @@ const AUTHORITY_INDEX: Record<AuthorityLevel, number> = {
   L0: 0, L1: 1, L2: 2, L3: 3, L4: 4, L5: 5, L6: 6,
 };
 
+const NECESSARY_FIX_FOUNDER_GATES = Object.freeze([
+  'scope-expansion',
+  'external-publication',
+  'spend',
+  'destructive-change',
+  'irreversible-change',
+  'authority-expansion',
+] as const);
+
 export const STANDING_FOUNDER_POLICY = Object.freeze({
   version: 'standing-founder-policy-v1',
   principle: 'Autonomous to founder standing policy; never autonomous from founder authority.',
   selfExpansionAllowed: false,
+  necessaryFixDefault: Object.freeze({
+    enabled: true,
+    principle: 'When a necessary reversible fix is inside the current approved scope and the existing standing rule authorizes it, implement it in the same loop instead of returning it as founder homework.',
+    doesNotGrantAuthority: true,
+    requiresCurrentAuthority: true,
+    proofGatedActionsRemainProofGated: true,
+    founderRequiredFor: NECESSARY_FIX_FOUNDER_GATES,
+  }),
   rules: RULES,
 });
 
 export function standingFounderRule(action: StandingFounderAction): StandingFounderRule {
   return RULES[action];
+}
+
+/**
+ * Decides how a necessary fix should proceed under the standing policy.
+ * This function never proves live provider/connection authority. Callers must still
+ * satisfy the selected action's current authority, evidence, exact-head, rollback,
+ * capability, and provider-readback requirements before mutation.
+ */
+export function necessaryFixPolicyDisposition(input: NecessaryFixPolicyInput): NecessaryFixDisposition {
+  if (!input.necessary) return 'not-necessary';
+
+  const rule = standingFounderRule(input.action);
+  const crossesFounderGate = !input.withinApprovedScope
+    || input.widensScope === true
+    || input.externalPublication === true
+    || input.spendsMoney === true
+    || input.destructive === true
+    || input.irreversible === true
+    || input.authorityExpansion === true
+    || !rule.reversible;
+
+  if (crossesFounderGate || rule.mode === 'founder-required') return 'founder-required';
+  if (rule.mode === 'proof-gated') return 'proof-gated';
+  return 'execute-now';
 }
 
 export function connectionCanSupportStandingAction(input: {

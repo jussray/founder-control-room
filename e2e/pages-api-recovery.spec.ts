@@ -130,3 +130,141 @@ test('preserves a verified Founder Control Room API response through the service
   expect(response.headers.get('x-founder-control-room-service')).toBe('founder-control-room');
   await expect(response.json()).resolves.toEqual({ ok: true });
 });
+
+test('serves the owned Juss Rayy identity from Pages with machine-readable identity', async ({ page }) => {
+  const handler = await loadHandler();
+  const identityHtml = readFileSync(resolve(repoRoot, 'public/juss-rayy/index.html'), 'utf8');
+  let apiCalls = 0;
+  let assetRequestPath = '';
+
+  const identityAssets = {
+    fetch: async (request: Request) => {
+      assetRequestPath = new URL(request.url).pathname;
+      return new Response(identityHtml, {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    },
+  };
+  const fcrApi = {
+    fetch: async (_request: Request) => {
+      apiCalls += 1;
+      return new Response('unexpected API route', { status: 500 });
+    },
+  };
+
+  const response = await handler.fetch(
+    new Request('https://foundercontrolroom.org/juss-rayy', {
+      headers: { accept: 'text/html' },
+    }),
+    { ASSETS: identityAssets, FCR_API: fcrApi },
+  );
+
+  expect(response.status).toBe(200);
+  expect(assetRequestPath).toBe('/juss-rayy');
+  expect(apiCalls).toBe(0);
+
+  await page.setContent(await response.text());
+  await expect(page).toHaveTitle('Juss Rayy | Founder · Product & Systems Architect');
+  await expect(page.getByRole('heading', { level: 1, name: 'Juss Rayy' })).toBeVisible();
+  await expect(page.getByText('Historical truth is immutable. Current truth must be re-observed.')).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'https://foundercontrolroom.org/juss-rayy',
+  );
+  await expect(page.locator('body[itemscope][itemtype="https://schema.org/ProfilePage"]')).toHaveCount(1);
+  await expect(page.locator('main[itemprop="mainEntity"][itemtype="https://schema.org/Person"]')).toHaveCount(1);
+  await expect(page.locator('link[itemprop="sameAs"][href="https://github.com/jussray"]')).toHaveCount(1);
+  await expect(page.locator('link[itemprop="sameAs"][href="https://www.linkedin.com/in/juss-rayy-13ba691a1"]')).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 2, name: 'Support the work' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sponsor on GitHub →' })).toHaveAttribute(
+    'href',
+    'https://github.com/sponsors/jussray',
+  );
+  await expect(page.getByRole('link', { name: 'Buy me a coffee' })).toHaveAttribute(
+    'href',
+    'https://buymeacoffee.com/jussrayy',
+  );
+  await expect(page.getByText(/does not represent an investment or ownership interest/i)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Juss Receipts' })).toBeVisible();
+
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({
+    path: resolve(outputDir, 'juss-rayy-desktop.png'),
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('heading', { level: 1, name: 'Juss Rayy' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Public identity links' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Support links' })).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+
+  await page.screenshot({
+    path: resolve(outputDir, 'juss-rayy-mobile.png'),
+    fullPage: true,
+  });
+});
+
+test('serves the bounded AI crawler contract as Pages assets without touching the API binding', async () => {
+  const handler = await loadHandler();
+  let apiCalls = 0;
+
+  const crawlerAssets = {
+    fetch: async (request: Request) => {
+      const pathname = new URL(request.url).pathname;
+      const fileName = pathname === '/' ? 'index.html' : pathname.slice(1);
+      const body = readFileSync(resolve(repoRoot, 'public', fileName), 'utf8');
+      const contentType = pathname.endsWith('.json')
+        ? 'application/json; charset=utf-8'
+        : pathname.endsWith('.xml')
+          ? 'application/xml; charset=utf-8'
+          : 'text/plain; charset=utf-8';
+      return new Response(body, { status: 200, headers: { 'content-type': contentType } });
+    },
+  };
+  const fcrApi = {
+    fetch: async (_request: Request) => {
+      apiCalls += 1;
+      return new Response('unexpected API route', { status: 500 });
+    },
+  };
+
+  const robots = await handler.fetch(
+    new Request('https://foundercontrolroom.org/robots.txt'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(robots.status).toBe(200);
+  const robotsBody = await robots.text();
+  expect(robotsBody).toContain('User-agent: OAI-SearchBot');
+  expect(robotsBody).toContain('User-agent: GPTBot');
+  expect(robotsBody).toContain('Allow: /crawlers.json$');
+
+  const crawlers = await handler.fetch(
+    new Request('https://foundercontrolroom.org/crawlers.json'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(crawlers.status).toBe(200);
+  const policy = await crawlers.json() as {
+    schema?: string;
+    policy?: Record<string, string>;
+    bots?: Record<string, string>;
+  };
+  expect(policy.schema).toBe('juss/ai-crawler-contract@v1');
+  expect(policy.policy?.search_discovery).toBe('allow_bounded_public_paths');
+  expect(policy.policy?.model_training).toBe('deny');
+  expect(policy.policy?.write_or_action_authority).toBe('none');
+  expect(policy.bots?.['OAI-SearchBot']).toBe('allow_bounded_public_paths');
+  expect(policy.bots?.GPTBot).toBe('deny');
+
+  const llms = await handler.fetch(
+    new Request('https://foundercontrolroom.org/llms.txt'),
+    { ASSETS: crawlerAssets, FCR_API: fcrApi },
+  );
+  expect(llms.status).toBe(200);
+  expect(await llms.text()).toContain('Canonical founder profile: https://www.foundercontrolroom.org/juss-rayy/');
+  expect(apiCalls).toBe(0);
+});

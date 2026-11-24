@@ -200,17 +200,21 @@ export async function verifyRemoteMcpOauthToken(
   const user = userData?.user;
   const email = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
   const userId = typeof user?.id === 'string' ? user.id.trim() : '';
-  if (userError || !email || !userId || !subject || subject !== userId) {
+  const confirmedEmail = typeof user?.email_confirmed_at === 'string' && user.email_confirmed_at.length > 0;
+  if (userError || !email || !userId || !confirmedEmail || !subject || subject !== userId) {
     throw new Error('OAuth access token is invalid or revoked');
   }
 
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
-    .select('email')
+    .select('user_id')
     .eq('email', email)
+    .eq('user_id', userId)
     .maybeSingle();
   if (allowError) throw new Error('Founder allowlist check failed');
-  if (!allowRow) throw new Error('OAuth identity is not on the founder allowlist');
+  if (!allowRow || allowRow.user_id !== userId) {
+    throw new Error('OAuth identity is not on the founder allowlist');
+  }
 
   return { userId, email, clientId, projectIds, authMode: 'oauth' };
 }
@@ -486,7 +490,7 @@ export function createRemoteReadMcpHandler(
         supportedVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
         capabilities: { tools: {} },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. It exposes six read/preview-only tools, fails closed on auth/scope/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
+          'Paired Chief AI + Founder Control Room connector. It exposes nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool. The relay calls only the explicitly addressed provider for research/propose/review, carries no mutation authority, fails closed on auth/scope/provider/evidence errors, stores no raw MCP arguments or results, and grants no execution authority.',
       }, { ttlMs: 300_000, cacheScope: 'private' })));
       return;
     }
@@ -502,7 +506,7 @@ export function createRemoteReadMcpHandler(
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         instructions:
-          'Paired Chief AI + Founder Control Room connector. Six read/preview-only tools; no generic nested invocation, provider mutation, credential input, cookies, fingerprinting, or execution authority.',
+          'Paired Chief AI + Founder Control Room connector. Nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay; relay is research/propose/review only, fails closed when the addressed provider is unavailable, carries no provider mutation or execution authority, and accepts no credential input.',
       }));
       return;
     }

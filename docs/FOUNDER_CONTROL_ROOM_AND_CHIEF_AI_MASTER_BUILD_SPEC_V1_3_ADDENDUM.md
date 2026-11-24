@@ -145,6 +145,39 @@ Question requirements, remove unnecessary steps, simplify before optimizing, acc
 
 ---
 
+## Product Control Room federation
+
+A product may expose its own bounded Control Room actuator, but the authority chain remains split deliberately:
+
+```text
+Chief capability plan
+-> FCR validates exact plan + proposal + founder decision
+-> FCR issues exact ProductBuildDirective
+-> FCR verifies target product runtime identity
+-> product Control Room executes only its local bounded actuator
+-> ProductBuildReceipt
+-> FCR re-verifies runtime identity + receipt
+-> FCR records the evidence state
+```
+
+For the first StoryEngine slice:
+
+- Chief remains the capability selector; FCR must not infer specialist selection from user wording.
+- FCR is the authority/evidence boundary and must bind the directive to the exact StoryEngine head.
+- StoryEngine remains the local executor and may mutate only `control-room:event-log` in this slice.
+- the Product Build directive and receipt cannot authorize or claim merge, deploy, or provider mutation;
+- the StoryEngine service identity and release SHA must be verified immediately before and after execution;
+- if the write request loses its terminal response, classify execution as **UNKNOWN** and do not blind-retry;
+- the signed service receipt ingress is mounted before browser same-origin middleware because it is a service-to-service boundary, not a browser session;
+- the receipt root secret remains FCR-only. StoryEngine receives only a purpose-derived token;
+- v1 receipt ingress performs canonical validation/reconciliation in-request. It does **not** claim durable receipt persistence or replay protection until those are separately implemented and proven;
+- loopback HTTP is permitted only for exact-head CI/local proof. Non-loopback federation requires HTTPS;
+- Playwright proof must run the actual FCR federation code against the actual exact StoryEngine server code before this path is called integration-verified.
+
+This federation does not turn product Control Rooms into independent governance authorities. They execute within an FCR-issued ceiling and return evidence upward.
+
+---
+
 ## Review and merge truth
 
 Before merging:

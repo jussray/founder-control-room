@@ -32,7 +32,7 @@ function privateKeyPem(): string {
 describe("getGitHubInstallationToken token-format compatibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetRepoInstallation.mockResolvedValue({ data: { id: 4242 } });
+    mockGetRepoInstallation.mockResolvedValue({ data: { id: 4242, app_id: 12345 } });
   });
 
   it("treats a long JWT-shaped stateless installation token as an opaque credential", async () => {

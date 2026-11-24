@@ -61,10 +61,20 @@ describe('Cloudflare Worker Git authority contract', () => {
     ]);
     expect(authorityPolicy.currentDesiredState).toBe('non-promoting');
     expect(authorityPolicy.currentDesiredDeployCommand).toBe(
-      'npx wrangler versions upload',
+      'npx wrangler versions upload --config wrangler.worker.toml',
     );
     expect(authorityPolicy.canonicalProductionAuthority).toBe(
       'github-manual-deploy-workflow',
+    );
+  });
+
+  it('keeps a non-promoting but stale deploy command as visible drift', () => {
+    expect(authorityScript).toContain('normalizeDeployCommand');
+    expect(authorityScript).toContain('matchesDesiredDeployCommand');
+    expect(authorityScript).toContain('desiredDeployCommandMatched');
+    expect(authorityScript).toContain('WORKER_GIT_DESIRED_DEPLOY_COMMAND_DRIFT');
+    expect(authorityScript).toContain(
+      'observedState !== "non-promoting" || desiredDeployCommandMatched',
     );
   });
 

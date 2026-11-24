@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 
+import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { classifyMainReleaseProvenance } from './verify-main-release-provenance.mjs';
+
 const VERSION_PATTERN = /^\d{14}$/;
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const GITHUB_API_BASE = 'https://api.github.com';
+const MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH = '.github/workflows/main-release-provenance.yml';
 export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
   '20260809072500',
 ]);
@@ -57,6 +64,174 @@ export function buildReceipt({
   };
 }
 
+export function shouldEnforceMainReleaseProvenance({
+  phase,
+  githubActions = process.env.GITHUB_ACTIONS,
+  githubWorkflow = process.env.GITHUB_WORKFLOW,
+  githubEventName = process.env.GITHUB_EVENT_NAME,
+} = {}) {
+  return phase === 'preflight'
+    && githubActions === 'true'
+    && githubWorkflow === 'Deploy'
+    && githubEventName === 'workflow_dispatch';
+}
+
+async function fetchGithubJson(fetchImpl, url, token) {
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('GitHub provider observation requires fetch support');
+  }
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'founder-control-room-production-provenance-gate',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetchImpl(url, { headers });
+  if (!response?.ok) {
+    throw new Error(`GitHub provider observation failed with HTTP ${response?.status ?? 'unknown'}`);
+  }
+  return response.json();
+}
+
+export function classifyTrustedMainReleaseProvenanceRun({
+  repository,
+  targetSha,
+  workflowRuns,
+} = {}) {
+  const repo = String(repository || '').trim();
+  const target = String(targetSha || '').trim().toLowerCase();
+  const owner = repo.split('/')[0]?.toLowerCase() || '';
+
+  if (!REPOSITORY_PATTERN.test(repo)) {
+    return { ok: false, reason: 'invalid_repository', targetSha: target || null };
+  }
+  if (!FULL_SHA.test(target)) {
+    return { ok: false, reason: 'invalid_sha', targetSha: target || null };
+  }
+  if (!Array.isArray(workflowRuns)) {
+    return { ok: false, reason: 'provenance_runs_unavailable', targetSha: target };
+  }
+
+  const trusted = workflowRuns
+    .filter((run) => {
+      if (!run || typeof run !== 'object') return false;
+      const actor = String(run.actor?.login || '').trim().toLowerCase();
+      return String(run.path || '').trim() === MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH
+        && String(run.head_sha || '').trim().toLowerCase() === target
+        && String(run.head_branch || '').trim() === 'main'
+        && String(run.event || '').trim() === 'push'
+        && String(run.status || '').trim() === 'completed'
+        && String(run.conclusion || '').trim() === 'success'
+        && actor === owner;
+    })
+    .sort((left, right) => Number(right.id || 0) - Number(left.id || 0));
+
+  if (trusted.length === 0) {
+    return {
+      ok: false,
+      reason: 'missing_trusted_direct_main_provenance_receipt',
+      targetSha: target,
+    };
+  }
+
+  const [run] = trusted;
+  return {
+    ok: true,
+    reason: 'verified_main_release_provenance_workflow',
+    targetSha: target,
+    workflowRunId: run.id,
+    workflowActor: run.actor?.login,
+    workflowPath: MAIN_RELEASE_PROVENANCE_WORKFLOW_PATH,
+  };
+}
+
+export async function observeMainReleaseProvenance({
+  repository,
+  targetSha,
+  fetchImpl = globalThis.fetch,
+  token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
+} = {}) {
+  const repo = String(repository || '').trim();
+  const target = String(targetSha || '').trim().toLowerCase();
+
+  if (!REPOSITORY_PATTERN.test(repo)) {
+    return { ok: false, reason: 'invalid_repository', targetSha: target || null };
+  }
+  if (!FULL_SHA.test(target)) {
+    return { ok: false, reason: 'invalid_sha', targetSha: target || null };
+  }
+
+  try {
+    const [mainBranch, associatedPulls] = await Promise.all([
+      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/branches/main`, token),
+      fetchGithubJson(fetchImpl, `${GITHUB_API_BASE}/repos/${repo}/commits/${target}/pulls`, token),
+    ]);
+
+    const reviewedResult = classifyMainReleaseProvenance({
+      targetSha: target,
+      currentMainSha: mainBranch?.commit?.sha,
+      associatedPulls,
+    });
+
+    if (reviewedResult.ok || reviewedResult.reason !== 'direct_or_unproven_main_commit') {
+      return {
+        ...reviewedResult,
+        repository: repo,
+        provider: 'github',
+      };
+    }
+
+    const query = new URLSearchParams({
+      head_sha: target,
+      event: 'push',
+      status: 'success',
+      per_page: '100',
+    });
+    // This repository is public. The provenance run itself is public provider
+    // evidence, so observe it without widening the Deploy token to actions:read.
+    // If the repository or provider visibility changes, this request fails closed.
+    const runs = await fetchGithubJson(
+      fetchImpl,
+      `${GITHUB_API_BASE}/repos/${repo}/actions/runs?${query.toString()}`,
+      '',
+    );
+    const directResult = classifyTrustedMainReleaseProvenanceRun({
+      repository: repo,
+      targetSha: target,
+      workflowRuns: runs?.workflow_runs,
+    });
+
+    return {
+      ...directResult,
+      repository: repo,
+      provider: 'github',
+      reviewedProvenanceReason: reviewedResult.reason,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'provider_unavailable',
+      targetSha: target,
+      repository: repo,
+      provider: 'github',
+      detail: error instanceof Error ? error.message.slice(0, 200) : 'unknown provider failure',
+    };
+  }
+}
+
+function checkedOutHeadSha() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim().toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
 export async function main() {
   const migrationsDir = resolve(process.cwd(), 'supabase/migrations');
   const remoteListPath = process.env.REMOTE_MIGRATION_LIST_PATH
@@ -81,6 +256,14 @@ export async function main() {
     throw new Error('REQUIRED_MIGRATION_VERSIONS must contain comma-separated 14-digit versions');
   }
 
+  let releaseProvenance = null;
+  if (shouldEnforceMainReleaseProvenance({ phase })) {
+    releaseProvenance = await observeMainReleaseProvenance({
+      repository: process.env.GITHUB_REPOSITORY,
+      targetSha: checkedOutHeadSha(),
+    });
+  }
+
   const requiredVersions = requiredMigrationVersions(configuredRequiredVersions);
   const localFiles = (await readdir(migrationsDir))
     .filter((name) => name.endsWith('.sql'))
@@ -88,19 +271,25 @@ export async function main() {
   const localVersions = localFiles.map(parseLocalVersion).filter(Boolean);
   const remoteText = await readFile(remoteListPath, 'utf8');
   const remoteVersions = parseRemoteVersions(remoteText);
-  const receipt = buildReceipt({
-    phase,
-    localVersions,
-    remoteVersions,
-    requiredVersions,
-    remoteListSource: basename(remoteListPath),
-  });
+  const receipt = {
+    ...buildReceipt({
+      phase,
+      localVersions,
+      remoteVersions,
+      requiredVersions,
+      remoteListSource: basename(remoteListPath),
+    }),
+    ...(releaseProvenance ? { releaseProvenance } : {}),
+  };
 
   await mkdir(dirname(receiptPath), { recursive: true });
   await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(receipt, null, 2));
 
   const failures = [];
+  if (releaseProvenance && !releaseProvenance.ok) {
+    failures.push(`main release provenance blocked: ${releaseProvenance.reason}`);
+  }
   if (receipt.missingRequiredLocal.length > 0) {
     failures.push(`required migrations absent locally: ${receipt.missingRequiredLocal.join(', ')}`);
   }

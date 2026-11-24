@@ -16,7 +16,7 @@ function createTestApp() {
 }
 
 describe("Portfolio Design OS API", () => {
-  it("returns all readiness dimensions without promoting design to runtime proof", async () => {
+  it("returns all readiness dimensions and the shared 23-command design deck without promoting design to runtime proof", async () => {
     const response = await request(createTestApp()).get("/design-os");
 
     expect(response.status).toBe(200);
@@ -38,9 +38,18 @@ describe("Portfolio Design OS API", () => {
       noApprovalCarriesAcrossProjects: true,
     });
     expect(response.body.projects).toHaveLength(7);
+    expect(response.body.commands).toHaveLength(23);
+    expect(response.body.commandContract).toMatchObject({
+      contract: "juss/design-command-deck@v1",
+      count: 23,
+      sharedCapability: "control-room-design-implementation",
+      commandsAreOperationsNotAuthority: true,
+      mutatingCommandsRequireFounderApproval: true,
+      uiRuntimeClaimsRequireExactHeadPlaywright: true,
+    });
   });
 
-  it("returns the registered Command Center file with a not-started implementation state", async () => {
+  it("returns the registered Command Center file with a not-started implementation state and the same command deck", async () => {
     const response = await request(createTestApp()).get("/design-os/founder-control-room");
 
     expect(response.status).toBe(200);
@@ -48,6 +57,37 @@ describe("Portfolio Design OS API", () => {
     expect(response.body.project.designState).toBe("registered");
     expect(response.body.project.implementationState).toBe("not_started");
     expect(response.body.project.codeConnectMappings).toBe(0);
+    expect(response.body.commands).toHaveLength(23);
+    expect(response.body.commandContract.sharedCapability).toBe("control-room-design-implementation");
+  });
+
+  it("exposes exactly 23 bounded commands and can resolve one by id", async () => {
+    const deck = await request(createTestApp()).get("/design-os/commands");
+    const layout = await request(createTestApp()).get("/design-os/commands/layout");
+
+    expect(deck.status).toBe(200);
+    expect(deck.body.commands).toHaveLength(23);
+    expect(deck.body.commands.map((entry: { slash: string }) => entry.slash)).toContain("/prove");
+    expect(layout.status).toBe(200);
+    expect(layout.body.command).toMatchObject({
+      id: "layout",
+      slash: "/layout",
+      phase: "expression",
+      mode: "mutate",
+      requiresFounderApproval: true,
+      requiresPlaywright: true,
+    });
+    expect(layout.body.command.owns).toContain("structural placement");
+  });
+
+  it("fails closed for an unknown design command", async () => {
+    const response = await request(createTestApp()).get("/design-os/commands/make-it-pretty");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: "DESIGN_COMMAND_NOT_FOUND",
+      commandId: "make-it-pretty",
+    });
   });
 
   it("fails closed for an unknown repository instead of falling back", async () => {

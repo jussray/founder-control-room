@@ -9,6 +9,7 @@ import type {
   Patch,
   ProjectRepo,
   PullRequestReviewContext,
+  PullRequestObservation,
   RepositoryProvider,
   RepositoryRef,
   ReviewSignal,
@@ -27,6 +28,7 @@ const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
 const FOUNDER_CONTROL_ROOM_REPOSITORY = "jussray/founder-control-room";
 const FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH = "main";
 export const FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME = "Founder Control Room main exact-head gate";
+export const FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS = 0;
 const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
   "Required Gate",
   "Verify test-ledger contract",
@@ -109,8 +111,13 @@ export function assertRulesetGovernancePolicy(
   if (!config.requirePullRequest) {
     throw new Error("Founder Control Room main governance requires pull-request enforcement");
   }
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    throw new Error("Founder Control Room main governance requires at least one approving review");
+  if (
+    !Number.isInteger(config.requiredApprovingReviewCount)
+    || config.requiredApprovingReviewCount !== FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS
+  ) {
+    throw new Error(
+      `Founder Control Room main governance requires exactly ${FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS} native approving reviews for the checked-in phase`,
+    );
   }
   for (const requiredCheck of FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS) {
     if (!config.requiredStatusCheckNames.includes(requiredCheck)) {
@@ -192,6 +199,17 @@ class LazyRepositoryProvider implements RepositoryProvider {
       throw new Error(`${delegate.name}: does not support provider-backed pull-request reviews`);
     }
     return delegate.listReviewSignals(this.governanceProjectId(projectId), pullRequestNumber);
+  }
+
+  async observePullRequest(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestObservation> {
+    const delegate = await this.delegate();
+    if (!delegate.observePullRequest) {
+      throw new Error("Provider does not support read-only PR observations");
+    }
+    return delegate.observePullRequest(this.governanceProjectId(projectId), pullRequestNumber);
   }
 
   async getPullRequestReviewContext(

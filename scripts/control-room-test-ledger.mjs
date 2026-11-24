@@ -54,9 +54,16 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
 
     const key = checkKey(run);
     const current = selected.get(key);
-    const currentTime = timestamp(current?.completed_at ?? current?.started_at);
-    const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    // Check-run IDs are allocated at creation; completion timestamps can make an
+    // older completed attempt look newer than a just-queued replacement.
+    const currentId = /^\d+$/.test(String(current?.id ?? '')) ? BigInt(current.id) : null;
+    const candidateId = /^\d+$/.test(String(run.id ?? '')) ? BigInt(run.id) : null;
+    const currentTime = timestamp(current?.started_at ?? current?.completed_at);
+    const candidateTime = timestamp(run.started_at ?? run.completed_at);
+    const newer = currentId !== null && candidateId !== null
+      ? candidateId > currentId || (candidateId === currentId && candidateTime >= currentTime)
+      : candidateTime >= currentTime;
+    if (!current || newer) selected.set(key, run);
   }
 
   return [...selected.values()]
@@ -97,7 +104,7 @@ export function aggregateTestLedger(checks) {
   return {state, counts};
 }
 
-export function buildTestLedger({
+export function buildTestLedger({runtimeState = null,
   repository,
   sha,
   branch,
@@ -113,6 +120,7 @@ export function buildTestLedger({
     commitSha: normalizeSha(sha),
     branch: clean(branch) || null,
     generatedAt: observedAt.toISOString(),
+    ...(runtimeState ? { runtimeState } : {}),
     source: {
       provider: 'github-check-runs',
       exactRef: 'commit-sha',
@@ -131,38 +139,95 @@ export function buildTestLedger({
   };
 }
 
-async function githubJson(url, token) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'control-room-test-ledger',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`GitHub check lookup failed (${response.status}): ${body.slice(0, 500)}`);
-  }
-  return response.json();
+const GITHUB_TRANSIENT_ATTEMPTS = 4;
+const GITHUB_TRANSIENT_BASE_DELAY_MS = 2_000;
+
+function isTransientGithubStatus(status) {
+  return status === 429 || (status >= 500 && status <= 599);
 }
 
-async function fetchAllCheckRuns({repository, sha, token}) {
+// One check-run read inside a ~20-minute observation window. A transient
+// provider fault (5xx, 429, network error) is retried with backoff instead of
+// killing the whole window; any 4xx or final failure still throws, so a
+// partial or failed read is never treated as an observation.
+export async function githubJson(url, token, {
+  fetchImpl = fetch,
+  sleepImpl = sleep,
+  attempts = GITHUB_TRANSIENT_ATTEMPTS,
+  baseDelayMs = GITHUB_TRANSIENT_BASE_DELAY_MS,
+} = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'control-room-test-ledger',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+    } catch (error) {
+      lastError = new Error(`GitHub check lookup failed (network): ${error instanceof Error ? error.message : String(error)}`);
+      if (attempt < attempts) await sleepImpl(baseDelayMs * 2 ** (attempt - 1));
+      continue;
+    }
+    if (response.ok) return response.json();
+    const body = await response.text();
+    lastError = new Error(`GitHub check lookup failed (${response.status}): ${body.slice(0, 500)}`);
+    if (!isTransientGithubStatus(response.status)) throw lastError;
+    if (attempt < attempts) await sleepImpl(baseDelayMs * 2 ** (attempt - 1));
+  }
+  throw lastError;
+}
+
+// GitHub check runs can arrive while pages are being read. Re-enumerate the
+// complete set when an offset-based page boundary moves; never dedupe away
+// missing runs or treat an incomplete snapshot as a passing observation.
+const CHECK_SNAPSHOT_RETRY_DELAYS_MS = [250, 500];
+
+export async function fetchAllCheckRuns({
+  repository, sha, token, getJson = githubJson, sleepImpl = sleep,
+}) {
   const [owner, repo] = clean(repository).split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must use owner/repo format.');
 
-  const runs = [];
-  for (let page = 1; page <= 10; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`);
-    url.searchParams.set('filter', 'all');
-    url.searchParams.set('per_page', '100');
-    url.searchParams.set('page', String(page));
-    const payload = await githubJson(url, token);
-    const pageRuns = Array.isArray(payload?.check_runs) ? payload.check_runs : [];
-    runs.push(...pageRuns);
-    if (pageRuns.length < 100) break;
+  let lastError;
+  for (let attempt = 0; attempt <= CHECK_SNAPSHOT_RETRY_DELAYS_MS.length; attempt += 1) {
+    const runs = [];
+    let providerTotal = null;
+    let countMoved = false;
+    for (let page = 1; page <= 10; page += 1) {
+      const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`);
+      url.searchParams.set('filter', 'all');
+      url.searchParams.set('per_page', '100');
+      url.searchParams.set('page', String(page));
+      const payload = await getJson(url, token);
+      if (!Array.isArray(payload?.check_runs) || !Number.isSafeInteger(payload.total_count) || payload.total_count < 0) {
+        throw new Error('GitHub check-run page has an invalid or incomplete shape.');
+      }
+      const pageRuns = payload.check_runs;
+      if (providerTotal === null) providerTotal = payload.total_count;
+      else if (payload.total_count !== providerTotal) countMoved = true;
+      runs.push(...pageRuns);
+      if (page === 10 && pageRuns.length === 100) {
+        throw new Error('GitHub check-run enumeration reached the 1000-record limit; refusing partial ledger.');
+      }
+      if (pageRuns.length < 100) break;
+    }
+    const ids = runs.map((run) => String(run?.id ?? ''));
+    const invalidIds = ids.some((id) => !/^\d+$/.test(id)) || new Set(ids).size !== runs.length;
+    if (!invalidIds && !countMoved && providerTotal === runs.length) return runs;
+
+    lastError = invalidIds
+      ? new Error('GitHub check-run pagination returned missing or duplicate IDs; refusing partial ledger.')
+      : new Error(`GitHub check-run enumeration incomplete: fetched ${runs.length} of ${providerTotal}; refusing partial ledger.`);
+    if (attempt < CHECK_SNAPSHOT_RETRY_DELAYS_MS.length) {
+      await sleepImpl(CHECK_SNAPSHOT_RETRY_DELAYS_MS[attempt]);
+    }
   }
-  return runs;
+  throw lastError;
 }
 
 function sleep(milliseconds) {
@@ -182,6 +247,15 @@ export async function observeExactHeadChecks(env = process.env) {
   const runId = clean(env.GITHUB_RUN_ID);
   const observerCheckName = clean(env.CONTROL_ROOM_LEDGER_SELF_CHECK || 'Publish exact-head test ledger');
   const outputPath = clean(env.CONTROL_ROOM_TEST_LEDGER_PATH) || 'artifacts/control-room-test-ledger.json';
+  const runtimeStatePath = clean(env.CONTROL_ROOM_RUNTIME_STATE_PATH);
+  const runtimeState = runtimeStatePath
+    ? JSON.parse(fs.readFileSync(runtimeStatePath, 'utf8'))
+    : null;
+  if (runtimeState) {
+    if (clean(runtimeState.repository) !== repository) throw new Error('Runtime-state receipt repository does not match the ledger repository.');
+    if (normalizeSha(runtimeState.sourceSha) !== sha) throw new Error('Runtime-state receipt sourceSha does not match the exact ledger head.');
+    if (!/^sha256:[0-9a-f]{64}$/u.test(clean(runtimeState?.trackedConfig?.sha256))) throw new Error('Runtime-state receipt is missing a valid tracked-config fingerprint.');
+  }
   const timeoutMs = Number(env.CONTROL_ROOM_LEDGER_TIMEOUT_MS || 20 * 60 * 1000);
   const pollMs = Number(env.CONTROL_ROOM_LEDGER_POLL_MS || 10_000);
   const minimumObservationMs = Number(env.CONTROL_ROOM_LEDGER_MINIMUM_MS || 30_000);
@@ -199,7 +273,7 @@ export async function observeExactHeadChecks(env = process.env) {
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
-    const ledger = buildTestLedger({repository, sha, branch, runId, checks});
+    const ledger = buildTestLedger({runtimeState, repository, sha, branch, runId, checks});
     writeLedger(outputPath, ledger);
 
     const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
@@ -217,7 +291,7 @@ export async function observeExactHeadChecks(env = process.env) {
     await sleep(pollMs);
   }
 
-  const ledger = buildTestLedger({
+  const ledger = buildTestLedger({runtimeState, 
     repository,
     sha,
     branch,

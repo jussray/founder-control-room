@@ -10,7 +10,10 @@ import {
 
 const CONTENT_ID = '11111111-1111-4111-8111-111111111111';
 const REQUESTED = '2026-08-17T16:20:00.000Z';
+const RETRY_REQUESTED = '2026-08-17T16:40:00.000Z';
+const APPROVAL_EXPIRES_AT = '2026-08-17T18:20:00.000Z';
 const RESERVATION_ID = '22222222-2222-4222-8222-222222222222';
+const EXPIRY_GUARD_MIGRATION = 'supabase/migrations/20260830113000_founder_content_cadence_expiry_guard.sql';
 
 function rpcRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -23,7 +26,11 @@ function rpcRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function rpcClient(row = rpcRow(), error: { message: string } | null = null) {
+function rpcClient(
+  row = rpcRow(),
+  error: { message: string } | null = null,
+  expectedRequested = REQUESTED,
+) {
   return {
     async rpc(functionName: string, args: Record<string, unknown>) {
       expect(functionName).toBe('reserve_founder_content_cadence');
@@ -31,7 +38,8 @@ function rpcClient(row = rpcRow(), error: { message: string } | null = null) {
         p_provider: 'buffer',
         p_channel: 'juss_rayy_linkedin',
         p_content_id: CONTENT_ID,
-        p_requested_schedule_at: REQUESTED,
+        p_requested_schedule_at: expectedRequested,
+        p_approval_expires_at: APPROVAL_EXPIRES_AT,
       });
       return { data: row ? [row] : null, error };
     },
@@ -45,6 +53,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'JUSS_RAYY_LINKEDIN',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient());
 
     expect(reservation.policyId).toBe('founder-content-hourly-cap-v1');
@@ -61,6 +70,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow({ reserved_schedule_at: reserved, deferred_seconds: 3600 })));
 
     expect(reservation.reservedScheduleAt).toBe(reserved);
@@ -81,14 +91,16 @@ describe('founder-content hourly cadence', () => {
     expect(FOUNDER_CONTENT_MIN_GAP_MINUTES).toBe(60);
   });
 
-  it('changes only the provider schedule after cadence reservation and preserves founder review timing', async () => {
+  it('moves the review deadline with a cadence-deferred provider schedule', async () => {
+    const reserved = '2026-08-17T17:20:00.000Z';
     const reservation = await reserveFounderContentCadence({
       provider: 'buffer',
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow({
-      reserved_schedule_at: '2026-08-17T17:20:00.000Z',
+      reserved_schedule_at: reserved,
       deferred_seconds: 3600,
     })));
     const envelope = {
@@ -104,11 +116,60 @@ describe('founder-content hourly cadence', () => {
     };
 
     const adjusted = applyFounderContentCadenceSchedule(envelope, reservation);
-    expect(adjusted.provider_request.schedule_at).toBe('2026-08-17T17:20:00.000Z');
-    expect(adjusted.provider_request.review_deadline).toBe(REQUESTED);
+    expect(adjusted.provider_request.schedule_at).toBe(reserved);
+    expect(adjusted.provider_request.review_deadline).toBe(reserved);
     expect(adjusted.provider_request.review_window_minutes).toBe(20);
     expect(adjusted.text).toBe(envelope.text);
     expect(envelope.provider_request.schedule_at).toBe(REQUESTED);
+    expect(envelope.provider_request.review_deadline).toBe(REQUESTED);
+  });
+
+  it('reuses the canonical cadence slot and carries the review deadline to that slot on retry', async () => {
+    const reserved = '2026-08-17T17:20:00.000Z';
+    const reservation = await reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: RETRY_REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }, rpcClient(rpcRow({
+      requested_schedule_at: REQUESTED,
+      reserved_schedule_at: reserved,
+      deferred_seconds: 3600,
+    }), null, RETRY_REQUESTED));
+
+    expect(reservation.requestedScheduleAt).toBe(REQUESTED);
+    expect(reservation.reservedScheduleAt).toBe(reserved);
+
+    const adjusted = applyFounderContentCadenceSchedule({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      content_id: CONTENT_ID,
+      provider_request: {
+        schedule_at: RETRY_REQUESTED,
+        review_deadline: RETRY_REQUESTED,
+        review_window_minutes: 20,
+      },
+      text: 'same exact authorized content',
+    }, reservation);
+
+    expect(adjusted.provider_request.schedule_at).toBe(reserved);
+    expect(adjusted.provider_request.review_deadline).toBe(reserved);
+    expect(adjusted.provider_request.review_window_minutes).toBe(20);
+  });
+
+  it('rejects a cadence row whose canonical review origin postdates the current request', async () => {
+    await expect(reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }, rpcClient(rpcRow({
+      requested_schedule_at: '2026-08-17T16:30:00.000Z',
+      reserved_schedule_at: '2026-08-17T17:20:00.000Z',
+      deferred_seconds: 3000,
+    })))).rejects.toThrow(/may not postdate current request/);
   });
 
   it('rejects a reservation being replayed onto a different content or channel', async () => {
@@ -117,6 +178,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient());
 
     expect(() => applyFounderContentCadenceSchedule({
@@ -133,6 +195,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow({ cadence_policy_id: 'different-policy' })))).rejects.toThrow(/policy identity mismatch/);
   });
 
@@ -142,10 +205,41 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow({
       reserved_schedule_at: '2026-08-17T16:19:59.000Z',
       deferred_seconds: 0,
     })))).rejects.toThrow(/may not predate requested schedule/);
+  });
+
+  it('fails closed if a returned reservation reaches or exceeds approval expiry', async () => {
+    await expect(reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }, rpcClient(rpcRow({
+      reserved_schedule_at: APPROVAL_EXPIRES_AT,
+      deferred_seconds: 7200,
+    })))).rejects.toThrow(/must remain before approval expiry/);
+  });
+
+  it('fails before durable cadence authority when requested schedule is already outside approval', async () => {
+    let touchedRpc = false;
+    await expect(reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: REQUESTED,
+    }, {
+      async rpc() {
+        touchedRpc = true;
+        return { data: [rpcRow()], error: null };
+      },
+    })).rejects.toThrow(/approvalExpiresAt must be later than requestedScheduleAt/);
+    expect(touchedRpc).toBe(false);
   });
 
   it('fails closed when cadence storage is unavailable', async () => {
@@ -154,6 +248,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss_rayy_linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow(), { message: 'database unavailable' }))).rejects.toThrow(/CADENCE_RESERVATION_FAILED/);
   });
 
@@ -163,6 +258,7 @@ describe('founder-content hourly cadence', () => {
       channel: 'juss rayy linkedin',
       contentId: CONTENT_ID,
       requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient())).rejects.toThrow(/channel is invalid/);
   });
 
@@ -180,5 +276,21 @@ describe('founder-content hourly cadence', () => {
     expect(migration).toContain('grant execute on function public.reserve_founder_content_cadence');
     expect(migration).toContain('to service_role');
     expect(migration).not.toContain('post_text');
+  });
+
+  it('rejects approval-expired deferred slots inside the atomic RPC before any insert', () => {
+    const migration = readFileSync(EXPIRY_GUARD_MIGRATION, 'utf8');
+    const expiryGuard = "if next_reserved_at >= p_approval_expires_at then";
+    const guardIndex = migration.indexOf(expiryGuard);
+    const insertIndex = migration.indexOf('insert into public.founder_content_cadence_reservations', guardIndex);
+
+    expect(migration).toContain('p_approval_expires_at timestamptz');
+    expect(migration).toContain("raise exception 'FOUNDER_CONTENT_CADENCE_APPROVAL_EXPIRED'");
+    expect(migration).toContain('pg_advisory_xact_lock');
+    expect(guardIndex).toBeGreaterThan(-1);
+    expect(insertIndex).toBeGreaterThan(guardIndex);
+    expect(migration).toContain('drop function public.reserve_founder_content_cadence(text, text, uuid, timestamptz)');
+    expect(migration).toContain('grant execute on function public.reserve_founder_content_cadence(text, text, uuid, timestamptz, timestamptz) to service_role');
+    expect(migration).not.toContain('delete from public.founder_content_cadence_reservations');
   });
 });
