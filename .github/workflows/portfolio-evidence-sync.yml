@@ -27,7 +27,7 @@ env:
 
 jobs:
   sync:
-    name: Observe and propose portfolio evidence (read-only)
+    name: Observe aggregate portfolio evidence (read-only)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -58,7 +58,7 @@ jobs:
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
         run: node scripts/mint-portfolio-github-app-token.mjs
 
-      - name: Observe canonical repositories and propose bounded evidence (no publication)
+      - name: Observe canonical repositories and record aggregate evidence (no publication)
         id: sync
         env:
           PORTFOLIO_SYNC_TOKEN_FILE: ${{ runner.temp }}/portfolio-sync-token
@@ -84,10 +84,10 @@ jobs:
             echo "- State: \`$(jq -r '.state' "$PORTFOLIO_SYNC_RECEIPT")\`"
             echo "- Target commit: \`$(jq -r '.targetCommit' "$PORTFOLIO_SYNC_RECEIPT")\`"
             echo "- Repositories observed: \`$(jq -r '.observedRepositoryCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
-            echo "- Worlds refreshed: \`$(jq -r '.changedWorlds | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
-            echo "- Systems refreshed: \`$(jq -r '.changedSystems | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
-            echo "- Unavailable repositories: \`$(jq -r '.unavailableRepositories | length' "$PORTFOLIO_SYNC_RECEIPT")\`"
-            echo '- Mutation boundary: reviewable local evidence proposals only; no GitHub writes'
+            echo "- Worlds with changed observations: \`$(jq -r '.changedWorldCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Systems with changed observations: \`$(jq -r '.changedSystemCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo "- Unavailable repositories: \`$(jq -r '.unavailableRepositoryCount' "$PORTFOLIO_SYNC_RECEIPT")\`"
+            echo '- Mutation boundary: aggregate observations only; no GitHub writes or private artifacts'
           echo '- Source readback is not production release or founder authorization'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -133,14 +133,11 @@ jobs:
             '{contract:"juss/fcr-portfolio-evidence@v1",state:"BLOCKED",reason:"WORKFLOW_FAILED_BEFORE_EVIDENCE_RECEIPT",runId:$run,headSha:$sha,jobStatus:$status,mintStepOutcome:$mint,bindingOrigin:"UNKNOWN_FROM_WORKFLOW",providerCredentialValidity:"NOT_EVALUATED_BY_THIS_RECEIPT",sourceVerified:false,liveVerified:false}' \
             > "$PORTFOLIO_SYNC_RECEIPT"
 
-      - name: Upload bounded evidence receipt and browser proof
+      - name: Upload aggregate observation receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: portfolio-evidence-sync-${{ github.run_id }}
-          path: |
-            artifacts/portfolio-evidence-sync/receipt.json
-            artifacts/portfolio-evidence-sync/proposed/
-            proof/portfolio-evidence-sync/
+          path: artifacts/portfolio-evidence-sync/receipt.json
           if-no-files-found: warn
           retention-days: 30
