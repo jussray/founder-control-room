@@ -123,3 +123,8 @@ Shopify commerce is a provider boundary, not inherited founder authority. `src/p
 Child apps are reconciled by provider-account identity, installation identity, app identity, complete scope inventory, observation freshness, and founder-approved declaration evidence. Installation alone is never approval. A reinstall under a different installation ID surfaces as `IDENTITY_DRIFT`; added or removed scopes surface as `SCOPE_DRIFT`; missing declaration surfaces as `UNDECLARED`; incomplete provider evidence is `UNKNOWN`; expired provider evidence is `STALE`. Even `CURRENT` is evidence-only and retains `authorityGranted: false`.
 
 The current source module accepts an already authenticated, sanitized provider snapshot. It performs no Shopify network request, persists no provider inventory as current truth, creates no `project_connections` row, exposes no credential, and provides no order, checkout, product, price, refund, app-installation, scope-change, or customer mutation path. A future runtime observer must re-read Shopify at the use boundary, exhaust pagination, keep credentials server-side/provider-held, and fail closed when provider state is unavailable, partial, stale, or identity-mismatched.
+
+
+### GitHub App installation versus MCP consent — #852
+
+The GitHub App installation Setup URL is an owned, post-installation handoff into FCR Plugin Center; it does not authorize a GitHub API write or MCP token exchange. The app installation is verified server-side against owner, repository and app identity, suspension state and effective permission scopes. The FCR MCP OAuth consent is separate. A read-only genealogy capability does not donate merge or deploy authority; these require current exact-candidate founder consent and provider proof.

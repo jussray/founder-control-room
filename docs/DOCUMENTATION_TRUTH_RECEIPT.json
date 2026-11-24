@@ -630,7 +630,8 @@
     {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
-        "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof."
+        "src/providers/githubAppAuth.ts must recognize only bounded, transport-equivalent private-key wrappers, preserve RSA-only cryptographic parsing, reject ambiguous or malformed values without logging secret material, and never turn parsing or source tests into current provider or release proof.",
+        "`src/providers/githubAppAuth.ts` must verify provider-observed GitHub App installation identity, suspension status and repository selection, and mint only explicitly requested scoped installation-token permissions; no caller-supplied installation ID may grant authority."
       ]
     },
     {
@@ -1011,6 +1012,30 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppCapabilities.ts",
+      "claims": [
+        "`src/providers/githubAppCapabilities.ts` must reject missing or inadequate permission scopes and never infer repository mutation authority from an unrelated installation or permission label."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProviderFactory.ts",
+      "claims": [
+        "`src/providers/RepositoryProviderFactory.ts` must require capability evidence and explicit read/write scopes before constructing a repository-scoped App provider, while preserving the current read-only genealogy adapter and rejecting suspended/mismatched installations."
+      ]
+    },
+    {
+      "path": "src/http/routes/pluginCenter.ts",
+      "claims": [
+        "`src/http/routes/pluginCenter.ts` must validate a verified current founder identity and server-observed installation data before showing a GitHub App post-installation connection result; browser query parameters are never proof of installation."
+      ]
+    },
+    {
+      "path": ".github/workflows/capability-contract.yml",
+      "claims": [
+        "`.github/workflows/capability-contract.yml` must test the exact-head installation handoff, permission-scoped token capability contract and non-authorizing founder UI without replacing current required release gates."
       ]
     }
   ]

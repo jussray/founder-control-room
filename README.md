@@ -854,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+## GitHub App capability-aware installation (PR #852 source reconciliation)
+
+The GitHub App installation proof, post-installation UI, GitHub API token minting, and FCR MCP OAuth are **separate** operations. Current provider-observed installation state, repository selection, app identity and narrowly scoped permissions must be verified before issuing a repository token; a suspended or mismatched installation fails closed. The capability-aware repository provider maintains a read-only genealogy adapter and does not grant merge, deploy, token exfiltration, public publishing or owner authority. The required capability-contract CI and exact-head checks must pass before any deployment; a source candidate or a successful GitHub App install cannot substitute for live provider/owner consent.
