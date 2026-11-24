@@ -62,6 +62,9 @@ describe('n8n conveyor probe founder command contract', () => {
     expect(liveProbeWorkflow).toContain('test "$(git rev-parse HEAD)" = "${N8N_CONVEYOR_PROBE_HEAD_SHA}"');
     expect(liveProbeWorkflow).toContain('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED:');
     expect(liveProbeWorkflow).toContain('npx tsx scripts/verify-n8n-conveyor-live.ts');
-    expect(liveProbeWorkflow).toContain('actions/upload-artifact@v4');
+    expect(liveProbeWorkflow).toContain('uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
+    expect(liveProbeWorkflow).toContain('name: n8n-live-probe-${{ inputs.target_sha }}');
+    expect(liveProbeWorkflow).toContain('path: n8n-live-probe-receipt.json');
+    expect(liveProbeWorkflow).toContain('if-no-files-found: error');
   });
 });
