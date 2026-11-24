@@ -854,3 +854,23 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+## Friend Intake first slice (PR #774 source candidate)
+
+The founder-only `/friend-intake` route and browser page compose a deterministic mirror plus one next move. Both `FCR_FRIEND_INTAKE_ENABLED` and `FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED` default to `false`; source presence is not deployment or runtime enablement. The authenticated route uses the existing immutable/confirmed founder identity and the interactive opaque-session boundary for saving reviewed sensitive content. `process_without_saving` persists no intake summary or sensitive labels; reviewed `save_redacted_summary` stores bounded redacted content and only the reviewed labels. The server-signed five-minute review receipt binds the exact content and current founder browser session; the cookie is `HttpOnly`, `SameSite=Strict`, and scoped to `/friend-intake`. Database migrations and production behavior require their own verification. No external model, provider write, public publishing, merge, or deploy is authorized by this source candidate.
+
+
+### Canonical database proof for Friend Intake
+
+The Friend Intake SQL relies on Supabase-owned authentication/schema objects. A plain Neon PostgreSQL preview cannot establish those constraints without an explicit isolated Neon fixture/contract. The PR database check therefore requires exact-head local Supabase migration replay and schema lint for any Supabase source change, and only launches a Neon provider preview where a matching explicit provider-specific fixture, contract, or assertion exists. A Neon NOT_APPLICABLE result is not itself a passing production migration or proof of applied runtime state.
+
+
+### Cookie scan coverage correction
+
+The cookie writer scan now recognizes `Response.append('Set-Cookie', …)` in addition to existing writer patterns. The legitimate opaque `__Host-fcr_member_session` cookie is explicitly documented and its server-only writer allowlisted. The unused historical bearer/refresh cookie emitter in `src/http/middleware/sessionCookies.ts` is retained as a non-writing, fail-closed compatibility stub; it cannot issue legacy bearer cookies. This change does not establish production member authentication or authorize using member sessions as founder credentials.
+
+
+
+## Provider-backed Friend runtime (PR #776, stacked on #774)
+The deterministic Friend Intake remains under `/friend-intake` with separate default-off feature and persistence flags. The Friend runtime is a distinct founder-authenticated `/mirror/friend-intake` route with its own contract and page `/control-room/friend.html`. The shared deterministic first-slice validator is not relaxed. Provider-backed inference must have a verified interactive founder session, explicitly enabled provider, installed server-only credential and atomic bounded budget reservation; absent any gate, it fails closed. This proposed source integration sets `FRIEND_MODELS_ENABLED=false` and both request/daily budgets to zero. No paid model call, credential access, production schema apply, merge or deployment is authorized. Schema preview must run the actual SQL and check RLS; source publication is not live evidence.

@@ -13,6 +13,7 @@ import {
 
 export interface FounderRequest extends Request {
   founder?: { email: string; userId: string };
+  founderAuthChannel?: 'bearer' | 'interactive';
 }
 
 export interface AuthenticatedIdentity {
@@ -111,6 +112,7 @@ export async function requireFounder(
   }
 
   req.founder = identity;
+  req.founderAuthChannel = explicitBearer ? 'bearer' : 'interactive';
   next();
 }
 
@@ -153,5 +155,6 @@ export async function requireInteractiveFounder(
   }
 
   req.founder = identity;
+  req.founderAuthChannel = 'interactive';
   next();
 }

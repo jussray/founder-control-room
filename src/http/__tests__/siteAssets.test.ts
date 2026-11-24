@@ -21,6 +21,12 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(buildScript).toContain("resolve(repositoryRoot, 'public')");
     expect(buildScript).toContain("resolve(repositoryRoot, 'dist-pages')");
     expect(buildScript).toContain("'_worker.js'");
+    expect(buildScript).toContain("'control-room/friend-intake.html'");
+    expect(buildScript).toContain("'control-room/friend-intake.js'");
+    expect(buildScript).toContain("'control-room/friend-intake.css'");
+    expect(buildScript).toContain("'control-room/friend.html'");
+    expect(buildScript).toContain("'control-room/friend.js'");
+    expect(buildScript).toContain("'control-room/friend.css'");
     expect(buildScript).toContain("'portable-founder-console/index.html'");
   });
 
@@ -87,6 +93,10 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(app).toContain('Create / Add to Project');
     expect(app).toContain('Consistent output becomes the next Chat prompt');
     expect(app).toContain('src="/control-room/stack-router.js"');
+    expect(app).toContain('href="/control-room/friend-intake.html"');
+    expect(app).toContain('Friend Intake · mirror + one move');
+    expect(stackRouter).toContain("refreshFriendIntakeAvailability");
+    expect(stackRouter).toContain('syncFriendEntryVisibility(authenticated)');
 
     expect(stackRouter).toContain("const PENDING_TAB_KEY = 'fcr_pending_tab'");
     expect(stackRouter).toContain("'terminal'");

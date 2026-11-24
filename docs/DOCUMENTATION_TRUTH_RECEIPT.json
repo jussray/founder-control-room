@@ -17,7 +17,8 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."
+        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization.",
+        "FRIEND_MODELS_ENABLED is false and Friend budgets are zero in source. Provider capability is opt-in and does not authorize provider spend or expose API keys."
       ]
     },
     {
@@ -886,7 +887,8 @@
     {
       "path": "src/auth/memberSession.ts",
       "claims": [
-        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable."
+        "`src/auth/memberSession.ts` must persist only salted or cryptographically hashed opaque browser capabilities server-side, issue Secure HttpOnly SameSite=Strict host-only cookies, reject malformed and expired sessions, and refuse to pretend revocation succeeded when storage is unavailable.",
+        "The existing member-session writer may emit only its short-lived server-held opaque __Host-fcr_member_session with Path=/, Secure, HttpOnly and SameSite=Strict; member identity is not founder/provider mutation authorization."
       ]
     },
     {
@@ -1011,6 +1013,100 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntake.ts",
+      "claims": [
+        "Friend Intake must default disabled behind FCR_FRIEND_INTAKE_ENABLED and separate FCR_FRIEND_INTAKE_PERSISTENCE_ENABLED flags, require verified immutable founder auth for all runs, require a current interactive opaque session for sensitive persistence, and never call external model providers.",
+        "process_without_saving may record only behavior and policy metadata while save_redacted_summary may store bounded redacted summary/labels only after the associated sensitive review gate passes; fail closed on mismatched token, browser session, payload, or missing persistence authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendIntakeReviewReceipt.ts",
+      "claims": [
+        "The five-minute review cookie must bind founder ID and opaque session hash to the exact reviewed privacy/summary/labels/move and engine version; a tampered or reused capability must fail closed and the review token must not persist raw input."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260909031700_friend_intake_v1.sql",
+      "claims": [
+        "The intake persistence migration may not store raw founder text, must restrict content tables to service-role-only access, and must enforce reviewed-sensitive one-save identity with database uniqueness."
+      ]
+    },
+    {
+      "path": "public/control-room/stack-router.js",
+      "claims": [
+        "The Friend Intake link remains hidden by default and must be shown only when same-origin Friend Intake status reports explicit enablement inside the existing authenticated founder launch dock.",
+        "The separate Friend runtime page navigation entry is installed only in authenticated founder UI and removed when the founder session is unavailable."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/friendIntake.integration.test.ts",
+      "claims": [
+        "Friend Intake regression tests must use the current email-confirmed immutable founder identity and two-key founder_users (email+user_id) allowlist mock; unverified authentication and forged sensitive review receipts must fail closed."
+      ]
+    },
+    {
+      "path": "scripts/build-pages.mjs",
+      "claims": [
+        "The Pages packaging contract must include all three Friend Intake browser assets as required files without publishing secrets or weakening existing Cloudflare asset checks."
+      ]
+    },
+    {
+      "path": ".security/cookies.json",
+      "claims": [
+        "The Friend Intake review cookie must be an explicitly declared sensitive HttpOnly, SameSite=Strict five-minute cookie scoped to /friend-intake, written only from the approved server-only review receipt module."
+      ]
+    },
+    {
+      "path": ".github/workflows/neon-pr-branches.yml",
+      "claims": [
+        "Neon preview scope must classify canonical Supabase changes separately from explicitly fixture-backed Neon previews; all Supabase changes must run exact-head local Supabase full migration replay and schema lint, and Neon provider NOT_APPLICABLE may be asserted only after canonical proof succeeds without creating, deleting, or treating provider branch state as authorization.",
+        "For an explicit Neon preview contract, run compatibility setup, the actual migration and postcondition verification in sequence, without replacing required local Supabase full migration replay or asserting production application."
+      ]
+    },
+    {
+      "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
+      "claims": [
+        "Regression tests must preserve the exact-main ref check, canonical Supabase replay/lint, fixture-specific Neon scope, provider preview write/readback gates, and safe non-applicability semantics."
+      ]
+    },
+    {
+      "path": "src/http/middleware/sessionCookies.ts",
+      "claims": [
+        "Legacy founder bearer and refresh-cookie issuing helpers must remain non-writing and throw on attempted use; no source may re-enable Set-Cookie from this obsolete transport. Current founder browser session transport is the opaque server-held cookie."
+      ]
+    },
+    {
+      "path": "scripts/verify-cookie-contract.mjs",
+      "claims": [
+        "Cookie writers using Response.append('Set-Cookie') must be detected as well as Set-Cookie headers, all active writers must have explicit manifest allowance, and sensitive cookies must remain HttpOnly with no-store and a bounded explicit path."
+      ]
+    },
+    {
+      "path": "src/http/routes/friendRuntimeIntake.ts",
+      "claims": [
+        "The provider-backed Friend route must remain independently mounted at /mirror/friend-intake and must not replace PR #774's deterministic /friend-intake route, its confirmed-identity and review-receipt privacy policy.",
+        "Live model calls are permitted only for authenticated interactive founders with explicitly enabled providers, valid server-only credentials, and a successful atomic usage-budget reservation; no runtime, output or bearer token grants merge, publish, deploy, financial or external-action authority."
+      ]
+    },
+    {
+      "path": "src/chief/friendRuntimeContracts.ts",
+      "claims": [
+        "Provider-backed first-slice validation is isolated from the strict deterministic first-slice contract. Sensitive inputs must remain on local protective/clarifying paths and runtime execution state must match the actual provider."
+      ]
+    },
+    {
+      "path": "src/http/middleware/requireFounder.ts",
+      "claims": [
+        "Founder request auth channel is marked only after current immutable email-confirmed and user-id-bound allowlist identity verification, distinguishing bearer automation from interactive opaque-session authentication."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260909033000_friend_intake_privacy_store.sql",
+      "claims": [
+        "Friend runtime budget reservation and private summary/feedback migrations must enforce founder ownership, RLS and server-only RPC privileges. Raw transcripts, related memories, and credentials must not be stored."
       ]
     }
   ]

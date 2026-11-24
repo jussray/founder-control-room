@@ -57,28 +57,96 @@ jobs:
             git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"
           )
 
+          # FCR's canonical database is Supabase. Plain Neon PostgreSQL cannot
+          # replay auth/storage roles or the full Supabase schema. A Neon provider
+          # preview is valid only when an isolated provider-specific contract exists.
+          NEEDS_SUPABASE=false
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
             case "$path" in
               supabase/*)
+                NEEDS_SUPABASE=true
+                ;;
+            esac
+            case "$path" in
+              supabase/preview-fixtures/*.sql|supabase/preview-contracts/*.sql|supabase/preview-assertions/*.sql)
                 NEEDS_NEON=true
-                break
+                ;;
+              supabase/migrations/*.sql)
+                preview_file="${path##*/}"
+                if [ -f "supabase/preview-fixtures/$preview_file" ] ||
+                   [ -f "supabase/preview-contracts/$preview_file" ] ||
+                   [ -f "supabase/preview-assertions/$preview_file" ]; then
+                  NEEDS_NEON=true
+                fi
                 ;;
             esac
           done
 
-          echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
-          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          # Reject unbound changed Neon preview companions before provider allocation.
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected against live base; Neon preview branch is required.'
+            added_migrations="$(git diff --name-only --diff-filter=A --no-renames "$live_base_sha" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql')"
+            for path in "${CHANGED_FILES[@]}"; do
+              case "$path" in
+                supabase/preview-fixtures/*.sql|supabase/preview-contracts/*.sql|supabase/preview-assertions/*.sql)
+                  if [[ ! "$path" =~ ^supabase/preview-(fixtures|contracts|assertions)/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]] || [ ! -f "$path" ]; then
+                    echo "::error title=Invalid Neon preview companion::${path} must be a present canonical SQL file."
+                    exit 1
+                  fi
+                  migration="supabase/migrations/${path##*/}"
+                  if ! grep -Fxq -- "$migration" <<< "$added_migrations"; then
+                    echo "::error title=Unbound Neon preview companion::${path} requires its matching added migration ${migration}."
+                    exit 1
+                  fi
+                  ;;
+              esac
+            done
+          fi
+          # End changed Neon preview companion guard.
+
+          echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "needs_supabase=${NEEDS_SUPABASE}" >> "$GITHUB_OUTPUT"
+          echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
+          if [ "$NEEDS_SUPABASE" = "true" ]; then
+            echo 'Supabase change detected: local full-schema migration replay and lint are required.'
           else
-            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
+            echo 'No Supabase source change against exact live base.'
+          fi
+          if [ "$NEEDS_NEON" = "true" ]; then
+            echo 'Neon-specific preview contract found: isolated provider preview remains mandatory.'
+          else
+            echo 'No Neon-specific preview contract: generic Neon PostgreSQL cannot prove Supabase auth/storage semantics.'
           fi
 
       - name: Record non-database no-op
-        if: steps.neon_scope.outputs.needs_neon == 'false'
+        if: steps.neon_scope.outputs.needs_supabase == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/ against live base.'
+        run: echo 'No Supabase source change detected against live base; database proof not required.'
+
+      - name: Set up Supabase CLI for canonical schema
+        if: steps.neon_scope.outputs.needs_supabase == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+
+      - name: Replay exact-head Supabase migrations and lint
+        if: steps.neon_scope.outputs.needs_supabase == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          supabase start
+          supabase db lint --local --fail-on error
+          echo 'Canonical Supabase local migration replay and schema lint passed on exact PR head.'
+
+      - name: Record Neon non-applicability only after canonical schema proof
+        if: steps.neon_scope.outputs.needs_supabase == 'true' && steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: |
+          echo 'Neon provider preview NOT_APPLICABLE: no explicit Neon preview fixture/contract; Supabase local schema proof passed.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -184,6 +252,15 @@ jobs:
             PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
             PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"
             PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"
+            # A canonical Supabase migration without a Neon compatibility
+            # contract is out of scope for plain PostgreSQL. It must still pass
+            # the separate exact-head local Supabase full-schema replay and lint.
+            if [ ! -f "$PREVIEW_FIXTURE" ] &&
+               [ ! -f "$PREVIEW_CONTRACT" ] &&
+               [ ! -f "$PREVIEW_ASSERT" ]; then
+              echo "Neon NOT_APPLICABLE for Supabase-only migration: $migration (canonical Supabase replay required)"
+              continue
+            fi
             if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then
               echo "::error title=Ambiguous migration preview::Cannot mix an isolated fixture with a substitution contract: $migration"
               exit 1
@@ -205,15 +282,19 @@ jobs:
               exit 1
             fi
             if [ -f "$PREVIEW_FIXTURE" ]; then
-              # Run compatibility fixture and original migration atomically.
-              # This acts only on the ephemeral Neon branch, never on Supabase.
+              # Isolated fixtures plus original migration are atomic on Neon only.
               echo "Applying original SQL with isolated Neon-only fixture: $migration"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$PREVIEW_FIXTURE" -f "$migration"
             elif [ -f "$PREVIEW_CONTRACT" ]; then
+              # CI-only compatibility setup; cannot replace the actual SQL migration.
               echo "Running migration preview contract: $PREVIEW_CONTRACT"
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
-            else
               echo "Applying preview migration atomically: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+              echo "Verifying applied migration with preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+            else
+              echo "Applying original migration atomically: $migration"
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
             fi
             if [ -f "$PREVIEW_ASSERT" ]; then

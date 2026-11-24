@@ -10,6 +10,7 @@ import type {
   MirrorRunInput,
   MirrorRunResponse,
 } from '../../mirror/types.js';
+import { friendRuntimeIntakeRouter } from './friendRuntimeIntake.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 type DbRecord = Record<string, unknown>;
@@ -98,6 +99,9 @@ export function createMirrorRouter(dependencies: MirrorRouteDependencies = {}) {
   const runMirror = dependencies.runMirror ?? createOpenAiMirrorRunner();
   const resolveProjectId = dependencies.resolveProjectId ?? defaultResolveProjectId;
   const writeAuditEvent = dependencies.writeAuditEvent ?? defaultWriteAuditEvent;
+
+  // Provider-backed Friend is isolated from the default-off deterministic Friend Intake.
+  router.use('/friend-intake', friendRuntimeIntakeRouter);
 
   router.use(requireFounder);
 
