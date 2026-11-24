@@ -365,7 +365,7 @@ export function createRemoteReadMcpHandler(
   const toolIsAllowed = (name: string): name is ExternalMcpToolName =>
     isExternalMcpToolName(name) && (!allowedToolNames || allowedToolNames.has(name));
   const instructions = overrides.instructions ??
-    'Paired Chief AI + Founder Control Room connector. Read and preview tools only; execution authority is not granted.';
+    'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool. Checkpoint persistence stores reference metadata only; peer relay is a separate bounded handoff and grants no execution authority.';
 
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     applyMcpHeaders(res);
