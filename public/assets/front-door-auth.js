@@ -107,6 +107,11 @@
   for (var o = 0; o < openers.length; o++) {
     openers[o].addEventListener('click', function (e) {
       e.preventDefault();
+      // Browser sessions are host-only on the canonical apex. Never submit credentials from a public alias.
+      if (location.hostname === 'welcome.foundercontrolroom.org' || location.hostname === 'www.foundercontrolroom.org') {
+        location.assign('https://foundercontrolroom.org/welcome');
+        return;
+      }
       openModal(e.currentTarget.getAttribute('data-auth-open') || 'signup');
     });
   }

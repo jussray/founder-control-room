@@ -87,8 +87,9 @@
   .foot{margin:.9rem 0 0;font-size:.74rem;color:var(--muted-2)}
   .card a:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:.5rem}
 </style>
+<link rel="stylesheet" href="/cinematic-direction.css">
 </head>
-<body data-session-url="/auth/me" data-magic-url="/auth/magic-link" data-enter-url="/control-room/" data-member-url="/auth/member/me" data-member-magic-url="/auth/member/magic-link" data-enabled="true">
+<body data-fcr-entry="welcome" data-session-url="/auth/me" data-magic-url="/auth/magic-link" data-enter-url="/control-room/" data-member-url="/auth/member/me" data-member-magic-url="/auth/member/magic-link" data-enabled="true">
 <div class="ambient" aria-hidden="true"></div>
 
 <main class="card" id="door" data-state="checking" aria-live="polite">
@@ -126,7 +127,7 @@
   </section>
 
   <div class="status"><span class="dot" aria-hidden="true"></span><span id="statusline">Checking sign-in service…</span></div>
-  <p class="foot">We use your email only to send the link.</p>
+  <p class="foot">We use your email only to send the link. <a class="entry-home" href="/">Explore Founder Control Room</a>.</p>
 </main>
 
 <script src="/assets/welcome-door.js" defer></script>
