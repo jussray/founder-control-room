@@ -1,0 +1,9 @@
+{
+  "project": "founder-control-room",
+  "status": "draft",
+  "intendedUseCases": [
+    "Governed actions and approvals",
+    "Engineering evidence and release control"
+  ],
+  "verifiedCapabilities": []
+}
