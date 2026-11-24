@@ -95,7 +95,11 @@ function contentRoot() {
 
 function setUrlTab(tab) {
   const url = new URL(window.location.href);
-  url.searchParams.set('tab', tab);
+  // Publish the canonical Proof route before rendering its content. The five-screen
+  // shell may initialize after the Truth Console, so do not leave a legacy tab.
+  url.searchParams.delete('tab');
+  url.searchParams.set('screen', 'proof');
+  url.searchParams.set('view', tab);
   history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 

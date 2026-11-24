@@ -138,6 +138,45 @@ assert(
   !runtimeProof.includes('FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}'),
   "operator relay runtime proof must not relabel the founder browser bearer as MCP OAuth authority",
 );
+const runtimeProofLines = runtimeProof.split("\n");
+const runtimeProofJobStart = runtimeProofLines.indexOf("  playwright-runtime-proof:");
+const runtimeProofJobEnd = runtimeProofLines.findIndex((line, index) =>
+  index > runtimeProofJobStart && /^  [a-z0-9-]+:$/.test(line),
+);
+const runtimeProofJob = runtimeProofJobStart >= 0
+  ? runtimeProofLines.slice(runtimeProofJobStart, runtimeProofJobEnd >= 0 ? runtimeProofJobEnd : undefined)
+  : [];
+assert(runtimeProofJob.length > 0, "operator relay runtime proof job must exist");
+assert(
+  runtimeProofJob.includes("    if: github.ref == 'refs/heads/main'") &&
+    runtimeProofJob.includes("    environment: production"),
+  "live OAuth proof must be restricted to trusted main and the protected production environment",
+);
+const runtimeProofJobEnvStart = runtimeProofJob.indexOf("    env:");
+const runtimeProofJobStepsStart = runtimeProofJob.indexOf("    steps:");
+const runtimeProofJobEnv = runtimeProofJob.slice(runtimeProofJobEnvStart, runtimeProofJobStepsStart);
+assert(runtimeProofJobEnvStart >= 0 && runtimeProofJobStepsStart > runtimeProofJobEnvStart && !runtimeProofJobEnv.join("\n").includes("secrets."),
+  "production credentials must not be exposed at job scope");
+assert(
+  runtimeProofLines.join("\n").includes([
+    "      - name: Prove deployed prompt workflow router",
+    "        env:",
+    "          FCR_PLAYWRIGHT_FOUNDER_BEARER: ${{ secrets.FCR_PLAYWRIGHT_FOUNDER_BEARER }}",
+  ].join("\n")) &&
+    runtimeProofLines.join("\n").includes([
+      "      - name: Prove exact deployed operator relay and provider receipt",
+      "        env:",
+      "          FCR_OPERATOR_RELAY_OAUTH_TOKEN: ${{ secrets.FCR_OPERATOR_RELAY_OAUTH_TOKEN }}",
+    ].join("\n")),
+  "founder and OAuth credentials must be scoped only to their respective Playwright steps",
+);
+assert(
+  runtimeProof.includes("Validate trusted FCR production targets before exposing credentials") &&
+    runtimeProofLines.some((line) => line.trim() === 'if (runtime.origin !== "https://api.foundercontrolroom.org" || runtime.pathname !== "/" || runtime.search || runtime.hash) {') &&
+    runtimeProofLines.some((line) => line.trim() === 'if (publicSite.origin !== "https://foundercontrolroom.org" || publicSite.pathname !== "/" || publicSite.search || publicSite.hash) {') &&
+    runtimeProof.includes("FCR production witness targets validated."),
+  "live proof must validate fixed FCR production origins before loading credentials",
+);
 assert(
   secretsDoc.includes('| `FCR_OPERATOR_RELAY_OAUTH_TOKEN` | `prompt-workflow-router-runtime-proof.yml` |'),
   "docs/SECRETS.md must document the dedicated operator-relay OAuth proof token",
