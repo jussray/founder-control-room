@@ -854,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Source-only Browser Operator rollout (#1006)
+
+The founder-only Control Room now has source candidates for a Playwright journey planner, manual workflow, synthetic Sync Party journey and a read-only Grafana probe. The preview endpoint cannot run a browser or grant execution. The mission restoration fix preserves project-specific evidence, an immutable selected mission ID and the separation between script restoration and a new founder choice. No live game session was created or site deployed.

@@ -148,6 +148,9 @@ const page = await context.newPage();
 async function expectReadiness(state, label) {
   const status = page.locator('[data-conveyor-readiness]');
   await status.waitFor({ state: 'visible' });
+  // Opening the dock and initial bootstrap may overlap real readiness GETs.
+  // Assert only after in-flight refreshes settle, never against "checking".
+  await page.waitForLoadState('networkidle');
   await page.waitForFunction(
     ({ expectedState, expectedLabel }) => {
       const node = document.querySelector('[data-conveyor-readiness]');

@@ -57,6 +57,7 @@ let applying = false;
 let homeLoadToken = 0;
 let shellObserver = null;
 const restoreAttempts = new Set();
+let restoringByScript = false;
 
 function safeSessionGet(key) {
   try { return sessionStorage.getItem(key); } catch { return null; }
@@ -77,7 +78,13 @@ function readContext() {
 }
 
 function writeContext(patch) {
-  const next = { ...readContext(), ...patch };
+  const previous = readContext();
+  const next = { ...previous, ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, 'projectSlug')
+    && patch.projectSlug !== previous.projectSlug
+    && !Object.prototype.hasOwnProperty.call(patch, 'projectName')) {
+    delete next.projectName;
+  }
   for (const [key, value] of Object.entries(next)) {
     if (value === null || value === undefined || value === '') delete next[key];
   }
@@ -422,12 +429,18 @@ function maybeRestoreContext() {
   const context = readContext();
   if (locationState.view === 'overview' && context.projectSlug) {
     const key = `project:${context.projectSlug}`;
-    if (restoreAttempts.has(key)) return;
     const card = [...document.querySelectorAll('#project-list .card[data-slug]')]
       .find((candidate) => candidate.dataset.slug === context.projectSlug);
-    if (card instanceof HTMLElement && !document.querySelector('#project-detail h2')) {
+    const renderedSlug = document.querySelector('#project-detail h2 .mono')?.textContent?.trim();
+    const detail = document.querySelector('#project-detail');
+    if (renderedSlug && renderedSlug !== `(${context.projectSlug})` && detail instanceof HTMLElement) {
+      detail.style.display = 'none';
+    }
+    if (restoreAttempts.has(key)) return;
+    if (card instanceof HTMLElement && renderedSlug !== `(${context.projectSlug})`) {
       restoreAttempts.add(key);
-      card.click();
+      restoringByScript = true;
+      try { card.click(); } finally { restoringByScript = false; }
     }
   }
   if (locationState.view === 'work' && context.missionId) {
@@ -435,15 +448,22 @@ function maybeRestoreContext() {
     if (restoreAttempts.has(key)) return;
     const card = [...document.querySelectorAll('#mission-lanes .card[data-id]')]
       .find((candidate) => candidate.dataset.id === context.missionId);
-    const displayedMissionId = document.querySelector('#mission-detail')?.dataset?.missionId ?? null;
+    const detail = document.querySelector('#mission-detail');
+    const displayedMissionId = detail?.dataset?.missionId ?? null;
+    if (displayedMissionId && displayedMissionId !== context.missionId && detail instanceof HTMLElement) {
+      detail.style.display = 'none';
+    }
     if (card instanceof HTMLElement && displayedMissionId !== context.missionId) {
       restoreAttempts.add(key);
-      card.click();
+      restoringByScript = true;
+      try { card.click(); } finally { restoringByScript = false; }
     }
   }
 }
 
 function captureContext(event) {
+  // Programmatic restore must never count as a new founder selection.
+  if (restoringByScript) return;
   const projectCard = event.target instanceof Element ? event.target.closest('#project-list .card[data-slug]') : null;
   if (projectCard instanceof HTMLElement) {
     const title = projectCard.querySelector('.title')?.textContent?.trim() || '';

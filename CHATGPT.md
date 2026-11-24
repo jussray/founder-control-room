@@ -203,3 +203,8 @@ Do not claim launch merely because the merge loop is moving quickly.
 ## Output format
 
 Return: REALITY · GENEALOGY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE, including exact repo/branch/SHA, files touched, checks actually run, preserved work/history, truth age/superseded state, documentation state, and blocked evidence.
+
+
+### Founder browser operator preview and explicit execution gate (#1006)
+
+The browser operator may preview a bounded test plan but a preview is never browser execution, provider access, merge or deploy authority. Only synthetic owned-site journeys with explicit founder approval and exact target/actor proof may be run. Existing private sessions, payment methods and customer accounts are outside the test lane. Live workflows are manual only; code authorship does not prove any browser journey ran.

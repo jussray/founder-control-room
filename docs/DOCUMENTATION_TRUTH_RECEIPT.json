@@ -1012,6 +1012,48 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "src/lib/browserOperatorPlan.ts",
+      "claims": [
+        "`src/lib/browserOperatorPlan.ts` must return only a founder-reviewed, non-executing exact-origin browser plan, reject ambiguous or privileged intents, and never grant browser execution, merge, deployment or provider mutation authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/browserOperator.ts",
+      "claims": [
+        "`src/http/routes/browserOperator.ts` must require confirmed and allowlisted founder identity and return no browser credentials, execution grants or provider write authority when exposing a preview."
+      ]
+    },
+    {
+      "path": "scripts/fcr-browser-journey.mjs",
+      "claims": [
+        "`scripts/fcr-browser-journey.mjs` must require an explicit reviewed synthetic journey and exact permitted origin; it may not import user sessions, harvest credentials, place payments or perform unapproved public social actions."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-browser-operator.yml",
+      "claims": [
+        "`.github/workflows/fcr-browser-operator.yml` must remain manually triggered for live synthetic browser journeys and enforce owned origin and exact-source review, without a recurring schedule or unattended live side effects."
+      ]
+    },
+    {
+      "path": "public/control-room/five-screen-shell.js",
+      "claims": [
+        "`public/control-room/five-screen-shell.js` must preserve project-specific mission context and never treat programmatic navigation restoration as fresh founder selection or show project A evidence under project B."
+      ]
+    },
+    {
+      "path": "config/browser-journeys/sync-party.json",
+      "claims": [
+        "`config/browser-journeys/sync-party.json` must confine test actors to synthetic accounts, explicitly owned permitted Sync Party origins and non-destructive gameplay journeys."
+      ]
+    },
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "`src/http/server.ts` must register browser plan preview behind current founder authentication without creating a public privileged execution endpoint."
+      ]
     }
   ]
 }
