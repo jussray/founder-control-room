@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization.",
+  "purpose": "Add a founder-authenticated, read-only FCR distribution skill-inventory consumer with a source-pinned, fail-closed credential boundary. The implementation and optional secret declaration are source-only: they neither provision a token nor prove deployed runtime behaviour, end-to-end authentication, or founder canonicalization. This receipt also records the Facebook Page text-only publication boundary and its remaining live-activation requirements.",
   "domains": [
     "cloudflare-authority",
     "repository-provider",
@@ -762,7 +762,8 @@
     {
       "path": "src/lib/firstPartyFounderContentExecutor.ts",
       "claims": [
-        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post."
+        "`src/lib/firstPartyFounderContentExecutor.ts` must allow X publication only through canonical Current You authority, exact source/content hashes, a durable one-use FCR reservation, server-held account binding and destination-native readback; unknown write outcomes must retain a non-retryable UNKNOWN state, not a verified social post.",
+        "`src/lib/firstPartyFounderContentExecutor.ts` must keep Facebook Page text publication inside the same exact authenticated Current You approval, durable one-use reservation, and temporal revalidation path as first-party LinkedIn and X; it must treat provider-native Page identity, exact text, post ID, permalink, and timestamp readback as terminal evidence, never a successful write response or configured Page ID alone. Source wiring does not prove OAuth, live permissions, or a published post."
       ]
     },
     {
@@ -1011,6 +1012,12 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderContentLifecycle.ts",
+      "claims": [
+        "`src/http/routes/founderContentLifecycle.ts` must allow only the exact `facebook/facebook` provider/platform pair, require the stored account ID to match the numeric server-owned `META_FACEBOOK_PAGE_ID`, and block nonzero Facebook media before dispatch; a configured Page ID or mocked route test does not prove a live Meta publication."
       ]
     }
   ]
