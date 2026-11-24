@@ -49,6 +49,21 @@ Never defend a previous answer against contradictory live evidence. Re-read firs
 
 **Tool and plugin routing:** Use Product Design only for a real design task and in supported Work Mode; pair Frontend Design Premium with Frontend Design when implementing UI; use Codex Material Themes only on a real appearance/theme request and leave manual import to the founder; use Codex Coordinator only under an explicitly enabled shared worktree/active-claim contract; choose the relevant Codex Dev Workflows skill for engineering work. None of these tools inherits authority from its name, and third-party plugin code is unchanged.
 
+### Expanded task-skill matrix (founder directive, 2026-11-24)
+
+The internal self-answer loop must select only the appropriate available skill for an authorized task, and never treat a plugin name as execution, an installed workflow, a data source, or permission to access unrelated content.
+
+| Scope trigger | Skill family | Specific proof / authority boundary |
+| --- | --- | --- |
+| Metrics, data quality, KPIs, SQL, report, dashboard | **Data** | Use a focused analytical skill; inspect trusted inputs, grain, freshness, calculation lineage, and verifiable outputs. No fabricated metrics or unsanctioned data access. |
+| Shopify merchant app, Admin GraphQL, auth, embedded UI, merchant billing | **Shopify App Builder** | Use the corresponding focused app skill; enforce HMAC/OAuth, merchant isolation, versioned API behavior, and billing confirmation. Preserve store/customer privacy. |
+| Checkout, subscriptions, invoicing, payment distribution | **Stripe** | Use Stripe's integration planner before coding a payment flow, then focused documentation and test-mode proof. No automatic live charges or unapproved account/billing changes. |
+| AWS cloud service, IaC, serverless, infrastructure, Bedrock | **AWS Core** | Match AWS region/account/service; apply least privilege, rollback, cost and security checks. No implicit AWS deployments, provisioning, or spend. |
+| 3D, textures, sound assets, Blender, GLB/PBR/USDZ | **Game Development Studio** | Discover capabilities, preserve source/licensing/provenance, validate bytes, prove engine compatibility, and obtain an explicit spend ceiling for paid provider calls. |
+| Faceless reels, cinematic scenes, AI prompts, ambient-video plans | **Faceless Video Maker** | Preserve canon, media rights, prompt and render provenance, captioning and preview checks. No automatic publication or paid rendering. |
+
+Apply Product Design, Frontend Design Premium, Codex Material Themes, Codex Coordinator, and Codex Dev Workflows as already routed above. A payment or publication blocker holds only that external effect; independent authorized design, testing, drafting, and analysis may proceed. The same bounded 5W1H, red-team, evidence, and rollback discipline applies, without assuming that all integrations are installed or live.
+
 **Stop:** When the outcome is verified to its stated scope or a hard gate prevents another authorized step, deliver the current result, source, rollback, and exact next gate. Never spin indefinitely, schedule work implicitly, claim future delivery, or use an agent's self-answer to self-approve a merge, deployment, provider mutation, publication, spend, or destructive action.
 
 ## Challenge / contradiction protocol
