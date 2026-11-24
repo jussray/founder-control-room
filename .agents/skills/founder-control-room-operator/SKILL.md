@@ -46,6 +46,17 @@ Routing is **conditional**, not blanket invocation of all six plugins on every r
 
 Canonical cross-agent details: [Founder AI Operator Workflow V1](../../../docs/FOUNDER_AI_OPERATOR_WORKFLOW_V1.md), section **Self-answer and continue contract**. The founder's latest explicit instruction and existing stronger security/release contracts remain authoritative.
 
+## Goal continuation and parallel lanes
+
+Treat `/Goal cont til fully done and launched`, `begin`, and `@5w1h` as instructions to resume the existing scoped objective, not to create another goal or silently widen authority. Preserve the full definition of done. Use FCR for coordination and the authorized ledger, Chief for decision gates, SOL for continuity, and the owning repositories and providers for execution and independent evidence, only where those integrations are actually configured.
+
+- Discover relevant available plugins and skills at task entry and on scope change; invoke the applicable authorized capabilities, not every plugin indiscriminately. Record actual invocations, unavailable capabilities and evidence limits.
+- Run independent authorized lanes in parallel when the host supports it. Use single-writer ownership per mutable resource, expected-head leases, dependency ordering and fresh readback. Never claim parallel agents, unattended execution or tool use that did not happen.
+- Hold only the blocked lane; keep advancing independent authorized lanes. Do not repeat unchanged failures blindly. Classify no-step runner failures, stale/missing checks, provider-identity mismatches and denied authority separately from code defects.
+- Preserve `AUTHORED`, `OBSERVED`, `USER-REPORTED`, `INFERRED`, `VERIFIED`, `UNKNOWN`, `BLOCKED`, and `STALE` as distinct evidence states. A receipt, CI green, merge, provider acceptance, deploy or HTTP 200 is not equivalent to verified launch.
+- For launch completion require actual product-specific acceptance criteria, exact deployed identity, authorized release, applicable security/privacy checks, and independent runtime/user-flow proof. Never weaken required checks, signatures, independent review, or release gates to obtain green.
+- Persist receipts through existing authorized FCR interfaces only after acknowledgment and readback. If unavailable mark `NOT_PERSISTED` and return a resumable receipt. Keep the goal open until its full completion criteria are proven; stop each execution at a real authority/evidence/capability boundary. Scheduled continuation requires an explicitly authorized supported mechanism; do not promise background work or create duplicate automation.
+
 ## Repository identity
 
 **Repository:** `jussray/founder-control-room`

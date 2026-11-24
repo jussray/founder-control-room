@@ -151,4 +151,23 @@ for (const [source, value] of [
   }
 }
 
+// Validate the additional goal-continuation policy and its canonical prompt.
+// This is source-contract verification, not proof of runtime agent behavior.
+const goalContinuationTokens = [
+  "## Goal continuation and parallel lanes",
+  "single-writer ownership",
+  "Hold only the blocked lane",
+  "USER-REPORTED",
+  "NOT_PERSISTED",
+  "exact deployed identity",
+  "Scheduled continuation requires an explicitly authorized supported mechanism"
+];
+for (const [label, body] of [['operator skill', operatorSkill], ['operator workflow', operatorWorkflow]]) {
+  const missing = goalContinuationTokens.filter(token => !body.includes(token));
+  if (missing.length) throw new Error(`Goal continuation contract missing from ${label}: ${missing.join(', ')}`);
+}
+for (const token of ['### Reusable operator prompt', '/Goal CONTINUE', '@5w1h', 'ULTRATHINK / DEVIL / GODMODE', 'REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE']) {
+  if (!operatorWorkflow.includes(token)) throw new Error(`Canonical operator prompt missing: ${token}`);
+}
+
 console.log('Juss Flow launch-loop and Founder governance contracts verified.');
