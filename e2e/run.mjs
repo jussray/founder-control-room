@@ -465,6 +465,19 @@ async function main() {
     body: readFileSync(join(REPO_ROOT, 'public/assets/welcome-door.js'), 'utf8'),
   }));
 
+  // The welcome page now uses the same public stylesheet and landscape as the root.
+  // Serve those exact source assets from the Pages fixture, never the API fallback.
+  await page.route(`${BASE_URL}/cinematic-direction.css`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/css',
+    body: readFileSync(join(REPO_ROOT, 'public/cinematic-direction.css'), 'utf8'),
+  }));
+  await page.route(`${BASE_URL}/assets/front-door/hero-peak.jpg`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/jpeg',
+    body: readFileSync(join(REPO_ROOT, 'public/assets/front-door/hero-peak.jpg')),
+  }));
+
   console.log('\n[1] Signed-out Control Room remains founder gated');
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
@@ -709,6 +722,10 @@ async function main() {
   const branchName = createdBranches[0];
 
   console.log('\n[6c] Edit a file on the real sandbox branch through the real UI (real GitHub git-object calls: blob/tree/commit/updateRef)');
+  // This section makes real reads and a non-idempotent write. Reserve quota
+  // before entering it; never retry the commit or weaken the production limiter.
+  const fileHeadroom = await ensureRateLimitHeadroom(`${BASE_URL}/health`, { minimumRemaining: 45 });
+  if (fileHeadroom.waited) console.log(`  rate-limit reset before mission file proof: ${fileHeadroom.waitedMs}ms`);
   await page.fill('#mission-file-path', 'src/index.ts');
   await page.click('#mission-file-load');
   await waitForValue(page, '#mission-file-editor', 'hello');
