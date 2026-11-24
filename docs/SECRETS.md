@@ -412,3 +412,8 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 - Required by the canonical Founder Control Room Cloudflare Worker for the bounded Muse provider adapter.
 - Store the value only as a provider-held Cloudflare Worker secret; never commit, print, echo, attach, or include it in proof artifacts.
 - Source declaration or documentation proves the required secret name only. Live presence requires a successful provider-side secret-name readback, and successful Council/Muse operation requires a separate authenticated runtime receipt.
+
+
+### Protect Me ingest secret
+
+`FCR_PROTECT_EVENT_INGEST_SECRET` is an optional server-only HMAC input for a separately deployed, authorized Protect Me event source. Never place the secret in browser code, GitHub source, logs, receipts or public responses. Its registry entry does not enable ingestion, perform any security test or authorize remote provider writes.

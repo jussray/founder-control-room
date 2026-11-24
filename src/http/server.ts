@@ -11,6 +11,7 @@ import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
+import { handleProtectSecurityEventIngest } from './routes/protectSecurityEvents.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
@@ -209,6 +210,14 @@ export function createServer(options: CreateServerOptions = {}) {
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
+  );
+  // Signed, replay-bounded observation intake. Independent of browser sessions,
+  // founder approvals, and all privileged security response actions.
+  app.post(
+    '/ingest/protect-security-events',
+    rateLimitGeneral,
+    express.raw({ type: 'application/json', limit: '16kb' }),
+    handleProtectSecurityEventIngest,
   );
   app.post(
     '/ingest/build-events/:slug',

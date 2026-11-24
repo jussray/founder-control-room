@@ -84,3 +84,8 @@ The Firewall v10 and Attack-20 V3 workflows must execute this Attack Ten against
 ## Provider boundary
 
 Cloudflare remains a separate provider truth surface. Before any production firewall activation or stricter bot/WAF enforcement, require current provider readback, machine-client compatibility proof, controlled observation, rollback, and exact runtime/browser verification. Repository green is not provider green.
+
+
+### Protect Me / attack evidence workflow
+
+The ATTACK-48000 security workflow is a candidate plan; no attack results or live vendor observations were executed by this source reconciliation. HMAC-signed security events and protection coverage evidence must fail closed on invalid signatures, replay, stale timestamps or unverified source identity. The actual release gate retains independent runtime/browser proof and founder authorization.

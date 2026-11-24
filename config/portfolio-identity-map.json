@@ -23,13 +23,13 @@
     {"slug":"sweats","name":"SWEATS","aliases":["Sweats","SWEAT"],"role":"commerce-brand-prelaunch","status":"external","carriers":[["github","jussray/Sweats","canonical"]]},
     {"slug":"alexa-commerce-engine","name":"Alexa Commerce Engine","role":"commerce-supporting-system","status":"external","carriers":[["github","jussray/alexa-commerce-engine-","canonical"]]},
     {"slug":"sync-party","name":"SYNC Party","role":"consumer-experience-product","status":"active","carriers":[["github","jussray/sync-party-game","canonical"],["lovable","06f8665b-2f48-409a-a2d7-ec60362808f2","playtest-signup"]]},
-    {"slug":"ayure","name":"AYURE","role":"emerging-network-product","status":"continuity-only","carriers":[["github","jussray/Ayure-","canonical"]]}
+    {"slug":"ayure","name":"AYURE","role":"emerging-network-product","status":"continuity-only","carriers":[["github","jussray/Ayure-","canonical"]]},
+    {"slug":"juss-protect-me","name":"Juss Protect Me","role":"independent-personal-security-system","status":"deployed-preview","observedAt":"2026-10-15","carriers":[["github","jussray/juss-protect-me","canonical"],["web","protect.jussco.company","public-worker-front-door"]]},
+    {"slug":"juss-protect-me-2","name":"Juss Protect Me 2","role":"independent-infrastructure-security-system","status":"deployed-limited-scope","observedAt":"2026-10-15","carriers":[["github","jussray/juss-protect-me-2","canonical"],["web","protect2.jussco.company","worker-scoped-edge-shield"]]}
   ],
   "quarantinedGithub": ["jussray/do-not-use","jussray/don-t-touch-this-one","jussray/SekretBip_refactor_start","jussray/Se-kretBip","jussray/sekret-bip-demo","jussray/Juss-beautiful-hair-","jussray/jussbeautifulhair1"],
   "unresolvedCarriers": [
     ["base44","6a93e49bb1804a2648534bdf","ULTRATHINK prototype; canonical relationship unproven"],
-    ["base44","6a94aed27e712e8fd5058c2f","Untitled reconciliation app; rename/supersession unproven"],
-    ["github","jussray/juss-protect-me","placeholder; product contract unproven"],
-    ["github","jussray/juss-protect-me-2","empty placeholder; relationship unproven"]
+    ["base44","6a94aed27e712e8fd5058c2f","Untitled reconciliation app; rename/supersession unproven"]
   ]
 }

@@ -7,6 +7,8 @@ const conveyor = readFileSync('src/http/routes/n8nConveyor.ts', 'utf8');
 const founderAuth = readFileSync('src/http/middleware/requireFounder.ts', 'utf8');
 const csrf = readFileSync('src/http/middleware/csrf.ts', 'utf8');
 const security = readFileSync('src/http/middleware/security.ts', 'utf8');
+const attack48000 = JSON.parse(readFileSync('security/attack-48000.workflow.json', 'utf8'));
+const firewallDocs = readFileSync('docs/FIREWALL_V10.md', 'utf8');
 const failures = [];
 
 function requireTruthy(path, value) {
@@ -128,6 +130,19 @@ requireContains('csrf same-origin enforcement', csrf, "fetchSite !== 'same-origi
 requireContains('runtime referrer policy', security, "res.setHeader('Referrer-Policy', 'no-referrer');");
 requireContains('runtime frame policy', security, "res.setHeader('X-Frame-Options', 'SAMEORIGIN');");
 requireContains('runtime hsts', security, "res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');");
+// Request logs must keep operational counts without leaking founder email or raw IP.
+const auditStart = security.indexOf('export function requestAudit(');
+const auditEnd = security.indexOf('// Centralized error handler', auditStart);
+if (auditStart < 0 || auditEnd <= auditStart) {
+  failures.push('requestAudit middleware boundary must remain inspectable');
+} else {
+  const auditCode = security.slice(auditStart, auditEnd);
+  requireContains('requestAudit authenticated state', auditCode, 'founderAuthenticated: Boolean(founder)');
+  requireContains('requestAudit rate limiter', auditCode, 'rateLimitGeneral(req, res, next);');
+  if (/ip:\s*req\.ip|founder:\s*founder\.email|founder\.email/.test(auditCode)) {
+    failures.push('requestAudit must not persist raw IP or founder email');
+  }
+}
 if (!/const generalRateLimitCore = createRateLimiter\(\s*60 \* 1_000,\s*120,/s.test(security)) failures.push('application general rate limiter drifted from 120 requests per 60 seconds');
 if (!/export const rateLimitGeneral: RequestHandler = \(req, res, next\): void => \{[\s\S]*?generalRateLimitCore\(req,\s*res,\s*next\);[\s\S]*?\n\};/.test(security)) failures.push('exported general rate limiter must invoke the verified generalRateLimitCore');
 if (!/export const rateLimitMagicLink = createRateLimiter\(\s*15 \* 60 \* 1_000,\s*5,/s.test(security)) failures.push('application magic-link limiter drifted from 5 requests per 15 minutes');
@@ -137,6 +152,43 @@ const conveyorMountIndex = server.indexOf("app.use('/automation/conveyor', n8nCo
 if (csrfIndex < 0 || conveyorMountIndex < 0 || csrfIndex >= conveyorMountIndex) {
   failures.push('same-origin browser mutation gate must remain before conveyor mount');
 }
+
+// Attack-48000 is a fail-closed source contract, never a provider enforcement claim.
+requireEqual('attack48000.schema', attack48000.schema, 'juss/attack-48000-security-workflow@v1');
+requireEqual('attack48000.name', attack48000.name, 'ATTACK-48000');
+requireEqual('attack48000.status', attack48000.status, 'POLICY_ONLY_UNVERIFIED');
+requireEqual('attack48000.owner', attack48000.owner, 'founder-control-room');
+requireEqual('attack48000.pressureLabel', attack48000.pressureLabel, '48000');
+requireContains('attack48000.pressureMeaning', attack48000.pressureMeaning ?? '', 'not 48000 requests');
+requireEqual('attack48000.lineage.firewall', attack48000.lineage?.firewall, 'security/firewall-v10.policy.json');
+requireEqual('attack48000.lineage.attackSuite', attack48000.lineage?.attackSuite, 'security/attack-20-v3.policy.json');
+requireEqual('attack48000.lineage.personalPrivacy', attack48000.lineage?.personalPrivacy, 'juss-protect-me');
+requireEqual('attack48000.lineage.infrastructureShield', attack48000.lineage?.infrastructureShield, 'juss-protect-me-2');
+requireEqual('attack48000.phases', JSON.stringify(attack48000.phases), JSON.stringify([
+  'OBSERVE', 'BOUND_SCOPE', 'ORIENT', 'REDTEAM_REVIEW', 'DECIDE',
+  'PERMIT', 'PATCH_ONE', 'VERIFY', 'RECORD', 'ROLLBACK_READY',
+]));
+for (const key of [
+  'authorizedAssetsOnly', 'noExternalHackBack', 'noProductionStressOrFloodTests',
+  'noUnapprovedCredentialUse', 'noSecretsOrPrivateConversationExports',
+  'noAutomaticProviderMutation', 'noAutomaticMergeOrDeploy',
+  'dryRunAndCompatibilityBeforeEnforcement', 'perProductOwnershipPreserved',
+  'protectModelsRemainSeparate', 'providerReadbackBeforeLiveClaims',
+  'independentBrowserEvidenceForUiClaims', 'noStaleProofInheritance',
+  'failClosedOnMissingAuthority', 'reversibleSingleCauseFixes',
+]) {
+  requireEqual(`attack48000.controls.${key}`, attack48000.controls?.[key], true);
+}
+requireEqual('attack48000.deploymentAuthorized', attack48000.deploymentAuthorized, false);
+requireEqual('attack48000.mergesAuthorized', attack48000.mergesAuthorized, false);
+requireArray('attack48000.productionGate', attack48000.productionGate, 6);
+requireArray('attack48000.receiptFields', attack48000.receiptFields, 10);
+for (const prohibited of ['raw_secrets', 'chat_transcripts', 'retaliatory_actions']) {
+  requireTruthy(`attack48000.excludes.${prohibited}`, attack48000.excludes?.includes(prohibited));
+}
+requireContains('attack48000.docs.heading', firewallDocs, '## ATTACK-48000: approved defensive verification protocol');
+requireContains('attack48000.docs.truth', firewallDocs, 'Code-level workflow verification is not provider activation.');
+requireContains('attack48000.docs.playwright', firewallDocs, 'Playwright');
 
 if (failures.length) {
   console.error('Firewall v10 policy failed verification:');

@@ -1012,6 +1012,36 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "src/http/routes/protectSecurityEvents.ts",
+      "claims": [
+        "`src/http/routes/protectSecurityEvents.ts` must reject unauthenticated or replayed Protect Me event ingestion, bind any HMAC verification to exact raw payload, enforce bounded request size/time, and never return raw sensitive event material."
+      ]
+    },
+    {
+      "path": "src/security/protectionCoverage.ts",
+      "claims": [
+        "`src/security/protectionCoverage.ts` must distinguish independently observed protection evidence from claims or proposed coverage, and must fail closed on invalid or missing signed proof."
+      ]
+    },
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "`src/http/server.ts` must mount the scoped Protect Me event route without weakening founder authentication, existing public routes, the CSRF boundary or the Cloudflare Worker protected entry."
+      ]
+    },
+    {
+      "path": "src/http/middleware/security.ts",
+      "claims": [
+        "`src/http/middleware/security.ts` must redact sensitive security event fields from request audits and prevent client data from granting elevated incident or provider write authority."
+      ]
+    },
+    {
+      "path": "security/attack-48000.workflow.json",
+      "claims": [
+        "`security/attack-48000.workflow.json` must remain a policy-only test candidate requiring exact-head evidence; source attack counts cannot substitute for observed runs or authorized production actions."
+      ]
     }
   ]
 }

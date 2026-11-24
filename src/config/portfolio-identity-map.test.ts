@@ -74,4 +74,17 @@ describe('portfolio identity map', () => {
       expect(carrier[2].length).toBeGreaterThan(0);
     }
   });
+
+  it('keeps Protect Me models distinct from FCR and explicitly scoped', () => {
+    const one = map.identities.find((item) => item.slug === 'juss-protect-me');
+    const two = map.identities.find((item) => item.slug === 'juss-protect-me-2');
+    expect(one?.role).toBe('independent-personal-security-system');
+    expect(two?.role).toBe('independent-infrastructure-security-system');
+    expect(one?.status).toBe('deployed-preview');
+    expect(two?.status).toBe('deployed-limited-scope');
+    expect(one?.carriers).toContainEqual(['web', 'protect.jussco.company', 'public-worker-front-door']);
+    expect(two?.carriers).toContainEqual(['web', 'protect2.jussco.company', 'worker-scoped-edge-shield']);
+    expect(map.unresolvedCarriers.some(([, id]) =>
+      ['jussray/juss-protect-me', 'jussray/juss-protect-me-2'].includes(id))).toBe(false);
+  });
 });
