@@ -1012,6 +1012,117 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "src/http/middleware/requireFounder.ts",
+      "claims": [
+        "Existing platform founder identity must remain verified by Supabase-confirmed email and exact matching email+immutable user-id allowlist; an explicit workspace_owner row must never pass the global requireFounder or requireInteractiveFounder gate.",
+        "requireWorkspaceUser must independently check confirmed Supabase identity, matching founder_users membership and a valid assigned workspace UUID; missing schemas, workspace IDs, role or authorization fail closed."
+      ]
+    },
+    {
+      "path": "src/http/routes/workspaceAuth.ts",
+      "claims": [
+        "Public customer signup/magic-link and OAuth must route only through /auth/workspace, require Supabase-confirmed immutable identity before service-role provisioning, bind returned account_role=workspace_owner and workspace UUID, revoke existing member session and never create platform_owner authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/auth.ts",
+      "claims": [
+        "Existing platform founder login and enrollment, strict same-origin gate, member-session switching and verified identity logic are preserved; customer authentication is mounted under a separate /auth/workspace router."
+      ]
+    },
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "The workspace project/task routes must be mounted without changing legacy global project, founder authorization, audit or CSRF middleware ordering."
+      ]
+    },
+    {
+      "path": "src/controllers/ProjectController.ts",
+      "claims": [
+        "Global provider reconciliation must remain limited to platform-owned workspaces after tenancy rollout, and missing platform workspace evidence must prevent tenant provider operations."
+      ]
+    },
+    {
+      "path": "src/http/routes/workspaceProjects.ts",
+      "claims": [
+        "Workspace project list and Chief recommendation acceptance must bind workspace_id to authenticated membership, independently revalidate Chief recommendations before scoped database mutation and never grant execution, merge or deploy authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/workspaceTasks.ts",
+      "claims": [
+        "Tenant tasks must bind user_id, workspace_id and project identity, use bounded drafts, and return no live action authority from task creation."
+      ]
+    },
+    {
+      "path": "src/http/routes/founderOnboarding.ts",
+      "claims": [
+        "Platform founder onboarding may use Chief proposals only with exact recommendation revalidation and founder explicit acceptance; acceptance is evidence, not provider, merge or deployment authority."
+      ]
+    },
+    {
+      "path": "src/http/routes/onboardingAssets/workspaceSurface.ts",
+      "claims": [
+        "The public customer /app sign-in page must route to workspace authentication; it is not the private platform founder dashboard, and public entry conveys no privileged access."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260911050000_workspace_tenant_foundation.sql",
+      "claims": [
+        "Workspace tenancy migration must retain a unique platform owner and scoped workspace owner identities and restrict row access; source SQL does not prove application to a production Supabase database."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20261118090000_fcr_workspace_task_queue.sql",
+      "claims": [
+        "Workspace task migration must retain composite tenant/owner/project foreign keys, RLS and service-role-only grants; task drafts cannot silently enable background execution."
+      ]
+    },
+    {
+      "path": "src/http/middleware/__tests__/requireFounder.explicitRoleIdentity.contract.test.ts",
+      "claims": [
+        "Regression assertions require confirmed identity, exact email/user ID binding, platform-only global routes and denied invalid workspace membership."
+      ]
+    },
+    {
+      "path": "scripts/verify-founder-onboarding.mjs",
+      "claims": [
+        "Original founder enrollment remains preapproved with shouldCreateUser false, while isolated workspace public customer enrollment uses shouldCreateUser true only after verified identity and service-controlled provisioning.",
+        "The onboarding verification must accept formatted but semantically equivalent structured Chief Composer payloads while pinning platform/customer session API separation, never weakening confirmed identity or customer-only provisioning."
+      ]
+    },
+    {
+      "path": "src/http/routes/onboardingAssets/controlRoomJs.ts",
+      "claims": [
+        "The platform founder homepage must load /auth/me and only the public customer /app workspace surface may load /workspace/me; the two authority planes must never be silently interchanged."
+      ]
+    },
+    {
+      "path": ".github/workflows/neon-pr-branches.yml",
+      "claims": [
+        "Neon provider preview allocation must require an explicit fixture, contract or assertion, and unfixtured Supabase-owned auth/schema migrations must be labeled NOT_APPLICABLE for Neon while the separate required local Supabase Migration lint continues to verify real migrations.",
+        "When a Neon compatibility contract exists, provider preview must execute the actual SQL migration and check postconditions, not merely run the compatibility fixture or write a synthetic success receipt."
+      ]
+    },
+    {
+      "path": "src/governance/neonPrBranchLifecycle.contract.test.ts",
+      "claims": [
+        "Regression tests must distinguish canonical Supabase migration proof from fixture-scoped Neon previews, and fail if the provider-only branch attempts bare-Postgres replay of auth-dependent SQL."
+      ]
+    },
+    {
+      "path": "src/http/routes/__tests__/workspaceProjects.chief.integration.test.ts",
+      "claims": [
+        "A workspace owner authentication fixture must support both chained server-side email and immutable user-id predicates and never force weakening query scoping to make the test pass."
+      ]
+    },
+    {
+      "path": "src/tasks/__tests__/workspaceTaskQueue.contract.test.ts",
+      "claims": [
+        "SQL contract assertions must verify the exact owner, workspace, claimed state and expiry predicates using a working multiline regex, not escaped literals that silently skip the real clause."
+      ]
     }
   ]
 }

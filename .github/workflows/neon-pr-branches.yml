@@ -57,28 +57,47 @@ jobs:
             git diff --name-only "$live_base_sha" "$EXPECTED_HEAD_SHA"
           )
 
+          # Supabase's auth/storage catalogs cannot be replayed on bare Neon.
+          # The separate load-bearing CI "Migration lint" job runs the real
+          # exact-head local Supabase stack for every Supabase schema change.
+          NEEDS_SUPABASE=false
           NEEDS_NEON=false
           for path in "${CHANGED_FILES[@]}"; do
             case "$path" in
-              supabase/*)
-                NEEDS_NEON=true
-                break
-                ;;
+              supabase/*) NEEDS_SUPABASE=true ;;
+            esac
+            case "$path" in
+              supabase/preview-fixtures/*.sql|supabase/preview-contracts/*.sql|supabase/preview-assertions/*.sql)
+                NEEDS_NEON=true ;;
+              supabase/migrations/*.sql)
+                migration_name="${path##*/}"
+                if [ -f "supabase/preview-fixtures/$migration_name" ] ||
+                   [ -f "supabase/preview-contracts/$migration_name" ] ||
+                   [ -f "supabase/preview-assertions/$migration_name" ]; then
+                  NEEDS_NEON=true
+                fi ;;
             esac
           done
 
           echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "needs_supabase=${NEEDS_SUPABASE}" >> "$GITHUB_OUTPUT"
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
           if [ "$NEEDS_NEON" = "true" ]; then
-            echo 'Supabase change detected against live base; Neon preview branch is required.'
+            echo 'Explicit Neon fixture/contract detected; provider preview required.'
           else
-            echo 'No supabase/ change detected against live base; Neon preview branch is not required.'
+            echo 'No isolated Neon fixture/contract detected; canonical migration replay remains required in load-bearing Migration lint.'
           fi
 
       - name: Record non-database no-op
-        if: steps.neon_scope.outputs.needs_neon == 'false'
+        if: steps.neon_scope.outputs.needs_supabase == 'false'
         shell: bash
-        run: echo 'Neon preview skipped because this PR does not change supabase/ against live base.'
+        run: echo 'No Supabase source changes against exact live base.'
+
+      - name: Record Supabase-only Neon non-applicability
+        if: steps.neon_scope.outputs.needs_supabase == 'true' && steps.neon_scope.outputs.needs_neon == 'false'
+        shell: bash
+        run: |
+          echo 'Neon NOT_APPLICABLE: no provider-specific fixture; the independent required Migration lint gate must replay actual Supabase SQL.'
 
       - name: Validate Neon configuration
         if: steps.neon_scope.outputs.needs_neon == 'true'
@@ -184,6 +203,13 @@ jobs:
             PREVIEW_CONTRACT="supabase/preview-contracts/${migration##*/}"
             PREVIEW_FIXTURE="supabase/preview-fixtures/${migration##*/}"
             PREVIEW_ASSERT="supabase/preview-assertions/${migration##*/}"
+            # Skip only migrations that lack a compatible bare-Postgres preview.
+            # Their real SQL is still replayed by required Supabase Migration lint.
+            if [ ! -f "$PREVIEW_FIXTURE" ] && [ ! -f "$PREVIEW_CONTRACT" ] &&
+               [ ! -f "$PREVIEW_ASSERT" ]; then
+              echo "Neon NOT_APPLICABLE for Supabase-only migration: $migration"
+              continue
+            fi
             if [ -f "$PREVIEW_FIXTURE" ] && [ -f "$PREVIEW_CONTRACT" ]; then
               echo "::error title=Ambiguous migration preview::Cannot mix an isolated fixture with a substitution contract: $migration"
               exit 1
@@ -211,6 +237,10 @@ jobs:
               psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$PREVIEW_FIXTURE" -f "$migration"
             elif [ -f "$PREVIEW_CONTRACT" ]; then
               echo "Running migration preview contract: $PREVIEW_CONTRACT"
+              psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
+              echo "Applying actual preview migration: $migration"
+              psql "$NEON_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f "$migration"
+              echo "Rechecking compatibility and postconditions: $PREVIEW_CONTRACT"
               psql "$NEON_DB_URL" -X -v ON_ERROR_STOP=1 -f "$PREVIEW_CONTRACT"
             else
               echo "Applying preview migration atomically: $migration"

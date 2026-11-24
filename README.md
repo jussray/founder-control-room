@@ -854,3 +854,15 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+
+## Workspace tenancy & first-run Chief Composer (#784 source candidate)
+
+The existing global Founder Control Room remains platform-owner only; new `workspace_owner` users authenticate with a separately gated `/auth/workspace` flow and may access only `/workspace/me`, `/workspace/projects`, and `/workspace/tasks` after a verified Supabase-confirmed email, immutable user ID and workspace membership match. An exact database role and workspace UUID are mandatory; no new customer may inherit global provider or merge authority. A first-run Chief recommendation is a proposal, not permission: the exact recommendation must be re-read and explicitly accepted before a workspace project may be created atomically with its audit event. The task queue creates drafts with tenant-bound projects and no live execution grants. The new version preserves current global auth, member session revocation, same-origin CSRF and FCR UI assets; provider-backed runtime and tenancy migrations still require independent exact-head CI, deployment and database replay. No production tenant was provisioned in this source repair.
+
+
+
+### Exact-head candidate repair: tenancy CI proof boundaries
+
+First #784 source candidate `6f884cea8b8f7441ea24445e92142b8d69c05ccb` exposed three isolated test issues and a real browser route regression. The Founder/Customer UI previously queried `/workspace/me` on the platform founder page; corrected routing must query `/auth/me` for that page and `/workspace/me` only for `/app/`. The focused SQL contract retains the exact owner, workspace, task and claimed-state update predicates; the test regex and chained Supabase mock now represent the real query shape. The Neon lifecycle must explicitly classify unfixtured Supabase migrations as Neon-inapplicable, **not** as verified migrations; load-bearing local Supabase `Migration lint` remains mandatory. A passing branch mergeability calculation is not an all-CI-green, live signup or production migration claim.

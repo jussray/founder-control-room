@@ -18,6 +18,7 @@ interface ProjectRow {
   repo_provider: string;
   repo_identifier: string | null;
   status: "active" | "paused" | "archived";
+  workspace_id?: string | null;
 }
 
 export class ProjectController extends BaseController {
@@ -26,7 +27,7 @@ export class ProjectController extends BaseController {
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
     const { data, error } = await supabase
       .from("projects")
-      .select("id,slug,name,repo_provider,repo_identifier,status")
+      .select("*")
       .eq("id", req.projectId)
       .maybeSingle();
 
@@ -42,6 +43,20 @@ export class ProjectController extends BaseController {
         "converged",
         `Project ${project.slug} is active without a repository connection`,
       );
+    }
+
+    // Global platform credentials must never operate in a customer workspace.
+    // Legacy rows without workspace_id retain their existing pre-migration path.
+    const tenantWorkspace = typeof project.workspace_id === 'string' ? project.workspace_id.trim() : '';
+    if (tenantWorkspace) {
+      const { data: platformOwner, error: ownerError } = await supabase
+        .from('founder_users').select('workspace_id')
+        .eq('workspace_id', tenantWorkspace)
+        .eq('account_role', 'platform_owner').maybeSingle();
+      if (ownerError) return this.retry('Project workspace authority lookup failed');
+      if (!platformOwner) {
+        return this.done('converged', `Project ${project.slug} is tenant-scoped; platform provider automation is disabled`);
+      }
     }
 
     try {

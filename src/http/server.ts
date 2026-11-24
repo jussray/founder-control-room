@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { memberAuthRouter } from './routes/memberAuth.js';
 import { onboardingRouter } from './routes/onboarding.js';
+import { workspaceProjectsRouter } from './routes/workspaceProjects.js';
+import { workspaceTasksRouter } from './routes/workspaceTasks.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { paFundingReviewsRouter } from './routes/paFundingReviews.js';
 import { projectsRouter } from './routes/projects.js';
@@ -406,6 +408,8 @@ export function createServer(options: CreateServerOptions = {}) {
   );
 
   app.use('/', onboardingRouter);
+  app.use('/workspace', workspaceProjectsRouter);
+  app.use('/workspace', workspaceTasksRouter);
   app.use('/auth', authRouter);
   app.use('/auth/member', memberAuthRouter);
   app.use('/onboarding', founderOnboardingRouter);

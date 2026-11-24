@@ -43,7 +43,7 @@ async function mount(page) {
     if (url.pathname === '/assets/control-room.js') return route.fulfill({ status: 200, contentType: 'text/javascript', body: js });
     if (url.pathname === '/favicon.ico') return route.fulfill({ status: 204, body: '' });
     if (url.pathname === '/health') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
-    if (url.pathname === '/auth/me') {
+    if (url.pathname === '/auth/me' || url.pathname === '/workspace/me') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

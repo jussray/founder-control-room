@@ -376,3 +376,20 @@ describe('requireFounder', () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 });
+describe('workspace ownership cannot inherit platform authority', () => {
+  it('denies a verified workspace_owner from legacy global founder routes', async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: {
+        email: 'founder@example.com',
+        user_id: 'founder-user-1',
+        account_role: 'workspace_owner',
+        workspace_id: '11111111-1111-4111-8111-111111111111',
+      },
+      error: null,
+    });
+    const response = await request(createProbeApp())
+      .get('/protected')
+      .set('Authorization', 'Bearer test-token');
+    expect(response.status).toBe(403);
+  });
+});

@@ -10,6 +10,7 @@ import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireSameOriginBrowserMutation } from '../middleware/csrf.js';
 import { authenticatedIdentity, founderAllowlisted, requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
+import { workspaceAuthRouter } from './workspaceAuth.js';
 import { oauthConsentRouter } from './oauthConsent.js';
 
 export const authRouter = Router();
@@ -95,6 +96,7 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
 
 // Consent decisions require the existing interactive founder browser session.
 authRouter.use('/oauth', oauthConsentRouter);
+authRouter.use('/workspace', workspaceAuthRouter);
 
 authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
