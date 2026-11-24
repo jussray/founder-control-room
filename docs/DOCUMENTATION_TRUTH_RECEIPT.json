@@ -15,6 +15,12 @@
   ],
   "changes": [
     {
+      "path": "public/_worker.js",
+      "claims": [
+        "`public/_worker.js` must serve public GET/HEAD `/` from Pages ASSETS and keep `/welcome` as the separate sign-in door, while `/auth/callback`, `/assets/auth-callback.js`, and `/assets/control-room.css` stay on the identity-checked FCR_API route; successful founder session handoff in `src/http/routes/onboardingAssets/callbackJs.ts` must target `/control-room/` rather than the public root, and neither routing code nor a synthetic Playwright fixture proves deployed authentication or Cloudflare binding state."
+      ]
+    },
+    {
       "path": "wrangler.worker.toml",
       "claims": [
         "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."

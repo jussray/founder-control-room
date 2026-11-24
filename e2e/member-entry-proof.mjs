@@ -8,6 +8,9 @@ const outputDir = resolve('test-results/fcr-member-entry');
 const staticPaths = new Map([
   ['/', 'index.html'],
   ['/fcr-public-tabs.js', 'fcr-public-tabs.js'],
+  ['/cinematic-direction.css', 'cinematic-direction.css'],
+  ['/assets/front-door-auth.js', 'assets/front-door-auth.js'],
+  ['/assets/front-door/hero-peak.jpg', 'assets/front-door/hero-peak.jpg'],
   ['/welcome', 'welcome.html'],
   ['/assets/welcome-door.js', 'assets/welcome-door.js'],
   ['/member/', 'member/index.html'],
@@ -15,7 +18,7 @@ const staticPaths = new Map([
   ['/member/projects.js', 'member/projects.js'],
   ['/member/styles.css', 'member/styles.css'],
 ]);
-const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.jpg': 'image/jpeg' };
 const founderPaths = [];
 let lastMemberEmail = '';
 let failLogout = false;
@@ -85,6 +88,12 @@ try {
     fixtureProjects = []; failProjectSave = false;
     const publicPage = await browser.newPage({ viewport });
     await publicPage.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+    await publicPage.locator('body[data-fcr-entry="public"]').waitFor();
+    await publicPage.getByRole('link', { name: 'Get started' }).click();
+    await publicPage.getByRole('dialog').waitFor();
+    await publicPage.keyboard.press('Escape');
+    await publicPage.emulateMedia({ reducedMotion: 'reduce' });
+    if (await publicPage.locator('.hero-art img').evaluate(el => getComputedStyle(el).animationName) !== 'none') throw Error('Reduced motion ignored on public entrance');
     await publicPage.getByRole('tab', { name: 'Founder View' }).click();
     await publicPage.locator('#view-founder:not([hidden])').waitFor();
     const publicProjects = publicPage.locator('#view-founder #projects');
@@ -97,6 +106,12 @@ try {
     await signedOut.waitForURL('**/welcome');
     await signedOut.getByRole('heading', { name: 'Welcome to Founder Control Room' }).waitFor();
     await signedOut.getByRole('heading', { name: 'Your personal workspace' }).waitFor();
+    await signedOut.locator('body[data-fcr-entry="welcome"]').waitFor();
+    await signedOut.waitForFunction(() => getComputedStyle(document.body).backgroundImage.includes('hero-peak.jpg'));
+    await signedOut.getByRole('link', { name: 'Explore Founder Control Room' }).waitFor();
+    if (await signedOut.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) throw Error('Welcome horizontal overflow: ' + label);
+    await signedOut.emulateMedia({ reducedMotion: 'reduce' });
+    if (await signedOut.locator('.ambient').evaluate(el => getComputedStyle(el).animationName) !== 'none') throw Error('Reduced motion ignored on welcome');
     await signedOut.locator('#member-email').fill('member@example.com');
     await signedOut.getByRole('button', { name: 'Email me a sign-in link' }).click();
     await signedOut.getByRole('button', { name: 'Check your inbox' }).waitFor();
