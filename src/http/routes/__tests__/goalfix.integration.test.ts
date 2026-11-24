@@ -36,13 +36,19 @@ function buildApp() {
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }),
-      }),
+  let requestedUserId = '';
+  const query = {
+    eq: (field: string, value: unknown) => {
+      if (field === 'user_id') requestedUserId = String(value);
+      return query;
+    },
+    maybeSingle: () => Promise.resolve({
+      data: requestedUserId === 'founder-user-1'
+        ? { user_id: 'founder-user-1' } : null,
+      error: null,
     }),
   };
+  return { select: () => query };
 }
 
 function projectsRow() {
@@ -79,7 +85,7 @@ function validPayload() {
 
 function founderSession() {
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL, email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
 }

@@ -46,7 +46,7 @@ test('Quality Gate preserves coverage and release contracts with deterministic i
 });
 
 test('separate Playwright workflow builds once then runs the identical complete harness', () => {
-  const expected = 'npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs';
+  const expected = 'npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs';
   assert.equal(pkg.scripts['test:e2e:prepared'], expected);
   assert.equal(pkg.scripts['test:e2e'], 'npm run build && ' + expected);
   assert.match(playwright, /run: npm ci --no-audit --no-fund/);
@@ -114,4 +114,11 @@ test('migration lint executes real local DB checks only on an exact-head Supabas
   assert.match(jobBody(ci, 'test-discovery'), /ci-migration-scope\.node-test\.mjs/);
   assert.match(jobBody(ci, 'required-gate'), /- migration-lint/);
   assert.match(jobBody(ci, 'required-gate'), /MIGRATION_RESULT/);
+});
+
+test('Deploy workflow retains the provider secret-name JSON parser inside its executable YAML block', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /^          receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m);
+  assert.doesNotMatch(workflow, /^        receipt = json\.loads\(receipt_text\[array_start:array_end \+ 1\]\)$/m);
+  assert.match(workflow, /secret list \\\n\s+--config wrangler\.worker\.toml/);
 });

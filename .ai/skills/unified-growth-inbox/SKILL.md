@@ -137,7 +137,12 @@ provider webhook or inbound event
   contract-capable `/human` command (`src/growth/webchatHumanHandoff.ts`):
   it pauses the bot for that conversation, queues `pending_human`, and returns
   an acknowledgement with no response-time promise. It grants no dispatch
-  authority and is not yet wired to a live webchat route or persistence.
+  authority. It is wired (source only) to `POST /webchat/messages`, a founder
+  queue at `GET /webchat/handoffs` and `POST /webchat/handoffs/:key/release`,
+  and the service-role-only `webchat_human_handoffs` table. The public route is
+  off (404) unless the project is listed in `FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS`;
+  enabling it still requires the notice, disclosure, consent, retention and
+  security-review requirements above, plus a deployed migration.
 - **Google Business Messages:** retired. Do not build a new adapter. Replace it
   with Google Business Profile links to the website, phone, and supported channels.
 
