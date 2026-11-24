@@ -24,7 +24,7 @@
       <p class="lede">Verified project proof becomes reviewable content, then moves through explicit founder gates before any external platform receives a publish command.</p>
       <div class="status-row" aria-label="Content authority status">
         <span class="pill" data-founder-engine-state="contract-ready">Founder progress contract ready</span>
-        <span class="pill good" data-first-party-linkedin-capability="implemented">First-party LinkedIn publish capability implemented</span>
+        <span class="pill good" data-first-party-linkedin-capability="implemented" data-first-party-facebook-capability="implemented">First-party LinkedIn, X, and Facebook Page text capabilities implemented</span>
         <span class="pill warn" data-founder-evidence-state="unknown">Evidence UNKNOWN until proposal</span>
         <span class="pill warn" data-founder-sauce-state="unknown">Sauce receipt UNKNOWN until proposal</span>
         <span class="pill warn" data-temporal-truth-state="unknown">Temporal truth UNKNOWN until execution</span>
@@ -45,12 +45,12 @@
       </div>
       <div class="truth-card">
         <strong>Capability is not publication proof.</strong>
-        <p>FCR has a first-party LinkedIn execution path. LinkedIn still owns terminal external post state, so configuration, delivery, and publication remain UNKNOWN until provider readback proves them.</p>
+        <p>FCR has first-party LinkedIn, X, and Facebook Page text execution paths. Facebook remains text-only. Each provider still owns terminal external post state, so configuration, delivery, and publication remain UNKNOWN until provider readback proves them.</p>
       </div>
     </aside>
   </section>
 
-  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="capability-implemented" data-first-party-linkedin-capability="implemented" data-temporal-truth-state="unknown" data-analytics-authority="observation-only" data-public-proof-state="optional-off" data-review-window-state="not-handed-off" data-outcome-state="unknown">
+  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="capability-implemented" data-first-party-linkedin-capability="implemented" data-first-party-facebook-capability="implemented" data-temporal-truth-state="unknown" data-analytics-authority="observation-only" data-public-proof-state="optional-off" data-review-window-state="not-handed-off" data-outcome-state="unknown">
     <div class="founder-lane-head">
       <div>
         <p class="eyebrow">First-party founder progress</p>
@@ -94,7 +94,7 @@
     </div>
 
     <div class="gate-note" role="note">
-      <strong>Current execution boundary:</strong> first-party LinkedIn execution capability is implemented, but capability is not publication proof. A real post still requires exact Current You approval, canonical temporal revalidation, configured LinkedIn authority, durable one-shot reservation, provider write, provider readback, and a retained outcome receipt. Until those receipts exist, provider and publication state remain UNKNOWN.
+      <strong>Current execution boundary:</strong> first-party LinkedIn, X, and Facebook Page text execution capabilities are implemented, but capability is not publication proof. Facebook is text-only. A real post still requires exact Current You approval, canonical temporal revalidation, a matching server-owned destination account, durable one-shot reservation, provider write, provider readback, and a retained outcome receipt. Until those receipts exist, provider and publication state remain UNKNOWN.
     </div>
   </section>
 
@@ -189,7 +189,7 @@
     <li class="flow-step" data-content-stage="publish">
       <span class="step-number">6</span>
       <h2>Explicit publish</h2>
-      <p>First-party founder content can dispatch to LinkedIn only after exact Current You confirmation, temporal truth revalidation, one-shot reservation, provider write, and provider readback.</p>
+      <p>First-party founder content can dispatch to LinkedIn, X, and Facebook Page text only after exact Current You confirmation, temporal truth revalidation, a matching server-owned destination account, one-shot reservation, provider write, and provider readback.</p>
       <code>publish_founder_content</code>
     </li>
     <li class="flow-step" data-content-stage="metrics">
@@ -231,7 +231,7 @@
           <div class="field">
             <label for="lifecycle-provider">Provider lane</label>
             <select class="control-select" id="lifecycle-provider" name="provider">
-              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
+              <option value="buffer">Buffer</option><option value="linkedin">LinkedIn direct</option><option value="facebook">Facebook Page direct (text only)</option><option value="postiz">Postiz readback only</option><option value="meta">Meta</option><option value="x">X</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="pinterest">Pinterest</option><option value="bluesky">Bluesky</option><option value="mastodon">Mastodon</option><option value="google_business">Google Business</option>
             </select>
           </div>
           <div class="field">
@@ -245,7 +245,7 @@
           <div class="field full"><label for="lifecycle-draft">Public draft text</label><textarea class="control-textarea" id="lifecycle-draft" name="draft_text" placeholder="Exact public-safe copy for review" required></textarea></div>
         </div>
         <div class="lifecycle-toolbar"><button class="control-button primary" type="submit" data-live-only>Store draft</button></div>
-        <p class="field-note" data-postiz-readback-note>Use provider=linkedin only for the current first-party direct publish path. Postiz is account/status readback only; it does not expose scheduling or publication authority here. Other provider lanes remain adapter-gated until activated.</p>
+        <p class="field-note" data-postiz-readback-note>Use provider=linkedin, x, or facebook only for the current first-party direct publish path. Facebook is Page text-only. Postiz is account/status readback only; it does not expose scheduling or publication authority here. Other provider lanes remain adapter-gated until activated.</p>
       </form>
 
       <div class="control-card">
@@ -306,7 +306,7 @@
           <div class="console-actions"><button class="control-button" type="button" data-issue-approval data-live-only>Issue exact-copy approval</button><button class="control-button primary" type="button" data-bind-approval data-live-only>Bind approval to post</button></div>
           <label class="inline-check"><input type="checkbox" data-publish-confirm data-live-only /><span>I confirm this exact approved copy should publish now. I understand provider publication is irreversible even if lifecycle receipt synchronization later fails.</span></label>
           <div class="console-actions"><button class="control-button publish" type="button" data-selected-action="publish" data-live-only>Publish exact copy now</button></div>
-          <p class="field-note">Current direct publish is LinkedIn-only and still requires configured server-owned LinkedIn authority, temporal revalidation, one-shot execution reservation, provider write, and provider readback.</p>
+          <p class="field-note">Current direct publish supports LinkedIn, X, and Facebook Page text-only. Every destination still requires matching server-owned account authority, temporal revalidation, one-shot execution reservation, provider write, and provider readback.</p>
         </div>
       </div>
     </section>
