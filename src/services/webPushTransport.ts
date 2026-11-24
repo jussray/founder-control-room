@@ -117,6 +117,6 @@ export async function sendWebPush(subscription: WebPushSubscription, payload: un
     body: new Uint8Array(body),
   });
   // No provider response bodies or subscription URLs are logged.
-  await response.body?.cancel();
+  await response.body?.cancel().catch(() => undefined);
   return response.status;
 }
