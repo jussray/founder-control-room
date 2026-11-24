@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+test('public page exposes FCR and publisher through non-script microdata',()=>{const html=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');assert.doesNotMatch(html,/<script\b(?![^>]*\bsrc=)/i);assert.match(html,/itemprop="mainEntity" itemscope itemtype="https:\/\/schema.org\/SoftwareApplication" itemid="https:\/\/www.foundercontrolroom.org\/#application"/);assert.match(html,/itemprop="publisher" itemscope itemtype="https:\/\/schema.org\/Organization" itemid="https:\/\/www.jussco.company\/#organization"/);assert.ok(html.includes('<meta itemprop="name" content="Founder Control Room" />'));assert.ok(html.includes('<link itemprop="url" href="https://www.foundercontrolroom.org/" />'));});
+
+test('ADRP validation triggers when public identity or discovery text changes',()=>{const source=readFileSync(new URL('../.github/workflows/jsc-adrp-draft.yml',import.meta.url),'utf8');const filters=source.split('\n').filter(line=>line.trim().startsWith('paths:'));assert.equal(filters.length,2);for(const line of filters)for(const path of ['public/index.html','public/llms.txt'])assert.ok(line.includes("'"+path+"'"),path);});

@@ -96,4 +96,22 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(firstCredentialRead).toBeGreaterThan(firstClassifier);
     expect(firstDatabaseUrlRead).toBeGreaterThan(firstClassifier);
   });
+  it('requires bounded provider readback after deletion and fails closed on unresolved state', () => {
+    const deleteAction = workflow.indexOf('- name: Delete Neon Branch');
+    const providerReadback = workflow.indexOf('- name: Verify Neon branch deletion with provider readback');
+    expect(deleteAction).toBeGreaterThan(-1);
+    expect(providerReadback).toBeGreaterThan(deleteAction);
+    expect(workflow).toContain("if: steps.neon_branch.outputs.branch_found == 'true'");
+    expect(workflow).toContain('for attempt in {1..12}; do');
+    expect(workflow).toContain('curl --fail-with-body --silent --show-error --get');
+    expect(workflow).toContain("jq -e '.branches | type == \"array\"'");
+    expect(workflow).toContain('[.branches[] | select(.name == $target_name)] | length');
+    expect(workflow).toContain('Provider readback confirmed exact preview branch is absent: ${target_name}.');
+    expect(workflow).toContain('Neon deletion readback failed');
+    expect(workflow).toContain('Invalid Neon readback response');
+    expect(workflow).toContain('Ambiguous Neon deletion readback');
+    expect(workflow).toContain('Neon branch still exists after deletion');
+    expect(workflow).toContain('sleep 5');
+  });
+
 });
