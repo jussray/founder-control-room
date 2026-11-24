@@ -317,8 +317,8 @@
         "`docs/CLOUDFLARE_REASONING.md` must require FCR provider-held Worker binding names to pass the canonical Deploy membrane without treating source, binding-name presence, CI, or Playwright as proof of downstream provider activation or business outcomes.",
         "`docs/CLOUDFLARE_REASONING.md` must keep review-email Worker/managed-route deployment, provider route readback, zone subaddressing state, and runtime email invocation as distinct evidence planes; Wrangler 4.113+ may reconcile the literal `review@foundercontrolroom.org` Worker route without making provider readback or runtime proof implicit.",
         "`docs/CLOUDFLARE_REASONING.md` must require structured Wrangler deploy telemetry to preserve completed Worker mutation truth when a later Email Routing reconciliation step exits nonzero; post-deploy failure must never be collapsed into provider_deploy_succeeded=false.",
-        "`docs/CLOUDFLARE_REASONING.md` must treat `TINYFISH_API_KEY` as a provider-held Worker binding and require canonical Deploy to fail closed on a missing binding name without exposing or re-uploading its value.",
-        "`docs/CLOUDFLARE_REASONING.md` must treat `JBH_RECEIPT_INGEST_TOKEN` as a provider-held receiver binding whose name belongs to the canonical deploy membrane while preserving sender credential, sender/FCR runtime identity, migration state, dispatch, and ledger readback as separate activation evidence."
+        "`TINYFISH_API_KEY` is not declared in the current canonical Worker secret registry. Earlier proposed boot-required TinyFish policy is superseded; this receipt does not authorize a binding, secret transfer, or provider activation.",
+        "`docs/CLOUDFLARE_REASONING.md` must describe `JBH_RECEIPT_INGEST_TOKEN` as a provider-held, optional boot/deploy binding required before receiver feature activation, preserving sender credential, sender/FCR runtime identity, migration state, dispatch, and ledger readback as separate activation evidence."
       ]
     },
     {
@@ -629,8 +629,8 @@
         "`wrangler.worker.toml` must declare `FCR_CLOUDFLARE_MCP_READ_TOKEN`, `OPENAI_API_KEY`, and Muse `MODEL_API_KEY` as provider-held required Worker secret names while keeping public-safe runtime configuration outside the secret plane; declaration proves required-name policy only, not provider presence, deployed runtime identity, or successful provider use.",
         "A separate GitHub Actions copy of `OPENAI_API_KEY` may serve CI-only OpenAI consumers such as AI Failure Repair, but it is a distinct authority plane and does not prove or replace the provider-held Worker runtime binding.",
         "`wrangler.worker.toml` must publish only public-safe FCR OAuth resource, issuer, audience, and scope configuration while preserving server-held project authority and provider-held MCP secrets; a passing source build cannot be treated as proof of a deployed Cloudflare Worker, completed Supabase consent, ChatGPT client discovery, or persisted live tool-call evidence.",
-        "`wrangler.worker.toml` must list `TINYFISH_API_KEY` under `[secrets].required`, so canonical exact-main Deploy rejects missing provider-held TinyFish activation before Worker mutation while never copying the secret value through GitHub Actions.",
-        "`wrangler.worker.toml` must list `JBH_RECEIPT_INGEST_TOKEN` under `[secrets].required` because the mounted JBH commerce-receipt receiver fails closed without it; canonical Deploy may prove only provider-held binding-name presence and must not treat that check as proof of the `jbh-private` sender, dispatch, database migration, or stored receipt outcome."
+        "`wrangler.worker.toml` does not declare `TINYFISH_API_KEY` in its current required or optional secret registry; no TinyFish boot/deploy requirement or provider activation is established by this receipt.",
+        "`wrangler.worker.toml` must list `JBH_RECEIPT_INGEST_TOKEN` under `[secrets].optional` under Path B. The receiver fails closed without the credential; its absence does not block boot/deploy. Binding-name presence does not prove the sender, dispatch, migration, or stored receipt outcome."
       ]
     },
     {
@@ -841,7 +841,7 @@
       "claims": [
         "`README.md` must state that the StoryEngine live-peer gate accepts forward StoryEngine progress via ancestry, still fails closed on history rewrites, and claims no compatibility with newer StoryEngine commits until a repin is re-witnessed.",
         "`README.md` must keep TinyFish source and CI readiness separate from provider/runtime activation and state that canonical Deploy verifies only provider-held binding-name presence before promotion.",
-        "`README.md` must state that `JBH_RECEIPT_INGEST_TOKEN` belongs in the canonical required-secret contract because the receiver fails closed without it, while keeping Cloudflare binding presence, FCR runtime identity, `jbh-private` sender identity, dispatch, migration state, and the stored sanitized receipt as separate current proof gates.",
+        "`README.md` must state that `JBH_RECEIPT_INGEST_TOKEN` is optional for Worker boot/deploy under Path B and required before receiver activation, while keeping Cloudflare binding presence, FCR runtime identity, sender identity, dispatch, migration state, and stored sanitized receipt as separate proof gates.",
         "`README.md` must describe Shopify child-provider observation as source-only, non-authorizing evidence and must never relabel a matching snapshot as live provider authority or mutation permission.",
         "`README.md` must document Attack 3000 content currentness as independently evaluated from bounded observation time rather than trusted from a CURRENT label, and must keep distribution, external demand, publication, provider mutation, merge, deploy, spend, and external-contact authority separate.",
         "`README.md` must describe the Content Trend Radar as an advisory existing-lane capability whose first-wave evidence requires current source provenance and whose ranking cannot authorize publication, scheduling, spend, provider mutation, merge, deploy, or external contact.",
@@ -948,8 +948,8 @@
       "claims": [
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must state that the Workers Builds main trigger path (`deploy:api:production` -> `cloudflare:build:verify` -> `scripts/cloudflare-build-verification-only.mjs`) emits `worker_version_upload: false`, so a green Workers Build is build-verification evidence only and never deploy or Worker version evidence; the trigger command itself is provider configuration observed read-only on November 15, 2026, not proven by repository source.",
         "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must keep the November 2, 2026 plaintext `CF_API_TOKEN` sentence as historical with a dated correction and must frame the November 15, 2026 placeholder-stub Worker observation as a dated read-only readback; neither proves current provider state, correct bindings, or that the API Worker runs any main commit.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `TINYFISH_API_KEY` as a required canonical Worker secret while preserving live provider observation and real TinyFish Search/Fetch as separate activation proof.",
-        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `JBH_RECEIPT_INGEST_TOKEN` as a required canonical Worker secret while preserving the `jbh-private` sender credential, sender/FCR runtime identities, database migration state, dispatch, and one stored sanitized receipt as separate end-to-end proof."
+        "`TINYFISH_API_KEY` is absent from the current canonical Worker registry; earlier required-binding instructions are superseded. No TinyFish provider availability, Search/Fetch success, or activation is established.",
+        "`docs/deployment/CLOUDFLARE_WORKER_TARGETS.md` must name `JBH_RECEIPT_INGEST_TOKEN` as optional for boot/deploy and required before receiver activation, preserving sender credential, sender/FCR runtime identities, migration state, dispatch, and one stored sanitized receipt as separate end-to-end proof."
       ]
     },
     {
