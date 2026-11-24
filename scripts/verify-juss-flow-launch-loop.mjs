@@ -130,9 +130,8 @@ for (const [label, body] of [
   }
 }
 if (!operatorSkill.includes('Connector availability alone grants no access permission.') ||
-    !operatorWorkflow.includes('never infer new permission or a sensitive recipient') ||
-    !operatorWorkflow.includes('This validates policy text')) {
-  // The last condition is intentionally checked below against the verifier itself.
+    !operatorWorkflow.includes('never infer new permission or a sensitive recipient')) {
+  throw new Error('The operator self-answer contract must not infer access or consent.');
 }
 // The skill and workflow must independently preserve consent and stop conditions.
 for (const [source, value] of [
