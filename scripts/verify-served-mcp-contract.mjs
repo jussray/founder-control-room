@@ -115,12 +115,8 @@ assert(
 /* ---------- remoteReadMcp.ts: served description must match the actual catalog ---------- */
 
 assert(
-  remoteReadMcp.includes('nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool'),
-  "modern server/discover must describe nine read/preview tools plus the bounded peer relay",
-);
-assert(
-  remoteReadMcp.includes('Nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay'),
-  "legacy initialize must describe nine read/preview tools plus the bounded peer relay",
+  remoteReadMcp.includes("const instructions = overrides.instructions ??\n    'nine read/preview tools, one reference-only checkpoint write, plus one bounded peer-operator relay tool."),
+  "default MCP discovery instructions must describe the nine reads, reference-only checkpoint write, and bounded peer relay",
 );
 assert(
   !remoteReadMcp.includes('six read/preview-only tools') &&
