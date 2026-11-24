@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { githubNotificationIntent } from '../founderNotificationIntent.js';
+import { githubNotificationIntent, recoverWorkflowIntent } from '../founderNotificationIntent.js';
 
 const sha = 'a'.repeat(40);
 const repo = { full_name: 'example/project' };
@@ -51,4 +51,13 @@ test('untrusted metadata cannot override evidence links and malformed identities
   assert.equal(JSON.stringify(result).includes('secret'), false);
   assert.equal(githubNotificationIntent('workflow_run', { repository: { full_name: 'example/..' }, action: 'completed', workflow_run: workflow }), null);
   assert.equal(githubNotificationIntent('workflow_run', { repository: repo, action: 'completed', workflow_run: { ...workflow, head_sha: '0'.repeat(40) } }), null);
+});
+
+test('recovery requires an earlier completed failure for the same run and exact SHA', () => {
+  const intent = githubNotificationIntent('workflow_run', { repository: repo, action: 'completed', workflow_run: workflow })!;
+  const failure = { repository: repo, action: 'completed', workflow_run: { ...workflow, run_attempt: 1, conclusion: 'failure', updated_at: '2026-11-24T11:59:00Z' } };
+  assert.equal(recoverWorkflowIntent(intent, failure).kind, 'workflow_recovered');
+  assert.equal(recoverWorkflowIntent(intent, { ...failure, workflow_run: { ...failure.workflow_run, head_sha: 'b'.repeat(40) } }).kind, 'workflow_passed');
+  assert.equal(recoverWorkflowIntent(intent, { ...failure, workflow_run: { ...failure.workflow_run, conclusion: 'cancelled' } }).kind, 'workflow_passed');
+  assert.equal(recoverWorkflowIntent(intent, { ...failure, workflow_run: { ...failure.workflow_run, updated_at: '2026-11-24T12:01:00Z' } }).kind, 'workflow_passed');
 });
