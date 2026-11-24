@@ -20,9 +20,15 @@ vi.mock("@octokit/rest", () => ({
 
 const { SecurityPreservingGitHubProvider } = await import("../SecurityPreservingGitHubProvider.js");
 const PROJECT_ID = "chief-ai";
+const FCR_PROJECT_ID = "founder-control-room";
+const FCR_RULESET_NAME = "Founder Control Room main exact-head gate";
 const provider = () => new SecurityPreservingGitHubProvider({
   token: "test-token",
   projectMap: { [PROJECT_ID]: "jussray/chief-ai-machine" },
+});
+const fcrProvider = () => new SecurityPreservingGitHubProvider({
+  token: "test-token",
+  projectMap: { [FCR_PROJECT_ID]: "jussray/founder-control-room" },
 });
 
 const config = (overrides: Record<string, unknown> = {}) => ({
@@ -54,6 +60,21 @@ describe("SecurityPreservingGitHubProvider", () => {
       name: "governance boundary",
       enforcement: "active",
     } });
+  });
+
+  it("fails closed before mutating an existing FCR ruleset", async () => {
+    mockGetRepoRulesets.mockResolvedValueOnce({ data: [{ id: 20819094, name: FCR_RULESET_NAME }] });
+
+    await expect(fcrProvider().applyBranchRuleset(
+      FCR_PROJECT_ID,
+      config({ name: FCR_RULESET_NAME, requiredApprovingReviewCount: 0 }),
+    )).rejects.toThrow(
+      "existing Founder Control Room ruleset updates are blocked until a preservation-safe provider reconciliation contract exists",
+    );
+
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
   });
 
   it("fails closed instead of PUT-updating an existing non-FCR ruleset from a stale provider snapshot", async () => {

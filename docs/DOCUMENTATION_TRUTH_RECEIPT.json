@@ -421,7 +421,8 @@
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority."
+        "`src/providers/SecurityPreservingGitHubProvider.ts` must block ordinary forward patching unless the exact branch head is `VERIFIED_CLEAN`; a `KNOWN_BAD` head may accept only an explicit repair message bound to that same exact SHA, while stale repair intent and `UNVERIFIED` heads must fail closed without granting merge, deploy, publication, provider-policy, or founder authority.",
+        "`src/providers/SecurityPreservingGitHubProvider.ts` must prohibit changes that weaken FCR main branch protection, native approving-review count, required status checks, bypass restrictions or forced updates."
       ]
     },
     {
@@ -756,7 +757,8 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
-        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt."
+        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt.",
+        "`src/providers/providerFactory.ts` must preserve current FCR required review, exact-head authorization, and protected rulesets when routing approved GitHub merge operations through the async confirmation path; no stale approval is reusable."
       ]
     },
     {
@@ -1011,6 +1013,18 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/providers/githubAsyncMerge.ts",
+      "claims": [
+        "`src/providers/githubAsyncMerge.ts` must distinguish accepted async PR merge from independently observed merged commit, verify exact PR head and expected base before integration, and fail closed on ambiguous or unauthorized merge outcomes."
+      ]
+    },
+    {
+      "path": ".github/workflows/ai-failure-repair.yml",
+      "claims": [
+        "`.github/workflows/ai-failure-repair.yml` must bind all repair actions to the exact failure receipt and live source, preserving strict founder review and preventing automatic merge/deploy on inconclusive asynchronous provider acceptance."
       ]
     }
   ]

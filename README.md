@@ -854,3 +854,8 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+### Async stacked GitHub PR merge source contract (#857)
+
+GitHub may accept an authorized PR merge asynchronously. An HTTP acceptance or `mergeable` flag is not evidence that the merge occurred; the source contract must poll exact-PR state and verify merged commit ancestry, approved head and base, and required gates before recording completion. This source-only repair retains current founder-only approval, external provider authorization boundaries, branch protection, Code Owners, review checks and existing latest `main` policy. No PR was merged or production deployment activated through this change.

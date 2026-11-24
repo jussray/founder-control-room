@@ -25,14 +25,16 @@ jobs:
     name: Bind exact failed CI receipt
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.pull_requests[0].number != null &&
+      github.event.workflow_run.head_branch != 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       allowed: ${{ steps.gate.outputs.allowed }}
       repair_attempt: ${{ steps.gate.outputs.repair_attempt }}
+      pr_number: ${{ steps.gate.outputs.pr_number }}
       fingerprint: ${{ steps.receipt.outputs.fingerprint }}
     steps:
       - name: Check out exact failed head
@@ -42,8 +44,11 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      - name: Fail closed on stale head and repair loops
+      - name: Fail closed on stale PR head and repair loops
         id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         shell: bash
         run: |
           set -euo pipefail
@@ -52,15 +57,31 @@ jobs:
             exit 1
           fi
 
-          actual="$(git rev-parse HEAD)"
-          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
-          current_main="$(git rev-parse refs/remotes/origin/main)"
-          test "$actual" = "$FAILED_SHA"
-          if [[ "$current_main" != "$FAILED_SHA" ]]; then
-            echo "::notice title=Stale failure skipped::main advanced from $FAILED_SHA to $current_main; refusing to repair stale code."
+          # Only an existing, founder-owned, same-repository PR may be repaired.
+          # A workflow_run notification and an AI candidate carry no merge authority.
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || [[ -z "$FAILED_BRANCH" ]] ||
+             [[ "$FAILED_BRANCH" == main ]] || ! git check-ref-format --branch "$FAILED_BRANCH" >/dev/null; then
+            echo '::error title=Invalid PR binding::Missing or unsafe existing PR target.'
+            exit 1
+          fi
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          if ! jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "$FAILED_BRANCH" --arg sha "$FAILED_SHA" '
+            .state == "open" and .base.ref == "main" and
+            .head.repo.full_name == $repo and .head.ref == $branch and
+            .head.sha == $sha and .user.login == ($repo | split("/")[0])
+          ' <<<"$pr" >/dev/null; then
+            echo '::notice title=Stale or unauthorized PR::PR identity, author, branch, base or head no longer matches the failed run.'
             echo 'allowed=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          git fetch --no-tags --depth=1 origin "refs/heads/$FAILED_BRANCH:refs/remotes/origin/repair-target"
+          test "$(git rev-parse HEAD)" = "$FAILED_SHA"
+          if [[ "$(git rev-parse refs/remotes/origin/repair-target)" != "$FAILED_SHA" ]]; then
+            echo '::notice title=Stale PR branch::Branch advanced; do not replay the old failure.'
+            echo 'allowed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
           subject="$(git log -1 --pretty=%B)"
           if grep -Fq '[ai-repair 2/2]' <<<"$subject"; then
@@ -181,7 +202,7 @@ jobs:
           permission-profile: ':workspace'
           output-file: .repair/codex-final-message.txt
           prompt: |
-            You are the first bounded repair pass for a failed Founder Control Room CI run.
+            You are the first bounded repair pass for a failed Founder Control Room PR CI run.
             Read AGENTS.md, .ai/skills/goalfix/SKILL.md, and .agents/skills/control-room-incident-triage/SKILL.md first.
             Then read .repair/failure-receipt.json and .repair/failure.log.
 
@@ -345,17 +366,22 @@ jobs:
           mkdir -p .repair
           printf '.repair/\n' >> .git/info/exclude
 
-      - name: Reconfirm failed head is still current main
+      - name: Reconfirm original PR head before verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "$FAILED_BRANCH" --arg sha "$FAILED_SHA" '
+            .state == "open" and .base.ref == "main" and
+            .head.repo.full_name == $repo and .head.ref == $branch and
+            .head.sha == $sha and .user.login == ($repo | split("/")[0])
+          ' <<<"$pr" >/dev/null
+          git fetch --no-tags --depth=1 origin "refs/heads/$FAILED_BRANCH:refs/remotes/origin/repair-target"
           test "$(git rev-parse HEAD)" = "$FAILED_SHA"
-          current_main="$(git rev-parse refs/remotes/origin/main)"
-          if [[ "$current_main" != "$FAILED_SHA" ]]; then
-            echo "::error title=Stale before commit::main advanced to $current_main; refusing to overwrite newer work."
-            exit 1
-          fi
+          test "$(git rev-parse refs/remotes/origin/repair-target)" = "$FAILED_SHA"
 
       - name: Download failure receipt
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -464,8 +490,10 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           permission-contents: write
 
-      - name: Commit and push only the verified repair
+      - name: Commit and push only to the existing verified PR branch
         env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           REPAIR_ATTEMPT: ${{ needs.prepare.outputs.repair_attempt }}
           FAILURE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
@@ -474,8 +502,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
-          test "$(git rev-parse refs/remotes/origin/main)" = "$FAILED_SHA"
+          # The push is a fast-forward to the same existing PR branch, never main.
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "$FAILED_BRANCH" --arg sha "$FAILED_SHA" '
+            .state == "open" and .base.ref == "main" and
+            .head.repo.full_name == $repo and .head.ref == $branch and
+            .head.sha == $sha and .user.login == ($repo | split("/")[0])
+          ' <<<"$pr" >/dev/null
+          git fetch --no-tags --depth=1 origin "refs/heads/$FAILED_BRANCH:refs/remotes/origin/repair-target"
+          test "$(git rev-parse refs/remotes/origin/repair-target)" = "$FAILED_SHA"
 
           git add -A
           git reset -- .repair >/dev/null 2>&1 || true
@@ -494,21 +529,23 @@ jobs:
 
           repaired_sha="$(git rev-parse HEAD)"
           remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push "$remote" HEAD:main
+          git push "$remote" "HEAD:refs/heads/$FAILED_BRANCH"
 
           jq -n \
             --arg state 'REPAIR_PUSHED_AWAITING_FRESH_CI' \
             --arg failureFingerprint "$FAILURE_FINGERPRINT" \
             --arg failedSha "$FAILED_SHA" \
+            --arg prNumber "$PR_NUMBER" \
+            --arg repairBranch "$FAILED_BRANCH" \
             --arg repairedSha "$repaired_sha" \
             --arg repairAttempt "$REPAIR_ATTEMPT" \
             --arg codex "$CODEX_OUTCOME" \
             --arg claude "$CLAUDE_OUTCOME" \
-            '{schemaVersion:1,state:$state,failureFingerprint:$failureFingerprint,failedSha:$failedSha,repairedSha:$repairedSha,repairAttempt:($repairAttempt|tonumber),codexOutcome:$codex,claudeOutcome:$claude,verification:{typecheck:true,lint:true,tests:true,rlsContract:true,testDiscovery:true,documentationTruth:true,cloudflareAuthority:true,playwright:true},freshCiRequired:true}' \
+            '{schemaVersion:1,state:$state,failureFingerprint:$failureFingerprint,failedSha:$failedSha,repairedSha:$repairedSha,prNumber:($prNumber|tonumber),repairBranch:$repairBranch,repairAttempt:($repairAttempt|tonumber),codexOutcome:$codex,claudeOutcome:$claude,verification:{typecheck:true,lint:true,tests:true,rlsContract:true,testDiscovery:true,documentationTruth:true,cloudflareAuthority:true,playwright:true},freshCiRequired:true,mergeAuthorized:false,founderExactCandidateApprovalRequired:true}' \
             > .repair/final-repair-receipt.json
 
           {
-            echo '## AI repair pushed'
+            echo '## AI repair pushed to existing PR branch'
             echo
             echo "- Failure fingerprint: \`$FAILURE_FINGERPRINT\`"
             echo "- Failed head: \`$FAILED_SHA\`"
@@ -518,7 +555,8 @@ jobs:
             echo "- Claude: \`$CLAUDE_OUTCOME\`"
             echo '- Local runner verification: `GREEN` including Playwright'
             echo '- Final state: `REPAIR_PUSHED_AWAITING_FRESH_CI`'
-            echo '- The GitHub App push is expected to trigger a fresh CI run; that new exact-head run is the final authority.'
+            echo '- PR branch requires new exact-head CI, independent review, and exact-candidate founder merge approval.'
+            echo '- No merge, deployment, or main-branch mutation is authorized by this workflow.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload final repair receipt
