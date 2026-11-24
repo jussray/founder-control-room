@@ -10,6 +10,7 @@ import { paFundingReviewsRouter } from './routes/paFundingReviews.js';
 import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
+import { founderNotificationsRouter } from './routes/founderNotifications.js';
 import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
@@ -435,6 +436,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/l99/product-build', productBuildRouter);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
+  app.use('/founder-notifications', founderNotificationsRouter);
   app.use('/futureyou', futureYouRouter);
   app.use('/goalfix', goalfixRouter);
   app.use('/founder-os', founderOsSkillsRouter);
