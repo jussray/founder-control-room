@@ -47,6 +47,40 @@ requireValue(contract.pair?.controlRoom === 'jussray/founder-control-room', 'con
 requireValue(contract.pair?.chiefAI === 'jussray/chief-ai-machine', 'Chief AI repository drifted');
 requireValue(pkg.name === 'founder-control-room', 'validator is running in the wrong repository');
 requireValue(contract.relationship?.topology === 'standalone-peers', 'FCR/Chief topology must remain standalone peers');
+
+// Paired identity is evidence only. Each product retains its own authority plane.
+const relationship = contract.relationship ?? {};
+const crossSystem = relationship.crossSystem ?? {};
+for (const side of ['controlRoom', 'chiefAI']) {
+  const peer = relationship[side] ?? {};
+  for (const field of ['independentlyCallable', 'ownsIdentity', 'ownsLifecycle', 'ownsReceipts', 'ownsFailureState', 'ownsContinuityMarkers']) {
+    requireValue(peer[field] === true, `${side}.${field} must remain independently true`);
+  }
+}
+for (const field of [
+  'sharedRuntimeRequired', 'identityCollapseAllowed', 'implicitAuthorityTransferAllowed',
+  'receiptCollapseAllowed', 'failureCollapseAllowed', 'continuityCollapseAllowed',
+  'evidenceCreatesAuthority',
+]) {
+  requireValue(crossSystem[field] === false, `cross-system ${field} must stay false`);
+}
+requireValue(crossSystem.cooperationMayProceedWithinEachSystemsOwnAuthority === true, 'peer cooperation must be separately authorized');
+requireValue(relationship.continuityBoundary?.includes('recipient-side verification') && relationship.continuityBoundary?.includes('never transfers authority'), 'recipient-side proof and non-transfer boundary required');
+requireValue(relationship.cooperationBoundary?.includes('distinct receipts') && relationship.cooperationBoundary?.includes('never silently replaces'), 'peer receipt independence required');
+
+// Historical PR identifiers are not live authority; merged Chief PRs #142 and
+// #151 must be resolved from current Chief main, never from their old head SHAs.
+const pairing = contract.candidatePairing ?? {};
+requireValue(pairing.schema === 'juss/founder-chief-pair-candidate@v1', 'candidate record schema drifted');
+for (const name of ['founderControlRoomPullRequest', 'chiefAIPullRequest', 'chiefAINecessaryFixPolicyPullRequest']) {
+  requireValue(Number.isInteger(pairing[name]) && pairing[name] > 0, `candidate ${name} must identify a positive PR number`);
+}
+requireValue(pairing.truthBoundary?.includes('does not grant merge'), 'historical candidate snapshot cannot grant merge authority');
+requireValue(pairing.carrierSeparationBoundary?.includes('Neither carrier donates'), 'peer PR historical evidence remains separate');
+requireValue(contract.automatedPostingAuthorization?.includes('never weakens a stricter executable authority contract'), 'standing publication cannot bypass stricter policy');
+requireValue(contract.automatedPostingAuthorization?.includes('execution-time standing-approval readback'), 'standing publication requires execution-time readback');
+requireValue(contract.postingApprovalPolicy?.includes('fresh exact-proposal approval'), 'first-party direct publishing requires exact-proposal approval');
+
 requireValue(contract.commercialPackaging?.portfolioCommercialTopology === 'independent-products-with-explicit-bundles', 'commercial topology drifted');
 requireValue(contract.commercialPackaging?.defaultPublicFounderSoftwareIdentity === 'product-specific', 'public product identity must remain product-specific');
 requireValue(contract.commercialPackaging?.chiefTechnicalIndependence === true, 'Chief technical independence must remain true');
@@ -169,6 +203,27 @@ if (counterpartNecessaryFixPolicyPath) {
         && counterpartPolicy.truthBoundary?.requiresCurrentAuthority === true
         && counterpartPolicy.truthBoundary?.continuityMarkersAuthorize === false,
       'pair drift: Chief AI necessary-fix authority boundary changed',
+    );
+    requireValue(
+      counterpartPolicy.policyId === 'necessary-fix-execution-default'
+        && counterpartPolicy.projectId === 'chief-ai-machine',
+      'pair drift: Chief AI necessary-fix policy identity changed',
+    );
+    const mergeCanon = counterpartPolicy.mergeCanon ?? {};
+    requireValue(
+      mergeCanon.mergeAuthorityAvailable === true
+        && mergeCanon.mergeApprovalRequired === true
+        && mergeCanon.approvalScope === 'exact-repository-pr-base-head'
+        && mergeCanon.approvalCarryForward === false
+        && mergeCanon.reviewOrGreenChecksDoNotAuthorizeMerge === true
+        && mergeCanon.baseOrHeadMovementExpiresApproval === true,
+      'pair drift: Chief AI exact-candidate merge authority changed',
+    );
+    requireValue(
+      counterpartPolicy.truthBoundary?.requiresExactHeadForRepositoryMutation === true
+        && counterpartPolicy.truthBoundary?.verifiedEvidenceAloneDoesNotMutate === true
+        && counterpartPolicy.truthBoundary?.providerAcceptanceDoesNotProveOutcome === true,
+      'pair drift: Chief AI execution proof boundary changed',
     );
   } catch (error) {
     failures.push(`Chief AI necessary-fix policy could not be read: ${error.message}`);

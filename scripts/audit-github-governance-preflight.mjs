@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
 export const CANONICAL_NATIVE_APPROVAL_COUNT = 0;
-export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
+export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract', 'verify-pair-contract'];
 export const PRESERVABLE_REVIEW_RULE_TYPES = Object.freeze([
   'required_linear_history',
   'code_quality',

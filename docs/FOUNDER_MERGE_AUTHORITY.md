@@ -222,3 +222,9 @@ Workflow YAML syntax belongs to the same exact-head source contract: `.github/wo
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+
+
+## Standalone-peer pair-check merge freshness — PR #781
+
+FCR's source-level native ruleset policy now requires `Required Gate`, `Verify test-ledger contract`, and `verify-pair-contract`. The pair check must produce an exact-head result on every PR and perform cross-repository Chief-main verification for any change to a load-bearing pair input, comparing the candidate against observed current FCR main. A no-op is valid only if that dependency surface is genuinely unchanged. Already-merged Chief #142/#151 head snapshots are historical evidence, not live authority. Green source checks do not establish that GitHub provider rulesets currently enforce these settings or authorize a merge or deployment. Any candidate SHA movement expires prior proof.

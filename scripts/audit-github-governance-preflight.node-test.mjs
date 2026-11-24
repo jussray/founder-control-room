@@ -81,6 +81,7 @@ function freshnessRuleset(overrides = {}) {
           required_status_checks: [
             { context: 'Required Gate' },
             { context: 'Verify test-ledger contract' },
+            { context: 'verify-pair-contract' },
           ],
         },
       },
@@ -130,7 +131,7 @@ test('canonical FCR founder-selected review policy preserves zero-bypass freshne
   assert.deepEqual(freshness.ruleTypes, ['required_status_checks']);
   assert.equal(freshness.requirePullRequest, false);
   assert.equal(freshness.strictRequiredStatusChecks, true);
-  assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract']);
+  assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract', 'verify-pair-contract']);
   assert.deepEqual(freshness.bypassActors, []);
   assert.equal(freshnessFloorSatisfied(freshness), true);
 });
@@ -307,6 +308,7 @@ test('legacy monolithic ruleset is NOT_READY and cannot impersonate canonical tw
         required_status_checks: [
           { context: 'Required Gate' },
           { context: 'Verify test-ledger contract' },
+            { context: 'verify-pair-contract' },
         ],
       },
     },

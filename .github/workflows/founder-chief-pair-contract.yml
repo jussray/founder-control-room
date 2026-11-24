@@ -2,18 +2,6 @@ name: Founder Control Room / Chief AI Pair Contract
 
 on:
   pull_request:
-    paths:
-      - 'config/founder-chief-pair.contract.json'
-      - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
-      - 'scripts/verify-founder-chief-pair.mjs'
-      - 'src/lib/standingFounderPolicy.ts'
-      - 'src/founder-os-lab/projectAdapters.ts'
-      - 'src/founder-os-lab/capabilityKernel.ts'
-      - 'src/founder-os-lab/engine.ts'
-      - 'src/lib/n8nConveyor.ts'
-      - 'src/lib/n8nConveyorRuntime.ts'
-      - 'automation/n8n/founder-conveyor.workflow.json'
-      - '.github/workflows/founder-chief-pair-contract.yml'
   push:
     branches: [main]
     paths:
@@ -47,25 +35,71 @@ jobs:
           path: founder-control-room
           persist-credentials: false
 
+      - name: Classify exact-head pair-enforcement scope against live main
+        id: pair-scope
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          required=true
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            required=false
+            live_main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+            [[ "$live_main_sha" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+            test "$(git -C founder-control-room rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+            git -C founder-control-room fetch --no-tags --depth=1 origin "$live_main_sha"
+            while IFS= read -r path; do
+              case "$path" in
+                config/founder-chief-pair.contract.json|\
+                .github/workflows/founder-chief-pair-contract.yml|\
+                scripts/verify-founder-chief-pair.mjs|\
+                test/founder-chief-pair-peer-contract.test.mjs|\
+                docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md|\
+                docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md|\
+                docs/FOUNDER_MERGE_AUTHORITY.md|\
+                src/lib/standingFounderPolicy.ts|\
+                src/founder-os-lab/projectAdapters.ts|\
+                src/founder-os-lab/capabilityKernel.ts|\
+                src/founder-os-lab/engine.ts|\
+                src/lib/n8nConveyor.ts|\
+                src/lib/n8nConveyorRuntime.ts|\
+                automation/n8n/founder-conveyor.workflow.json|\
+                package.json)
+                  required=true
+                  break
+                  ;;
+              esac
+            done < <(git -C founder-control-room diff --name-only "$live_main_sha" "$EXPECTED_HEAD_SHA")
+          fi
+          printf 'required=%s\n' "$required" >> "$GITHUB_OUTPUT"
+          {
+            echo '## FCR ↔ Chief peer authority scope'
+            printf -- '- exact candidate: `%s`\n' "$EXPECTED_HEAD_SHA"
+            printf -- '- cross-repository check required: `%s`\n' "$required"
+            echo '- Historical PR #142/#151 candidate snapshots are not live source authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pair contract unchanged for this pull request
+        if: steps.pair-scope.outputs.required != 'true'
+        shell: bash
+        run: echo 'Pair contract source unchanged against live main; no external candidate snapshot grants authority.'
       - name: Resolve paired Chief AI authority
+        if: steps.pair-scope.outputs.required == 'true'
         id: pair-ref
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          FCR_HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
+          # Chief main is the canonical verified peer. Do not select an
+          # unreviewed same-name branch or an already-merged historical PR head.
           selected_ref="main"
           source="chief-ai-machine/main"
           remote="https://github.com/jussray/chief-ai-machine.git"
-
-          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$FCR_HEAD_REF" ]; then
-            git check-ref-format --branch "$FCR_HEAD_REF" >/dev/null
-            if git ls-remote --exit-code --heads "$remote" "refs/heads/$FCR_HEAD_REF" >/dev/null 2>&1; then
-              selected_ref="$FCR_HEAD_REF"
-              source="paired-same-name-branch"
-            fi
-          fi
 
           selected_sha="$(git ls-remote --exit-code --heads "$remote" "refs/heads/$selected_ref" | awk 'NR==1 {print $1}')"
           printf '%s' "$selected_sha" | grep -Eq '^[0-9a-f]{40}$'
@@ -83,6 +117,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check out exact Chief AI authority
+        if: steps.pair-scope.outputs.required == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: jussray/chief-ai-machine
@@ -91,6 +126,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact Chief AI checkout
+        if: steps.pair-scope.outputs.required == 'true'
         shell: bash
         working-directory: chief-ai-machine
         env:
@@ -100,10 +136,12 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_CHIEF_SHA"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.pair-scope.outputs.required == 'true'
         with:
           node-version: '24'
 
       - name: Verify local and cross-repository pair contract
+        if: steps.pair-scope.outputs.required == 'true'
         working-directory: founder-control-room
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
@@ -113,3 +151,8 @@ jobs:
           PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.sha }}
           PAIR_SELECTION_MODE: ${{ steps.pair-ref.outputs.source }}
         run: node scripts/verify-founder-chief-pair.mjs
+
+      - name: Verify non-authorizing standalone peer invariants
+        if: steps.pair-scope.outputs.required == 'true'
+        working-directory: founder-control-room
+        run: node --test test/founder-chief-pair-peer-contract.test.mjs

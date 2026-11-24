@@ -854,3 +854,9 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+
+## FCR ↔ Chief standalone-peer exact-source verification (PR #781)
+
+Chief AI PRs #142 and #151 were observed merged, not open, during this reconciliation. Their old PR branch SHA locks are historical candidate evidence only and must not act as current runtime or merge authorization. The FCR and Chief `main` pair-contract blobs matched exactly at inspection. The required pair workflow now reports on every FCR PR, compares the exact head to provider-observed live FCR main and runs live Chief-main source/necessary-fix verification when a pair authority input changes. Each system keeps distinct identities, receipts, lifecycle and final approval; source configuration and a passing CI job are not proof of deployed runtime behavior. Historical candidate code remains in the original PR ancestry, without being activated as current authority. No separate Chief repo mutation is authorized by this reconciliation.

@@ -756,7 +756,8 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "`src/providers/providerFactory.ts` must delegate `observePullRequest` only through the repository-scoped provider, reject unsupported read-only observation without fallback credentials, and never populate or bypass the strict FCR merge-review context.",
-        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt."
+        "`src/providers/providerFactory.ts` must require zero additional native approving reviews for active canonical FCR main governance, reject caller-supplied drift from the founder-only approval phase, and preserve `Required Gate`, `Verify test-ledger contract`, pull-request enforcement, and other provider authority boundaries. The founder's authenticated GitHub Auto-merge selection is the native merge instruction, not a formal GitHub `APPROVED` review event or a separate FCR in-app founder-final receipt.",
+        "The FCR native ruleset invariant must require verify-pair-contract together with Required Gate and Verify test-ledger contract, without increasing the founder-required native reviewer count or granting bypass authority."
       ]
     },
     {
@@ -849,7 +850,8 @@
     {
       "path": "scripts/audit-github-governance-preflight.mjs",
       "claims": [
-        "`scripts/audit-github-governance-preflight.mjs` must use founder-only native approval count zero and must not block READY merely because no outside human reviewer is available. It must keep collaborator eligibility observational and preserve independent deterministic proof and all other exact ruleset security floors."
+        "`scripts/audit-github-governance-preflight.mjs` must use founder-only native approval count zero and must not block READY merely because no outside human reviewer is available. It must keep collaborator eligibility observational and preserve independent deterministic proof and all other exact ruleset security floors.",
+        "The governance-readiness floor must require verify-pair-contract as a current exact-head status check, treat provider readback as separate evidence and never assume source-only declarations changed live GitHub rulesets."
       ]
     },
     {
@@ -861,7 +863,8 @@
     {
       "path": "docs/FOUNDER_MERGE_AUTHORITY.md",
       "claims": [
-        "`docs/FOUNDER_MERGE_AUTHORITY.md` must describe founder-selected native Auto-merge as the founder's GitHub merge instruction without an extra native approving reviewer, while retaining separate deterministic independent review and authenticated founder-final authority for AI-initiated in-app merges."
+        "`docs/FOUNDER_MERGE_AUTHORITY.md` must describe founder-selected native Auto-merge as the founder's GitHub merge instruction without an extra native approving reviewer, while retaining separate deterministic independent review and authenticated founder-final authority for AI-initiated in-app merges.",
+        "Standalone FCR ↔ Chief peer verification is a required source-level merge gate for changed pair-contract truth, with cheap no-op success only when the exact-current-main diff shows no pair-sensitive change. Current live ruleset enforcement is separately verified."
       ]
     },
     {
@@ -1011,6 +1014,18 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "src/providers/__tests__/providerFactory.rulesetGovernance.test.ts",
+      "claims": [
+        "The native provider ruleset regression suite must reject removal of any one of Required Gate, Verify test-ledger contract or verify-pair-contract, while preserving founder-selected native Auto-merge and protected main safety policy."
+      ]
+    },
+    {
+      "path": "scripts/audit-github-governance-preflight.node-test.mjs",
+      "claims": [
+        "Governance fixture/readiness test matrices must include verify-pair-contract in the required status-check floor without claiming that test fixtures prove provider ruleset state."
       ]
     }
   ]
