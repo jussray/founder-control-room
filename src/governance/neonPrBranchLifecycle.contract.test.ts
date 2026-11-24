@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/neon-pr-branches.yml', 'utf8');
@@ -124,6 +127,50 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Ambiguous Neon deletion readback');
     expect(workflow).toContain('Neon branch still exists after deletion');
     expect(workflow).toContain('sleep 5');
+  });
+
+  it('fails closed on unbound changed Neon companions before provider allocation', () => {
+    const start = workflow.indexOf('# Reject unbound changed Neon preview companions before provider allocation.');
+    const end = workflow.indexOf('# End changed Neon preview companion guard.');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(end).toBeLessThan(workflow.indexOf('- name: Validate Neon configuration'));
+    const guard = workflow.slice(start, end);
+    const directory = mkdtempSync(join(tmpdir(), 'fcr-neon-scope-'));
+    const filename = '20261124000000_demo.sql';
+    const companion = 'supabase/preview-contracts/' + filename;
+    const migration = 'supabase/migrations/' + filename;
+    const malformed = 'supabase/preview-contracts/nested/' + filename;
+    const setup = [
+      'set -euo pipefail',
+      'CHANGED_FILES=("$PREVIEW_PATH")',
+      'live_base_sha=base',
+      'EXPECTED_HEAD_SHA=head',
+      'git(){ printf "%s\\n" "$ADDED_MIGRATIONS"; }',
+    ].join('\n') + '\n';
+    try {
+      mkdirSync(join(directory, 'supabase/preview-contracts/nested'), {recursive:true});
+      writeFileSync(join(directory, companion), 'SELECT 1;');
+      writeFileSync(join(directory, malformed), 'SELECT 1;');
+      const cases: Array<[string,string,string,string,number]> = [
+        ['bound', companion, migration, 'true', 0],
+        ['unbound', companion, '', 'true', 1],
+        ['wrong binding', companion, 'supabase/migrations/20261124000001_other.sql', 'true', 1],
+        ['deleted', 'supabase/preview-contracts/20261124000002_deleted.sql', 'supabase/migrations/20261124000002_deleted.sql', 'true', 1],
+        ['non-Neon', companion, '', 'false', 0],
+        ['malformed', malformed, migration, 'true', 1],
+      ];
+      for (const [label, previewPath, added, needsNeon, expected] of cases) {
+        const result = spawnSync('bash', ['-c', setup + guard], {
+          cwd: directory,
+          env: {...process.env, PREVIEW_PATH:previewPath, ADDED_MIGRATIONS:added, NEEDS_NEON:needsNeon},
+          encoding: 'utf8',
+        });
+        expect(result.status, label + ': ' + result.stdout + result.stderr).toBe(expected);
+      }
+    } finally {
+      rmSync(directory, {recursive:true, force:true});
+    }
   });
 
 });

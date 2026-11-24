@@ -83,6 +83,27 @@ jobs:
             esac
           done
 
+          # Reject unbound changed Neon preview companions before provider allocation.
+          if [ "$NEEDS_NEON" = "true" ]; then
+            added_migrations="$(git diff --name-only --diff-filter=A --no-renames "$live_base_sha" "$EXPECTED_HEAD_SHA" -- 'supabase/migrations/*.sql')"
+            for path in "${CHANGED_FILES[@]}"; do
+              case "$path" in
+                supabase/preview-fixtures/*.sql|supabase/preview-contracts/*.sql|supabase/preview-assertions/*.sql)
+                  if [[ ! "$path" =~ ^supabase/preview-(fixtures|contracts|assertions)/[0-9]{14}_[A-Za-z0-9_]+\.sql$ ]] || [ ! -f "$path" ]; then
+                    echo "::error title=Invalid Neon preview companion::${path} must be a present canonical SQL file."
+                    exit 1
+                  fi
+                  migration="supabase/migrations/${path##*/}"
+                  if ! grep -Fxq -- "$migration" <<< "$added_migrations"; then
+                    echo "::error title=Unbound Neon preview companion::${path} requires its matching added migration ${migration}."
+                    exit 1
+                  fi
+                  ;;
+              esac
+            done
+          fi
+          # End changed Neon preview companion guard.
+
           echo "live_base_sha=${live_base_sha}" >> "$GITHUB_OUTPUT"
           echo "needs_supabase=${NEEDS_SUPABASE}" >> "$GITHUB_OUTPUT"
           echo "needs_neon=${NEEDS_NEON}" >> "$GITHUB_OUTPUT"
