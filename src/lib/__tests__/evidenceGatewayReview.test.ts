@@ -19,9 +19,9 @@ describe('Evidence Gateway bounded analysis',()=>{
      nextGate:{...answer.nextGate,gate:'DEPLOY'}}),['one'])).toThrow(/invalid_model_response/);
  });
  it('calls FCR gateway, returns advisory only, hashes input and never grants execution authority',async()=>{
-   let seenUrl='';let body:Record<string,any>={};
+   let seenUrl='';let body:Record<string,any>={};let headers:Record<string,string>={};
    const fetchFn=(async (url:string,init:RequestInit)=>{
-     seenUrl=url;body=JSON.parse(String(init.body));
+     seenUrl=url;body=JSON.parse(String(init.body));headers=init.headers as Record<string,string>;
      return {ok:true,status:200,json:async()=>({
        choices:[{message:{content:JSON.stringify(answer)}}]
      })} as Response;
@@ -30,6 +30,9 @@ describe('Evidence Gateway bounded analysis',()=>{
      providerToken:'server-test-provider-key',fetchFn,
      now:()=>new Date('2026-11-02T21:00:00.000Z')});
    expect(seenUrl).toContain('/fcr-evidence/openai/chat/completions');
+   expect(headers['cf-aig-collect-log']).toBe('false');
+   expect(headers['cf-aig-skip-cache']).toBe('true');
+   expect(headers['Cache-Control']).toBe('no-store');
    expect(body.messages[1].content).toContain('Our site is indexed');
    expect(result).toMatchObject({authorityGranted:false,basis:'MODEL_ANALYSIS_NOT_VERIFIED',
      nextGate:{gate:'COLLECT_EVIDENCE'}});
