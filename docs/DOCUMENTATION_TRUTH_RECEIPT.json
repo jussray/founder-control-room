@@ -1012,6 +1012,18 @@
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
       ]
+    },
+    {
+      "path": "src/config/portfolio.ts",
+      "claims": [
+        "`src/config/portfolio.ts` must record Apple/Google mobile distribution intent separately from project runtime and repository authority; sync-party remains active under current main, and a carrier target never authorizes publish, store upload or provider mutation."
+      ]
+    },
+    {
+      "path": "src/config/providerAuthorities.ts",
+      "claims": [
+        "`src/config/providerAuthorities.ts` must treat Supabase organization and project references as identity-only observations, classifying unavailable organization scope as UNKNOWN/visibility-limited and keeping mutationAuthority=false for every binding."
+      ]
     }
   ]
 }

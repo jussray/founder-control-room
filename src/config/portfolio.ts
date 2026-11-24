@@ -1,6 +1,19 @@
 import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
 
 export type PortfolioProjectStatus = "active" | "external" | "continuity-only";
+export type MobileStoreTarget = "apple-app-store" | "google-play";
+export type MobileCarrierStrategy =
+  | "native-existing"
+  | "native-client-required"
+  | "hybrid-native-candidate"
+  | "canonical-port-required";
+export type MobileDistributionProofState = "planned" | "source-implemented";
+
+export interface MobileDistributionIntent {
+  targetStores: readonly MobileStoreTarget[];
+  carrierStrategy: MobileCarrierStrategy;
+  proofState: MobileDistributionProofState;
+}
 
 export interface PortfolioProject {
   slug: string;
@@ -8,7 +21,14 @@ export interface PortfolioProject {
   repository: string;
   status: PortfolioProjectStatus;
   capabilities: readonly string[];
+  /**
+   * Product distribution intent only. This field grants zero FCR execution,
+   * merge, deploy, provider, publication, payment, or repository authority.
+   */
+  mobileDistribution?: MobileDistributionIntent;
 }
+
+const iosAndAndroidStores = ["apple-app-store", "google-play"] as const;
 
 /**
  * Projects that currently carry FCR portfolio/MCP authority.
@@ -26,6 +46,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/Sekret-Bip",
     status: "active",
     capabilities: ["mobile-app", "companion-runtime", "playwright", "figma"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-existing",\n      proofState: "source-implemented",
+    },
   },
   {
     slug: "juss-beautiful-hair",
@@ -33,6 +55,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/jussbeautifulhair-site",
     status: "active",
     capabilities: ["commerce", "storefront", "playwright"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "hybrid-native-candidate",\n      proofState: "planned",
+    },
   },
   {
     slug: "juss-beautiful-hair-private",
@@ -40,6 +64,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/jbh-private",
     status: "active",
     capabilities: ["commerce-admin", "private-operations"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "l99",
@@ -47,6 +73,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: L99_REPOSITORY_IDENTIFIER,
     status: "active",
     capabilities: ["story-runtime", "artifact-generation", "provenance"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "chief-ai-machine",
@@ -54,6 +82,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/chief-ai-machine",
     status: "active",
     capabilities: ["prompt-operations", "provider-routing"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "untold-stories",
@@ -61,6 +91,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/untold-stories-storefront",
     status: "active",
     capabilities: ["shopify", "story-commerce", "playwright"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "hybrid-native-candidate",\n      proofState: "planned",
+    },
   },
   {
     slug: "sync-party",
@@ -68,6 +100,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/sync-party-game",
     status: "active",
     capabilities: ["multiplayer-game", "control-room", "playwright", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "hybrid-native-candidate",\n      proofState: "planned",
+    },
   },
   {
     slug: "founder-control-room",
@@ -75,6 +109,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/founder-control-room",
     status: "active",
     capabilities: ["portfolio-operations", "mcp-host", "approval-engine"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "promptos",
@@ -82,6 +118,8 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/promptos",
     status: "active",
     capabilities: ["prompt-registry", "ooda", "redteam", "l99", "lindymode"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
 ] as const;
 
@@ -97,6 +135,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/THINK-TANK",
     status: "external",
     capabilities: ["idea-memory", "scorecards", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "hybrid-native-candidate",\n      proofState: "planned",
+    },
   },
   {
     slug: "solcontinuity",
@@ -111,6 +151,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/SleepWealth-Agent",
     status: "external",
     capabilities: ["agent-runtime", "audit", "risk-gates"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "sweats",
@@ -118,6 +160,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/Sweats",
     status: "external",
     capabilities: ["product", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "hybrid-native-candidate",\n      proofState: "planned",
+    },
   },
   {
     slug: "truth-compass",
@@ -125,6 +169,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/truth-compass",
     status: "external",
     capabilities: ["truth-analysis", "evidence", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "truth-weaver",
@@ -132,6 +178,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/truth-weaver",
     status: "external",
     capabilities: ["legal-knowledge", "decision-support", "evidence", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "alexa-commerce-engine",
@@ -139,6 +187,8 @@ export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/alexa-commerce-engine-",
     status: "external",
     capabilities: ["commerce-agent", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "native-client-required",\n      proofState: "planned",
+    },
   },
 ] as const;
 
@@ -166,6 +216,8 @@ export const CONTINUITY_ONLY_PROJECTS: readonly PortfolioProject[] = [
     repository: "jussray/Bip-Jr",
     status: "continuity-only",
     capabilities: ["bip-universe", "continuity"],
+    mobileDistribution: {\n      targetStores: iosAndAndroidStores,\n      carrierStrategy: "canonical-port-required",\n      proofState: "planned",
+    },
   },
   {
     slug: "exact-match-engine",
