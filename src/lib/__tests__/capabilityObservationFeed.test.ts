@@ -242,9 +242,9 @@ describe('capability observation feed from operator relay receipts', () => {
 
   it('never re-attributes receipts answered by another operator and returns no observation when none remain', () => {
     const summary = foldRelayReceiptsIntoCapabilityObservation({
-      operatorId: 'muse',
+      operatorId: 'deepseek',
       taskClass: 'architecture-review',
-      receipts: [receipt('codex', 'completed'), receipt('claude-code', 'failed'), receipt('muse', 'accepted')],
+      receipts: [receipt('codex', 'completed'), receipt('claude-code', 'failed'), receipt('deepseek', 'accepted')],
     });
     expect(summary.observation).toBeNull();
     expect(summary.consideredReceipts).toBe(0);

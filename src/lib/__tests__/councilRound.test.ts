@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CouncilLineageError, runCouncilRound, sha256, type CouncilConversationRow } from '../councilRound.js';
+import { CouncilLineageError, recoverPersistedRelayResponses, runCouncilRound, sha256, type CouncilConversationRow } from '../councilRound.js';
 import { buildOperatorRelayResponse } from '../operatorRelayProviderResult.js';
 import type { OperatorRelayAdapter, OperatorRelayAdapters } from '../operatorRelayDispatch.js';
 
@@ -20,7 +20,7 @@ function seat(name: string, seen: Record<string, string>, opts: { fail?: boolean
 
 const seats = [
   { operator: 'claude-code', capability: 'propose' },
-  { operator: 'perplexity', capability: 'propose' },
+  { operator: 'deepseek', capability: 'propose' },
   { operator: 'muse', capability: 'propose' },
   { operator: 'gemini', capability: 'propose' },
 ] as const;
@@ -30,7 +30,7 @@ describe('runCouncilRound', () => {
     const seen: Record<string, string> = {};
     const adapters: OperatorRelayAdapters = {
       'claude-code': seat('claude', seen),
-      perplexity: seat('perplexity', seen),
+      deepseek: seat('deepseek', seen),
       muse: seat('muse', seen),
       gemini: seat('gemini', seen),
     };
@@ -46,8 +46,8 @@ describe('runCouncilRound', () => {
     }, adapters);
 
     expect(seen.claude).toBe('A');
-    expect(seen.perplexity).toBe('claude on [A]');
-    expect(seen.muse).toBe(`perplexity on [${seen.perplexity}]`);
+    expect(seen.deepseek).toBe('claude on [A]');
+    expect(seen.muse).toBe(`deepseek on [${seen.deepseek}]`);
     expect(seen.gemini).toBe(`muse on [${seen.muse}]`);
 
     const hops = row.transcript.hops;
@@ -55,14 +55,20 @@ describe('runCouncilRound', () => {
     expect(row.transcript.humanRelay).toBe(false);
     expect(row.transcript.sourceRef).toBe('founder-attested:claude-code');
     expect(hops.map((h) => `${h.fromOperator}>${h.toOperator}`)).toEqual([
-      'fcr>claude-code', 'claude-code>perplexity', 'perplexity>muse', 'muse>gemini',
+      'fcr>claude-code', 'claude-code>deepseek', 'deepseek>muse', 'muse>gemini',
     ]);
     expect(hops[0].inputSha256).toBe(sha256('A'));
     for (let i = 1; i < hops.length; i += 1) expect(hops[i].inputSha256).toBe(hops[i - 1].answerSha256);
     expect(hops.every((h) => h.liveProviderEvidence)).toBe(true);
-    expect(row.participants).toEqual(['fcr', 'claude-code', 'perplexity', 'muse', 'gemini']);
+    expect(row.participants).toEqual(['fcr', 'claude-code', 'deepseek', 'muse', 'gemini']);
     expect(row.outcome).toBe(hops[3].answer);
     expect(written).toEqual([row]);
+
+    const recovered = recoverPersistedRelayResponses(row.transcript);
+    expect(recovered.ignoredLegacyProjections).toBe(0);
+    expect(recovered.rejectedInvalidProjections).toBe(0);
+    expect(recovered.responses).toHaveLength(4);
+    expect(recovered.responses.map((response) => response.responseHash)).toEqual(hops.map((hop) => hop.responseHash));
   });
 
   it('interrupts on a failed seat and resumes from the exact checkpoint without re-calling finished seats', async () => {
@@ -76,7 +82,7 @@ describe('runCouncilRound', () => {
       goal: 'g', initiator: 'fcr', sourceRef: 'mission:m1', seed: 'A', seats: [...seats], now: fixedNow,
     }, {
       'claude-code': counted('claude', seat('claude', seen)),
-      perplexity: counted('perplexity', seat('perplexity', seen, { fail: true })),
+      deepseek: counted('deepseek', seat('deepseek', seen, { fail: true })),
     });
     expect(first.transcript.state).toBe('interrupted');
     expect(first.transcript.nextSeatIndex).toBe(1);
@@ -87,13 +93,13 @@ describe('runCouncilRound', () => {
       goal: 'g', initiator: 'fcr', sourceRef: 'mission:m1', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
     }, {
       'claude-code': counted('claude', seat('claude', seen)),
-      perplexity: counted('perplexity', seat('perplexity', seen)),
+      deepseek: counted('deepseek', seat('deepseek', seen)),
       muse: counted('muse', seat('muse', seen)),
       gemini: counted('gemini', seat('gemini', seen)),
     });
     expect(resumed.transcript.state).toBe('complete');
-    expect(calls).toEqual(['claude', 'perplexity', 'perplexity', 'muse', 'gemini']);
-    expect(seen.perplexity).toBe('claude on [A]');
+    expect(calls).toEqual(['claude', 'deepseek', 'deepseek', 'muse', 'gemini']);
+    expect(seen.deepseek).toBe('claude on [A]');
   });
 
   it('does not advance past a blocked seat and retries that exact seat on resume', async () => {
@@ -115,6 +121,9 @@ describe('runCouncilRound', () => {
     expect(blocked.transcript.hops).toHaveLength(0);
     expect(blocked.transcript.nextSeatIndex).toBe(0);
     expect(blocked.transcript.interruption).toMatchObject({ seatIndex: 0, operator: 'claude-code', status: 'blocked' });
+    const blockedRecovery = recoverPersistedRelayResponses(blocked.transcript);
+    expect(blockedRecovery.responses).toHaveLength(1);
+    expect(blockedRecovery.responses[0]).toMatchObject({ fromOperator: 'claude-code', toOperator: 'fcr', status: 'blocked' });
 
     const resumed = await runCouncilRound({
       goal: 'g', initiator: 'fcr', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: blocked.transcript,
@@ -125,7 +134,7 @@ describe('runCouncilRound', () => {
           answer: 'claude accepted', evidenceRefs: ['provider:claude:ok-2'], completedAt: '2026-10-05T16:00:02.000Z',
         });
       },
-      perplexity: seat('perplexity', {}),
+      deepseek: seat('deepseek', {}),
       muse: seat('muse', {}),
       gemini: seat('gemini', {}),
     });
@@ -147,6 +156,30 @@ describe('runCouncilRound', () => {
     await expect(runCouncilRound({
       goal: 'g', initiator: 'fcr', sourceRef: 'founder-attested:codex', seed: 'A', seats: [...seats], now: fixedNow, resumeFrom: first.transcript,
     }, {})).rejects.toThrow('resume source reference mismatch');
+  });
+
+  it('refuses to synthesize relay receipts from legacy or tampered persisted projections', async () => {
+    const row = await runCouncilRound({
+      goal: 'g', initiator: 'fcr', seed: 'A', seats: [seats[0]], now: fixedNow,
+    }, { 'claude-code': seat('claude', {}) });
+
+    const legacy = structuredClone(row.transcript);
+    const legacyHop: Partial<(typeof legacy.hops)[number]> = legacy.hops[0];
+    delete legacyHop.unresolved;
+    delete legacyHop.authorityRequested;
+    expect(recoverPersistedRelayResponses(legacy)).toMatchObject({
+      responses: [],
+      ignoredLegacyProjections: 1,
+      rejectedInvalidProjections: 0,
+    });
+
+    const tampered = structuredClone(row.transcript);
+    tampered.hops[0].unresolved.push('forged-after-persistence');
+    expect(recoverPersistedRelayResponses(tampered)).toMatchObject({
+      responses: [],
+      ignoredLegacyProjections: 0,
+      rejectedInvalidProjections: 1,
+    });
   });
 
   it('labels a hop backed only by non-provider evidence as not live', async () => {

@@ -1,0 +1,99 @@
+name: FCR Bip Sprite Founder Dispatch
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/bip-sprite-founder-dispatch.mjs
+      - scripts/bip-sprite-founder-dispatch.node-test.mjs
+      - .github/workflows/bip-sprite-founder-dispatch.yml
+  workflow_dispatch:
+    inputs:
+      bip_sha:
+        description: Exact Bip governance-branch commit SHA
+        type: string
+        required: true
+      mission:
+        description: One fixed read-only proof mission
+        type: choice
+        required: true
+        options:
+          - repo-truth
+          - agent-contract
+          - companion-contract
+      execute:
+        description: Execute only after exact SHA and mission approval in Production
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: fcr-bip-sprite-founder-dispatch-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  contract:
+    name: Validate Bip Sprite founder-dispatch contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact immutable proof subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Assert exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Test all dispatch safety boundaries
+        run: |
+          node --check scripts/bip-sprite-founder-dispatch.mjs
+          node --test scripts/bip-sprite-founder-dispatch.node-test.mjs
+
+  dispatch:
+    name: Founder-authorized exact-head Sprite proof
+    needs: contract
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'jussray/founder-control-room' && github.ref == 'refs/heads/main' && github.actor == 'jussray'
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 8
+    env:
+      BIP_SPRITE_HEAD_SHA: ${{ inputs.bip_sha }}
+      BIP_SPRITE_MISSION: ${{ inputs.mission }}
+      BIP_SPRITE_EXECUTE: ${{ inputs.execute == true && 'true' || 'false' }}
+      BIP_SPRITE_CONFIRM_EXECUTION: ${{ inputs.execute == true && 'EXECUTE' || 'DRY_RUN' }}
+      BIP_SPRITE_APPROVED_SHA: ${{ vars.BIP_SPRITE_APPROVED_SHA }}
+      BIP_SPRITE_APPROVED_MISSION: ${{ vars.BIP_SPRITE_APPROVED_MISSION }}
+      FOUNDER_OPERATION_KILL_SWITCH: ${{ vars.FOUNDER_OPERATION_KILL_SWITCH }}
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+    steps:
+      - name: Checkout exact trusted FCR main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Assert current candidate matches checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Dispatch founder-approved read-only Sprite proof
+        run: node scripts/bip-sprite-founder-dispatch.mjs
+      - name: Retain sanitized exact-head Sprite proof receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-bip-sprite-dispatch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/bip-sprite-dispatch/receipt.json
+          if-no-files-found: error
+          retention-days: 7

@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createFakeGitHubServer } from './fakeGitHubServer.mjs';
+import { ensureRateLimitHeadroom } from './rate-limit-headroom.mjs';
 
 const PORT = 8802;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -221,6 +222,7 @@ const server = spawn(
       SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key',
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
+      E2E_SEED_FOUNDER_USER_ID: '11111111-1111-4111-8111-111111111111',
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
       // Seed only the guarded-terminal scenario. Seeding the full journey
       // pre-populates the project list and makes its first project/mission
@@ -387,10 +389,20 @@ async function runGuardedTerminalProof(page) {
     'replayed patch did not create another Git commit');
 }
 
-async function verifyLogoutAndProtectedBoundary(page) {
+async function verifyLogoutAndProtectedBoundary(page, priorSessionCookie) {
   console.log('\n[logout] Server-revoked logout returns to welcome and denies the private shell');
+  // The same origin and per-IP limiter protect subsequent real page/script requests.
+  // Observe its own remaining quota and wait for a bounded reset when needed;
+  // this does not relax the server limiter or assert an unobserved 200.
+  const logoutHeadroom = await ensureRateLimitHeadroom(`${BASE_URL}/health`, { minimumRemaining: 90 });
+  if (logoutHeadroom.waited) console.log(`  rate-limit reset observed before logout browser proof: ${logoutHeadroom.waitedMs}ms`);
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#sign-out');
+  // Capture the callback-issued capability, already paired with a successful
+  // authenticated /auth/me response, without logging or persisting its value.
+  if (!/^__Host-fcr_session=v1\.[A-Za-z0-9_-]{43}$/.test(priorSessionCookie ?? '')) {
+    throw new Error('Expected a callback-issued founder cookie for the logout replay test');
+  }
   await page.click('#sign-out');
   await page.waitForURL(`${BASE_URL}/welcome`);
   await page.waitForFunction(() => document.getElementById('door')?.dataset.state === 'signed_out');
@@ -400,6 +412,18 @@ async function verifyLogoutAndProtectedBoundary(page) {
     return response.status;
   });
   assert(identityAfterLogout === 401, 'revoked browser cookie no longer authorizes founder identity');
+  // A copied pre-logout cookie must be invalid on the server too. A fresh
+  // isolated BrowserContext makes this fail if logout only clears client state.
+  const replayContext = await page.context().browser().newContext();
+  try {
+    const replayIdentity = await replayContext.request.get(`${BASE_URL}/auth/me`, {
+      headers: { Cookie: priorSessionCookie },
+      failOnStatusCode: false,
+    });
+    assert(replayIdentity.status() === 401, 'the pre-logout cookie is rejected in an isolated browser context');
+  } finally {
+    await replayContext.close();
+  }
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#magic-link-form');
   assert(await page.locator('.shell').count() === 0, 'protected founder shell remains hidden after logout');
@@ -485,6 +509,11 @@ async function main() {
     'authenticated browser identity matches the allowlisted founder',
   );
   const callbackCookies = await callbackResponse.headerValues('set-cookie');
+  // Preserve only the server-issued cookie pair in test memory, not in logs.
+  // Browser cookie listings can vary for Secure cookies on HTTP loopback.
+  const callbackSessionCookie = callbackCookies
+    .map((value) => value.split(';', 1)[0])
+    .find((value) => /^__Host-fcr_session=v1\.[A-Za-z0-9_-]{43}$/.test(value));
   assert(
     callbackCookies.some((value) =>
       /^__Host-fcr_session=[^;]+;/i.test(value) &&
@@ -506,7 +535,7 @@ async function main() {
   );
 
   if (E2E_SCENARIO === 'auth-lifecycle') {
-    await verifyLogoutAndProtectedBoundary(page);
+    await verifyLogoutAndProtectedBoundary(page, callbackSessionCookie);
     assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
     await browser.close();
     return;
@@ -547,8 +576,29 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('.workbench');
+    const mobileOverflow = await page.evaluate(() => {
+      const viewport = window.innerWidth;
+      const documentWidth = document.documentElement.scrollWidth;
+      const offenders = Array.from(document.body.querySelectorAll('*'))
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName.toLowerCase(),
+            className: typeof element.className === 'string' ? element.className.slice(0, 80) : '',
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+          };
+        })
+        .filter(({ left, right }) => left < -1 || right > viewport + 1)
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 8);
+      return { viewport, documentWidth, offenders };
+    });
+    if (mobileOverflow.documentWidth > mobileOverflow.viewport) {
+      console.error('Mobile workbench overflow diagnostic:', JSON.stringify(mobileOverflow));
+    }
     assert(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      mobileOverflow.documentWidth <= mobileOverflow.viewport,
       'mobile workbench avoids document-level horizontal overflow',
     );
     assert(
@@ -579,7 +629,7 @@ async function main() {
 
   if (E2E_SCENARIO === 'guarded-terminal') {
     await runGuardedTerminalProof(page);
-    await verifyLogoutAndProtectedBoundary(page);
+    await verifyLogoutAndProtectedBoundary(page, callbackSessionCookie);
     assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
     if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
     await browser.close();
@@ -671,6 +721,10 @@ async function main() {
   assert(branchFileContent === 'console.log("edited by e2e");\n', 'the fake GitHub branch tree was actually updated by a real commitPatch call');
 
   console.log('\n[6d] Deliver a real signed CI webhook (check_run success) — should advance the mission to in_review via the real background reconciler');
+  // Preserve the real general API limiter during the dense founder journey.
+  // A 429 here is evidence of backpressure, not a reason to fake mission status.
+  const missionHeadroom = await ensureRateLimitHeadroom(`${BASE_URL}/health`);
+  if (missionHeadroom.waited) console.log(`  rate-limit reset observed before CI webhook proof: ${missionHeadroom.waitedMs}ms`);
   const branchHeadSha = fakeGitHubBranches.get(branchName)?.sha;
   await sendCheckRunWebhook({ headSha: branchHeadSha, conclusion: 'success' });
   const inReviewText = await waitForMissionStatusByPolling(page, 'in_review', 25000);
@@ -726,22 +780,61 @@ async function main() {
   await page.fill('#log-cost-form input[name="agentName"]', 'perplexity');
   await page.fill('#log-cost-form input[name="costUsd"]', '0.05');
   await page.click('#log-cost-form button[type=submit]');
-  const costText = await waitForText(page, '#mission-detail', 'Total: $');
+  const costText = await waitForText(page, '#mission-detail', 'Total: $', 65000);
   assert(costText.includes('0.0500'), 'cost entry round-tripped and totals correctly');
 
   console.log('\n[8] Register an MCP connector and record a health check');
+  // The full founder journey compresses many legitimate API interactions into
+  // seconds, so this final UI mutation can honestly arrive after the real
+  // 60-requests/minute security budget is exhausted. Do not weaken or bypass
+  // that limiter for proof. If it returns 429, require its bounded Retry-After
+  // receipt, wait for the real bucket to reset, then retry the same browser UI
+  // mutation once against the unchanged application boundary.
+  const fillFigmaConnectionForm = async () => {
+    await page.waitForSelector('#new-connection-form');
+    await page.selectOption('#new-connection-form select[name=connectionType]', 'figma');
+    await page.fill('#new-connection-form input[name=label]', 'design-system');
+    await page.selectOption('#new-connection-form select[name=authorityLevel]', 'L2');
+    await page.fill('#new-connection-form input[name=capabilities]', 'inspect_designs, compare_design_vs_implementation');
+  };
+  const waitForConnectionPost = () => page.waitForResponse((response) => {
+    try {
+      return response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/projects/demo-project/connections';
+    } catch {
+      return false;
+    }
+  }, { timeout: 15000 });
+
   // The project detail panel is already showing from step 5's selection
   // (state.selectedProjectSlug persists across tabs) — re-clicking the
   // card here would trigger a redundant re-fetch mid-fill and wipe the
   // form the test is actively filling in, a real timing hazard worth not
   // repeating in the app's own click handlers either.
   await page.click('.tabs button[data-tab=projects]');
-  await page.waitForSelector('#new-connection-form');
-  await page.selectOption('#new-connection-form select[name=connectionType]', 'figma');
-  await page.fill('#new-connection-form input[name=label]', 'design-system');
-  await page.selectOption('#new-connection-form select[name=authorityLevel]', 'L2');
-  await page.fill('#new-connection-form input[name=capabilities]', 'inspect_designs, compare_design_vs_implementation');
+  await fillFigmaConnectionForm();
+  let connectionResponsePromise = waitForConnectionPost();
   await page.click('#new-connection-form button[type=submit]');
+  let connectionResponse = await connectionResponsePromise;
+
+  if (connectionResponse.status() === 429) {
+    const retryAfterHeader = await connectionResponse.headerValue('retry-after');
+    const retryAfterSeconds = Number(retryAfterHeader);
+    if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0 || retryAfterSeconds > 61) {
+      throw new Error(`General API limiter returned invalid Retry-After: ${String(retryAfterHeader)}`);
+    }
+    assert(true, `real general API limiter failed closed with bounded Retry-After=${retryAfterSeconds}s during accelerated browser proof`);
+    await sleep((retryAfterSeconds * 1000) + 250);
+
+    await fillFigmaConnectionForm();
+    connectionResponsePromise = waitForConnectionPost();
+    await page.click('#new-connection-form button[type=submit]');
+    connectionResponse = await connectionResponsePromise;
+  }
+
+  if (!connectionResponse.ok()) {
+    throw new Error(`figma connection registration failed after real rate-limit handling: HTTP ${connectionResponse.status()}`);
+  }
   await waitForText(page, '[data-connection-id]', 'figma');
   assert(true, 'figma connector registered with authority level L2 and capabilities');
 

@@ -1,3 +1,4 @@
+import { boundFounderRow } from './founderAuthFixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser, supabaseMock } = vi.hoisted(() => ({
@@ -42,20 +43,13 @@ function projectBody(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({
-    data: { user: { id: 'founder-user-1', email: 'founder@example.com' } },
+    data: { user: { id: 'founder-user-1', email: 'founder@example.com', email_confirmed_at: '2026-11-15T00:00:00Z' } },
     error: null,
   });
   supabaseMock.from.mockImplementation((table: string) => {
     if (table !== 'founder_users') throw new Error(`Unexpected persistence access: ${table}`);
     return {
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({
-            data: { email: 'founder@example.com' },
-            error: null,
-          }),
-        }),
-      }),
+      ...boundFounderRow('founder@example.com', 'founder-user-1'),
     };
   });
 });

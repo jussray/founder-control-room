@@ -14,6 +14,6 @@ export function createOperatorRelayAdapters(input: OperatorRelayAdapters): Opera
     codex: input.codex,
     'claude-code': input['claude-code'],
     perplexity: input.perplexity,
-    muse: input.muse,
+    deepseek: input.deepseek,
   };
 }
