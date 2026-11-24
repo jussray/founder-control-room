@@ -12,53 +12,32 @@ import {
 } from '../../auth/founderSession.js';
 
 export type FounderAccountRole = 'platform_owner' | 'workspace_owner';
-
-export interface FounderIdentity {
-  email: string;
-  userId: string;
+export interface FounderIdentity extends AuthenticatedIdentity {
   role?: FounderAccountRole;
   workspaceId?: string | null;
 }
-
 export interface FounderRequest extends Request {
   founder?: FounderIdentity;
 }
 
-interface AuthenticatedIdentity {
+export interface AuthenticatedIdentity {
   email: string;
   userId: string;
 }
 
-interface FounderAccess {
-  role: FounderAccountRole;
-  workspaceId: string | null;
-  exposesWorkspaceIdentity: boolean;
-}
-
-type FounderAccessState =
-  | { state: 'allowed'; access: FounderAccess }
-  | { state: 'denied' }
-  | { state: 'error' };
-
-function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
+export function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
   const record = user as Record<string, unknown>;
   const email = typeof record.email === 'string'
     ? record.email.trim().toLowerCase()
     : '';
   const userId = typeof record.id === 'string' ? record.id.trim() : '';
-  const confirmed = typeof record.email_confirmed_at === 'string'
-    && record.email_confirmed_at.length > 0;
-  // A typed email, even with a valid user ID, never grants founder authority.
+  // Founder identity requires Supabase-confirmed ownership, not just a typed address.
+  const confirmed = typeof record.email_confirmed_at === 'string' && record.email_confirmed_at.length > 0;
   return email && userId && confirmed ? { email, userId } : null;
 }
 
-async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAccessState> {
-  // Immutable Auth ID is the database predicate, not merely a field checked
-  // after an email lookup. `user_id` has been part of founder_users since the
-  // immutable-authority migration, so a legacy email-only row cannot match
-  // this query and therefore fails closed. Selecting `*` keeps the rollout
-  // compatible while account_role/workspace_id are introduced.
+export async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
   const { data: allowRow, error: allowError } = await supabase
     .from('founder_users')
     .select('*')
@@ -66,91 +45,42 @@ async function founderAccess(identity: AuthenticatedIdentity): Promise<FounderAc
     .eq('user_id', identity.userId)
     .maybeSingle();
 
-  if (allowError) return { state: 'error' };
-  if (!allowRow || typeof allowRow !== 'object' || Array.isArray(allowRow)) {
-    return { state: 'denied' };
+  if (allowError) return 'error';
+  if (!allowRow || allowRow.user_id !== identity.userId) return 'denied';
+  const row = allowRow as Record<string, unknown>;
+  if (typeof row.email === 'string' && row.email.trim().toLowerCase() !== identity.email) return 'denied';
+  // Before the workspace migration, role is absent on the pre-provisioned
+  // platform founder row. After migration, only explicit platform_owner is valid.
+  if (Object.prototype.hasOwnProperty.call(row, 'account_role') && row.account_role !== 'platform_owner') {
+    return 'denied';
   }
-
-  const record = allowRow as Record<string, unknown>;
-  const rowEmail = typeof record.email === 'string'
-    ? record.email.trim().toLowerCase()
-    : '';
-  const boundUserId = typeof record.user_id === 'string' ? record.user_id.trim() : '';
-  const rawRole = record.account_role;
-  const hasExplicitRole = rawRole !== undefined && rawRole !== null;
-  const hasExplicitWorkspaceColumn = Object.prototype.hasOwnProperty.call(record, 'workspace_id');
-
-  // Real provider truth is established by the exact user_id predicate above.
-  // Validate any echoed identity fields as an additional consistency check.
-  if (!rowEmail || rowEmail !== identity.email) {
-    return { state: 'denied' };
-  }
-  if (boundUserId !== identity.userId) {
-    return { state: 'denied' };
-  }
-
-  if (!hasExplicitRole) {
-    return {
-      state: 'allowed',
-      access: {
-        role: 'platform_owner',
-        workspaceId: null,
-        exposesWorkspaceIdentity: false,
-      },
-    };
-  }
-
-  if (rawRole !== 'platform_owner' && rawRole !== 'workspace_owner') {
-    return { state: 'error' };
-  }
-
-  const workspaceId = typeof record.workspace_id === 'string' && record.workspace_id.trim()
-    ? record.workspace_id.trim()
-    : null;
-  const workspaceUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (rawRole === 'workspace_owner' && (!workspaceId || !workspaceUuid.test(workspaceId))) {
-    return { state: 'denied' };
-  }
-
-  return {
-    state: 'allowed',
-    access: {
-      role: rawRole,
-      workspaceId,
-      exposesWorkspaceIdentity: hasExplicitRole || hasExplicitWorkspaceColumn,
-    },
-  };
+  return 'allowed';
 }
 
-function founderIdentity(
-  identity: AuthenticatedIdentity,
-  access: FounderAccess,
-): FounderIdentity {
-  const base: FounderIdentity = {
-    email: identity.email,
-    userId: identity.userId,
-  };
-
-  if (!access.exposesWorkspaceIdentity) return base;
-  return {
-    ...base,
-    role: access.role,
-    workspaceId: access.workspaceId,
-  };
-}
-
-async function authorizeFounderRequest(
+/**
+ * Founder authorization has two independent gates:
+ *
+ * 1. A valid Supabase Auth session, supplied either as a Bearer token for API
+ *    clients or resolved server-side from the opaque HttpOnly Control Room
+ *    browser session capability.
+ * 2. The verified Supabase user ID and email must match the same server-only
+ *    `founder_users` row. An unbound founder email grants no authority.
+ *
+ * Cookie sessions may refresh once with their server-held refresh token. A
+ * successful refresh rotates the opaque browser capability; Bearer sessions
+ * never receive implicit refresh behavior so automated clients remain explicit.
+ */
+export async function requireFounder(
   req: FounderRequest,
   res: Response,
-  allowWorkspaceOwner: boolean,
-): Promise<FounderIdentity | null> {
+  next: NextFunction,
+) {
   const explicitBearer = bearerToken(req);
   const cookieSession = explicitBearer ? null : await readFounderSession(req);
-  const accessToken = explicitBearer ?? cookieSession?.accessToken ?? null;
+  let accessToken = explicitBearer ?? cookieSession?.accessToken ?? null;
 
   if (!accessToken) {
-    res.status(401).json({ error: 'Founder session required' });
-    return null;
+    return res.status(401).json({ error: 'Founder session required' });
   }
 
   let { data: userData, error: userError } = await supabaseAuth.auth.getUser(accessToken);
@@ -165,6 +95,7 @@ async function authorizeFounderRequest(
     const refreshedIdentity = authenticatedIdentity(refreshed.data.user);
 
     if (refreshed.data.session?.access_token && refreshedIdentity) {
+      accessToken = refreshed.data.session.access_token;
       userData = { user: refreshed.data.user };
       userError = null;
       identity = refreshedIdentity;
@@ -173,76 +104,39 @@ async function authorizeFounderRequest(
   }
 
   if (userError || !identity) {
-    res.status(401).json({ error: 'Invalid or expired founder session' });
-    return null;
+    return res.status(401).json({ error: 'Invalid or expired founder session' });
   }
 
-  const accessState = await founderAccess(identity);
-  if (accessState.state === 'error') {
-    res.status(500).json({ error: 'Founder allowlist check failed' });
-    return null;
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
+    return res.status(500).json({ error: 'Founder allowlist check failed' });
   }
-  if (accessState.state === 'denied') {
-    res.status(403).json({ error: 'Not on the founder allowlist' });
-    return null;
-  }
-
-  if (!allowWorkspaceOwner && accessState.access.role !== 'platform_owner') {
-    res.status(403).json({ error: 'This route requires platform founder authority' });
-    return null;
-  }
-
-  if (
-    allowWorkspaceOwner
-    && accessState.access.role === 'workspace_owner'
-    && !accessState.access.workspaceId
-  ) {
-    res.status(503).json({ error: 'Founder workspace assignment is required' });
-    return null;
+  if (allowState === 'denied') {
+    return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
 
   if (refreshedSession) {
     try {
       await rotateFounderSession(req, res, refreshedSession);
     } catch {
-      res.status(503).json({ error: 'Founder browser session rotation failed' });
-      return null;
+      return res.status(503).json({ error: 'Founder browser session rotation failed' });
     }
   }
 
-  return founderIdentity(identity, accessState.access);
-}
-
-/**
- * Legacy/global FCR routes stay platform-owner-only. Adding a tenant founder
- * to the allowlist cannot silently inherit global projects or authority.
- */
-export async function requireFounder(
-  req: FounderRequest,
-  res: Response,
-  next: NextFunction,
-) {
-  const founder = await authorizeFounderRequest(req, res, false);
-  if (!founder) return;
-  req.founder = founder;
-  next();
-}
-
-/** Workspace-aware routes may admit either the platform owner or a workspace owner. */
-export async function requireWorkspaceUser(
-  req: FounderRequest,
-  res: Response,
-  next: NextFunction,
-) {
-  const founder = await authorizeFounderRequest(req, res, true);
-  if (!founder) return;
-  req.founder = founder;
+  req.founder = identity;
   next();
 }
 
 /**
- * High-consequence interactive founder decisions remain platform-owner-only.
- * A bearer token is deliberately ignored here.
+ * High-consequence interactive founder decisions must authenticate the opaque
+ * browser capability itself. An Authorization bearer header is deliberately
+ * ignored here, so bearer automation cannot borrow a browser session as proof
+ * of a current founder interaction.
+ *
+ * The Supabase access token held in server-side session state must still be
+ * current at decision time. We do not silently refresh it in this path: an
+ * expired interactive identity must return through the normal authenticated UI
+ * flow before it can decide authority.
  */
 export async function requireInteractiveFounder(
   req: FounderRequest,
@@ -263,17 +157,68 @@ export async function requireInteractiveFounder(
     return res.status(401).json({ error: 'Invalid or expired interactive founder session' });
   }
 
-  const accessState = await founderAccess(identity);
-  if (accessState.state === 'error') {
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
     return res.status(500).json({ error: 'Founder allowlist check failed' });
   }
-  if (accessState.state === 'denied') {
+  if (allowState === 'denied') {
     return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
-  if (accessState.access.role !== 'platform_owner') {
-    return res.status(403).json({ error: 'Interactive platform founder authority required' });
-  }
 
-  req.founder = founderIdentity(identity, accessState.access);
+  req.founder = identity;
+  next();
+}
+
+/**
+ * Workspace membership is separate from platform founder authority.
+ * The legacy global routes continue to call requireFounder, which refuses
+ * workspace_owner rows even when they are verified.
+ */
+export async function requireWorkspaceUser(
+  req: FounderRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const explicitBearer = bearerToken(req);
+  const cookieSession = explicitBearer ? null : await readFounderSession(req);
+  let accessToken = explicitBearer ?? cookieSession?.accessToken ?? null;
+  if (!accessToken) return res.status(401).json({ error: 'Workspace session required' });
+
+  let { data: userData, error: userError } = await supabaseAuth.auth.getUser(accessToken);
+  let identity = authenticatedIdentity(userData?.user);
+  let refreshedSession: Session | null = null;
+  if ((userError || !identity) && cookieSession?.refreshToken) {
+    const client = createSupabaseAuthClient();
+    const refreshed = await client.auth.refreshSession({ refresh_token: cookieSession.refreshToken });
+    const confirmed = authenticatedIdentity(refreshed.data.user);
+    if (refreshed.data.session?.access_token && confirmed) {
+      userData = { user: refreshed.data.user };
+      userError = null;
+      identity = confirmed;
+      refreshedSession = refreshed.data.session;
+      accessToken = refreshedSession.access_token;
+    }
+  }
+  if (userError || !identity) return res.status(401).json({ error: 'Invalid or unconfirmed workspace session' });
+
+  const { data, error } = await supabase.from('founder_users')
+    .select('*').eq('email', identity.email).eq('user_id', identity.userId).maybeSingle();
+  if (error) return res.status(503).json({ error: 'Workspace membership lookup unavailable' });
+  const row = data as Record<string, unknown> | null;
+  if (!row || row.user_id !== identity.userId ||
+      typeof row.email !== 'string' || row.email.trim().toLowerCase() !== identity.email) {
+    return res.status(403).json({ error: 'Workspace membership required' });
+  }
+  if (row.account_role !== 'platform_owner' && row.account_role !== 'workspace_owner') {
+    return res.status(403).json({ error: 'Invalid workspace role' });
+  }
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const workspaceId = typeof row.workspace_id === 'string' ? row.workspace_id.trim() : '';
+  if (!uuid.test(workspaceId)) return res.status(503).json({ error: 'Workspace assignment unavailable' });
+  if (refreshedSession) {
+    try { await rotateFounderSession(req, res, refreshedSession); }
+    catch { return res.status(503).json({ error: 'Workspace session rotation failed' }); }
+  }
+  req.founder = { ...identity, role: row.account_role, workspaceId };
   next();
 }

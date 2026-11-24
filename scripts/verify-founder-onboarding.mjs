@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 const files = {
   auth: await readFile(new URL('../src/http/routes/auth.ts', import.meta.url), 'utf8'),
+  workspaceAuth: await readFile(new URL('../src/http/routes/workspaceAuth.ts', import.meta.url), 'utf8'),
   ui: [
     await readFile(new URL('../src/http/routes/onboarding.ts', import.meta.url), 'utf8'),
     await readFile(new URL('../src/http/routes/onboardingAssets/controlRoomHtml.ts', import.meta.url), 'utf8'),
@@ -38,7 +39,12 @@ requireText('auth', 'Google OAuth route', "authRouter.get('/google'");
 requireText('auth', 'Google OAuth provider', "provider: 'google'");
 requireText('auth', 'Google OAuth callback', "redirectTo: `${FOUNDER_API_URL}/auth/callback`");
 requireText('auth', 'server-managed OAuth redirect', 'skipBrowserRedirect: true');
-requireText('auth', 'first-login identity creation', 'shouldCreateUser: true');
+requireText('auth', 'no founder identity creation during sign-in', 'shouldCreateUser: false');
+requireText('workspaceAuth', 'public customer first login provisioning', 'shouldCreateUser: true');
+requireText('workspaceAuth', 'confirmed workspace identity', 'email_confirmed_at');
+requireText('workspaceAuth', 'workspace-only provisioning RPC', "'provision_workspace_founder'");
+requireText('workspaceAuth', 'isolated workspace auth routing', "workspaceAuthRouter.post('/session'");
+
 requireText('auth', 'session endpoint', "authRouter.post('/session'");
 requireText('auth', 'strict session establishment helper', 'await rotateFounderSession(req, res, session)');
 requireText('auth', 'verified session establishment', 'establishFounderSession(req, res, founderSession)');
@@ -69,10 +75,7 @@ requireText('ui', 'HubSpot onboarding slot', 'value="hubspot"');
 requireText('ui', 'Playwright onboarding slot', 'value="playwright"');
 requireText('ui', 'workspace bootstrap endpoint', "api('/onboarding/bootstrap'");
 requireText('ui', 'workspace state endpoint', "api('/onboarding/state')");
-// The Composer's field structure is authoritative, not the code formatter.
-if (!/controlRoom\s*:\s*\{\s*projectType\s*:/.test(files.ui)) {
-  errors.push('composer payload: missing controlRoom projectType field');
-}
+requireText('ui', 'composer payload', 'controlRoom:{projectType:');
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "api('/auth/password'");

@@ -3,10 +3,12 @@ import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
+import { memberAuthRouter } from './routes/memberAuth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { workspaceProjectsRouter } from './routes/workspaceProjects.js';
 import { workspaceTasksRouter } from './routes/workspaceTasks.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
+import { paFundingReviewsRouter } from './routes/paFundingReviews.js';
 import { projectsRouter } from './routes/projects.js';
 import { projectShellStateRouter } from './routes/projectShellState.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
@@ -19,6 +21,7 @@ import { handleProductBuildReceiptIngest } from './routes/productBuildReceipts.j
 import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
+import { operatorContinuationRouter } from './routes/operatorContinuation.js';
 import { promptosRouter } from './routes/promptos.js';
 import { createPromptOSCommandIntakeRouter } from './routes/promptOsCommandIntake.js';
 import { builderPromptWorkflowRouter } from './routes/builderPromptWorkflow.js';
@@ -46,6 +49,9 @@ import { handleXEngagementSignalMcp } from './routes/xEngagementSignalMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
+import { createWebchatHandoffRouter, createWebchatMessageHandler } from './routes/webchatHandoff.js';
+import { createSupabaseWebchatHandoffStore } from '../growth/webchatHandoffStore.js';
+import { supabase as webchatSupabase } from '../lib/supabaseClient.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
@@ -54,11 +60,13 @@ import {
   handleProofOfShipReceiptLookup,
 } from './routes/proofOfShipReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
+import { exactHeadCockpitRouter } from './routes/exactHeadCockpit.js';
 import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
+import { johnstownAiPilotRouter } from './routes/johnstownAiPilot.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
@@ -97,6 +105,14 @@ const rateLimitJiraWorkAutomationIngress = rateLimit({
   legacyHeaders: false,
   message: { error: 'Rate limit exceeded.' },
 });
+const rateLimitWebchatMessages = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Rate limit exceeded.' },
+});
+const webchatHandoffStore = createSupabaseWebchatHandoffStore(webchatSupabase);
 const FCR_REVIEW_PROJECT = {
   repo_provider: 'github',
   slug: 'founder-control-room',
@@ -172,18 +188,6 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use(corsMiddleware);
   app.use(requestAudit);
 
-  // The request-audit path enforces 120/minute per IP with a custom limiter.
-  // Keep it first so all denied requests are logged. This independently
-  // modeled Express limiter adds defense in depth without altering the
-  // existing RateLimit headers or allowing a different request quota.
-  app.use(rateLimit({
-    windowMs: 60 * 1_000,
-    limit: 120,
-    standardHeaders: false,
-    legacyHeaders: false,
-    message: { error: 'Rate limit exceeded.' },
-  }));
-
   if (options.serveStatic) {
     const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public');
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
@@ -253,6 +257,14 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitJiraWorkAutomationIngress,
     express.raw({ type: 'application/json', limit: '16kb' }),
     handleJiraWorkAutomationIngress,
+  );
+  // Public, cross-origin webchat ingress. Disabled (404) unless the project is
+  // listed in FCR_WEBCHAT_HUMAN_HANDOFF_PROJECTS; never generates or sends replies.
+  app.post(
+    '/webchat/messages',
+    rateLimitWebchatMessages,
+    express.json({ type: 'application/json', limit: '4kb' }),
+    createWebchatMessageHandler(webchatHandoffStore),
   );
   app.post(
     '/ingest/product-build-receipts/storyengine',
@@ -399,8 +411,11 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/workspace', workspaceProjectsRouter);
   app.use('/workspace', workspaceTasksRouter);
   app.use('/auth', authRouter);
+  app.use('/auth/member', memberAuthRouter);
   app.use('/onboarding', founderOnboardingRouter);
+  app.use('/pa-funding', paFundingReviewsRouter);
   app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/integration-cockpit', exactHeadCockpitRouter);
   app.use('/switchboard', switchboardRouter);
   app.use('/security-posture', securityPostureRouter);
   app.use('/projects', repositoryVerificationRouter);
@@ -429,6 +444,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
+  app.use('/operator/continuity', operatorContinuationRouter);
   app.use('/promptos', createPromptOSCommandIntakeRouter(options.chiefAiBinding));
   app.use('/promptos', promptosRouter);
   app.use('/prompt-workflows', builderPromptWorkflowRouter);
@@ -444,6 +460,8 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mcp', mcpRouter);
   app.use('/external-use', externalUseRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
+  app.use('/johnstown-ai-pilot', johnstownAiPilotRouter);
+  app.use('/webchat', createWebchatHandoffRouter(webchatHandoffStore));
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);

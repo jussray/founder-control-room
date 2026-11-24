@@ -25,10 +25,6 @@ export class ProjectController extends BaseController {
   readonly name = "ProjectController";
 
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
-    // `select('*')` preserves the pre-tenancy rollout path: before workspace_id
-    // exists, legacy platform projects continue their current provider reads.
-    // Once workspace_id exists, the project must belong to the workspace that
-    // contains the unique platform_owner before platform credentials may be used.
     const { data, error } = await supabase
       .from("projects")
       .select("*")
@@ -49,25 +45,17 @@ export class ProjectController extends BaseController {
       );
     }
 
-    const ownerWorkspaceId = typeof project.workspace_id === "string"
-      ? project.workspace_id.trim()
-      : "";
-    if (ownerWorkspaceId) {
-      const { data: platformOwner, error: platformOwnerError } = await supabase
-        .from("founder_users")
-        .select("workspace_id")
-        .eq("workspace_id", ownerWorkspaceId)
-        .eq("account_role", "platform_owner")
-        .maybeSingle();
-
-      if (platformOwnerError) {
-        return this.retry(`Project workspace authority lookup failed: ${platformOwnerError.message}`);
-      }
+    // Global platform credentials must never operate in a customer workspace.
+    // Legacy rows without workspace_id retain their existing pre-migration path.
+    const tenantWorkspace = typeof project.workspace_id === 'string' ? project.workspace_id.trim() : '';
+    if (tenantWorkspace) {
+      const { data: platformOwner, error: ownerError } = await supabase
+        .from('founder_users').select('workspace_id')
+        .eq('workspace_id', tenantWorkspace)
+        .eq('account_role', 'platform_owner').maybeSingle();
+      if (ownerError) return this.retry('Project workspace authority lookup failed');
       if (!platformOwner) {
-        return this.done(
-          "converged",
-          `Project ${project.slug} is tenant-scoped; platform provider automation is disabled`,
-        );
+        return this.done('converged', `Project ${project.slug} is tenant-scoped; platform provider automation is disabled`);
       }
     }
 

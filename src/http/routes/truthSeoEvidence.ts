@@ -32,6 +32,9 @@ intelligenceRouter.get('/seo',readLimit,async (_req,res)=>{
 });
 intelligenceRouter.post('/review',aiLimit,async (req,res)=>{
  res.set('Cache-Control','no-store');
+ if(!req.body||typeof req.body!=='object'||Array.isArray(req.body))return res.status(400).json({state:'blocked',error:'explicit_model_consent_required'});
+ const {shareEvidenceWithModel,...claimEvidence}=req.body as Record<string,unknown>;
+ if(shareEvidenceWithModel!==true)return res.status(400).json({state:'blocked',error:'explicit_model_consent_required'});
  const options={
    accountId:process.env.CF_ACCOUNT_ID??'',
    gatewayId:process.env.FCR_EVIDENCE_GATEWAY_ID??'',
@@ -44,7 +47,7 @@ intelligenceRouter.post('/review',aiLimit,async (req,res)=>{
  if(!options.gatewayId||options.gatewayId==='truth-weaver-evidence'||!options.providerToken||!options.gatewayToken)
    return res.status(503).json({state:'not_configured',error:'fcr_gateway_not_configured'});
  try{
-   const result=await reviewEvidence(req.body,options);
+   const result=await reviewEvidence(claimEvidence,options);
    return res.json(result);
  }catch(e){
    const reason=e instanceof ReviewError?e.reason:'gateway_unavailable';

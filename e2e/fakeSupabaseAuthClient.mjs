@@ -5,13 +5,17 @@
 // inbox" without needing a real SMTP provider.
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { table } from './fakeStore.mjs';
 
 const pendingByTokenHash = new Map(); // tokenHash -> email
 const sessionsByAccessToken = new Map(); // accessToken -> { email, userId, refreshToken }
 const accessTokenByRefreshToken = new Map(); // refreshToken -> accessToken
 
 const bridgeFile = process.env.E2E_AUTH_BRIDGE_FILE;
+const seededFounderEmail = process.env.E2E_SEED_FOUNDER_EMAIL;
+const seededFounderId = process.env.E2E_SEED_FOUNDER_USER_ID;
+function verifiedUser(email, userId) {
+  return { id: userId, email, email_confirmed_at: '2026-11-15T00:00:00Z' };
+}
 
 function issueSession(email, userId) {
   const accessToken = randomUUID();
@@ -23,14 +27,6 @@ function issueSession(email, userId) {
     refresh_token: refreshToken,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   };
-}
-
-function bindSeededFounderIdentity(email, userId) {
-  const normalizedEmail = String(email ?? '').trim().toLowerCase();
-  const founder = table('founder_users').find((row) => (
-    String(row.email ?? '').trim().toLowerCase() === normalizedEmail
-  ));
-  if (founder) founder.user_id = userId;
 }
 
 // requireFounder.ts calls createSupabaseAuthClient() to obtain a fresh
@@ -55,16 +51,15 @@ export function createSupabaseAuthClient() {
           return { data: { session: null, user: null }, error: { message: 'Invalid or expired token_hash' } };
         }
         pendingByTokenHash.delete(tokenHash);
-        const userId = randomUUID();
-        bindSeededFounderIdentity(email, userId);
+        const userId = email === seededFounderEmail && seededFounderId ? seededFounderId : randomUUID();
         const session = issueSession(email, userId);
-        return { data: { session, user: { id: userId, email } }, error: null };
+        return { data: { session, user: verifiedUser(email, userId) }, error: null };
       },
 
       async getUser(token) {
         const session = sessionsByAccessToken.get(token);
         if (!session) return { data: { user: null }, error: { message: 'Invalid or expired session' } };
-        return { data: { user: { id: session.userId, email: session.email } }, error: null };
+        return { data: { user: verifiedUser(session.email, session.userId) }, error: null };
       },
 
       async refreshSession({ refresh_token: refreshToken }) {
@@ -77,7 +72,7 @@ export function createSupabaseAuthClient() {
         accessTokenByRefreshToken.delete(refreshToken);
 
         const session = issueSession(previous.email, previous.userId);
-        return { data: { session, user: { id: previous.userId, email: previous.email } }, error: null };
+        return { data: { session, user: verifiedUser(previous.email, previous.userId) }, error: null };
       },
 
       async signOut() {
