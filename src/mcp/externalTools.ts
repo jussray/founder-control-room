@@ -1020,6 +1020,11 @@ export function createExternalMcpToolExecutor(
       const priorRecord = isRecord(prior) && isRecord(prior.continuation) && isRecord(prior.continuation.record)
         ? prior.continuation.record as unknown as OperatorExecutionContinuation
         : null;
+      const closedAt = taskState === 'CLOSED'
+        ? priorRecord?.taskState === 'CLOSED' && priorRecord.closedAt
+          ? priorRecord.closedAt
+          : new Date().toISOString()
+        : null;
       const continuation = createOperatorExecutionContinuation({
         ...checkpoint,
         sourceOperator,
@@ -1033,7 +1038,7 @@ export function createExternalMcpToolExecutor(
           : taskState === 'CLOSED' ? priorRecord?.verificationRefs ?? [] : [],
         verifiedByOperator: taskState === 'VERIFIED' ? sourceOperator
           : taskState === 'CLOSED' ? priorRecord?.verifiedByOperator ?? null : null,
-        closedAt: taskState === 'CLOSED' ? new Date().toISOString() : null,
+        closedAt,
         observation,
       });
       if (continuation.observation.projectSlug !== receiptProject) throw new Error('Checkpoint project does not match caller grant');

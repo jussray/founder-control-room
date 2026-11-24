@@ -12,8 +12,11 @@ if (workersCi !== '1') {
 }
 
 const commitSha = required('WORKERS_CI_COMMIT_SHA');
-if (!/^[0-9a-f]{40}$/i.test(commitSha)) {
-  throw new Error(`WORKERS_CI_COMMIT_SHA must be an exact 40-character Git SHA, got ${commitSha.length}`);
+const invalidShaCharacters = Array.from(commitSha)
+  .map((character, index) => ({ index, codePoint: character.codePointAt(0) }))
+  .filter(({ codePoint }) => !(codePoint >= 48 && codePoint <= 57) && !(codePoint >= 65 && codePoint <= 70) && !(codePoint >= 97 && codePoint <= 102));
+if (commitSha.length !== 40 || invalidShaCharacters.length > 0) {
+  throw new Error(`WORKERS_CI_COMMIT_SHA must be an exact 40-character hexadecimal Git SHA; length=${commitSha.length}; invalid character positions/codepoints=${JSON.stringify(invalidShaCharacters)}`);
 }
 
 const branch = required('WORKERS_CI_BRANCH');
