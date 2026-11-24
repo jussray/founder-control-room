@@ -31,16 +31,14 @@ function app() {
 }
 
 function founderUsersRow() {
-  return {
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () => Promise.resolve({
-          data: { email: FOUNDER_EMAIL, user_id: 'founder-user', account_role: 'platform_owner' },
-          error: null,
-        }),
-      }),
+  const chain = {
+    eq: (_column: string, _value: unknown): unknown => chain,
+    maybeSingle: () => Promise.resolve({
+      data: { email: FOUNDER_EMAIL, user_id: 'founder-user', account_role: 'platform_owner' },
+      error: null,
     }),
   };
+  return { select: () => chain };
 }
 
 function chiefRecommendation(recommendationHash = CHIEF_HASH) {

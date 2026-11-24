@@ -43,7 +43,7 @@ describe('Neon pull-request branch lifecycle contract', () => {
     expect(workflow).toContain('Applying actual preview migration: $migration');
     expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'false'");
     expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'true'/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
-    expect(workflow.match(/if: steps\.neon_scope\.outputs\.needs_neon == 'false'/g)).toHaveLength(1);
+    expect(workflow).toContain("if: steps.neon_scope.outputs.needs_supabase == 'true' && steps.neon_scope.outputs.needs_neon == 'false'");
     expect(workflow).toContain('No isolated Neon fixture/contract detected');
     expect(workflow).toContain('the independent required Migration lint gate must replay actual Supabase SQL.');
     expect(workflow).not.toContain('Neon cleanup skipped because this PR does not change supabase/.');
