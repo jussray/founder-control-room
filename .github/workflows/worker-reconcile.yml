@@ -328,7 +328,9 @@ jobs:
 
           health_body=''
           version_body=''
-          for attempt in 1 2 3 4 5 6; do
+          # Custom-domain edges can serve the previous version for a few minutes
+          # after deploy; two observed runs exceeded the old ~60s window.
+          for attempt in $(seq 1 24); do
             : > "$headers"
             : > "$version_headers"
             candidate_health="$(curl --silent --show-error --fail \
@@ -354,6 +356,19 @@ jobs:
           done
 
           if [[ -z "$health_body" || -z "$version_body" ]]; then
+            # Summarize only public HTTP/identity fields; never emit raw
+            # response bodies or headers, which may contain Cloudflare Access state.
+            health_http="$(awk '/^HTTP\// { status=$2 } END { print status+0 }' "$headers")"
+            version_http="$(awk '/^HTTP\// { status=$2 } END { print status+0 }' "$version_headers")"
+            health_service_header=false
+            version_service_header=false
+            if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$'; then health_service_header=true; fi
+            if tr -d '\r' < "$version_headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$'; then version_service_header=true; fi
+            live_sha="$(jq -r '.gitSha // empty | select(type == "string")' <<<"$candidate_version" 2>/dev/null || true)"
+            if [[ ! "$live_sha" =~ ^[0-9a-f]{40}$ ]]; then live_sha=unavailable; fi
+            grant_contract=false
+            if jq -e '.founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then grant_contract=true; fi
+            echo "Runtime proof diagnostics (last attempt): health_http=$health_http version_http=$version_http health_service_header=$health_service_header version_service_header=$version_service_header live_sha=$live_sha expected_sha=$EXPECTED_HEAD_SHA grant_contract=$grant_contract"
             echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
             exit 1
           fi

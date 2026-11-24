@@ -117,6 +117,34 @@ function startServer(mode) {
     }
     if (mode === 'signed-out' && path.startsWith('/auth/')) return json(res, 401, { error: 'unauthenticated' });
 
+    if (req.method === 'POST' && /^\/projects\/[^/]+\/missions$/.test(path)) {
+      return setTimeout(() => json(res, 201, {
+        mission: {
+          id: 'chat-mission-1',
+          title: 'Founder chat fixture',
+          description: 'Founder Chat intent fixture',
+          status: 'proposed',
+          risk_level: 'high',
+        },
+      }), 250);
+    }
+    if (req.method === 'POST' && path === '/missions/chat-mission-1/council/run') {
+      if (mode === 'chat-down') return json(res, 503, { error: 'Council unavailable' });
+      return json(res, 201, {
+        executionState: 'complete',
+        conversation: {
+          id: 'chat-conversation-1',
+          outcome: 'Smallest next move: inspect the signup flow before proposing a patch.',
+        },
+        relay: {
+          transcript: {
+            state: 'complete',
+            hops: [{ answer: 'Smallest next move: inspect the signup flow before proposing a patch.' }],
+          },
+        },
+      });
+    }
+
     const api = {
       '/projects': { projects: FIXTURE.projects },
       '/dashboard/tasks': { tasks: FIXTURE.tasks },
@@ -355,7 +383,100 @@ console.log('\n[5] Missing essential reads never become observed zero');
   server.close();
 }
 
-console.log('\n[6] Signed-out founder cannot view private screens');
+console.log('\n[6] Founder Chat routes intent into one proposed mission and bounded Council reasoning');
+{
+  const {server,baseUrl}=await startServer('full');
+  const {pageErrors,consoleErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
+    const writes=[];
+    page.on('request',(request)=>{
+      if(request.method()!=='POST')return;
+      const pathname=new URL(request.url()).pathname;
+      if(!/\/missions(?:\/|$)/.test(pathname))return;
+      let body=null;
+      try{body=request.postDataJSON();}catch{}
+      writes.push({pathname,body});
+    });
+
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('[data-founder-chat]',{state:'visible'});
+    await page.selectOption('[data-founder-chat-project]','sekret-bip');
+    await page.fill('[data-founder-chat-input]','Repair signup without widening authority');
+    await page.click('[data-founder-chat-send]');
+    await page.waitForFunction(()=>document.querySelector('[data-founder-chat-send]')?.disabled===true);
+    assert(await page.locator('[data-founder-chat-project]').isDisabled(),
+      'project selector locks while a chat turn is pending');
+    assert(await page.locator('[data-founder-chat-new]').isDisabled(),
+      'new-thread control locks while a chat turn is pending');
+    await page.waitForFunction(()=>document.querySelectorAll('[data-founder-chat-message][data-role="council"]').length===1);
+
+    const thread=await page.locator('[data-founder-chat-thread]').innerText();
+    assert(thread.includes('Repair signup without widening authority'),'Founder Chat keeps the founder turn visible');
+    assert(thread.includes('Smallest next move: inspect the signup flow before proposing a patch.'),'Founder Chat renders the Council outcome');
+
+    const missionWrites=()=>writes.filter((write)=>/^\/projects\/[^/]+\/missions$/.test(write.pathname));
+    const councilWrites=()=>writes.filter((write)=>write.pathname==='/missions/chat-mission-1/council/run');
+    assert(missionWrites().length===1,'first chat turn creates exactly one proposed mission');
+    assert(Array.isArray(missionWrites()[0]?.body?.requiredChecks)&&missionWrites()[0].body.requiredChecks.length===0,
+      'chat-created mission has no automatic proof checks and cannot self-advance');
+    assert(missionWrites()[0]?.body?.riskLevel==='high','chat-created mission inherits the selected project risk');
+    assert(councilWrites().length===1,'first chat turn calls the existing mission Council route once');
+    assert(councilWrites()[0]?.body?.capability==='propose'&&councilWrites()[0]?.body?.sensitivity==='internal',
+      'chat Council turn is proposal-only and internal');
+    assert(councilWrites()[0]?.body?.sourceRef==='control-room:founder-chat:chat-mission-1',
+      'chat Council receipt is bound to the thread mission');
+    const boundary=await page.locator('[data-founder-chat-boundary]').innerText();
+    assert(/never grants merge, deploy, provider-write, spend, publish/i.test(boundary),
+      'chat makes the execution-authority boundary visible');
+
+    await page.fill('[data-founder-chat-input]','What proof should I collect first?');
+    await page.click('[data-founder-chat-send]');
+    await page.waitForFunction(()=>document.querySelectorAll('[data-founder-chat-message][data-role="council"]').length===2);
+    assert(missionWrites().length===1,'second chat turn reuses the same mission instead of creating a duplicate');
+    assert(councilWrites().length===2,'second chat turn continues reasoning through the same mission Council route');
+
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Control$/}).click();
+    await page.locator('[data-control-view=work]').click();
+    await page.locator('#mission-lanes .card[data-id="m-1"]').click();
+    await page.waitForFunction(()=>document.querySelector('#mission-detail')?.dataset?.missionId==='m-1');
+    assert((await page.locator('#mission-detail').innerText()).includes('Review Bip partnership proposal'),
+      'a different mission can already be selected before returning to Founder Chat');
+
+    await page.locator('.founder-screen-nav button').filter({hasText:/^Home$/}).click();
+    await page.waitForSelector('[data-founder-chat]',{state:'visible'});
+    await page.click('[data-founder-chat-mission]');
+    await page.waitForFunction(()=> {
+      const url=new URL(window.location.href);
+      return url.searchParams.get('screen')==='control'
+        && url.searchParams.get('view')==='work'
+        && document.querySelector('#mission-detail')?.dataset?.missionId==='chat-mission-1';
+    });
+    assert((await page.locator('#mission-detail').innerText()).includes('Founder chat fixture'),
+      'Open thread mission replaces a stale mission selection with the exact chat mission in Control / Work');
+    await noOverflow(page,'Founder Chat desktop');
+  });
+  assert(pageErrors.length===0,'Founder Chat has no JS exceptions: '+JSON.stringify(pageErrors));
+  assert(consoleErrors.length===0,'Founder Chat has no console errors: '+JSON.stringify(consoleErrors));
+  server.close();
+}
+
+console.log('\n[7] Founder Chat failures remain visible on five-screen Home');
+{
+  const {server,baseUrl}=await startServer('chat-down');
+  const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
+    await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+    await page.waitForSelector('[data-founder-chat]',{state:'visible'});
+    await page.selectOption('[data-founder-chat-project]','sekret-bip');
+    await page.fill('[data-founder-chat-input]','Test visible failure');
+    await page.click('[data-founder-chat-send]');
+    await page.waitForSelector('[data-founder-chat-feedback]',{state:'visible'});
+    assert((await page.locator('[data-founder-chat-feedback]').innerText()).includes('Council unavailable'),
+      'chat API failure is relocated beside visible Founder Chat instead of remaining in hidden legacy content');
+  });
+  assert(pageErrors.length===0,'Founder Chat failure path has no JS exceptions: '+JSON.stringify(pageErrors));
+  server.close();
+}
+
+console.log('\n[8] Signed-out founder cannot view private screens');
 {
   const {server,baseUrl}=await startServer('signed-out');
   const {pageErrors}=await withPage(browser,{width:1280,height:900},async(page)=>{
