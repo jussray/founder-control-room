@@ -862,3 +862,8 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+
+## Main release provenance historical tree witness (PR #775 candidate)
+
+Two read-only historical ratification scripts replay exact Git first-parent ancestry and expected tree/file-set checks for previously recorded direct-main incidents. This source-only candidate does **not** convert those historical incidents into current approval, allow new direct-main pushes, modify the current release classifier, or grant merge/deploy authority. The CI contract checks out full Git history and requires both historical verifiers to succeed before declaring historical provenance proof; the live `main` SHA, required checks, and current founder approval remain separate.

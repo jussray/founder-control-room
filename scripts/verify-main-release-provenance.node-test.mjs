@@ -2,15 +2,21 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { classifyMainReleaseProvenance } from './verify-main-release-provenance.mjs';
+import {
+  classifyMainReleaseProvenance,
+  classifyReviewedFirstParentSuccessors,
+} from './verify-main-release-provenance.mjs';
 import {
   classifyTrustedMainReleaseProvenanceRun,
   observeMainReleaseProvenance,
   shouldEnforceMainReleaseProvenance,
+  TERMINAL_RATIFIED_MAIN_TIP,
 } from './verify-production-migration-ledger.mjs';
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
+const TERMINAL = 'c'.repeat(40);
+const DIRECT = 'd'.repeat(40);
 
 function pr(overrides = {}) {
   return {
@@ -164,6 +170,80 @@ test('rejects ambiguous release provenance even with valid direct-main context',
   assert.deepEqual(result.matchingPullRequestNumbers, [42, 43]);
 });
 
+test('accepts a fully reviewed first-parent successor chain after the terminal ratified tip', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: SHA,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: OTHER })] },
+      { sha: SHA, associatedPulls: [pr({ number: 52 })] },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'reviewed_first_parent_successor_chain');
+  assert.equal(result.successorCount, 2);
+  assert.deepEqual(result.successors.map((entry) => entry.pullRequestNumber), [51, 52]);
+});
+
+test('rejects an unreviewed direct commit hidden before a later reviewed main merge', () => {
+  const result = classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [pr({ number: 52 })],
+    terminalRatifiedTip: TERMINAL,
+    successorCommits: [
+      { sha: DIRECT, associatedPulls: [] },
+      { sha: SHA, associatedPulls: [pr({ number: 52 })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, DIRECT);
+});
+
+test('rejects a successor whose merged PR names a different merge commit', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: OTHER,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: SHA })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, OTHER);
+});
+
+test('rejects a successor observation that does not terminate at the release target', () => {
+  const result = classifyReviewedFirstParentSuccessors({
+    terminalRatifiedTip: TERMINAL,
+    targetSha: SHA,
+    successorCommits: [
+      { sha: OTHER, associatedPulls: [pr({ number: 51, merge_commit_sha: OTHER })] },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'successor_chain_not_bound_to_target');
+  assert.equal(result.observedTip, OTHER);
+});
+
+test('requires successor PR evidence whenever a terminal ratified tip is supplied', () => {
+  const result = classifyMainReleaseProvenance({
+    targetSha: SHA,
+    currentMainSha: SHA,
+    associatedPulls: [pr()],
+    terminalRatifiedTip: TERMINAL,
+    successorCommits: null,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'successor_pr_provenance_unavailable');
+});
+
 test('accepts durable exact-head provenance run only when GitHub actor is repository owner', () => {
   assert.deepEqual(classifyTrustedMainReleaseProvenanceRun({
     repository: 'jussray/founder-control-room',
@@ -280,6 +360,101 @@ test('provider observation failure blocks instead of manufacturing green', async
   assert.equal(result.reason, 'provider_unavailable');
 });
 
+test('deploy observer rejects a direct first-parent successor before a reviewed release tip', async () => {
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) return response({ commit: { sha: SHA } });
+    if (value.endsWith(`/commits/${SHA}/pulls`)) return response([pr({ number: 52 })]);
+    if (value.endsWith(`/commits/${SHA}`)) {
+      return response({ sha: SHA, parents: [{ sha: DIRECT }] });
+    }
+    if (value.endsWith(`/commits/${DIRECT}/pulls`)) return response([]);
+    if (value.endsWith(`/commits/${DIRECT}`)) {
+      return response({ sha: DIRECT, parents: [{ sha: TERMINAL_RATIFIED_MAIN_TIP }] });
+    }
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unreviewed_first_parent_successor');
+  assert.equal(result.successorSha, DIRECT);
+});
+
+test('deploy observer walks a first-parent successor chain longer than 256 commits', async () => {
+  const chain = Array.from({ length: 301 }, (_, index) => index.toString(16).padStart(40, '0'));
+  const terminal = chain[0];
+  const target = chain[300];
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) return response({ commit: { sha: target } });
+    const match = value.match(/\/commits\/([0-9a-f]{40})(\/pulls)?$/);
+    if (!match) return response({}, 404);
+    const sha = match[1];
+    const index = chain.indexOf(sha);
+    if (index < 0) return response({}, 404);
+    if (match[2]) return response([pr({ number: index, merge_commit_sha: sha })]);
+    return response({ sha, parents: index > 0 ? [{ sha: chain[index - 1] }] : [] });
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: target,
+    terminalRatifiedTip: terminal,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'reviewed_pr_merge_provenance');
+  assert.equal(result.successorChain.reason, 'reviewed_first_parent_successor_chain');
+  assert.equal(result.successorChain.successorCount, 300);
+});
+
+test('deploy observer re-reads mutable main after the successor walk', async () => {
+  let mainReads = 0;
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/branches/main')) {
+      mainReads += 1;
+      return response({ commit: { sha: mainReads === 1 ? SHA : OTHER } });
+    }
+    if (value.endsWith(`/commits/${SHA}/pulls`)) return response([pr()]);
+    if (value.endsWith(`/commits/${SHA}`)) {
+      return response({ sha: SHA, parents: [{ sha: TERMINAL_RATIFIED_MAIN_TIP }] });
+    }
+    return response({}, 404);
+  };
+
+  const result = await observeMainReleaseProvenance({
+    repository: 'jussray/founder-control-room',
+    targetSha: SHA,
+    terminalRatifiedTip: TERMINAL_RATIFIED_MAIN_TIP,
+    fetchImpl,
+    token: '',
+  });
+
+  assert.equal(mainReads, 2);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'stale_target');
+  assert.equal(result.currentMainSha, OTHER);
+});
+
+test('deploy ratification boundary stays bound to the extended ratification verifier', () => {
+  const extension = readFileSync(new URL('./verify-main-release-ratification-extension.mjs', import.meta.url), 'utf8');
+  assert.match(
+    extension,
+    new RegExp(`const INCIDENT_TIP = '${TERMINAL_RATIFIED_MAIN_TIP}'`),
+  );
+});
+
 test('preflight verifier is load-bearing before the first production mutation', () => {
   const deploy = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
   const preflight = deploy.indexOf('MIGRATION_LEDGER_PHASE: preflight');
@@ -325,10 +500,39 @@ test('main provenance workflow cancels stale push runs without weakening provena
   assert.ok(verifierGuard > verifier, 'the verifier may be skipped only for an explicitly superseded push');
 });
 
+test('main provenance workflow observes every first-parent successor after historical ratification', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /verify-main-release-ratification-extension\.mjs > historical-ratification\.json/);
+  assert.match(workflow, /git rev-list --reverse --first-parent "\$\{terminal_tip\}\.\.\$\{TARGET_SHA\}"/);
+  assert.match(workflow, /SUCCESSOR_COMMITS_JSON/);
+  assert.match(workflow, /TERMINAL_RATIFIED_TIP/);
+});
+
+test('main provenance workflow re-reads mutable main at the final decision boundary', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+  const verifier = workflow.indexOf('- name: Verify release provenance against live GitHub state');
+  const liveRead = workflow.indexOf('export CURRENT_MAIN_SHA="$(gh api', verifier);
+  const classifier = workflow.indexOf('node scripts/verify-main-release-provenance.mjs', verifier);
+
+  assert.ok(verifier >= 0, 'live provenance verifier step must exist');
+  assert.ok(liveRead > verifier, 'verifier must re-read current main after successor observation');
+  assert.ok(classifier > liveRead, 'classifier must consume the final current-main read');
+});
+
 test('main provenance workflow binds founder direct-main authority to trusted GitHub context', () => {
   const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
   assert.match(workflow, /MAIN_RELEASE_EVENT_NAME: \$\{\{ github\.event_name \}\}/);
   assert.match(workflow, /MAIN_RELEASE_REF: \$\{\{ github\.ref \}\}/);
   assert.match(workflow, /MAIN_RELEASE_ACTOR: \$\{\{ github\.actor \}\}/);
   assert.match(workflow, /MAIN_RELEASE_REPOSITORY_OWNER: \$\{\{ github\.repository_owner \}\}/);
+});
+
+test('historical main release audit uses full commit history and cannot replace current release gates', () => {
+  const workflow = readFileSync('.github/workflows/main-release-provenance.yml', 'utf8');
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /node scripts\/verify-main-release-historical-ratification\.mjs/);
+  assert.match(workflow, /node scripts\/verify-main-release-ratification-extension\.mjs/);
+  assert.match(workflow, /node --test scripts\/verify-main-release-provenance\.node-test\.mjs/);
 });
