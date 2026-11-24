@@ -694,7 +694,8 @@
     {
       "path": ".github/workflows/control-room-test-ledger.yml",
       "claims": [
-        "`.github/workflows/control-room-test-ledger.yml` must protect non-PR evidence from supersession and only cancel obsolete PR runs, retain all existing source and runtime checks, and must never treat a canceled predecessor as passing current exact-head proof."
+        "`.github/workflows/control-room-test-ledger.yml` must protect non-PR evidence from supersession and only cancel obsolete PR runs, retain all existing source and runtime checks, and must never treat a canceled predecessor as passing current exact-head proof.",
+        "`.github/workflows/control-room-test-ledger.yml` must run the read-only external-state readback on explicitly dispatched events, without enabling a new recurring schedule or auto-approving production writes."
       ]
     },
     {
@@ -730,7 +731,8 @@
     {
       "path": "scripts/control-room-test-ledger.mjs",
       "claims": [
-        "`scripts/control-room-test-ledger.mjs` must select the newest exact-SHA check attempt by check-run identity instead of completion timestamp and fail closed on incomplete or duplicated GitHub check-run enumeration; its observational ledger cannot authorize merge."
+        "`scripts/control-room-test-ledger.mjs` must select the newest exact-SHA check attempt by check-run identity instead of completion timestamp and fail closed on incomplete or duplicated GitHub check-run enumeration; its observational ledger cannot authorize merge.",
+        "`scripts/control-room-test-ledger.mjs` must preserve all check-attempt history, exact-head bindings and failed/skipped evidence; provider acceptance is not a substitute for independently verified output."
       ]
     },
     {
@@ -1011,6 +1013,24 @@
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."
+      ]
+    },
+    {
+      "path": "scripts/observe-cloudflare-runtime-state.mjs",
+      "claims": [
+        "`scripts/observe-cloudflare-runtime-state.mjs` must independently query the exact Cloudflare Worker, binding types, required secrets and cron rather than inferring live provider state from local config or a successful deploy command; secret values must never enter receipts."
+      ]
+    },
+    {
+      "path": "scripts/required-gate-evidence.mjs",
+      "claims": [
+        "`scripts/required-gate-evidence.mjs` must read provider ruleset/check status on the exact current head and classify skipped or missing evidence as unknown/blocked, never as an implicit passing gate or merger authority."
+      ]
+    },
+    {
+      "path": "scripts/control-room-runtime-state.mjs",
+      "claims": [
+        "`scripts/control-room-runtime-state.mjs` must distinguish source configuration from independently observed Cloudflare runtime state and avoid claiming external revalidation if required readback fails."
       ]
     }
   ]

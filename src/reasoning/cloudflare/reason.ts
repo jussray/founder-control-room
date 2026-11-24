@@ -14,7 +14,7 @@ const AUTH_FAILURE_CODES = new Set(['10000', '9109', '10502']);
 
 function normalizeSha(value: string | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
-  return normalized ? normalized : null;
+  return normalized && /^[a-f0-9]{40}$/u.test(normalized) ? normalized : null;
 }
 
 function timestampMs(value: string): number | null {
@@ -37,10 +37,34 @@ function latestByKind(
   return newest(signals.filter((signal) => signal.kind === kind));
 }
 
-function latestPagesProof(signals: CloudflareSignal[]): CloudflareSignal | undefined {
-  return newest(signals.filter(
-    (signal) => signal.kind === 'pages_deployment' || signal.kind === 'release_marker',
-  ));
+// Check names and build triggers are not deployment proofs, even when green.
+export function classifyCloudflareSignalKind(value: unknown): CloudflareSignalKind {
+  const resource = typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/[\s:/-]+/gu, '_')
+    : '';
+  if (/(?:^|_)(?:builds?|checks?|check_run|workflow|trigger)(?:_|$)/u.test(resource)) return 'other';
+  if (resource === 'worker_deployment' || resource === 'cloudflare_worker_deployment') return 'worker_deployment';
+  if (resource === 'pages_deployment' || resource === 'cloudflare_pages_deployment') return 'pages_deployment';
+  if (resource.includes('health') || resource.includes('smoke')) return 'runtime_health';
+  if (resource.includes('authority') || resource.includes('deployment_path')) return 'deployment_authority';
+  if (resource.includes('credential') || resource.includes('token') || resource.includes('auth')) return 'credential';
+  if (resource.includes('dns')) return 'dns';
+  if (resource.includes('route')) return 'route';
+  if (resource.includes('secret') || resource.includes('binding')) return 'secret_binding';
+  if (resource.includes('release') || resource.includes('marker')) return 'release_marker';
+  return 'other';
+}
+
+function productionProviderDeployment(signal: CloudflareSignal): boolean {
+  return signal.source === 'provider_observation'
+    && signal.environment === 'production'
+    && Boolean(signal.resourceId);
+}
+
+function productionRuntimeWitness(signal: CloudflareSignal): boolean {
+  return signal.source === 'provider_observation'
+    && signal.environment === 'production'
+    && Boolean(signal.url);
 }
 
 function boundedEvidenceAge(value: number | undefined): number {
@@ -120,9 +144,10 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
   }
 
   const desiredCommit = normalizeSha(input.desired.commitSha);
-  const worker = latestByKind(freshSignals, 'worker_deployment');
-  const pages = latestPagesProof(freshSignals);
-  const health = latestByKind(freshSignals, 'runtime_health');
+  const deploymentProofs = freshSignals.filter(productionProviderDeployment);
+  const worker = latestByKind(deploymentProofs, 'worker_deployment');
+  const pages = latestByKind(deploymentProofs, 'pages_deployment');
+  const health = latestByKind(freshSignals.filter(productionRuntimeWitness), 'runtime_health');
   const authFailureSignal = newest(freshSignals.filter(
     (signal) => signal.kind === 'credential'
       && signal.status === 'failure'
@@ -144,7 +169,8 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
   const pagesMismatch = Boolean(desiredCommit && pages?.commitSha && !commitMatches(pages, desiredCommit));
   const exactWorker = successful(worker) && commitMatches(worker, desiredCommit);
   const exactPages = successful(pages) && commitMatches(pages, desiredCommit);
-  const healthyRuntime = successful(health);
+  const healthyRuntime = successful(health) && commitMatches(health, desiredCommit);
+  const duplicateReleaseId = Boolean(worker?.resourceId && worker.resourceId === pages?.resourceId);
 
   const missingEvidence: string[] = [];
   if (!desiredCommit) missingEvidence.push('desired_commit');
@@ -157,6 +183,7 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
     freshFailures.length > 0
     || workerMismatch
     || pagesMismatch
+    || duplicateReleaseId
     || (authFailure && duplicateAuthority)
   ) {
     outcome = 'blocked';
@@ -168,9 +195,9 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
     outcome = 'degraded';
   }
 
-  const confidence = freshSignals.length >= 4 && desiredCommit
+  const confidence = exactWorker && exactPages && healthyRuntime && !duplicateReleaseId
     ? 'high'
-    : freshSignals.length >= 2
+    : deploymentProofs.length > 0
       ? 'medium'
       : 'low';
 
@@ -190,6 +217,12 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
 
   if (workerMismatch || pagesMismatch) {
     reality.push('The observed deployed commit does not match the desired commit.');
+  }
+  if (duplicateReleaseId) {
+    reality.push('Worker and Pages evidence reused the same deployment identifier; independent release identity is required.');
+  }
+  if (!healthyRuntime) {
+    reality.push('A green health status without the exact production commit and a production runtime witness is not release proof.');
   }
   if (duplicateAuthority) {
     reality.push(`Multiple deployment authorities are visible: ${[...authorities].sort().join(', ')}.`);

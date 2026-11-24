@@ -7,6 +7,8 @@ import {
   buildTestLedger,
   mapCheckState,
   selectLatestChecks,
+  selectCheckAttemptHistory,
+  aggregateCheckAttemptHistory,
 } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = '019f405030af7d79cde420cc504a060fdcaea29b';
@@ -228,4 +230,38 @@ test('fails closed after the transient retry budget and never retries a 4xx', as
     sleepImpl: async () => {},
   }), /GitHub check lookup failed \(404\)/);
   assert.equal(calls, 1);
+});
+
+
+test('retains failed, successful and skipped provider attempts after a successful retry', () => {
+  const input = [
+    check({ id: 201, name: 'Cloudflare Worker', conclusion: 'failure', app: {slug: 'cloudflare'}, started_at: '2026-08-04T20:00:00Z' }),
+    check({ id: 202, name: 'Cloudflare Worker', conclusion: 'success', app: {slug: 'cloudflare'}, started_at: '2026-08-04T20:03:00Z' }),
+    check({ id: 203, name: 'Delete Neon Branch', conclusion: 'skipped', started_at: '2026-08-04T20:04:00Z' }),
+    check({ id: 204, name: 'Observer', conclusion: 'success' }),
+    check({ id: 205, name: 'Other head', head_sha: 'b'.repeat(40) }),
+  ];
+  const attempts = selectCheckAttemptHistory(input, SHA, 'Observer');
+  assert.deepEqual(attempts.map((item) => item.id), ['201', '202', '203']);
+  assert.deepEqual(aggregateCheckAttemptHistory(attempts), {
+    total: 3, passed: 1, failed: 1, skipped: 1, pending: 0, unknown: 0,
+  });
+  const current = selectLatestChecks(input, SHA, 'Observer');
+  assert.equal(current.find((item) => item.name === 'Cloudflare Worker')?.state, 'passed');
+  const ledger = buildTestLedger({
+    repository: 'jussray/founder-control-room', sha: SHA,
+    branch: 'fix/example', runId: '7', checks: current, checkAttempts: attempts,
+  });
+  assert.equal(ledger.aggregate.counts.failed, 0);
+  assert.equal(ledger.checkAttemptHistory.aggregate.failed, 1);
+  assert.equal(ledger.checkAttemptHistory.attempts.find((item) => item.id === '201')?.state, 'failed');
+  assert.equal(ledger.source.priorCommitHistoryIncluded, false);
+  assert.equal(ledger.runner.authoritativeForMerge, false);
+});
+
+test('does not silently drop duplicate or missing provider identities', () => {
+  const initial = check({id: 300});
+  assert.throws(() => selectCheckAttemptHistory([initial, {...initial}], SHA), /Duplicate check attempt ID/);
+  assert.throws(() => selectCheckAttemptHistory([check({id: null})], SHA), /missing provider ID/);
+  assert.equal(selectCheckAttemptHistory([check({id: 3, head_sha: 'b'.repeat(40)})], SHA).length, 0);
 });

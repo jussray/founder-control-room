@@ -83,4 +83,18 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain('.founderSignalAutomationGrant.configured == true');
     expect(workflow).toContain('.founderSignalAutomationGrant.enabled == false');
   });
+  it('refuses production mutation when required provider-held secrets have not been independently read back', () => {
+    // Current main implements this gate as a name-only Wrangler secret list plus
+    // a name/type binding check; the PR's intent (read back before mutation) is kept.
+    const step = 'Verify provider-held Worker secret names before reconciliation';
+    expect(workflow).toContain(step);
+    expect(workflow).toContain("with open('wrangler.worker.toml', 'rb') as handle:");
+    expect(workflow).toContain('missing = sorted(required - present)');
+    expect(workflow).toContain('Missing provider-held Worker secret');
+    expect(workflow).toContain('node scripts/verify-worker-binding-types.mjs');
+    expect(workflow.indexOf(step)).toBeLessThan(workflow.indexOf('Record bounded authority receipt'));
+    expect(workflow.indexOf(step))
+      .toBeLessThan(workflow.indexOf('wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'));
+  });
+
 });
