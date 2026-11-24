@@ -2,13 +2,15 @@
 type RecordValue = Record<string, unknown>;
 export interface FounderNotificationIntent {
   key: string;
-  kind: 'workflow_passed' | 'pull_request_merged' | 'deployment_succeeded';
+  kind: 'workflow_passed' | 'workflow_recovered' | 'pull_request_merged' | 'deployment_succeeded';
   repository: string;
   commitSha: string;
   branch?: string;
   environment?: string;
   occurredAt: string;
   evidenceUrl: string;
+  workflowName?: string;
+  recoveryEvidenceUrl?: string;
 }
 function record(value: unknown): RecordValue {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {};
@@ -34,7 +36,7 @@ export function githubNotificationIntent(eventType: string, payload: RecordValue
     const run = record(payload.workflow_run);
     const id = positive(run.id), attempt = positive(run.run_attempt), commitSha = exactSha(run.head_sha), occurredAt = time(run.updated_at);
     if (payload.action !== 'completed' || run.status !== 'completed' || run.conclusion !== 'success' || !id || !attempt || !commitSha || !occurredAt) return null;
-    return { key: `${prefix}:workflow:${id}:${attempt}`, kind: 'workflow_passed', repository, commitSha, branch: label(run.head_branch), occurredAt, evidenceUrl: `${url}/actions/runs/${id}/attempts/${attempt}` };
+    return { key: `${prefix}:workflow:${id}:${attempt}`, kind: 'workflow_passed', repository, commitSha, workflowName: label(run.name), branch: label(run.head_branch), occurredAt, evidenceUrl: `${url}/actions/runs/${id}/attempts/${attempt}` };
   }
   if (eventType === 'pull_request') {
     const pr = record(payload.pull_request);
@@ -49,4 +51,24 @@ export function githubNotificationIntent(eventType: string, payload: RecordValue
     return { key: `${prefix}:deployment:${id}:success`, kind: 'deployment_succeeded', repository, commitSha, environment, occurredAt, evidenceUrl: `${url}/deployments` };
   }
   return null;
+}
+
+/** Recovery is based on a previously observed failure, never a rerun number alone. */
+export function recoverWorkflowIntent(intent: FounderNotificationIntent, priorPayload: RecordValue): FounderNotificationIntent {
+  if (intent.kind !== 'workflow_passed') return intent;
+  const prior = record(priorPayload.workflow_run);
+  const id = positive(prior.id);
+  const attempt = positive(prior.run_attempt);
+  const at = time(prior.updated_at);
+  const repo = record(priorPayload.repository).full_name;
+  if (typeof repo !== 'string' || repo.toLowerCase() !== intent.repository.toLowerCase() ||
+      priorPayload.action !== 'completed' || prior.status !== 'completed' ||
+      !['failure', 'timed_out', 'startup_failure'].includes(String(prior.conclusion)) ||
+      !id || !attempt || !at || Date.parse(at) >= Date.parse(intent.occurredAt) ||
+      exactSha(prior.head_sha) !== intent.commitSha) return intent;
+  const prefix = 'github:' + intent.repository.toLowerCase() + ':workflow:' + id + ':';
+  if (!intent.key.startsWith(prefix)) return intent;
+  const currentAttempt = Number(intent.key.slice(prefix.length));
+  if (!Number.isSafeInteger(currentAttempt) || currentAttempt !== attempt + 1) return intent;
+  return { ...intent, kind: 'workflow_recovered', recoveryEvidenceUrl: 'https://github.com/' + intent.repository + '/actions/runs/' + id + '/attempts/' + attempt };
 }
