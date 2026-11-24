@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 20, 2026 — public front door and founder callback remain separate (PR #837 candidate)
+
+The candidate Pages routing in `public/_worker.js` serves the public `/` landing page from Pages assets while `/welcome` is the founder sign-in door and `/control-room/` is the founder workspace entry. API-generated `/auth/callback`, `/assets/auth-callback.js` and `/assets/control-room.css` must still pass through the identity-checked API binding, not public static assets. After a successful same-origin `/auth/session` handoff, `src/http/routes/onboardingAssets/callbackJs.ts` routes the founder into `/control-room/` instead of returning them to the public landing page; an active OAuth consent request still takes precedence. The updated Playwright callback proof checks the route and mock session handoff but does not establish a live login, live cookie permissions, Cloudflare Access coverage or production deployment.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -854,3 +858,7 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+### Facebook Page text capability (source-only)
+
+Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
