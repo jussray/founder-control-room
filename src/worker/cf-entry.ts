@@ -54,6 +54,7 @@ const composed = composeWorkerHandler(
       { runMondayPortfolioOrientationCycle },
       { publishCloudflareRuntimeSignal },
       { runAiProviderChangeWatchCycle },
+      { runFounderNotificationDeliveryCycle },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
@@ -62,6 +63,7 @@ const composed = composeWorkerHandler(
       import('../services/mondayPortfolioOrientation.js'),
       import('./cloudflareRuntimeSignal.js'),
       import('../external-use/aiProviderChangeWatchService.js'),
+      import('../services/founderNotificationDelivery.js'),
     ]);
 
     return {
@@ -74,6 +76,7 @@ const composed = composeWorkerHandler(
           mondayOrientationResult,
           cloudflareRuntimeSignalResult,
           aiProviderChangeWatchResult,
+          founderNotificationResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(new Date(), (env as unknown as ControlRoomWorkerEnv).FCR_EMAIL),
@@ -81,6 +84,7 @@ const composed = composeWorkerHandler(
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
           runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
+          runFounderNotificationDeliveryCycle(),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
@@ -89,6 +93,7 @@ const composed = composeWorkerHandler(
           { name: 'monday-portfolio-orientation', result: mondayOrientationResult },
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
           { name: 'ai-provider-change-watch', result: aiProviderChangeWatchResult },
+          { name: 'founder-notification-delivery', result: founderNotificationResult },
         ]);
       },
     };
