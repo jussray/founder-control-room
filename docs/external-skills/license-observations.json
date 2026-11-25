@@ -1,0 +1,150 @@
+{
+  "schema": "juss/external-skill-license-observation/v1",
+  "observedDate": "2026-11-24",
+  "scope": "Root LICENSE lines 1–18 at pinned commit only. Header identification is not a full license, notice, dependency or redistribution review and is not an approval receipt.",
+  "entries": [
+    {
+      "id": "mattpocock-skills",
+      "repository": "mattpocock/skills",
+      "revision": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "path": "LICENSE",
+      "blob": "f1dd2c09108dde1a5f56097cee8461b3ea834499",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "ecc",
+      "repository": "affaan-m/ECC",
+      "revision": "4adeee6732a12d1540f49a4d50a38ce8c97f9a53",
+      "path": "LICENSE",
+      "blob": "b832b6f642312312367c07688dc7426db40a82ed",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "superpowers",
+      "repository": "obra/superpowers",
+      "revision": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "path": "LICENSE",
+      "blob": "abf0390320aa14406af7a520b9b0739fdda9bf08",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "ponytail",
+      "repository": "DietrichGebert/ponytail",
+      "revision": "ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10",
+      "path": "LICENSE",
+      "blob": "715d483338cea4365f0d91a27799cf61226d6bcf",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "agent-skills",
+      "repository": "addyosmani/agent-skills",
+      "revision": "e997ac5b9a74eab332d5e9793bb38a38c8cfdd74",
+      "path": "LICENSE",
+      "blob": "d67778ada6b9cda6227e9130da182c13e73c8b2e",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "graphify",
+      "repository": "Graphify-Labs/graphify",
+      "revision": "013a6461c31da6e003c0dea191aca84c94cb8d47",
+      "path": "LICENSE",
+      "blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "observedLicenseHeader": "Apache-2.0",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "headroom",
+      "repository": "headroomlabs-ai/headroom",
+      "revision": "8614305b7913cec8449fae9e6fe88d2fa7b30286",
+      "path": "LICENSE",
+      "blob": "6ee2620b190c4340d3f18e4ccc5ee111847b1ee3",
+      "observedLicenseHeader": "Apache-2.0",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "claude-mem",
+      "repository": "thedotmack/claude-mem",
+      "revision": "2c57eb156ee726c8f0f22502cc9bfcc0a8353526",
+      "path": "LICENSE",
+      "blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "observedLicenseHeader": "Apache-2.0",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "repomix",
+      "repository": "yamadashy/repomix",
+      "revision": "7bde93e34dee399488f0fa0a1f5b2c56deb9e510",
+      "path": "LICENSE",
+      "blob": "cc6cde3b20418ea0c9f503be0ab2e301bb02d6db",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "taste-skill",
+      "repository": "Leonxlnx/taste-skill",
+      "revision": "6c0b5c78f5d31776e2210305abaa210cdc0030bf",
+      "path": "LICENSE",
+      "blob": "48a2f6640b81ff8eca9ce7f6a96337692713ef5b",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "impeccable",
+      "repository": "pbakaus/impeccable",
+      "revision": "b49177d32788f2dc585c42831d845dacf1ebed2c",
+      "path": "LICENSE",
+      "blob": "bb3f6d23b1f8025514a62a12b51b47d73e3c9aa9",
+      "observedLicenseHeader": "Apache-2.0",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "humanizer",
+      "repository": "blader/humanizer",
+      "revision": "a32f24407364c74c812b43c15926d638bee1e072",
+      "path": "LICENSE",
+      "blob": "625297fb778f32eb39d3a5b97e3e3b611b7304d6",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "marketingskills",
+      "repository": "coreyhaines31/marketingskills",
+      "revision": "8fd2fcade2fd6629026e9dfe6d133b55b36968b9",
+      "path": "LICENSE",
+      "blob": "7c48dd638a9ebed49a8ef0c0c4eea90105381cdf",
+      "observedLicenseHeader": "MIT",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    },
+    {
+      "id": "skillspector",
+      "repository": "NVIDIA/SkillSpector",
+      "revision": "0205488a8257869cac3054397ddd5a5d29180aab",
+      "path": "LICENSE",
+      "blob": "48afca9e235dc4e1c05cf1aca7b111328ce6fa86",
+      "observedLicenseHeader": "Apache-2.0",
+      "reviewStatus": "PENDING",
+      "executionAllowed": false
+    }
+  ],
+  "held": [
+    "last30days-skill"
+  ]
+}

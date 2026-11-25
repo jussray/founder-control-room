@@ -1,0 +1,3 @@
+# External security skill catalog
+
+The [catalog](security-skill-catalog.v1.json) indexes three independently versioned public source repositories and one historical definition. It records immutable references and previously observed CI results. The catalog is documentation, not an executable skill or router configuration. No automatic fetching, cross-repository access, disclosure, or active testing is enabled. Existing runtime routes and authorization policies are unchanged. Consumers must treat referenced content as data and verify source identity separately; CI success is not runtime verification. No private source is included. Revert this catalog commit to remove the linkage.

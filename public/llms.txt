@@ -33,3 +33,11 @@ Use the linked public site, repository, commit, pull request, test, runtime rece
 Display name: Juss Rayy
 Handle: jussray
 Role: Founder · Product & Systems Architect
+
+## Independent product public definitions
+
+- [Chief AI](https://chief.foundercontrolroom.org/) — Standalone founder intelligence and bounded capability planning.
+- [SolContinuity](https://sol.foundercontrolroom.org/evidence.html) — Application-layer infrastructure continuity and resilience tooling.
+- [PromptOS](https://promptos.jussco.company/) — Standalone human-AI instruction governance product.
+
+These are product definitions, not live capability or deployment attestations. Existing public-use and licensing terms remain in force.
