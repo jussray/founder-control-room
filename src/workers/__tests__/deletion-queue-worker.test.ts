@@ -33,6 +33,8 @@ interface QueueClientOptions {
   readError?: unknown;
   updateErrors?: unknown[];
   rpcError?: unknown;
+  failedCount?: number | null;
+  failedCountError?: unknown;
 }
 
 function queueClient(options: QueueClientOptions = {}) {
@@ -40,7 +42,15 @@ function queueClient(options: QueueClientOptions = {}) {
   const updateErrors = [...(options.updateErrors ?? [])];
 
   const from = vi.fn(() => ({
-    select: vi.fn(() => {
+    select: vi.fn((_columns: string, selectOptions?: { head?: boolean }) => {
+      if (selectOptions?.head) {
+        return {
+          eq: vi.fn().mockResolvedValue({
+            count: options.failedCount === undefined ? 0 : options.failedCount,
+            error: options.failedCountError ?? null,
+          }),
+        };
+      }
       const query = {
         eq: vi.fn(),
         order: vi.fn(),
@@ -197,6 +207,32 @@ describe('deletion queue Worker runtime bindings', () => {
     await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
       'Deletion queue failed 1 of 1 entries',
     );
+  });
+
+  it('surfaces previously failed erasure work even if no pending rows remain', async () => {
+    const { client, updates } = queueClient({ failedCount: 2 });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue has 2 failed entries requiring operator recovery',
+    );
+    expect(updates).toEqual([]);
+  });
+
+  it('fails closed when failed-erasure health cannot be determined', async () => {
+    const { client } = queueClient({ failedCount: null });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue failed-entry count unavailable',
+    );
+  });
+
+  it('propagates failed-erasure health query errors', async () => {
+    const { client } = queueClient({ failedCountError: new Error('health read denied') });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow('health read denied');
   });
 
   it('marks a fully processed entry done and resolves', async () => {
