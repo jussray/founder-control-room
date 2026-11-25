@@ -1047,7 +1047,7 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml` declares the nine-provider explicit `N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS` allowlist while retaining the expected workflow ID and runtime version. Source configuration does not prove any live provider credential, schedule, or publication; feature-held secrets and exact provider readback remain required."
+        "`wrangler.worker.toml` must explicitly allowlist the nine configured `N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS` lanes (buffer, meta, tiktok, x, youtube, pinterest, bluesky, mastodon, google_business) while retaining the pinned workflow identity and runtime version. Source configuration alone cannot prove a live provider credential, schedule, or publication; feature-held secrets and exact provider readback remain required."
       ]
     }
   ]
