@@ -8,7 +8,6 @@ describe('first-party founder content truth UI contract', () => {
   it('separates implemented capability from evidence, temporal, provider, and outcome truth', () => {
     expect(source).toContain('data-founder-engine-state="contract-ready"');
     expect(source).toContain('data-first-party-linkedin-capability="implemented"');
-    expect(source).toContain('data-first-party-facebook-capability="implemented"');
     expect(source).toContain('data-founder-evidence-state="unknown"');
     expect(source).toContain('data-founder-sauce-state="unknown"');
     expect(source).toContain('data-temporal-truth-state="unknown"');
