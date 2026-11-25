@@ -19,6 +19,27 @@ export type RemediationSignal = {
   kind: keyof typeof ROUTES;
 };
 
+/** Interpret minimized, persisted GitHub metadata as a candidate only.
+ * This is not live PR truth, disclosure authorization, or a dispatch receipt.
+ */
+export function deriveCheckRemediationSignal(payload: unknown): RemediationSignal | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const event = payload as Record<string, unknown>;
+  const repository = event.repository as Record<string, unknown> | undefined;
+  const check = event.check_run as Record<string, unknown> | undefined;
+  if (event.action !== 'completed' || check?.status !== 'completed' ||
+      check.conclusion !== 'failure' || typeof repository?.full_name !== 'string' ||
+      typeof check.remediation_pr_number !== 'number' || typeof check.head_sha !== 'string') return null;
+  const signal: RemediationSignal = {
+    repository: repository.full_name, pr: check.remediation_pr_number, head: check.head_sha, kind: 'ci_failed',
+  };
+  try {
+    return planRemediationSignal(signal) ? signal : null;
+  } catch {
+    return null;
+  }
+}
+
 // Planning is pure; it does not establish repository scope or dispatch authority.
 export function planRemediationSignal(signal: RemediationSignal) {
   if (!/^jussray\/[a-z0-9_.-]{1,100}$/i.test(signal.repository) ||

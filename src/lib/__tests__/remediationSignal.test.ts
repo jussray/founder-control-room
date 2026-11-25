@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { dispatchRemediationSignal, planRemediationSignal } from '../remediationSignal.js';
+import { deriveCheckRemediationSignal, dispatchRemediationSignal, planRemediationSignal } from '../remediationSignal.js';
 import type { OperatorRelayRequestV1 } from '../operatorRelay.js';
 import { buildOperatorRelayResponse } from '../operatorRelayProviderResult.js';
 
@@ -8,6 +8,24 @@ const now = new Date('2026-11-25T12:00:00Z');
 const authorize = async () => true;
 
 describe('FCR remediation signal', () => {
+  it('derives a candidate only from a completed failed check with a minimized PR identity', () => {
+    const payload = { action: 'completed', repository: { full_name: signal.repository }, check_run: {
+      status: 'completed', conclusion: 'failure', head_sha: signal.head, remediation_pr_number: signal.pr,
+    } };
+    expect(deriveCheckRemediationSignal(payload)).toEqual(signal);
+    for (const check_run of [
+      { ...payload.check_run, conclusion: 'success' },
+      { ...payload.check_run, conclusion: 'cancelled' },
+      { ...payload.check_run, status: 'in_progress' },
+      { ...payload.check_run, remediation_pr_number: undefined },
+      { ...payload.check_run, remediation_pr_number: '7' },
+      { ...payload.check_run, head_sha: 'abc' },
+    ]) expect(deriveCheckRemediationSignal({ ...payload, check_run })).toBeNull();
+    expect(deriveCheckRemediationSignal({ ...payload, repository: { full_name: 'other/example' } })).toBeNull();
+    expect(deriveCheckRemediationSignal({ ...payload, action: 'created' })).toBeNull();
+    expect(deriveCheckRemediationSignal(null)).toBeNull();
+  });
+
   it('routes CI to Codex and conflict to Claude, never converts a founder hold into work', () => {
     expect(planRemediationSignal(signal)?.target).toBe('codex');
     expect(planRemediationSignal({ ...signal, kind: 'merge_conflict' })?.target).toBe('claude-code');

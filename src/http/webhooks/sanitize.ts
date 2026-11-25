@@ -118,7 +118,25 @@ function sanitizePullRequest(value: unknown): JsonRecord | undefined {
   return sanitized;
 }
 
-function sanitizeCheckRun(value: unknown): JsonRecord | undefined {
+// GitHub check-run associations are hints, never current PR truth. Retain
+// only the single same-repository PR number when the raw head matches exactly.
+function remediationPrNumber(checkRun: JsonRecord, repository: unknown, action: unknown): number | undefined {
+  if (action !== 'completed' || checkRun.status !== 'completed' || checkRun.conclusion !== 'failure') return undefined;
+  const repoId = positiveInteger(asRecord(repository)?.id);
+  const headSha = checkRun.head_sha;
+  const prs = checkRun.pull_requests;
+  if (!repoId || typeof headSha !== 'string' || !/^[a-f0-9]{40}$/i.test(headSha) ||
+      !Array.isArray(prs) || prs.length !== 1) return undefined;
+  const pr = asRecord(prs[0]);
+  const head = asRecord(pr?.head);
+  const base = asRecord(pr?.base);
+  if (typeof head?.sha !== 'string' || head.sha.toLowerCase() !== headSha.toLowerCase() ||
+      positiveInteger(asRecord(head.repo)?.id) !== repoId ||
+      positiveInteger(asRecord(base?.repo)?.id) !== repoId) return undefined;
+  return positiveInteger(pr?.number);
+}
+
+function sanitizeCheckRun(value: unknown, repository: unknown, action: unknown): JsonRecord | undefined {
   const checkRun = asRecord(value);
   if (!checkRun) return undefined;
 
@@ -128,6 +146,7 @@ function sanitizeCheckRun(value: unknown): JsonRecord | undefined {
   setIfDefined(sanitized, 'conclusion', boundedString(checkRun['conclusion'], 64));
   setIfDefined(sanitized, 'head_sha', shaValue(checkRun['head_sha']));
   setIfDefined(sanitized, 'details_url', safeUrlValue(checkRun['details_url']));
+  setIfDefined(sanitized, 'remediation_pr_number', remediationPrNumber(checkRun, repository, action));
   return sanitized;
 }
 
@@ -206,7 +225,7 @@ export function sanitizeWebhookPayload(
   }
 
   if (eventType === 'check_run') {
-    const checkRun = sanitizeCheckRun(payload['check_run']);
+    const checkRun = sanitizeCheckRun(payload['check_run'], payload['repository'], payload['action']);
     if (checkRun) sanitized['check_run'] = checkRun;
   }
 

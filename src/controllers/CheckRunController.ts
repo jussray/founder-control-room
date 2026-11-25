@@ -9,6 +9,7 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from './base.js';
 import { enqueueReconcile } from '../events/outbox.js';
+import { deriveCheckRemediationSignal, planRemediationSignal } from '../lib/remediationSignal.js';
 import type {
   ReconcileRequest,
   ReconcileResult,
@@ -80,12 +81,16 @@ export class CheckRunController extends BaseController {
 
     const { data: event } = await supabase
       .from('provider_events')
-      .select('payload, project_id')
+      .select('payload, project_id, provider, event_type')
       .eq('id', sourceEventId)
       .single();
 
     if (!event) {
       return this.done('retry', `Event ${sourceEventId} not found`);
+    }
+
+    if (event.project_id !== projectId || event.provider !== 'github' || event.event_type !== 'check_run') {
+      return this.done('blocked', 'Check event identity does not match its reconciliation scope');
     }
 
     const payload = event.payload as Record<string, unknown>;
@@ -165,6 +170,19 @@ export class CheckRunController extends BaseController {
       );
     }
 
+    // Audit the candidate through the existing reconciliation run. No provider
+    // receives repository metadata until the separate trusted eligibility gate.
+    const signal = deriveCheckRemediationSignal(payload);
+    const plan = signal && planRemediationSignal(signal);
+    const proposedActions: ReconcileResult['proposedActions'] = signal && plan ? [{
+      actionType: 'remediation_review',
+      resourceType: 'pull_request',
+      resourceId: String(signal.pr),
+      requiresApproval: true,
+      idempotencyKey: plan.key,
+      payload: { ...signal, target: plan.target, sourceEventId, evidenceId: inserted!.id },
+    }] : [];
+
     return {
       status: 'converged',
       observedChanges: [{
@@ -174,9 +192,9 @@ export class CheckRunController extends BaseController {
         previousValue: null,
         newValue: conclusion,
       }],
-      proposedActions: [],
+      proposedActions,
       evidenceIds: [inserted!.id],
-      requiresApproval: false,
+      requiresApproval: proposedActions.length > 0,
     };
   }
 
