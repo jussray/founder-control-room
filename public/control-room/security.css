@@ -211,3 +211,10 @@ button, input, select { font: inherit; }
   .crypto-entry-card .target-badge { width: 100%; max-width: 100%; }
   .hero h1 { max-width: none; }
 }
+
+/* Three metadata cards, with no empty desktop columns. */
+#security-skill-library .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#security-skill-library .summary-card { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  #security-skill-library .summary-grid { grid-template-columns: 1fr; }
+}
