@@ -21,7 +21,8 @@ test('bootstrap is opt-in and uses verified identity and public tenant tables on
 });
 test('founder-reported ChatGPT Site stays unverified', () => {
   const sites = file('SITES.md');
-  assert.match(sites, /fcr-command-center\.jussray\.chatgpt\.site/);
+  assert.match(sites, /chatgpt_site_url: null/);
+  assert.doesNotMatch(sites, /chatgpt_site_url:\s*https?:\/\//);
   assert.match(sites, /site_identity_status: unverified/);
   assert.match(sites, /continuity_status: UNKNOWN/);
 });
