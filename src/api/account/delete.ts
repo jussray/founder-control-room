@@ -34,7 +34,11 @@ export async function deleteAccount(userId: string): Promise<DeleteAccountResult
   const { error: signOutErr } = await supabaseAdmin.auth.admin.signOut(userId, 'global');
   if (signOutErr) throw new Error(`sign-out failed: ${signOutErr.message}`);
 
-  await supabaseAdmin.rpc('anonymize_user_audit_logs', { p_user_id: userId });
+  const { error: anonymizeErr } = await supabaseAdmin.rpc(
+    'anonymize_user_audit_logs',
+    { p_user_id: userId },
+  );
+  if (anonymizeErr) throw new Error(`audit anonymization failed: ${anonymizeErr.message}`);
 
   const { error: queueErr } = await supabaseAdmin
     .from('deletion_queue')
