@@ -302,3 +302,8 @@ For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing ow
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+
+### Public vs private FCR front door (#1002)
+
+FCR's public homepage, legitimate customer signup and public product discovery must remain available without a founder session. Founder Control Room, privileged bridge/API and admin operations must remain behind both Cloudflare Access policy and application identity checks. A public Site resource token is not interchangeable with founder authentication. Deployment and Access provider state require independent exact-live checks.

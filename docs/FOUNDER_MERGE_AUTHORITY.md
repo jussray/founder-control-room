@@ -222,3 +222,8 @@ Workflow YAML syntax belongs to the same exact-head source contract: `.github/wo
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+
+### Public Site bridge and protected founder authority (#1002)
+
+The `Command Center` route is a separate server-to-server read-only capability, not delegated founder approval. Public signup and discovery must remain reachable, while owner/admin/privileged functions use separate identity and authorization gates. A passing test or matching bearer does not authorize a PR merge, production deployment, database migration or provider-policy change.

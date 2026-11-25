@@ -86,3 +86,8 @@ Founder Control Room remains the portfolio governance, evidence, approval, and g
 ## Stop conditions
 
 Stop rather than improvise when the Site identity is unverified, the canonical repository cannot be resolved, `main` moved after proof, required Markdown authority cannot be read, a privacy/Sauce Guard boundary is unclear, or the requested action crosses a separate deploy/publication/credential/data/destructive gate without its exact authority.
+
+
+### Command Center public/owner boundary (#1002)
+
+The public FCR entrance remains open for visitors and new accounts; founder/private functions require independent authorized identity. Site read-only integration uses a separate exact resource and never inherits a founder session or provider write rights. Retain existing live site design, routes and current domain authority until independently verified deployment.

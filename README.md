@@ -862,3 +862,8 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+### Separate Command Center read-only bridge (#1002)
+
+The separately hosted ChatGPT Site may read only explicitly scoped public/customer project summaries through its own server-held resource credential. It cannot access founder browser cookies, alter branch protection, execute Chief or mutate Cloudflare. The tenant database migration and isolated preview are source candidates; no production migration, live customer signup, external Site deploy or Cloudflare Access mutation was performed in this reconciliation.
+
