@@ -87,12 +87,13 @@ MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 MCP_CLOUDFLARE_API_URL = "https://mcp.cloudflare.com/mcp"
 
 # Founder-approved source activation for the governed founder-content n8n lane.
-# Buffer is the only enabled provider, share-now remains forbidden, and runtime
-# identity must match the exact workflow fingerprint and pinned n8n version.
+# All nine contract provider lanes are runtime-enabled (founder activation
+# 2026-11-25), share-now remains forbidden, and runtime identity must match
+# the exact workflow fingerprint and pinned n8n version.
 # These vars express source intent only. Production use still requires the four
 # provider-held secret bindings below, exact-main deployment, and live readback.
 N8N_FOUNDER_CONTENT_ENABLED = "true"
-N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
+N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer,meta,tiktok,x,youtube,pinterest,bluesky,mastodon,google_business"
 N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
 N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
 
