@@ -131,6 +131,28 @@ export async function processDeletionEntry(
   }
 }
 
+/**
+ * A quiet cron must not conceal earlier failed erasure work. This check reads
+ * counts only and does not retry or expose user identifiers.
+ */
+export async function assertNoFailedDeletionEntries(
+  supabaseAdmin: SupabaseClient,
+): Promise<void> {
+  const { count, error } = await supabaseAdmin
+    .from('deletion_queue')
+    .select('id', { head: true, count: 'exact' })
+    .eq('status', 'failed');
+  if (error) throw error;
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+    throw new Error('Deletion queue failed-entry count unavailable');
+  }
+  if (count > 0) {
+    throw new Error(
+      `Deletion queue has ${count} failed entries requiring operator recovery`,
+    );
+  }
+}
+
 export async function runDeletionWorker(
   env: DeletionQueueEnv,
 ): Promise<void> {
@@ -150,7 +172,10 @@ export async function runDeletionWorker(
   }
 
   const pending = pendingValues as DeletionQueueEntry[];
-  if (pending.length === 0) return;
+  if (pending.length === 0) {
+    await assertNoFailedDeletionEntries(supabaseAdmin);
+    return;
+  }
 
   const results = await Promise.allSettled(
     pending.map((row) => processDeletionEntry(row, supabaseAdmin, env)),
@@ -165,6 +190,7 @@ export async function runDeletionWorker(
       `Deletion queue failed ${failures.length} of ${pending.length} entries`,
     );
   }
+  await assertNoFailedDeletionEntries(supabaseAdmin);
 }
 
 export default {
