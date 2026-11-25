@@ -1025,6 +1025,12 @@
       "claims": [
         "`src/http/routes/founderContentLifecycle.ts` must allow only the exact `facebook/facebook` provider/platform pair, require the stored account ID to match the numeric server-owned `META_FACEBOOK_PAGE_ID`, and block nonzero Facebook media before dispatch; a configured Page ID or mocked route test does not prove a live Meta publication."
       ]
+    },
+    {
+      "path": "src/buildEvents/founderNotificationIntent.ts",
+      "claims": [
+        "`src/buildEvents/founderNotificationIntent.ts` must project only completed successful workflow events, actual merged closed PRs and provider-reported successful deployments with valid exact nonzero commit SHAs and evidence links; workflow recovery requires the same repository, run ID and SHA, an earlier failed attempt and the immediately succeeding attempt. This projection neither sends Web Push nor proves independent runtime verification, founder authorization or phone receipt."
+      ]
     }
   ]
 }
