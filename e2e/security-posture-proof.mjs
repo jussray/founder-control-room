@@ -14,7 +14,13 @@ const html = (await readFile(htmlPath, 'utf8'))
   .replace('<link rel="stylesheet" href="/control-room/security.css" />', '')
   .replace('<script type="module" src="/control-room/security.js"></script>', '');
 const css = await readFile(cssPath, 'utf8');
-const js = await readFile(jsPath, 'utf8');
+// The fixture has an about:blank document, so resolve the real sibling module
+// explicitly instead of letting a relative import fail before boot.
+const catalogSource = await readFile(resolve(here, '../public/control-room/security-skill-catalog.mjs'), 'utf8');
+const catalogModuleUrl = 'data:text/javascript;base64,' + Buffer.from(catalogSource).toString('base64');
+const source = await readFile(jsPath, 'utf8');
+assert.ok(source.includes("'./security-skill-catalog.mjs'"), 'security page imports the real catalog module');
+const js = source.replace("'./security-skill-catalog.mjs'", JSON.stringify(catalogModuleUrl));
 
 const stageNames = [
   'Inventory and Ownership',
