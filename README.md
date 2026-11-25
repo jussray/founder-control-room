@@ -862,3 +862,7 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+### Source-only introductory paid month eligibility (#977)
+
+The $1 Juss & Co introductory paid-month policy is a sandbox-only classification guard. It does not activate live Stripe, schedule recurring payments, present checkout or place a charge. Juss Beautiful Hair and its separate merchant/payment identity remain excluded. Any real offer must first establish verified product owner, approved account destination, billing consent, pricing terms, Stripe readback and founder authorization. The source module and tests provide no production payment proof.
