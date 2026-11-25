@@ -1025,6 +1025,30 @@
       "claims": [
         "`src/http/routes/founderContentLifecycle.ts` must allow only the exact `facebook/facebook` provider/platform pair, require the stored account ID to match the numeric server-owned `META_FACEBOOK_PAGE_ID`, and block nonzero Facebook media before dispatch; a configured Page ID or mocked route test does not prove a live Meta publication."
       ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "`src/http/routes/n8nConveyor.ts` must report the canonical default provider set from `N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS`, not a hard-coded Buffer-only list; readiness is configuration evidence, not provider acceptance, publication or authority."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "claims": [
+        "`src/lib/n8nFounderContentReadiness.test.ts` must assert the nine default contract providers while preserving disabled, unconfigured transport and false Buffer probe readiness when credentials are absent; default allowlisting must not imply execution."
+      ]
+    },
+    {
+      "path": "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts",
+      "claims": [
+        "`src/lib/n8nProviderNeutralFounderContentOrchestrator.ts` must derive its default provider list from the canonical contract routes, retain explicit environment allowlist override and fail closed on invalid configuration; this does not authorize publication or prove provider-native execution."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` declares the nine-provider explicit `N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS` allowlist while retaining the expected workflow ID and runtime version. Source configuration does not prove any live provider credential, schedule, or publication; feature-held secrets and exact provider readback remain required."
+      ]
     }
   ]
 }
