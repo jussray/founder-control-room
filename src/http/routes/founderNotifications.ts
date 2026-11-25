@@ -1,4 +1,5 @@
 import { Router, type RequestHandler } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { randomUUID } from 'node:crypto';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -12,20 +13,22 @@ const requireNotificationOwner: RequestHandler = (req: FounderRequest,res,next) 
   next();
 };
 
+// One shared per-client process-local budget, before any authorization or provider call.
+const notificationRateLimit = rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false });
 export const founderNotificationsRouter = Router();
 founderNotificationsRouter.use((_req,res,next) => {
   res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
   next();
 });
 
-founderNotificationsRouter.get('/config', requireFounder, requireNotificationOwner, async (_req,res) => {
+founderNotificationsRouter.get('/config', notificationRateLimit, requireFounder, requireNotificationOwner, async (_req,res) => {
   try {
     const config = founderPushConfig();
     return res.json({ enabled: Boolean(config), publicKey: config?.publicKey ?? null });
   } catch { return res.status(503).json({ error: 'push_configuration_unavailable' }); }
 });
 
-founderNotificationsRouter.get('/feed', requireFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
+founderNotificationsRouter.get('/feed', notificationRateLimit, requireFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
   try {
     const { data, error } = await supabase.from('project_events')
       .select('id,metadata,created_at').eq('event_type','founder_notification_intent')
@@ -50,7 +53,7 @@ founderNotificationsRouter.get('/feed', requireFounder, requireNotificationOwner
   } catch { return res.status(503).json({error:'notification_feed_unavailable'}); }
 });
 
-founderNotificationsRouter.post('/subscribe', requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
+founderNotificationsRouter.post('/subscribe', notificationRateLimit, requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
   let subscription;
   try { subscription = normalizePushSubscription(req.body); }
   catch { return res.status(400).json({error:'invalid_push_subscription'}); }
@@ -75,7 +78,7 @@ founderNotificationsRouter.post('/subscribe', requireInteractiveFounder, require
   } catch { return res.status(503).json({error:'subscription_registration_unavailable'}); }
 });
 
-founderNotificationsRouter.post('/unsubscribe', requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
+founderNotificationsRouter.post('/unsubscribe', notificationRateLimit, requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
   try {
     const subscription = normalizePushSubscription(req.body);
     const { error } = await supabase.from('founder_notification_subscriptions').update({revoked_at:new Date().toISOString()})
@@ -85,7 +88,7 @@ founderNotificationsRouter.post('/unsubscribe', requireInteractiveFounder, requi
   } catch { return res.status(503).json({error:'subscription_revocation_unavailable'}); }
 });
 
-founderNotificationsRouter.post('/test', requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
+founderNotificationsRouter.post('/test', notificationRateLimit, requireInteractiveFounder, requireNotificationOwner, async (req: FounderRequest,res) => {
   try {
     const config = founderPushConfig();
     if (!config) return res.status(503).json({error:'push_disabled'});
