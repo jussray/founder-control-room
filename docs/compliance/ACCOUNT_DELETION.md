@@ -37,7 +37,7 @@ export async function deleteAccount(userId: string) {
 ## Recovery and retry policy (current source behavior)
 
 - Status transitions are `pending → processing → done` or `pending → processing → failed`.
-- **No automatic retry is configured.** A failed row stays `failed`; a crashed job may stay `processing`. Neither state is automatically selected by the current scheduled Worker. Never call that a successful erasure.
+- **No automatic retry is configured.** A failed row stays `failed`; a crashed job may stay `processing`. Neither state is automatically selected by the current scheduled Worker. A nonzero `failed` count now causes the cron to fail visibly (count only, no personal data logged). Never call either state a successful erasure.
 - An authorized operator must inspect failed and stale-processing counts and error classes, check downstream idempotency and previous erasure evidence, then obtain founder-governed approval for a *specific* job before manually returning it to `pending`. Do not bulk requeue or re-delete.
 - Where a job is `processing` beyond one six-hour cron interval, treat it as **stale/unknown**, not `done`. Confirm the prior invocation is no longer running before a scoped retry. Treat a `failed` row as **unresolved** until an independently verified `done` receipt is observed.
 - Measure and alert on counts/ages of `pending`, `processing`, and `failed` jobs without exporting private user IDs into public logs. Escalate before the 72-hour target; do not infer operation from a passing configuration check.
