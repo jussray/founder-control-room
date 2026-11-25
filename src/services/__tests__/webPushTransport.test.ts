@@ -15,6 +15,9 @@ describe('founder web push', () => {
     }
     expect(() => normalizePushSubscription({ ...subscription, keys: { ...subscription.keys, auth: 'bad' } })).toThrow();
   });
+  // The encoded values below are public known-answer vectors from RFC 8291
+  // Section 5 and Appendix A, not application credentials. Keep them exact
+  // to detect cryptographic interoperability regressions.
   it('matches the RFC 8291 ciphertext example', () => {
     const receiver = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
     const sender = Buffer.from('yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw','base64url');
