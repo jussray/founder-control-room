@@ -135,15 +135,61 @@ export async function collectJusscoRulesetPreflight({ token, request=fetch }) {
     prBaseSha:pr.base?.sha,prState:pr.state,prAuthor:pr.user?.login,reviews,
   });
 }
+// Historical v1 exports remain for receipt compatibility. Current CLI uses v2.
+export function assessCurrentJussco({mainSha,pull,commit,timeline,rulesets}) {
+  const sha=/^[a-f0-9]{40}$/i;
+  if(!sha.test(mainSha)||!sha.test(pull?.head?.sha)||!sha.test(pull?.base?.sha)||!Number.isSafeInteger(pull?.number)||pull.number<1||pull.state!=="open"||pull.base.ref!=="main"||commit?.sha!==pull.head.sha||!Array.isArray(timeline)||!Array.isArray(rulesets)) throw Error("Incomplete provider evidence");
+  const issues=[];
+  if(pull.base.sha!==mainSha)issues.push("PR_BASE_STALE");
+  if(pull.draft!==false)issues.push("PR_NOT_READY");
+  const created=Date.parse(commit.commit?.committer?.date||"");
+  const events=timeline.filter(e=>/^auto_(merge|squash|rebase)_(enabled|disabled)$/.test(e?.event||""));
+  if(events.some(e=>!Number.isFinite(Date.parse(e.created_at))))throw Error("Invalid event timestamp");
+  const latest=events.sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at)).at(-1);
+  const ui=latest?.event.endsWith("_enabled")&&latest.actor?.login==="jussray"&&Object.hasOwn(latest,"performed_via_github_app")&&latest.performed_via_github_app===null&&pull.auto_merge?.enabled_by?.login==="jussray";
+  const approval=!ui||!Number.isFinite(created)?"FOUNDER_SIGNAL_NOT_PROVEN":Date.parse(latest.created_at)<created?"STALE_FOUNDER_SIGNAL":"FOUNDER_SIGNAL_OBSERVED_PUSH_FRESHNESS_UNVERIFIED";
+  if(approval!=="FOUNDER_SIGNAL_OBSERVED_PUSH_FRESHNESS_UNVERIFIED")issues.push(approval);
+  const mainRefs=new Set(["~DEFAULT_BRANCH","~ALL","refs/heads/main"]);
+  const known=new Set([...mainRefs,"refs/heads/Production","refs/heads/releases","refs/heads/Deployed"]);
+  const active=[];
+  for(const r of rulesets){
+    if(r.target!=="branch"||r.enforcement==="disabled"||r.enforcement==="evaluate")continue;
+    const refs=r.conditions?.ref_name;
+    if(r.enforcement!=="active"||!Array.isArray(refs?.include)||!Array.isArray(refs?.exclude)||!Array.isArray(r.rules)||!Array.isArray(r.bypass_actors))throw Error("Incomplete active ruleset");
+    if([...refs.include,...refs.exclude].some(x=>!known.has(x))){issues.push("UNKNOWN_RULESET_SCOPE");continue;}
+    if(refs.include.some(x=>mainRefs.has(x))&&!refs.exclude.some(x=>mainRefs.has(x)))active.push(r);
+  }
+  const rules=active.flatMap(r=>r.rules),pr=rules.filter(r=>r.type==="pull_request"),checks=rules.filter(r=>r.type==="required_status_checks");
+  const mandatory=["Independent Review Evidence","Review Gate Unit Tests","Juss & Co Site Browser Proof","Repo Reality / exact-head"];
+  const contexts=new Set(checks.flatMap(r=>r.parameters?.required_status_checks||[]).filter(c=>c.integration_id===15368).map(c=>c.context));
+  if(!active.length)issues.push("NO_ACTIVE_MAIN_RULESET");
+  if(active.some(r=>r.bypass_actors.length))issues.push("MAIN_BYPASS_ACTORS");
+  if(!pr.length||pr.some(r=>r.parameters?.required_approving_review_count!==0||r.parameters?.require_code_owner_review!==false||r.parameters?.require_last_push_approval!==false)||!pr.some(r=>r.parameters?.required_review_thread_resolution===true))issues.push("NATIVE_REVIEW_CONFLICT");
+  if(!checks.some(r=>r.parameters?.strict_required_status_checks_policy===true)||mandatory.some(c=>!contexts.has(c)))issues.push("REQUIRED_EXACT_HEAD_CHECKS_MISSING");
+  if(!rules.some(r=>r.type==="non_fast_forward")||!rules.some(r=>r.type==="deletion"))issues.push("MAIN_REF_PROTECTION_MISSING");
+  if(rules.some(r=>r.type==="required_deployments"&&(r.parameters?.required_deployment_environments?.length||0)>0))issues.push("PREMERGE_DEPLOYMENT_REQUIREMENTS_REVIEW");
+  return {contract:"fcr/jussco-current-ruleset-preflight@v2",repository:"jussray/jussray",candidate:{prNumber:pull.number,mainSha,prBaseSha:pull.base.sha,prHeadSha:pull.head.sha,approval,founderSignalAt:latest?.created_at??null},activeRulesets:active.map(r=>({id:r.id,name:r.name})),issues:[...new Set(issues)],authority:{observationOnly:true,providerMutationAuthority:false,mergeAuthority:false,deployAuthority:false},mutation:null,disposition:"OBSERVATION_ONLY"};
+}
+export async function collectCurrentJussco({token,prNumber,request=fetch}){
+  if(typeof token!=="string"||!token.trim())throw Error("trusted GitHub read credential unavailable");
+  if(!Number.isSafeInteger(prNumber)||prNumber<1)throw Error("Specify current PR number");
+  const root="https://api.github.com/repos/jussray/jussray";
+  async function get(path){const r=await request(root+path,{method:"GET",headers:{Accept:"application/vnd.github+json",Authorization:"Bearer "+token,"X-GitHub-Api-Version":"2022-11-28"}});if(!r.ok)throw Error("GitHub read HTTP "+r.status);return r.json();}
+  async function list(path){const all=[];for(let p=1;p<=10;p++){const batch=await get(path+(path.includes("?")?"&":"?")+"per_page=100&page="+p);if(!Array.isArray(batch))throw Error("Invalid provider list");all.push(...batch);if(batch.length<100)return all;}throw Error("Provider pagination incomplete");}
+  const [main,pull,summaries,timeline]=await Promise.all([get("/branches/main"),get("/pulls/"+prNumber),list("/rulesets?includes_parents=true"),list("/issues/"+prNumber+"/timeline")]);
+  if(pull.number!==prNumber||!/^[a-f0-9]{40}$/i.test(pull.head?.sha)||summaries.some(r=>!Number.isSafeInteger(r.id)||r.id<1))throw Error("Invalid provider identity");
+  const [commit,rulesets]=await Promise.all([get("/commits/"+pull.head.sha),Promise.all(summaries.map(r=>get("/rulesets/"+r.id)))]);
+  if(rulesets.some((r,i)=>r.id!==summaries[i].id))throw Error("Ruleset identity changed");
+  const [latestMain,latestPull]=await Promise.all([get("/branches/main"),get("/pulls/"+prNumber)]);
+  if(latestMain.commit?.sha!==main.commit?.sha||latestPull.head?.sha!==pull.head.sha||latestPull.base?.sha!==pull.base.sha||latestPull.state!==pull.state||latestPull.draft!==pull.draft||latestPull.auto_merge?.enabled_by?.login!==pull.auto_merge?.enabled_by?.login)throw Error("Candidate moved during audit");
+  return assessCurrentJussco({mainSha:main.commit?.sha,pull,commit,timeline,rulesets});
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    if (process.argv.slice(2).some(a => a !== '--read-only'))
-      fail('no write operation is supported; use --read-only only');
-    const report = await collectJusscoRulesetPreflight({token:process.env.GITHUB_TOKEN});
-    process.stdout.write(JSON.stringify(report,null,2) + '\n');
-    if (report.issues.length) process.exitCode = 2;
-  } catch (error) {
-    process.stderr.write((error instanceof Error ? error.message : 'GitHub preflight failed') + '\n');
-    process.exitCode = 2;
-  }
+    const args=process.argv.slice(2);
+    if(args.length!==3||args[0]!=='--read-only'||args[1]!=='--pr'||!/^\d+$/.test(args[2]))fail('use --read-only --pr NUMBER; writes unsupported');
+    const report=await collectCurrentJussco({token:process.env.GITHUB_TOKEN,prNumber:Number(args[2])});
+    process.stdout.write(JSON.stringify(report,null,2)+'\n');
+    if(report.issues.length)process.exitCode=2;
+  }catch(error){process.stderr.write((error instanceof Error?error.message:'GitHub preflight failed')+'\n');process.exitCode=2;}
 }
