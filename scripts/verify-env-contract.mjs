@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { parseWranglerSecretRegistry } from './wrangler-secret-registry.mjs';
 
 const failures = [];
 const notes = [];
@@ -120,15 +121,6 @@ function quotedNames(source) {
   return [...source.matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((match) => match[1]);
 }
 
-function duplicates(values) {
-  const seen = new Set();
-  const repeated = new Set();
-  for (const value of values) {
-    if (seen.has(value)) repeated.add(value);
-    seen.add(value);
-  }
-  return [...repeated];
-}
 
 function tomlAssignmentKeys(source) {
   const keys = [];
@@ -251,19 +243,19 @@ if (canonicalEnv && localEnv) {
 }
 
 const wrangler = read('wrangler.worker.toml');
-const requiredSecretsMatch = wrangler.match(/\[secrets\][\s\S]*?required\s*=\s*\[([\s\S]*?)\]/m);
-requireValue(Boolean(requiredSecretsMatch), 'wrangler.worker.toml must declare [secrets].required');
-const workerRequiredSecrets = requiredSecretsMatch ? quotedNames(requiredSecretsMatch[1]) : [];
-// Founder Path B ruling (2026-10-30): feature secrets moved to
-// [secrets].optional are still declared Worker secret names; they are
-// installed before feature activation instead of gating deployment.
-const optionalSecretsMatch = wrangler.match(/\[secrets\][\s\S]*?optional\s*=\s*\[([\s\S]*?)\]/m);
-const workerOptionalSecrets = optionalSecretsMatch ? quotedNames(optionalSecretsMatch[1]) : [];
+// Share the deployment and MCP registry parser: comments, malformed arrays,
+// duplicates and required/optional overlap must have identical semantics.
+let workerRequiredSecrets = [];
+let workerOptionalSecrets = [];
+try {
+  const registry = parseWranglerSecretRegistry(wrangler);
+  workerRequiredSecrets = registry.required;
+  workerOptionalSecrets = registry.optional;
+} catch (error) {
+  fail(`wrangler.worker.toml secret registry invalid: ${error.message}`);
+}
 const workerDeclaredSecrets = [...workerRequiredSecrets, ...workerOptionalSecrets];
 requireValue(workerRequiredSecrets.length > 0, 'Worker required secret set must not be empty');
-for (const duplicate of duplicates(workerRequiredSecrets)) {
-  fail(`wrangler.worker.toml repeats required secret ${duplicate}`);
-}
 
 const docs = read('docs/SECRETS.md');
 const documentedIdentifiers = exactDocumentedIdentifiers(docs);
