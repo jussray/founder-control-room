@@ -1,3 +1,4 @@
+import { readSkillCatalog, renderSkillCatalog } from './security-skill-catalog.mjs';
 const root = document.querySelector('#security-root');
 const SESSION_KEY = 'fcr_session';
 
@@ -249,6 +250,8 @@ function render(snapshot) {
 
     ${truthMarkup(snapshot)}
 
+    <section class="section" id="security-skill-library" aria-live="polite"><p>Loading security skill catalog…</p></section>
+
     <section class="summary-grid" aria-label="Portfolio security target summary">
       ${summaryCard('Registered projects', summary.totalProjects)}
       ${summaryCard('V10 targets', summary.v10Targets, 'v10')}
@@ -283,6 +286,14 @@ async function boot() {
   try {
     const snapshot = await api('/security-posture');
     render(snapshot);
+    const library = document.querySelector('#security-skill-library');
+    try {
+      const catalog = await readSkillCatalog();
+      renderSkillCatalog(library, catalog);
+    } catch (error) {
+      if (error?.auth) { signInBoundary(); return; }
+      library.textContent = 'Security Skills Library unavailable. No cached catalog is shown.';
+    }
   } catch (error) {
     if (error?.auth) signInBoundary();
     else unavailableBoundary(error instanceof Error ? error.message : String(error));
