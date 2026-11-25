@@ -22,7 +22,7 @@ export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
     allowedToolPatterns: ["get_approved_knowledge", "search_approved_knowledge"],
     deniedToolPatterns: [
       "*create*", "*update*", "*delete*", "*write*", "*apply*",
-      "*approve*", "*publish*", "*deploy*", "*merge*", "*execute*",
+      "approve_*", "*publish*", "*deploy*", "*merge*", "*execute*",
       "*revoke*", "*remove*", "*upload*",
     ],
     defaultRisk: "read",
