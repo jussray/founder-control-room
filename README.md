@@ -866,3 +866,5 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.

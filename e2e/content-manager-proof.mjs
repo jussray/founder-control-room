@@ -334,6 +334,7 @@ try {
   await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
   const publicPayloadHash = selected.locator('[data-public-payload-hash]');
   assert.equal(await publicPayloadHash.isEditable(), false, 'public payload hash must remain read-only');
+  assert.equal(await publicPayloadHash.getAttribute('readonly'), '', 'public payload hash must have the readonly attribute');
   assert.equal(await publicPayloadHash.inputValue(), approvedPost.contentHash, 'selected post supplies the exact payload hash');
   await page.locator('[data-publish-confirm]').check();
   await publish.click();

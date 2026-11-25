@@ -50,7 +50,7 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '568d8c4f3bb2c01faf8f369857774d1bdde88205';
+const SEKRET_BIP_AUDITED_HEAD = '392c23bfed4026d01e2bd018c93ace27f8a8819b';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'app/index.tsx': '13201b51df3477b3032d091365d37056e411c4e9',
   'screens/WebWelcomeScreen.tsx': '41fcf511ff5298ddf3efd9426a37e02f8c4d3197',
@@ -61,7 +61,7 @@ const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
 } as const;
 const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
-const CHIEF_AI_AUDITED_HEAD = '20d34e257997c866836af06a30e6af7b6f8f0b8c';
+const CHIEF_AI_AUDITED_HEAD = 'f3e66f60e12804e616b4b0cd718194792b741725';
 const CHIEF_AI_AUDITED_CONTRACT_BLOBS = {
   'src/domain/capability-plan.js': '7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5',
   'src/domain/capability-registry.js': '5b1c6e39a9ec675e03032a480ff00c2967479f22',
