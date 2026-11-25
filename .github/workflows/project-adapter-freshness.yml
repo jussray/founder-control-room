@@ -12,6 +12,8 @@ on:
       - "src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts"
       - "src/founder-os-lab/__tests__/projectAdapterFreshness.test.ts"
       - "scripts/verify-project-adapter-freshness.ts"
+      - "scripts/project-adapter-triage.mjs"
+      - "scripts/project-adapter-triage.test.mjs"
       - ".github/workflows/project-adapter-freshness.yml"
   push:
     branches: [main]
@@ -24,6 +26,8 @@ on:
       - "src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts"
       - "src/founder-os-lab/__tests__/projectAdapterFreshness.test.ts"
       - "scripts/verify-project-adapter-freshness.ts"
+      - "scripts/project-adapter-triage.mjs"
+      - "scripts/project-adapter-triage.test.mjs"
       - ".github/workflows/project-adapter-freshness.yml"
   schedule:
     - cron: "37 * * * *"
@@ -76,6 +80,9 @@ jobs:
           src/founder-os-lab/__tests__/projectAdapters.test.ts
           src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts
 
+      - name: Prove drift incident automation remains fail-closed
+        run: node --test scripts/project-adapter-triage.test.mjs
+
       - name: Verify live main and audited project contract blobs
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -115,3 +122,39 @@ jobs:
           path: ${{ env.PROJECT_ADAPTER_FRESHNESS_RECEIPT }}
           if-no-files-found: error
           retention-days: 30
+
+  triage:
+    name: Reconcile hourly drift review incident
+    needs: freshness
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Check out the scheduled exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download authoritative freshness receipt
+        uses: actions/download-artifact@v4
+        with:
+          name: project-adapter-freshness-${{ github.sha }}
+          path: test-results
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Test incident state transitions
+        run: node --test scripts/project-adapter-triage.test.mjs
+
+      - name: Reconcile non-authorizing founder review incident
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/project-adapter-triage.mjs

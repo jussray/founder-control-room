@@ -862,3 +862,9 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+## November 25, 2026 — audited Se’kret Bip adapter renewal
+
+The source-only, read-only preview adapter in `src/founder-os-lab/projectAdapters.ts` now binds the seven required Se’kret Bip contract paths to inspected source head `41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223`. The two changed blobs versus the previous audited head `0765c804fc6d0ab4ad267d95f7cc5c7631843500` are `app/index.tsx` (`e3430ef2c9bc99507f9040b90ec6d54977d28ca8` → `13201b51df3477b3032d091365d37056e411c4e9`) and `screens/WebWelcomeScreen.tsx` (`9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c` → `41fcf511ff5298ddf3efd9426a37e02f8c4d3197`). The other five required blobs were independently re-read and matched the prior audit.
+
+The new entry route sends existing sessions that require renewed consent to the public auth consent screen before entering a private teen/parent route. The public welcome view also exposes a site-map link. These are source-code findings, not a claim that live sessions, the site-map destination, or production consent persistence were tested. The adapter **must** remain read-only (`inspect`/`plan`) and **must not** convert source re-pinning or test success into account, provider, publishing, merge, deployment, or production-runtime authority. This exact-head audit expires when required source files change again; `docs/TRUTH_DECAY_AUDIT.md` and `docs/DOCUMENTATION_TRUTH_RECEIPT.json` carry the corresponding time-bound evidence boundary.
