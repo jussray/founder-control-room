@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { dispatchRemediationSignal, planRemediationSignal } from '../remediationSignal.js';
+import type { OperatorRelayRequestV1 } from '../operatorRelay.js';
 import { buildOperatorRelayResponse } from '../operatorRelayProviderResult.js';
 
 const signal = { repository: 'jussray/example', pr: 7, head: 'a'.repeat(40), kind: 'ci_failed' as const };
@@ -13,7 +14,7 @@ describe('FCR remediation signal', () => {
     expect(() => planRemediationSignal({ ...signal, head: 'abc' })).toThrow();
   });
   it('binds a minimized signal to the exact head, never grants write authority', async () => {
-    const adapter = vi.fn(async (request) => buildOperatorRelayResponse(request, {
+    const adapter = vi.fn(async (request: OperatorRelayRequestV1) => buildOperatorRelayResponse(request, {
       answer: 'Plan only', evidenceRefs: ['provider:test:receipt'], completedAt: now.toISOString(),
     }));
     const result = await dispatchRemediationSignal(signal, { codex: adapter }, async () => true, now);
