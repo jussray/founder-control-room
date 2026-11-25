@@ -190,9 +190,9 @@ describe('provider-neutral n8n founder-content routing', () => {
     expect(providerSupportsFounderContentPlatform('youtube', 'youtube_shorts')).toBe(true);
   });
 
-  it('defaults runtime enablement to Buffer only and fails closed on invalid provider configuration', () => {
+  it('defaults runtime enablement to all founder-activated contract providers and fails closed on invalid provider configuration', () => {
     expect(readN8nFounderContentProviderConfig({})).toEqual({
-      enabledProviders: ['buffer'],
+      enabledProviders: ['buffer', 'meta', 'tiktok', 'x', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business'],
       invalidProviders: [],
     });
     expect(readN8nFounderContentProviderConfig({

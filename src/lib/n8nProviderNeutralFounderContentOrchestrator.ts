@@ -74,6 +74,11 @@ interface FounderContentAuthorizationContract {
 
 const canonicalFounderAuthorization = founderContentAuthorizationContract as FounderContentAuthorizationContract;
 const DEFAULT_PROVIDER: N8nFounderContentProvider = 'buffer';
+// Founder activation (2026-11-25): every contract provider lane is
+// runtime-enabled by default. The env allowlist can still narrow or
+// override this set; invalid values fail closed in the reader below.
+export const N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS: readonly N8nFounderContentProvider[] =
+  Object.freeze(Object.keys(N8N_FOUNDER_CONTENT_PROVIDER_ROUTES) as N8nFounderContentProvider[]);
 const NATIVE_REVIEW_WINDOW_MINUTES = 20;
 const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
@@ -242,7 +247,7 @@ export function readN8nFounderContentProviderConfig(
 ): N8nFounderContentProviderConfig {
   const raw = text(env.N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS);
   if (!raw) {
-    return { enabledProviders: [DEFAULT_PROVIDER], invalidProviders: [] };
+    return { enabledProviders: [...N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS], invalidProviders: [] };
   }
 
   const requested = [...new Set(raw

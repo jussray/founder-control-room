@@ -13,7 +13,7 @@ const verifiedBufferProof = {
 };
 
 describe('founder-content orchestration readiness', () => {
-  it('reports an unconfigured Buffer-default lane without exposing provider secrets', () => {
+  it('reports an unconfigured all-providers-default lane without exposing provider secrets', () => {
     const readiness = founderContentOrchestrationReadiness({});
 
     expect(readiness).toEqual({
@@ -22,7 +22,7 @@ describe('founder-content orchestration readiness', () => {
       enabled: false,
       webhookConfigured: false,
       bearerTokenConfigured: false,
-      enabledProviders: ['buffer'],
+      enabledProviders: ['buffer', 'meta', 'tiktok', 'x', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business'],
       invalidProviders: [],
       bufferEnabled: true,
       bufferReadyForProbe: false,

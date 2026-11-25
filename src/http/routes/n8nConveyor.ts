@@ -11,6 +11,7 @@ import {
 } from '../../lib/n8nConveyor.js';
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
+  N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { dispatchAuthoritativeN8nFounderContent } from '../../lib/authoritativeN8nFounderContentPublisher.js';
@@ -104,8 +105,8 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
       providerRuntimeConfiguration: {
         env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
-        defaultEnabled: ['buffer'],
-        rule: 'contract-capable-does-not-imply-runtime-enabled',
+        defaultEnabled: [...N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS],
+        rule: 'all-contract-providers-runtime-enabled-by-default-env-allowlist-overrides',
       },
       readiness: founderContentReadiness,
       controlledProbeAllowed: founderContentReadiness.bufferReadyForProbe,
