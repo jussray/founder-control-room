@@ -112,7 +112,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(app).toContain('Content manager');
     expect(contentManager).toContain('Workflow content lifecycle');
     expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
-    expect(contentManager).toContain('First-party LinkedIn publish capability implemented');
+    expect(contentManager).toContain('First-party LinkedIn, X, and Facebook Page text capabilities implemented');
     expect(contentManager).toContain('Temporal truth UNKNOWN until execution');
     expect(contentManager).toContain('Capability is not publication proof.');
     expect(contentManager).toContain('chief-ai/founder-content-proposal');
