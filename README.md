@@ -862,3 +862,9 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+
+## November 24, 2026 — founder success notifications (candidate only)
+
+`src/buildEvents/founderNotificationIntent.ts` must project only completed successful workflow events, actual merged closed PRs and provider-reported successful deployments with valid exact nonzero commit SHAs and evidence links; workflow recovery requires the same repository, run ID and SHA, an earlier failed attempt and the immediately succeeding attempt. This projection neither sends Web Push nor proves independent runtime verification, founder authorization or phone receipt.
+The source adds a private enrollment and evidence feed, with delivery disabled by default. Database migration, exact-head CI, independent review, authorized deployment, and witnessed device receipt remain distinct gates. See [activation runbook](docs/FOUNDER_SUCCESS_NOTIFICATIONS.md).
