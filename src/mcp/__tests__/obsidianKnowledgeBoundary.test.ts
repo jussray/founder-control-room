@@ -11,6 +11,7 @@ const LOCAL_URL = "http://127.0.0.1:8789/mcp";
 const env = {
   NODE_ENV: "development",
   MCP_OBSIDIAN_BRAIN_URL: LOCAL_URL,
+  JUSS_BRAIN_READ_TOKEN: "test-only-" + "x".repeat(48),
 } as NodeJS.ProcessEnv;
 
 function decision(
@@ -33,6 +34,12 @@ describe("Obsidian approved-knowledge boundary (local, opt-in, read-only)", () =
     expect(obsidian?.developmentOnly).toBe(true);
     expect(decision("search_approved_knowledge", {
       env: { NODE_ENV: "development" } as NodeJS.ProcessEnv,
+    })).toBe("deny");
+    expect(decision("search_approved_knowledge", {
+      env: { ...env, JUSS_BRAIN_READ_TOKEN: "" },
+    })).toBe("deny");
+    expect(decision("search_approved_knowledge", {
+      env: { ...env, JUSS_BRAIN_READ_TOKEN: "short" },
     })).toBe("deny");
   });
 
@@ -64,7 +71,7 @@ describe("Obsidian approved-knowledge boundary (local, opt-in, read-only)", () =
   it("rejects production, test, and unspecified runtime modes", () => {
     for (const mode of ["production", "test", undefined]) {
       expect(decision("get_approved_knowledge", {
-        env: { NODE_ENV: mode, MCP_OBSIDIAN_BRAIN_URL: LOCAL_URL },
+        env: { ...env, NODE_ENV: mode },
       })).toBe("deny");
     }
   });
@@ -82,7 +89,7 @@ describe("Obsidian approved-knowledge boundary (local, opt-in, read-only)", () =
       "file:///tmp/brain",
     ]) {
       expect(decision("search_approved_knowledge", {
-        env: { NODE_ENV: "development", MCP_OBSIDIAN_BRAIN_URL: url },
+        env: { ...env, MCP_OBSIDIAN_BRAIN_URL: url },
       })).toBe("deny");
     }
   });
