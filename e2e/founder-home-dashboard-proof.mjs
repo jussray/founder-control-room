@@ -535,12 +535,13 @@ console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR t
 {
   const {server,baseUrl,promptOsCommandIntakeRequests}=await startServer('full');
   for (const viewport of [{width:1280,height:900},{width:390,height:844}]) {
+    const priorCount=promptOsCommandIntakeRequests.length;
     const {pageErrors,consoleErrors}=await withPage(browser,viewport,async(page)=>{
       await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
       await page.waitForSelector('.founder-home-grid',{state:'visible'});
       await page.locator('.founder-screen-nav button').filter({hasText:/^PromptOS$/}).click();
       await page.waitForSelector('#promptos-command-intake-form',{state:'visible'});
-      assert(promptOsCommandIntakeRequests.length===0,'opening PromptOS never sends an intake automatically');
+      assert(promptOsCommandIntakeRequests.length===priorCount,'opening PromptOS never sends an intake automatically');
       const intent = {
         schema: 'promptos/public-command-intent@v1',
         command: { id: 'ai-mastery-v6', token: '/ai-mastery-v6', category: 'ai-mastery', label: 'AI Mastery V6' },
