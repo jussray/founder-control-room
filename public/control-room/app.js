@@ -475,7 +475,7 @@ function founderChatMarkup() {
       </div>
       <div class="founder-chat-thread" data-founder-chat-thread aria-live="polite">
         ${messages || '<p class="founder-chat-empty">Say what you want to move forward. FCR keeps the cockpit around the conversation instead of replacing it.</p>'}
-        ${state.founderChat.sending ? '<div class="founder-chat-message" data-role="council"><span>Council</span><p class="fcr-thinking-companion" data-fcr-thinking-companion role="status"><span class="fcr-thinking-butterfly fcr-vesper-sprite" aria-hidden="true"></span><img class="fcr-thinking-bird" src="/control-room/assets/mcallea-avatar.webp" alt="" width="62" height="64"><span>Vesper &amp; McAllea · Thinking across the existing Council lane…</span></p></div>' : ''}
+        ${state.founderChat.sending ? '<div class="founder-chat-message" data-role="council"><span>Council</span><p class="fcr-thinking-companion" data-fcr-thinking-companion role="status"><span class="fcr-thinking-butterfly fcr-vesper-sprite" aria-hidden="true"></span><span class="fcr-thinking-bird fcr-mcallea-flight" aria-hidden="true"></span><span>Vesper &amp; McAllea · Thinking across the existing Council lane…</span></p></div>' : ''}
       </div>
       <form id="founder-chat-form" class="founder-chat-form">
         <textarea name="message" data-founder-chat-input rows="3" maxlength="3000" placeholder="Tell FCR what you want to build, fix, decide, verify, or understand…" required ${projectSlug && !state.founderChat.sending ? '' : 'disabled'}></textarea>

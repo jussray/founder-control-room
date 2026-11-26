@@ -36,6 +36,7 @@ const requiredAssets = [
   'control-room/styles.css',
   'control-room/assets/vesper-sprite.webp',
   'control-room/assets/mcallea-avatar.webp',
+  'control-room/assets/mcallea-flight.webp',
   // These four files are load-bearing for the five-screen cockpit/runtime seam.
   // Packaging must fail closed if merge reconciliation ever drops one of them.
   'control-room/opaque-session-bootstrap.js',
