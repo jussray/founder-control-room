@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient.js';
 import type { FounderPermissionFederatedRelayKeyTarget } from './founderPermissionBroker.js';
 
@@ -50,23 +51,28 @@ function receipt(row: RelayKeyRow, target: FounderPermissionFederatedRelayKeyTar
   };
 }
 
-async function readKey(keyId: string): Promise<{ row: RelayKeyRow | null; error: unknown }> {
-  const { data, error } = await supabase.from('federated_relay_public_keys')
+type RelayKeyDatabase = Pick<SupabaseClient, 'from'>;
+
+async function readKey(db: RelayKeyDatabase, keyId: string): Promise<{ row: RelayKeyRow | null; error: unknown }> {
+  const { data, error } = await db.from('federated_relay_public_keys')
     .select('key_id,member,algorithm,public_key_jwk,state,valid_from,valid_until,revoked_at,created_at')
     .eq('key_id', keyId)
     .maybeSingle();
   return { row: data as RelayKeyRow | null, error };
 }
 
-export async function registerFederatedRelayPublicKey(target: FounderPermissionFederatedRelayKeyTarget) {
-  const existing = await readKey(target.keyId);
+export async function registerFederatedRelayPublicKey(
+  target: FounderPermissionFederatedRelayKeyTarget,
+  db: RelayKeyDatabase = supabase,
+) {
+  const existing = await readKey(db, target.keyId);
   if (existing.error) throw new Error('FCR_RELAY_KEY_LOOKUP_FAILED');
   if (existing.row) {
     if (!sameRegistration(existing.row, target)) throw new Error('FCR_RELAY_KEY_ID_CONFLICT');
     return receipt(existing.row, target, 'ALREADY_REGISTERED');
   }
 
-  const { data, error } = await supabase.from('federated_relay_public_keys').insert({
+  const { data, error } = await db.from('federated_relay_public_keys').insert({
     key_id: target.keyId,
     member: 'promptos',
     algorithm: 'Ed25519',
@@ -77,7 +83,7 @@ export async function registerFederatedRelayPublicKey(target: FounderPermissionF
   }).select('key_id,member,algorithm,public_key_jwk,state,valid_from,valid_until,revoked_at,created_at').single();
 
   if (error || !data) {
-    const winner = await readKey(target.keyId);
+    const winner = await readKey(db, target.keyId);
     if (!winner.error && winner.row && sameRegistration(winner.row, target)) {
       return receipt(winner.row, target, 'ALREADY_REGISTERED');
     }
