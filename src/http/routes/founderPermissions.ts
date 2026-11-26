@@ -30,6 +30,7 @@ import {
   type FounderRequest,
 } from '../middleware/requireFounder.js';
 import { rateLimitFounderPermissions } from '../middleware/security.js';
+import { registerFederatedRelayPublicKey } from '../../lib/federatedRelayKeyRegistration.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -91,6 +92,22 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
       baseSha: text(value.baseSha),
       headSha: text(value.headSha),
     };
+  }
+  if (type === 'federated_relay_public_key_register') {
+    const jwk = isRecord(value.publicKeyJwk) ? value.publicKeyJwk : null;
+    return {
+      type: 'federated_relay_public_key_register',
+      member: text(value.member) as 'promptos',
+      keyId: text(value.keyId),
+      algorithm: text(value.algorithm) as 'Ed25519',
+      publicKeyJwk: jwk ? { kty: text(jwk.kty) as 'OKP', crv: text(jwk.crv) as 'Ed25519', x: text(jwk.x) } : null,
+      publicKeyHash: text(value.publicKeyHash),
+      validFrom: text(value.validFrom),
+      validUntil: text(value.validUntil) || null,
+      providerIdentity: text(value.providerIdentity) as 'supabase:fcr',
+      capabilityVersion: text(value.capabilityVersion) as 'fcr-federated-relay-key-registration@v1',
+      consequence: text(value.consequence) as 'CONSEQUENTIAL_WRITE',
+    } as FounderPermissionActionTarget;
   }
   if (type === 'promptos_workflow_registry_promote') {
     return {
@@ -380,6 +397,33 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
         provider: executionProvider,
         writer: executionWriter,
       });
+      return res.json({
+        consumed: true,
+        ...projection(asJsonRecord(data)),
+        executionAuthorized: false,
+        executionPreconditionsVerified: true,
+        effectGate: 'SERVER_SIDE_ONLY',
+        outcomeVerified: true,
+        effectReceipt,
+      });
+    } catch (effectError) {
+      return res.status(409).json({
+        consumed: true,
+        ...projection(asJsonRecord(data)),
+        executionAuthorized: false,
+        executionPreconditionsVerified: false,
+        outcomeVerified: false,
+        requiresNewApproval: true,
+        retryAuthorized: false,
+        error: effectError instanceof Error ? effectError.message : String(effectError),
+        code: 'FOUNDER_PERMISSION_EFFECT_FAILED_OR_UNVERIFIED',
+      });
+    }
+  }
+
+  if (permissionRequest.actionTarget?.type === 'federated_relay_public_key_register') {
+    try {
+      const effectReceipt = await registerFederatedRelayPublicKey(permissionRequest.actionTarget);
       return res.json({
         consumed: true,
         ...projection(asJsonRecord(data)),
