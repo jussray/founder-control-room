@@ -222,3 +222,7 @@ Workflow YAML syntax belongs to the same exact-head source contract: `.github/wo
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+## Feature-branch CI is verification only
+
+The focused `feat/fcr-founder-gated-relay-key-registration` branch is included in the CI push trigger to run exact-head typecheck, lint, tests, and Playwright before review. Passing CI is evidence about that commit only. It does not create founder-final merge approval, authorize production deployment, provision signing secrets, or write relay keys to Supabase.
