@@ -1,0 +1,302 @@
+{
+  "schemaVersion": "1.0",
+  "registryVersion": "2.0.0",
+  "appId": "founder-control-room",
+  "registry": {
+    "repository": "jussray/promptos",
+    "manifestPath": "manifests/apps/founder-control-room.json",
+    "revision": "667ba485a051417f4ca6d00810b9732d08c095e0",
+    "sourceRef": "feat/app-skill-registry-v2-20261125",
+    "status": "candidate"
+  },
+  "source": {
+    "repository": "jussray/ULTRATHINK-",
+    "revision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+    "sourceRef": "feat/portable-skill-packages-20261125",
+    "status": "candidate"
+  },
+  "skills": {
+    "shared": [
+      {
+        "id": "goalfix",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/goalfix/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "ultrathink",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/ultrathink/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "redteam",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/redteam/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "proofmode",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/proofmode/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      }
+    ],
+    "owned": [
+      {
+        "id": "portfolio-control-plane",
+        "sourceRepository": "jussray/founder-control-room",
+        "sourcePath": "skills/portfolio-control-plane/SKILL.md",
+        "sourceRevision": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "founder-control-room",
+        "compatibility": {
+          "apps": [
+            "founder-control-room"
+          ],
+          "surfaces": [
+            "web",
+            "api"
+          ]
+        }
+      },
+      {
+        "id": "ultrathink-attack-godmode",
+        "sourceRepository": "jussray/founder-control-room",
+        "sourcePath": "skills/ultrathink-attack-godmode/SKILL.md",
+        "sourceRevision": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "founder-control-room",
+        "compatibility": {
+          "apps": [
+            "founder-control-room"
+          ],
+          "surfaces": [
+            "web",
+            "api"
+          ]
+        }
+      },
+      {
+        "id": "repair-to-proof",
+        "sourceRepository": "jussray/founder-control-room",
+        "sourcePath": "skills/repair-to-proof/SKILL.md",
+        "sourceRevision": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "founder-control-room",
+        "compatibility": {
+          "apps": [
+            "founder-control-room"
+          ],
+          "surfaces": [
+            "web",
+            "api"
+          ]
+        }
+      },
+      {
+        "id": "continuity-proof-ledger",
+        "sourceRepository": "jussray/founder-control-room",
+        "sourcePath": "skills/continuity-proof-ledger/SKILL.md",
+        "sourceRevision": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "founder-control-room",
+        "compatibility": {
+          "apps": [
+            "founder-control-room"
+          ],
+          "surfaces": [
+            "web",
+            "api"
+          ]
+        }
+      },
+      {
+        "id": "devil",
+        "sourceRepository": "jussray/founder-control-room",
+        "sourcePath": "skills/devil/SKILL.md",
+        "sourceRevision": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "founder-control-room",
+        "compatibility": {
+          "apps": [
+            "founder-control-room"
+          ],
+          "surfaces": [
+            "web",
+            "api"
+          ]
+        }
+      }
+    ],
+    "ownedSkillsStatus": "source-audited"
+  },
+  "plugins": [
+    {
+      "id": "github",
+      "provider": "GitHub",
+      "purpose": "Repository, PR, review, and CI evidence.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "repository.read",
+        "branch.read",
+        "pull-request.read",
+        "checks.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "cloudflare",
+      "provider": "Cloudflare",
+      "purpose": "Worker, deployment, and runtime metadata.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "worker.read",
+        "deployment.read",
+        "runtime.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "neon",
+      "provider": "Neon",
+      "purpose": "Database branch and schema inspection.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "database.branch.read",
+        "database.schema.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "openai-platform",
+      "provider": "OpenAI Platform",
+      "purpose": "Model project and API configuration inspection.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "model-project.read",
+        "model-config.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    }
+  ],
+  "compatibility": {
+    "surfaces": [
+      "web",
+      "api"
+    ],
+    "requiresPlaywrightForUi": true,
+    "observedSkillDirectories": [
+      "skills/",
+      "skills/juss-authored/",
+      ".agents/skills/"
+    ]
+  },
+  "authority": "catalog-and-compatibility-only",
+  "installationState": "not-asserted",
+  "executionAuthority": "none"
+}

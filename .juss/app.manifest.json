@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "registryVersion": "2.0.0",
+  "id": "founder-control-room",
+  "name": "Founder Control Room",
+  "repository": "founder-control-room",
+  "defaultBranch": "main",
+  "sourceHeadAtAudit": "e4a9888f6384a38782a21585ddbe43a75f1e5fa8",
+  "identityStatus": "source-verified",
+  "role": "founder-governance-approval-evidence-and-release-plane",
+  "authorityOwner": "founder-control-room",
+  "authorityScope": "Portfolio governance, exact-candidate approval, evidence, and release gates; sibling products retain their own ownership.",
+  "surfaces": [
+    "web",
+    "api"
+  ],
+  "localManifestPaths": [
+    ".juss/app.manifest.json",
+    ".juss/skills.manifest.json"
+  ]
+}
