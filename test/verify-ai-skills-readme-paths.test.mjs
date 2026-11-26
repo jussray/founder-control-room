@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {findMissingLocalPaths} from '../scripts/verify-ai-skills-readme-paths.mjs';
@@ -47,3 +47,15 @@ test('does not treat commands, external canonical links, packages or fenced exam
 test('fails closed on path traversal outside the repository', () => withRepo(root => {
   assert.deepEqual(findMissingLocalPaths('[Outside](../../forbidden.md)', root), ['../../forbidden.md']);
 }));
+
+test('PR workflow checks out and verifies the exact candidate head SHA', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ai-skills-readme-paths.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(workflow, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
+  assert.match(workflow, /git rev-parse HEAD/);
+});
+
+test('required verify:ai-skills contract enforces README path validity', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.scripts['verify:ai-skills'], /node scripts\/verify-ai-skills-readme-paths\.mjs/);
+});
