@@ -36,7 +36,7 @@ test('rejects intro and screen audio that ends before the authentic footage segm
     ['intro',shortIntro,fullScreen],
     ['screen',fullIntro,shortScreen],
   ]){
-   const output=join(d,name+'.mp4');
+   const output=join(d,name+'-out.mp4');
    const r=cmd('node',[script,'--intro',intro,'--screen',screen,'--output',output,'--width','270','--height','480']);
    assert.notEqual(r.status,0,`A full-length video with truncated ${name} audio must be rejected`);
    assert.match(r.stderr,new RegExp(name+'.*audio','i'));
