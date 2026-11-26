@@ -90,3 +90,13 @@ Not invoked for this source-only baseline:
 ## Coverage and confidence
 
 This is a targeted initial review of selected canonical files, not an exhaustive security audit. It does not inspect every route, dependency, model/provider adapter, environment, deployed setting, contributor record, or customer data path. Unknown means unknown, not safe and not absent.
+
+
+## First enforcement slice added to the FCR candidate
+
+- `config/founder-ip-protection-registry.json` now records the four standalone peers, six control states, known license posture, unresolved integration inventory, permission defaults, and required evidence.
+- `scripts/verify-founder-ip-protection.mjs` validates required peers and controls, preserves SolContinuity's Apache-2.0/contributor uncertainty, rejects an empty inventory marked complete, rejects confidential/restricted flows approved with unknown provider posture, requires a contract reference for cross-product access, and rejects any claim that technical access grants ownership.
+- `scripts/verify-founder-ip-protection.test.mjs` contains positive and negative contract tests.
+- `package.json` adds `verify:founder-ip-protection` and wires it into `npm test`.
+
+**Scope:** CI/source contract enforcement only. It does not intercept runtime provider calls, change provider settings, prove data isolation, establish ownership, or certify exports. Those remain open gates and must be implemented in each product's native runtime after its own preflight and local source review.
