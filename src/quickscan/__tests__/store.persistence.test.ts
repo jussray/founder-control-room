@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuickScanProspect } from '../contracts.js';
-
 const { rows } = vi.hoisted(() => ({
   rows: {
     quickscan_prospects: new Map<string, { id: string; prospect: unknown; updated_at: string }>(),
