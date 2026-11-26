@@ -95,19 +95,20 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
   }
   if (type === 'federated_relay_public_key_register') {
     const jwk = isRecord(value.publicKeyJwk) ? value.publicKeyJwk : null;
+    if (!jwk) return null;
     return {
       type: 'federated_relay_public_key_register',
       member: text(value.member) as 'promptos',
       keyId: text(value.keyId),
       algorithm: text(value.algorithm) as 'Ed25519',
-      publicKeyJwk: jwk ? { kty: text(jwk.kty) as 'OKP', crv: text(jwk.crv) as 'Ed25519', x: text(jwk.x) } : null,
+      publicKeyJwk: { kty: text(jwk.kty) as 'OKP', crv: text(jwk.crv) as 'Ed25519', x: text(jwk.x) },
       publicKeyHash: text(value.publicKeyHash),
       validFrom: text(value.validFrom),
       validUntil: text(value.validUntil) || null,
       providerIdentity: text(value.providerIdentity) as 'supabase:fcr',
       capabilityVersion: text(value.capabilityVersion) as 'fcr-federated-relay-key-registration@v1',
       consequence: text(value.consequence) as 'CONSEQUENTIAL_WRITE',
-    } as FounderPermissionActionTarget;
+    };
   }
   if (type === 'promptos_workflow_registry_promote') {
     return {
