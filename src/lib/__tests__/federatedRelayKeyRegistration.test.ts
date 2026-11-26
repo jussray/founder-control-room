@@ -49,7 +49,6 @@ describe('Founder-gated federated relay public-key registration', () => {
       publicKeyHash,
       validFrom: '2026-11-26T00:00:00.000Z',
       validUntil: null,
-      executionAuthorized: undefined,
     });
     expect(value.requestHash).toMatch(/^[0-9a-f]{64}$/);
   });
