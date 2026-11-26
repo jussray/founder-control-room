@@ -114,12 +114,12 @@ async function provePublicFrontDoor(label, viewport) {
   }
   const discover = page.locator('#discover');
   const explore = discover.getByRole('link', { name: /^Explore Founders/ });
+  const signup = discover.getByRole('link', { name: /^Get started/ });
   if (await explore.count() !== 1 || !(await explore.isVisible()) || await explore.getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: public Explore action must route to the real public work directory`);
   }
-  const signup = discover.getByRole('link', { name: /^Get started/ });
   if (await signup.count() !== 1 || !(await signup.isVisible()) || await signup.getAttribute('href') !== '/welcome' || await signup.getAttribute('data-auth-open') !== 'signup') {
-    throw new Error(`${label}: public signup action must preserve the separate authentication entry`);
+    throw new Error(`${label}: public Get started action must preserve the separate authentication entry`);
   }
   // Visual cards must preserve real keyboard-accessible public destinations.
   for (const [kind, expectedHref] of [
