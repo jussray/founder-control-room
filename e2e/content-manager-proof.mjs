@@ -332,7 +332,10 @@ try {
 
   await page.locator('[data-proposal-json]').fill('{}');
   await page.locator('[data-authorization-hash]').fill('c'.repeat(64));
-  await page.locator('[data-public-payload-hash]').fill(approvedPost.contentHash);
+  const publicPayloadHash = page.locator('[data-public-payload-hash]');
+  assert.equal(await publicPayloadHash.getAttribute('readonly'), '', 'public payload hash must not be editable by the founder');
+  assert.equal(await publicPayloadHash.isEditable(), false, 'the browser must enforce read-only payload hash behavior');
+  assert.equal(await publicPayloadHash.inputValue(), approvedPost.contentHash, 'selected approved post must supply the exact public payload hash');
   await page.locator('[data-publish-confirm]').check();
   await publish.click();
   await page.waitForFunction(() => document.querySelector('[data-console-output]')?.textContent?.includes('PLAYWRIGHT_PROOF_PROVIDER_WRITE_DISABLED'));
