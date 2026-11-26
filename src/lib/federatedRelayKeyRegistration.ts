@@ -28,6 +28,7 @@ function sameRegistration(row: RelayKeyRow, target: FounderPermissionFederatedRe
     && (row.public_key_jwk as Record<string, unknown>)?.kty === 'OKP'
     && (row.public_key_jwk as Record<string, unknown>)?.crv === 'Ed25519'
     && (row.public_key_jwk as Record<string, unknown>)?.x === target.publicKeyJwk.x
+    && Object.keys(row.public_key_jwk as Record<string, unknown>).length === 3
     && Date.parse(row.valid_from) === Date.parse(target.validFrom)
     && (row.valid_until === null ? target.validUntil === null : target.validUntil !== null && Date.parse(row.valid_until) === Date.parse(target.validUntil))
     && row.state === 'active'
