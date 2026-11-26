@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createPublicKey } from 'node:crypto';
 import {
   FOUNDER_CONTROL_SURFACES,
   founderControlProposalBindingErrors,
@@ -241,6 +241,11 @@ function normalizedFederatedRelayKeyTarget(
     throw new Error('Relay key registration validUntil must be later than validFrom');
   }
   const canonicalJwk = { kty: 'OKP' as const, crv: 'Ed25519' as const, x: publicKeyJwk.x };
+  try {
+    createPublicKey({ key: canonicalJwk, format: 'jwk' });
+  } catch {
+    throw new Error('Relay key registration public JWK cannot be imported as Ed25519');
+  }
   const digest = createHash('sha256').update(JSON.stringify(canonicalJwk)).digest('hex');
   if (text(input.publicKeyHash).toLowerCase() !== digest
     || proposal.proposalHash.toLowerCase() !== digest) {
