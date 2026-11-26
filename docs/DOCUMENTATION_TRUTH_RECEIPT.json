@@ -15,6 +15,12 @@
   ],
   "changes": [
     {
+      "path": "public/_worker.js",
+      "claims": [
+        "`public/_worker.js` must serve public GET/HEAD `/` from Pages ASSETS and keep `/welcome` as the separate sign-in door, while `/auth/callback`, `/assets/auth-callback.js`, and `/assets/control-room.css` stay on the identity-checked FCR_API route; successful founder session handoff in `src/http/routes/onboardingAssets/callbackJs.ts` must target `/control-room/` rather than the public root, and neither routing code nor a synthetic Playwright fixture proves deployed authentication or Cloudflare binding state."
+      ]
+    },
+    {
       "path": "wrangler.worker.toml",
       "claims": [
         "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."
@@ -432,7 +438,9 @@
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief integration evidence to one audited exact Chief head; moving that head expires predecessor adapter and pair-contract proof, requires the focused assertion and path-bound documentation receipt to move together, and grants no Chief runtime, merge, deploy, publication, or provider authority.",
         "`src/founder-os-lab/projectAdapters.ts` must bind Chief PR #242 exact candidate `0d1106424802fa21d37c6a05fc3e6f6422cc989a` to five observed contract blobs, the restored `necessary-fix-policy.json`, and pair blob `dd008420e1a91e78516b45d9e27de89344abf432`. FCR PR #1015 and Chief PR #242 remain draft. Live freshness must fail closed while Chief main still carries stale pair content; no preceding CI proof grants merge, founder, publishing, provider-write, or deploy authority.",
         "`src/founder-os-lab/projectAdapters.ts` must pin read-only Se’kret Bip adapter evidence to exact observed `main` `e3b6a3a36737f3c1d24c37fd2842ee6d7bf97150` and required `screens/WebWelcomeScreen.tsx` blob `9d3a1128d09d47f3e9b4eb5d8f3da5f3dbe2709c`; the other six audited contract blobs must still match. Audience-to-account-side routing, composite character canon, reduced-motion protection, and preview-only non-execution remain required. Head movement or blob drift must fail closed and cannot create merge, production, publication, or provider authority.",
-        "`src/founder-os-lab/projectAdapters.ts` must pin Se’kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` `e3430ef2`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (registry `5b1c6e39`, pair contract `dd008420`) after semantic review of each changed blob; the other nine blobs are unchanged. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement."
+        "`src/founder-os-lab/projectAdapters.ts` must pin Se’kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` `e3430ef2`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (registry `5b1c6e39`, pair contract `dd008420`) after semantic review of each changed blob; the other nine blobs are unchanged. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement.",
+        "`src/founder-os-lab/projectAdapters.ts` must pin Se’kret Bip main `568d8c4f3bb2c01faf8f369857774d1bdde88205` (`app/index.tsx` `13201b51`, `screens/WebWelcomeScreen.tsx` `41fcf511`) after semantic review of both changed blobs; the other five Bip blobs are unchanged and Chief stays at `20d34e25`. Adapters stay preview-only, grant no merge, deploy, publication, runtime, or provider authority, and must fail closed on further movement.",
+        "`src/founder-os-lab/projectAdapters.ts` must bind Se’kret Bip `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief `f3e66f60e12804e616b4b0cd718194792b741725` to their unchanged seven and five audited contract blob SHAs respectively; no semantic contract change is inferred from head movement, and preview-only execution denial and fail-closed contract drift remain required. This source readback grants no merge, deploy, publication or provider authority."
       ]
     },
     {

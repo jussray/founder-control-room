@@ -135,3 +135,33 @@ body{background:radial-gradient(ellipse at 50% -12%,rgba(103,83,217,.32),transpa
 @media (prefers-reduced-motion: reduce) {
   .card, a.card:hover, a.card:focus-visible { transition: none; transform: none; }
 }
+
+/* Shared public entrance and sign-in atmosphere. Uses the existing approved mountain art. */
+body[data-fcr-entry="welcome"] {
+  --ink:#f5f8ff; --muted:#cad6f5; --line:rgba(122,164,255,.38);
+  min-height:100vh; min-height:100svh; padding:clamp(1rem,4vw,3rem);
+  background:linear-gradient(110deg,rgba(4,8,25,.88),rgba(8,13,35,.61) 55%,rgba(4,8,25,.86)),url('/assets/front-door/hero-peak.jpg') center / cover fixed,#050917;
+  isolation:isolate;
+}
+body[data-fcr-entry="welcome"] .card {
+  display:block; width:min(100%,560px); min-height:0; padding:clamp(1.25rem,4vw,2rem);
+  border:1px solid var(--line); border-radius:1.4rem;
+  background:linear-gradient(150deg,rgba(14,26,58,.95),rgba(7,13,33,.94));
+  box-shadow:0 30px 90px rgba(0,0,0,.52),0 0 36px rgba(116,110,255,.18);
+}
+body[data-fcr-entry="welcome"] .btn {color:#08091a;background:linear-gradient(100deg,#a3e7ff,#c7b5ff);border-radius:.9rem}
+body[data-fcr-entry="welcome"] .btn.ghost {color:var(--ink);background:rgba(255,255,255,.055);box-shadow:none;border:1px solid var(--line)}
+body[data-fcr-entry="welcome"] .entry-home {color:#a3e7ff;text-decoration:underline;text-underline-offset:.2em}
+body[data-fcr-entry="public"] .entry-actions {display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
+body[data-fcr-entry="public"] .entry-actions .btn {min-height:46px}
+@keyframes fcr-landscape-drift {from {transform:scale(1)} to {transform:scale(1.055)}}
+@media (prefers-reduced-motion:no-preference) {
+  body[data-fcr-entry="public"] .hero-art img {animation:fcr-landscape-drift 22s ease-in-out infinite alternate}
+}
+@media (prefers-reduced-motion:reduce) {
+  body[data-fcr-entry] *,body[data-fcr-entry] *::before,body[data-fcr-entry] *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+@media(max-width:700px) {
+  body[data-fcr-entry="welcome"] {background-attachment:scroll;place-items:start center}
+  body[data-fcr-entry="public"] .entry-actions .btn {justify-content:center}
+}

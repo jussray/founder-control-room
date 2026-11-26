@@ -25,8 +25,10 @@ function publicAssets(): FetchBinding {
   return {
     fetch: async (request: Request) => {
       const pathname = new URL(request.url).pathname;
-      const source = pathname === '/welcome'
-        ? 'public/welcome.html'
+      const source = pathname === '/'
+        ? 'public/index.html'
+        : pathname === '/welcome'
+          ? 'public/welcome.html'
         : pathname === '/work.html'
           ? 'public/work.html'
           : pathname === '/juss-rayy/' || pathname === '/juss-rayy'
@@ -41,7 +43,7 @@ function publicAssets(): FetchBinding {
   };
 }
 
-test('canonical root serves the private invitation-only welcome door', async ({ page }) => {
+test('canonical root serves the approved public FCR homepage without calling the API', async ({ page }) => {
   const handler = await loadHandler();
   let apiCalls = 0;
   const fcrApi = {
@@ -53,6 +55,44 @@ test('canonical root serves the private invitation-only welcome door', async ({ 
 
   const response = await handler.fetch(
     new Request('https://foundercontrolroom.org/', { headers: { accept: 'text/html' } }),
+    { ASSETS: publicAssets(), FCR_API: fcrApi },
+  );
+
+  expect(response.status).toBe(200);
+  expect(apiCalls).toBe(0);
+  await page.setContent(await response.text());
+
+  await expect(page).toHaveTitle('Founder Control Room');
+  await expect(page.locator('body')).toHaveAttribute('data-fcr-visual', 'approved-mockup-v3');
+  await expect(page.locator('#home-title')).toContainText('Back Founders.');
+  await expect(page.locator('[data-view-panel="user"]')).toBeVisible();
+  await expect(page.locator('[data-view-panel="founder"]')).toBeHidden();
+  await expect(page.getByRole('link', { name: /Explore Founders/ })).toHaveAttribute('href', '/work.html');
+  await expect(page.getByRole('link', { name: 'Sign up or sign in' }).first()).toHaveAttribute('href', '/welcome');
+
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: resolve(outputDir, 'desktop-public-front-door.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+  await page.screenshot({ path: resolve(outputDir, 'mobile-public-front-door.png'), fullPage: true });
+});
+
+test('separate /welcome route serves founder sign-in without calling the API', async ({ page }) => {
+  const handler = await loadHandler();
+  let apiCalls = 0;
+  const fcrApi = {
+    fetch: async () => {
+      apiCalls += 1;
+      return new Response('unexpected API route', { status: 500 });
+    },
+  };
+
+  const response = await handler.fetch(
+    new Request('https://foundercontrolroom.org/welcome', { headers: { accept: 'text/html' } }),
     { ASSETS: publicAssets(), FCR_API: fcrApi },
   );
 
