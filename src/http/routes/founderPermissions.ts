@@ -95,7 +95,7 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
   }
   if (type === 'federated_relay_public_key_register') {
     const jwk = isRecord(value.publicKeyJwk) ? value.publicKeyJwk : null;
-    if (!jwk) return null;
+    if (!jwk || 'd' in jwk) return null;
     return {
       type: 'federated_relay_public_key_register',
       member: text(value.member) as 'promptos',
