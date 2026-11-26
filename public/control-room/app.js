@@ -1462,6 +1462,7 @@ function renderPromptOsTab(mount) {
   mount.querySelector('#promptos-command-intake-form').addEventListener('submit', (e) => {
     e.preventDefault();
     guarded(async () => {
+      state.promptosCommandIntake = null;
       const parsed = JSON.parse(mount.querySelector('#promptos-command-intent-json').value);
       const intent = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.intent
         ? parsed.intent
