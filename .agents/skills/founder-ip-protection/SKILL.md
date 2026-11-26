@@ -81,3 +81,48 @@ Report:
 - NEXT GATE
 
 Stop when the current referent is complete or reaches a genuine founder/provider approval boundary.
+
+
+## Full skill and plugin capability remembrance
+
+Treat the installed skill and connected-plugin catalogs as live capability registries, not static model memory.
+
+At the start of each material continuation:
+1. Discover the current installed skill catalog and available plugin/tool catalog.
+2. Match task scope to the skill trigger and the authoritative system owner.
+3. Read the complete applicable skill instructions and required references before using its tools.
+4. Record capability state precisely: `AVAILABLE`, `LOADED`, `APPLIED`, `VERIFIED`, or `NOT USED`.
+5. Re-discover after tool/plugin installation changes; do not assume a prior catalog snapshot is current.
+6. Invoke only the minimum relevant plugin set. Availability is not permission, and a connected plugin is not proof it was used.
+
+### Repository-native skill chain for FCR work
+
+Before FCR code, configuration, schemas, providers, verification contracts, or documentation changes, apply the exact current repository instructions and the relevant local skills. For this IP-protection workflow, the inspected FCR skill set includes:
+
+- `.ai/skills/juss-founder-os/SKILL.md` — founder intent, OODA, brand/IP, evidence and authority.
+- `skills/outcome-first/SKILL.md` — outcome, authority, constraints, acceptance and stop.
+- `skills/portfolio-control-plane/SKILL.md` — cross-repository governance and provider boundaries.
+- `skills/devil/SKILL.md` — premise and selected-plan attack.
+- `skills/ultrathink-suite/README.md` and `skills/ultrathink-attack-godmode/SKILL.md` — authorized adversarial execution.
+- `skills/repair-to-proof/SKILL.md` — exact-head verification and release gate.
+- `skills/continuity-proof-ledger/SKILL.md` — provenance, supersession and handoff.
+- `.claude/skills/confidentiality-gate/SKILL.md` — outbound disclosure classification and approval.
+- `skills/typescript-audit/SKILL.md` — required before FCR TypeScript/JavaScript/Worker edits.
+- `skills/typescript-root-cause-debugger/SKILL.md`, `skills/typescript-minimal-patch/SKILL.md`, `skills/typescript-behavior-tests/SKILL.md`, and `skills/typescript-strict-review/SKILL.md` — load when their respective debugging, implementation, test, and review triggers apply.
+
+This list is not a claim that every listed skill was invoked in every task. Use the exact repository-local source as authority and report actual invocation state.
+
+### Plugin routing memory
+
+- **GitHub:** source, branch, PR, review, CI and repository evidence. Use the exact repository and head.
+- **Cloudflare:** account identity, Pages/Workers deployments, routes, bindings, security and runtime readback. Search endpoint contracts before API execution; use read-only methods for preflight.
+- **Supabase:** app-specific project identity, migrations, tables, RLS, grants, advisors, auth and Edge Functions. Read the Supabase skill before any Supabase task. Never query private end-user content for this IP review.
+- **Atlassian Rovo (Legacy):** Jira/Confluence issue and internal-document discovery where the user/workflow has authorized workspace scope. It is a knowledge/work-item source, never repository, runtime, provider, ownership, or approval truth.
+- **Notion:** workspace knowledge, skill and decision records where explicitly relevant; not a substitute for source repository or provider truth.
+- **Files:** conversation uploads and Library artifacts; not a substitute for connector-native repository or account records.
+- **Plugin Management:** discover available app capabilities and permissions; installing or changing broad permissions always requires explicit user action.
+- **Other connected plugins:** route by the system that owns the authoritative record (for example Stripe for payment-provider state, Resend for email-provider state, Vercel for Vercel deployments, AWS for AWS resources, and GitBook for GitBook documentation). Do not invoke unrelated providers or infer they are in use from installation alone.
+
+### Cross-system rule
+
+The skill catalog and plugin catalog are capability inventories. They do not become a global agent runtime, do not automatically install into Chief/PromptOS/SolContinuity, and do not grant those agents access. Each standalone system must explicitly load or implement its own adapter/skill contract and prove the resulting behavior. Preserve product-local stricter rules and FCR's final approval boundary.
