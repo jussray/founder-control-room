@@ -24,9 +24,11 @@ function sameRegistration(row: RelayKeyRow, target: FounderPermissionFederatedRe
   return row.key_id === target.keyId
     && row.member === 'promptos'
     && row.algorithm === 'Ed25519'
-    && JSON.stringify(row.public_key_jwk) === JSON.stringify(canonicalJwk(target))
-    && row.valid_from === target.validFrom
-    && (row.valid_until ?? null) === target.validUntil
+    && (row.public_key_jwk as Record<string, unknown>)?.kty === 'OKP'
+    && (row.public_key_jwk as Record<string, unknown>)?.crv === 'Ed25519'
+    && (row.public_key_jwk as Record<string, unknown>)?.x === target.publicKeyJwk.x
+    && Date.parse(row.valid_from) === Date.parse(target.validFrom)
+    && (row.valid_until === null ? target.validUntil === null : target.validUntil !== null && Date.parse(row.valid_until) === Date.parse(target.validUntil))
     && row.state === 'active'
     && row.revoked_at === null;
 }
