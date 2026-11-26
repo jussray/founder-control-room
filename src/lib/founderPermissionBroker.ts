@@ -22,6 +22,9 @@ export const PROMPTOS_WORKFLOW_REGISTRY_PATH = 'workflows/registry.json' as cons
 export const PROMPTOS_WORKFLOW_REGISTRY_CAPABILITY = 'promptos-workflow-registry@v1' as const;
 export const PROMPTOS_WORKFLOW_REGISTRY_PROVIDER = 'github:jussray/promptos' as const;
 export const PROMPTOS_WORKFLOW_REGISTRY_CONSEQUENCE = 'CONSEQUENTIAL_WRITE' as const;
+export const FEDERATED_RELAY_KEY_REGISTER_ACTION = 'federated_relay_public_key_register' as const;
+export const FEDERATED_RELAY_KEY_REGISTER_CAPABILITY = 'fcr-federated-relay-key-registration@v1' as const;
+export const FEDERATED_RELAY_KEY_REGISTER_PROVIDER = 'supabase:fcr' as const;
 
 export type FounderPermissionStatus = (typeof FOUNDER_PERMISSION_STATUSES)[number];
 
@@ -31,6 +34,20 @@ export interface FounderPermissionMergeTarget {
   pullRequestNumber: number;
   baseSha: string;
   headSha: string;
+}
+
+export interface FounderPermissionFederatedRelayKeyTarget {
+  type: typeof FEDERATED_RELAY_KEY_REGISTER_ACTION;
+  member: 'promptos';
+  keyId: string;
+  algorithm: 'Ed25519';
+  publicKeyJwk: { kty: 'OKP'; crv: 'Ed25519'; x: string };
+  publicKeyHash: string;
+  validFrom: string;
+  validUntil: string | null;
+  providerIdentity: typeof FEDERATED_RELAY_KEY_REGISTER_PROVIDER;
+  capabilityVersion: typeof FEDERATED_RELAY_KEY_REGISTER_CAPABILITY;
+  consequence: 'CONSEQUENTIAL_WRITE';
 }
 
 export interface FounderPermissionPromptOSWorkflowRegistryTarget {
@@ -52,6 +69,7 @@ export interface FounderPermissionPromptOSWorkflowRegistryTarget {
 export type FounderPermissionActionTarget =
   | FounderPermissionMergeTarget
   | FounderPermissionPromptOSWorkflowRegistryTarget
+  | FounderPermissionFederatedRelayKeyTarget
   | null;
 
 export interface FounderPermissionRequest {
@@ -195,6 +213,59 @@ function normalizedPromptOSWorkflowRegistryTarget(
   };
 }
 
+function normalizedFederatedRelayKeyTarget(
+  proposal: FounderControlProposalBinding,
+  input: FounderPermissionFederatedRelayKeyTarget,
+): FounderPermissionFederatedRelayKeyTarget {
+  const keyId = text(input.keyId);
+  const publicKeyJwk = input.publicKeyJwk;
+  const validFrom = text(input.validFrom);
+  const validUntil = text(input.validUntil) || null;
+  if (proposal.projectSlug !== 'promptos') throw new Error('Relay key registration requires projectSlug promptos');
+  if (input.member !== 'promptos' || input.algorithm !== 'Ed25519') {
+    throw new Error('Relay key registration is restricted to PromptOS Ed25519 identities');
+  }
+  if (!/^[a-z0-9][a-z0-9._:-]{5,127}$/.test(keyId)) throw new Error('Relay key registration requires a stable keyId');
+  if (!publicKeyJwk || publicKeyJwk.kty !== 'OKP' || publicKeyJwk.crv !== 'Ed25519'
+    || typeof publicKeyJwk.x !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(publicKeyJwk.x)
+    || 'd' in (publicKeyJwk as unknown as Record<string, unknown>)) {
+    throw new Error('Relay key registration requires a public-only Ed25519 JWK');
+  }
+  const validFromMs = Date.parse(validFrom);
+  const validUntilMs = validUntil ? Date.parse(validUntil) : null;
+  if (!Number.isFinite(validFromMs) || new Date(validFromMs).toISOString() !== validFrom) {
+    throw new Error('Relay key registration validFrom must be a canonical ISO timestamp');
+  }
+  if (validUntil && (!Number.isFinite(validUntilMs) || new Date(validUntilMs!).toISOString() !== validUntil
+    || validUntilMs! <= validFromMs)) {
+    throw new Error('Relay key registration validUntil must be later than validFrom');
+  }
+  const canonicalJwk = { kty: 'OKP' as const, crv: 'Ed25519' as const, x: publicKeyJwk.x };
+  const digest = createHash('sha256').update(JSON.stringify(canonicalJwk)).digest('hex');
+  if (text(input.publicKeyHash).toLowerCase() !== digest
+    || proposal.proposalHash.toLowerCase() !== digest) {
+    throw new Error('Relay key registration proposalHash must equal the exact public-key digest');
+  }
+  if (text(input.providerIdentity) !== FEDERATED_RELAY_KEY_REGISTER_PROVIDER
+    || text(input.capabilityVersion) !== FEDERATED_RELAY_KEY_REGISTER_CAPABILITY
+    || text(input.consequence) !== 'CONSEQUENTIAL_WRITE') {
+    throw new Error('Relay key registration requires the canonical FCR provider, capability, and consequence');
+  }
+  return {
+    type: FEDERATED_RELAY_KEY_REGISTER_ACTION,
+    member: 'promptos',
+    keyId,
+    algorithm: 'Ed25519',
+    publicKeyJwk: canonicalJwk,
+    publicKeyHash: digest,
+    validFrom,
+    validUntil,
+    providerIdentity: FEDERATED_RELAY_KEY_REGISTER_PROVIDER,
+    capabilityVersion: FEDERATED_RELAY_KEY_REGISTER_CAPABILITY,
+    consequence: 'CONSEQUENTIAL_WRITE',
+  };
+}
+
 function normalizedActionTarget(
   proposal: FounderControlProposalBinding,
   input: FounderPermissionActionTarget | undefined,
@@ -206,9 +277,16 @@ function normalizedActionTarget(
     return normalizedPromptOSWorkflowRegistryTarget(proposal, input);
   }
 
+  if (proposal.actionType === FEDERATED_RELAY_KEY_REGISTER_ACTION) {
+    if (!input || input.type !== FEDERATED_RELAY_KEY_REGISTER_ACTION) {
+      throw new Error('Federated relay key registration requires an exact actionTarget');
+    }
+    return normalizedFederatedRelayKeyTarget(proposal, input);
+  }
+
   if (proposal.actionType !== 'merge') {
     if (input) {
-      throw new Error('actionTarget is only supported for merge and PromptOS workflow registry promotion requests in this broker version');
+      throw new Error('actionTarget is only supported for merge, PromptOS workflow registry promotion, and federated relay key registration requests');
     }
     return null;
   }
