@@ -1474,12 +1474,24 @@ function renderPromptOsTab(mount) {
         method: 'POST',
         body: JSON.stringify({ intent }),
       });
+      const intake = response?.intake;
       if (response?.proposalOnly !== true
         || response?.acceptedForAuthorityResolution !== false
         || response?.executionAuthorized !== false
-        || response?.intake?.authorityState !== 'unresolved'
-        || response?.intake?.actionAuthority !== false
-        || response?.intake?.executionAuthorized !== false) {
+        || response?.nextRequiredContract !== 'juss-v10/capability-plan@v1'
+        || intake?.contract !== 'juss/fcr-public-command-intake@v1'
+        || intake?.receivedFrom !== 'chief-ai-machine'
+        || intake?.acceptedForCapabilityPlanning !== true
+        || intake?.acceptedForAuthorityResolution !== false
+        || intake?.authorityState !== 'unresolved'
+        || intake?.actionAuthority !== false
+        || intake?.executionAuthorized !== false
+        || intake?.nextRequiredContract !== 'juss-v10/capability-plan@v1'
+        || typeof intake?.project !== 'string'
+        || intake?.specialistProduct !== intake?.project
+        || !/^[a-f0-9]{64}$/i.test(intake?.sourceIntentFingerprint ?? '')
+        || !/^[a-f0-9]{64}$/i.test(intake?.chiefHandoffFingerprint ?? '')
+        || !/^[a-f0-9]{40}$/i.test(intake?.chiefReleaseSha ?? '')) {
         throw new Error('FCR/Chief response did not preserve the proposal-only authority boundary.');
       }
       state.promptosCommandIntake = response;
