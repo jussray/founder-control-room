@@ -580,6 +580,9 @@ console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR t
   for (const request of promptOsCommandIntakeRequests) {
     assert(Object.keys(request).join(',')==='intent','FCR sends only the intent envelope to its existing Chief RPC route');
     assert(request.intent.schema==='promptos/public-command-intent@v1','FCR receives the established PromptOS command contract');
+    assert(request.intent.command?.id==='ai-mastery-v6'&&request.intent.command?.token==='/ai-mastery-v6','FCR receives the bounded AI Mastery V6 command identity');
+    assert(request.intent.project==='promptos'&&request.intent.route?.specialistProduct==='promptos','FCR receives matching project and specialist routing');
+    assert(request.intent.route?.owner==='promptos'&&request.intent.route?.reasoningPlane==='chief-ai-machine'&&request.intent.route?.authorityPlane==='founder-control-room','FCR receives the canonical three-plane routing contract');
     assert(request.intent.authorityCeiling==='advisory-only'&&request.intent.execution.mutationAuthorized===false,
       'FCR receives advisory-only, unexecuted PromptOS intent');
   }
