@@ -36,6 +36,17 @@ node scripts/verify-video-playback.mjs --media <output.mp4>
 
 7. Keep rendering, product truth, release approval, and publication as separate gates.
 
+## Authentic-footage follow-up (free-first)
+
+When the requested output is a Buffer/FCR build-in-public reel with actual camera and dashboard recordings, use the bounded first-party `scripts/free_buffer_video.mjs` footage assembler instead of turning the footage into the graphic-only `FfmpegTimelineSpec`. Both run locally with FFmpeg and ffprobe, with no paid video subscription.
+
+```bash
+node scripts/free_buffer_video.mjs --intro /approved/camera.mp4 --screen /approved/buffer.mp4 --output /local/ten-second-reel.mp4
+node --test scripts/test_free_buffer_video.mjs
+```
+
+Provide `--voiceover` with a genuine recorded audio file if the screen recording has no audio; optionally provide a licensed, approved Juss & Co reference still via `--world`. Missing actual footage or voice blocks the render; do not create simulated product interfaces, synthetic founder speech, or cheap imitation scenes. Preserve the `*.receipt.json` source/output hashes and manual rights/privacy/visual review. Encoding verification is not visual approval or Buffer/Facebook publication. Do not invoke a paid video provider as a silent fallback.
+
 ## Stop conditions
 
 Stop instead of improvising when source authority is unknown, ffmpeg/ffprobe is unavailable, the timeline is rejected, the output cannot be probed or played, or the requested claim would require publication/product-truth authority the renderer does not possess.

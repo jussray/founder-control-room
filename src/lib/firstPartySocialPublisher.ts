@@ -174,8 +174,11 @@ export const FIRST_PARTY_PLATFORM_CAPABILITIES: Record<
     accountBoundary: 'authenticated X user',
     safeCharacterLimit: 270,
     requiresMedia: false,
-    credentialRefs: ['X_USER_ACCESS_TOKEN'],
-    notes: ['Reserve 10 characters below the standard 280-character ceiling.'],
+    credentialRefs: ['X_USER_ACCESS_TOKEN', 'X_USER_ID'],
+    notes: [
+      'Requires a user-context OAuth access token and matching numeric account ID; developer API keys cannot publish.',
+      'Reserve 10 characters below the standard 280-character ceiling.',
+    ],
   },
   tiktok: {
     platform: 'tiktok',
@@ -380,12 +383,18 @@ export function validateFirstPartySocialPost(
     characterLimit,
   };
   const contentHash = stableHash(normalized);
+  // The delivery identity must survive changes in workflow mode or approval
+  // receipt. Those fields belong to authorization/contentHash, not to the
+  // destination-visible post. Otherwise a draft promoted to publish, or an
+  // identical post reapproved, can bypass the duplicate-post reservation.
   const idempotencyKey = stableHash({
     platform: input.platform,
     accountId,
     sourceRepository,
     sourceCommitSha,
-    contentHash,
+    text,
+    media,
+    proofUrls,
   });
 
   return {

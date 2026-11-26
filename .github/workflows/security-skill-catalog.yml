@@ -1,0 +1,52 @@
+name: Security catalog metadata
+on:
+  push:
+    branches: [main, 'skills/security-catalog-v1']
+    paths:
+      - 'docs/security-skill-catalog.v1.json'
+      - 'public/control-room/security.js'
+      - 'public/control-room/security.css'
+      - 'scripts/build-pages.mjs'
+      - 'e2e/security-skill-catalog-pages-proof.mjs'
+      - 'public/control-room/security-skill-catalog.mjs'
+      - 'test/security-skill-catalog-ui.test.mjs'
+      - 'scripts/check-security-skill-catalog.cjs'
+      - 'src/founder-os-lab/externalSecuritySkillCatalog.ts'
+      - 'src/http/routes/founderOsSkills.ts'
+      - 'src/http/routes/__tests__/founderOsSkills.integration.test.ts'
+      - '.github/workflows/security-skill-catalog.yml'
+  pull_request:
+    paths:
+      - 'docs/security-skill-catalog.v1.json'
+      - 'public/control-room/security.js'
+      - 'public/control-room/security.css'
+      - 'scripts/build-pages.mjs'
+      - 'e2e/security-skill-catalog-pages-proof.mjs'
+      - 'public/control-room/security-skill-catalog.mjs'
+      - 'test/security-skill-catalog-ui.test.mjs'
+      - 'scripts/check-security-skill-catalog.cjs'
+      - 'src/founder-os-lab/externalSecuritySkillCatalog.ts'
+      - 'src/http/routes/founderOsSkills.ts'
+      - 'src/http/routes/__tests__/founderOsSkills.integration.test.ts'
+      - '.github/workflows/security-skill-catalog.yml'
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: node scripts/check-security-skill-catalog.cjs
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install vitest run src/http/routes/__tests__/founderOsSkills.integration.test.ts
+      - run: node --test test/security-skill-catalog-ui.test.mjs
+      - run: npm run build:pages
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: node e2e/security-skill-catalog-pages-proof.mjs

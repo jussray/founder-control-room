@@ -1,0 +1,39 @@
+name: Verify Proof Engine Candidate
+
+on:
+  push:
+    branches:
+      - fix/proof-engine-evidence-freshness-20261121
+    paths:
+      - 'src/proof-engine/readiness.ts'
+      - 'src/proof-engine/readiness.test.ts'
+      - 'src/http/routes/dashboard.ts'
+      - 'docs/PROOF_ENGINE_V1.md'
+      - '.github/workflows/verify-proof-engine-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proof-engine:
+    name: Exact-head FCR proof readiness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Prove exact commit
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run proof engine regression suite
+        run: npx vitest run src/proof-engine/readiness.test.ts
+      - name: Typecheck exact candidate
+        run: npm run typecheck

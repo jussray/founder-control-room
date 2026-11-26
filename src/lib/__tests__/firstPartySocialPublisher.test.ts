@@ -53,6 +53,34 @@ describe('first-party social publisher', () => {
     expect(prepared.idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('keeps delivery dedupe stable across draft, queue, publish, and reapproval', () => {
+    const draft = validateFirstPartySocialPost(input({
+      mode: 'draft',
+      publishAllowed: false,
+      founderApprovalId: null,
+    }));
+    const queued = validateFirstPartySocialPost(input({
+      mode: 'queue',
+      founderApprovalId: 'founder-approval:queued',
+    }));
+    const reapproved = validateFirstPartySocialPost(input({
+      mode: 'publish',
+      founderApprovalId: 'founder-approval:post-002',
+    }));
+
+    expect(new Set([draft.idempotencyKey, queued.idempotencyKey, reapproved.idempotencyKey]).size).toBe(1);
+    expect(draft.contentHash).not.toBe(reapproved.contentHash);
+
+    const changedAccount = validateFirstPartySocialPost(input({
+      accountId: 'urn:li:person:different',
+    }));
+    const changedCopy = validateFirstPartySocialPost(input({
+      text: `${input().text} Another verified change is now included in this update.`,
+    }));
+    expect(changedAccount.idempotencyKey).not.toBe(draft.idempotencyKey);
+    expect(changedCopy.idempotencyKey).not.toBe(draft.idempotencyKey);
+  });
+
   it('rejects posts that omit governance advantage or clickable proof', () => {
     expect(() =>
       validateFirstPartySocialPost(
