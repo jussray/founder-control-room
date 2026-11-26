@@ -3,7 +3,7 @@
   "registryVersion": "2.0.0",
   "id": "founder-control-room",
   "name": "Founder Control Room",
-  "repository": "founder-control-room",
+  "repository": "jussray/founder-control-room",
   "defaultBranch": "main",
   "sourceHeadAtAudit": "48396f75a6543f4ccb54275e416594b7112fac3e",
   "identityStatus": "source-verified",
