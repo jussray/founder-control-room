@@ -436,3 +436,7 @@ For workflow-authority source changes, `.github/workflows/ci.yml` must also keep
 ## November 15, 2026 — Worker `[vars]`/secret collision gate
 
 Production Deploy and canonical Worker Reconcile authority gates must keep `scripts/verify-worker-var-secret-collisions.mjs` after the name-only `wrangler secret list` readback and before any mutation job. A collision is a founder decision (remove the secret or the var), never something an agent resolves by deleting or rewriting provider secrets. Passing the gate is name-disjointness evidence only, not deploy, credential or runtime proof.
+
+## Relay key registration feature verification
+
+The focused `feat/fcr-founder-gated-relay-key-registration` branch is included in the FCR CI push trigger. Require exact-head typecheck, lint, full tests, and Playwright e2e before calling its source work verified. CI success remains separate from founder-final merge approval, production deployment, signing-key provisioning, and Supabase registration.
