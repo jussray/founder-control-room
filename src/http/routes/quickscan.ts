@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express';
+import { Router, type RequestHandler, type Response } from 'express';
 import { assessQuickScanSandboxPilot } from '../../quickscan/pilotAssessment.js';
 import {
   QUICKSCAN_CONTRACT,
@@ -21,7 +21,11 @@ import {
   recordQualification,
   setChiefRecommendation,
 } from '../../quickscan/engine.js';
-import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } from '../../quickscan/store.js';
+import {
+  getQuickScanProspectDurable,
+  listQuickScanProspectsDurable,
+  saveQuickScanProspectDurable,
+} from '../../quickscan/store.js';
 import { buildTrackedStripePaymentLinkUrl } from '../../quickscan/stripeWebhook.js';
 import {
   createOpenAiQuickScanChiefRunner,
@@ -40,6 +44,12 @@ type RunQuickScanChief = ReturnType<typeof createOpenAiQuickScanChiefRunner>;
 
 export interface QuickScanRouteDependencies {
   runChief?: RunQuickScanChief;
+}
+
+function asyncRoute(handler: RequestHandler): RequestHandler {
+  return (req, res, next) => {
+    void Promise.resolve(handler(req, res, next)).catch(next);
+  };
 }
 
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : ''; }
@@ -97,8 +107,8 @@ quickScanRouter.post('/pilot/assess', (req: FounderRequest, res) => {
   });
 });
 
-quickScanRouter.get('/', (_req, res) => {
-  const prospects = listQuickScanProspects();
+quickScanRouter.get('/', asyncRoute(async (_req, res) => {
+  const prospects = await listQuickScanProspectsDurable();
   return res.json({
     ok: true,
     contract: QUICKSCAN_CONTRACT,
@@ -117,30 +127,30 @@ quickScanRouter.get('/', (_req, res) => {
     priceCents: QUICKSCAN_PRICE_CENTS,
     prospects,
   });
-});
+}));
 
-quickScanRouter.post('/prospects', (req: FounderRequest, res) => {
+quickScanRouter.post('/prospects', asyncRoute(async (req: FounderRequest, res) => {
   const body = record(req.body);
   const segment = text(body.segment) as QuickScanSegment;
   if (!text(body.businessName) || !SEGMENTS.has(segment)) return fail(res, 400, 'INVALID_PROSPECT', 'businessName and a supported segment are required');
   const prospect = createProspect({ businessName: text(body.businessName), ownerName: text(body.ownerName) || undefined, segment });
-  saveQuickScanProspect(prospect);
+  await saveQuickScanProspectDurable(prospect);
   return res.status(201).json({ ok: true, contract: QUICKSCAN_CONTRACT, prospect });
-});
+}));
 
-quickScanRouter.post('/prospects/:id/evidence', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/evidence', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   const category = text(body.category) as QuickScanEvidenceCategory;
   if (!EVIDENCE.has(category) || !text(body.note)) return fail(res, 400, 'INVALID_EVIDENCE', 'category and truthful evidence note are required');
   addEvidence(prospect, { category, note: text(body.note), sourceUrl: text(body.sourceUrl) || undefined }, req.founder?.email ?? 'founder');
-  saveQuickScanProspect(prospect);
+  await saveQuickScanProspectDurable(prospect);
   return res.json({ ok: true, prospect });
-});
+}));
 
-quickScanRouter.post('/prospects/:id/transition', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/transition', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   const to = text(body.to) as QuickScanLifecycleState;
@@ -152,41 +162,41 @@ quickScanRouter.post('/prospects/:id/transition', (req: FounderRequest, res) => 
       assertUngatedQuickScanTransition(prospect.lifecycleState, to);
       advanceProspect(prospect, to, req.founder?.email ?? 'founder');
     }
-    saveQuickScanProspect(prospect);
+    await saveQuickScanProspectDurable(prospect);
     return res.json({ ok: true, prospect });
   } catch (error) {
     return fail(res, 409, 'TRANSITION_BLOCKED', error instanceof Error ? error.message : 'transition blocked');
   }
-});
+}));
 
-quickScanRouter.post('/prospects/:id/approvals', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/approvals', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   const action = text(body.action) as 'outreach' | 'payment_link' | 'follow_up' | 'delivery';
   if (!['outreach','payment_link','follow_up','delivery'].includes(action) || !text(body.proposedAction) || !text(body.reason)) return fail(res, 400, 'INVALID_APPROVAL', 'action, proposedAction, and reason are required');
   const approval = proposeApproval(prospect, { action, proposedAction: text(body.proposedAction), reason: text(body.reason), evidenceIds: Array.isArray(body.evidenceIds) ? body.evidenceIds.filter((v): v is string => typeof v === 'string') : [], recommendedBy: 'human' });
-  saveQuickScanProspect(prospect);
+  await saveQuickScanProspectDurable(prospect);
   return res.status(201).json({ ok: true, approval, prospect });
-});
+}));
 
-quickScanRouter.post('/prospects/:id/approvals/:approvalId/decision', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/approvals/:approvalId/decision', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   const decision = text(body.decision) as 'APPROVE' | 'EDIT' | 'SKIP';
   if (!['APPROVE','EDIT','SKIP'].includes(decision)) return fail(res, 400, 'INVALID_DECISION', 'decision must be APPROVE, EDIT, or SKIP');
   try {
     decideApproval(prospect, req.params.approvalId, decision, req.founder?.email ?? 'founder', text(body.editedAction) || undefined);
-    saveQuickScanProspect(prospect);
+    await saveQuickScanProspectDurable(prospect);
     return res.json({ ok: true, prospect });
   } catch (error) {
     return fail(res, 409, 'APPROVAL_BLOCKED', error instanceof Error ? error.message : 'approval blocked');
   }
-});
+}));
 
-quickScanRouter.post('/prospects/:id/qualification', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/qualification', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   const qualification = {
@@ -197,15 +207,15 @@ quickScanRouter.post('/prospects/:id/qualification', (req: FounderRequest, res) 
   };
   try {
     recordQualification(prospect, qualification, req.founder?.email ?? 'founder');
-    saveQuickScanProspect(prospect);
+    await saveQuickScanProspectDurable(prospect);
     return res.json({ ok: true, qualified: qualificationIsValid(qualification), prospect });
   } catch (error) {
     return fail(res, 409, 'QUALIFICATION_BLOCKED', error instanceof Error ? error.message : 'qualification blocked');
   }
-});
+}));
 
-quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/payment/manual', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   if (!qualificationIsValid(prospect.qualification)) return fail(res, 409, 'QUALIFICATION_REQUIRED', 'verified qualification is required before payment progression');
@@ -232,7 +242,7 @@ quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res)
     prospect.audit.push({ id: `audit_${Date.now()}`, type: 'payment.manual_verified', message: text(body.evidence), actor: req.founder?.email ?? 'founder', createdAt: new Date().toISOString() });
     advanceProspect(prospect, 'paid', req.founder?.email ?? 'founder');
   } else return fail(res, 400, 'INVALID_PAYMENT_STATUS', 'supported manual statuses: link_ready, link_sent, paid');
-  saveQuickScanProspect(prospect);
+  await saveQuickScanProspectDurable(prospect);
   return res.json({
     ok: true,
     externalMutation: false,
@@ -240,20 +250,20 @@ quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res)
     ...(trackedPaymentLinkUrl ? { trackedPaymentLinkUrl } : {}),
     prospect,
   });
-});
+}));
 
-quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/delivery', asyncRoute(async (req: FounderRequest, res) => {
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
   const body = record(req.body);
   try {
     recordDelivery(prospect, text(body.loomUrl), req.founder?.email ?? 'founder');
-    saveQuickScanProspect(prospect);
+    await saveQuickScanProspectDurable(prospect);
     return res.json({ ok: true, prospect });
   } catch (error) {
     return fail(res, 409, 'DELIVERY_BLOCKED', error instanceof Error ? error.message : 'delivery blocked');
   }
-});
+}));
 
 /**
  * POST /prospects/:id/chief-recommendation
@@ -284,8 +294,8 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * before a new one is proposed, even when this recommendation is not
  * itself send-worthy, so the founder never sees more than one live draft.
  */
-quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderRequest, res) => {
-  const initial = getQuickScanProspect(req.params.id);
+quickScanRouter.post('/prospects/:id/chief-recommendation', asyncRoute(async (req: FounderRequest, res) => {
+  const initial = await getQuickScanProspectDurable(req.params.id);
   if (!initial) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
 
   const body = record(req.body);
@@ -323,7 +333,7 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
 
   // Re-read after reasoning. Another request may have changed the exact
   // evidence, qualification, or lifecycle state Chief actually reasoned on.
-  const prospect = getQuickScanProspect(req.params.id);
+  const prospect = await getQuickScanProspectDurable(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
 
   try {
@@ -396,9 +406,9 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     });
   }
 
-  saveQuickScanProspect(prospect);
+  await saveQuickScanProspectDurable(prospect);
   return res.json({ ok: true, prospect, approval });
-});
+}));
 
   return quickScanRouter;
 }
