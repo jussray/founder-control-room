@@ -753,3 +753,9 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Not proven: Bip deployment, runtime behavior, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
 
 Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.
+
+
+## November 24, 2026 — notification intent is not delivery proof
+
+`src/buildEvents/founderNotificationIntent.ts` must project only completed successful workflow events, actual merged closed PRs and provider-reported successful deployments with valid exact nonzero commit SHAs and evidence links; workflow recovery requires the same repository, run ID and SHA, an earlier failed attempt and the immediately succeeding attempt. This projection neither sends Web Push nor proves independent runtime verification, founder authorization or phone receipt.
+A provider success event is evidence of that reported event, not proof that the entire portfolio is healthy. The notification pipeline must retain that distinction through enrollment, queueing, provider acceptance and device observation. Earlier head evidence expires on candidate movement.

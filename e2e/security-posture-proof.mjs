@@ -13,9 +13,9 @@ const jsPath = resolve(here, '../public/control-room/security.js');
 const html = await readFile(htmlPath, 'utf8');
 const css = await readFile(cssPath, 'utf8');
 const js = await readFile(jsPath, 'utf8');
-const catalogJs = await readFile(resolve(here, '../public/control-room/security-skill-catalog.mjs'), 'utf8');
+const catalogModule = await readFile(resolve(here, '../public/control-room/security-skill-catalog.mjs'), 'utf8');
 const catalog = JSON.parse(await readFile(resolve(here, '../docs/security-skill-catalog.v1.json'), 'utf8'));
-const fixtureOrigin = 'http://security-posture.test';
+const origin = 'https://security-posture.fixture.invalid';
 
 const stageNames = [
   'Inventory and Ownership',
@@ -204,29 +204,30 @@ const fixture = {
   },
 };
 
-async function installRouteFixture(page) {
-  const resources = new Map([
-    ['/control-room/security.html', { contentType: 'text/html', body: html }],
-    ['/control-room/security.css', { contentType: 'text/css', body: css }],
-    ['/control-room/security.js', { contentType: 'text/javascript', body: js }],
-    ['/control-room/security-skill-catalog.mjs', { contentType: 'text/javascript', body: catalogJs }],
-    ['/security-posture', { contentType: 'application/json', body: JSON.stringify(fixture) }],
-    ['/founder-os/security-skills/catalog', { contentType: 'application/json', body: JSON.stringify(catalog) }],
-  ]);
+async function installFetchFixture(page) {
+  const requests = [];
   await page.route('**/*', async route => {
     const request = route.request();
     const url = new URL(request.url());
-    if (url.origin !== fixtureOrigin || request.method() !== 'GET') {
-      await route.abort();
-      return;
+    if (url.origin !== origin || request.method() !== 'GET') {
+      requests.push('denied:' + url.pathname);
+      return route.abort();
     }
-    if (url.pathname === '/favicon.ico') {
-      await route.fulfill({ status: 204, body: '' });
-      return;
-    }
-    const resource = resources.get(url.pathname);
-    await route.fulfill(resource ? { status: 200, ...resource } : { status: 404, body: 'Not found' });
+    requests.push(url.pathname);
+    const assets = {
+      '/control-room/security.html': ['text/html', html],
+      '/control-room/security.css': ['text/css', css],
+      '/control-room/security.js': ['text/javascript', js],
+      '/control-room/security-skill-catalog.mjs': ['text/javascript', catalogModule],
+      '/security-posture': ['application/json', JSON.stringify(fixture)],
+      '/founder-os/security-skills/catalog': ['application/json', JSON.stringify(catalog)],
+    };
+    if (url.pathname === '/favicon.ico') return route.fulfill({ status: 204 });
+    const asset = assets[url.pathname];
+    if (!asset) return route.fulfill({ status: 404, body: 'Fixture not found' });
+    return route.fulfill({ status: 200, contentType: asset[0], body: asset[1] });
   });
+  return requests;
 }
 
 async function proveViewport(browser, { name, width, height, isMobile = false }) {
@@ -237,15 +238,16 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   page.on('pageerror', error => pageErrors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 
-  // Navigate a real document origin so browser module resolution stays intact.
-  await installRouteFixture(page);
-  const response = await page.goto(fixtureOrigin + '/control-room/security.html');
-  assert.equal(response.status(), 200, `${name}: security document served`);
+  const requests = await installFetchFixture(page);
+  await page.goto(origin + '/control-room/security.html', { waitUntil: 'domcontentloaded' });
 
   await page.getByRole('heading', { name: 'Security posture without the green-check theater.' }).waitFor({ state: 'visible' });
-  const library = page.locator('#security-skill-library');
-  await library.getByRole('heading', { name: 'Security Skills Library' }).waitFor({ state: 'visible' });
-  assert.equal(await library.locator('article').count(), 3, `${name}: imported catalog module renders all records`);
+  await page.getByRole('heading', { name: 'Security Skills Library' }).waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#security-skill-library article').count(), 3, `${name}: all catalog metadata entries render`);
+  for (const path of ['/control-room/security.js', '/control-room/security-skill-catalog.mjs', '/security-posture', '/founder-os/security-skills/catalog']) {
+    assert.equal(requests.filter(item => item === path).length, 1, `${name}: actual module/fixture request ${path}`);
+  }
+  assert.equal(requests.some(item => item.startsWith('denied:')), false, `${name}: no external or mutating requests`);
   assert.equal(await page.locator('.stage-card').count(), 10, `${name}: V1-V10 ladder renders all stages`);
   assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card):not(.pqc-provider-card)').count(), 9, `${name}: registered portfolio renders all project cards`);
   assert.equal(await page.locator('.project-card[data-target-version="10"]').count(), 3, `${name}: V10 target count is visible`);

@@ -297,6 +297,27 @@ describe('GitHub webhook ingestion', () => {
     });
   });
 
+  it('queues a stable receipt for an authenticated completed workflow without interrupting reconciliation', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    mockFrom.mockReturnValueOnce({
+      select: mockSelect, eq: mockEq, filter: mockFilter, limit: mockLimit, maybeSingle: mockMaybeSingle,
+    }).mockReturnValueOnce({ insert });
+    const req = signedRequest({
+      repository: { full_name: 'jussray/founder-control-room' },
+      action: 'completed',
+      workflow_run: { id: 42, run_attempt: 1, name: 'CI', status: 'completed', conclusion: 'success',
+        head_sha: 'a'.repeat(40), head_branch: 'main', updated_at: '2026-11-24T12:00:00Z' },
+    }, 'workflow_run');
+    const res = makeResponse();
+    await handleGitHubWebhook(req, res as unknown as Response);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      project_id: 'project-123', event_type: 'founder_notification_intent',
+      metadata: expect.objectContaining({ delivery: 'queued', intent: expect.objectContaining({ kind: 'workflow_passed', commitSha: 'a'.repeat(40) }) }),
+    }));
+    expect(mockEnqueueReconcile).toHaveBeenCalledTimes(2);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   it('rejects invalid JSON only after the raw-body signature passes', async () => {
     const body = Buffer.from('{not-json');
     const signature = `sha256=${createHmac('sha256', process.env['GITHUB_WEBHOOK_SECRET']!)

@@ -34,6 +34,7 @@ describe('build-memory webhook sanitization', () => {
       action: 'completed',
       workflow_run: {
         id: 123,
+        run_attempt: 2,
         name: 'CI',
         event: 'push',
         status: 'completed',
@@ -54,6 +55,7 @@ describe('build-memory webhook sanitization', () => {
       action: 'completed',
       workflow_run: {
         id: 123,
+        run_attempt: 2,
         name: 'CI',
         event: 'push',
         status: 'completed',

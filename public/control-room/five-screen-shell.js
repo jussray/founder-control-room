@@ -269,7 +269,7 @@ function introMarkup(screen) {
     return `<div class="founder-screen-intro"><p class="eyebrow">PromptOS</p><h2>Turn instructions into reusable operating intelligence.</h2><p>Prompts and versions stay here. Workflows, execution, projects, and skills remain connected through the Founder Stack.</p></div>`;
   }
   if (screen === 'proof') {
-    return `<div class="founder-screen-intro"><p class="eyebrow">Proof</p><h2>What actually happened?</h2><p>History is evidence, not authority. Runtime identity, releases, browser receipts, and evidence-trust surfaces must agree before a green claim survives.</p><div class="founder-proof-links"><a href="/control-room/evidence-trust.html">Evidence trust plane</a><a href="/version">Runtime identity</a></div></div>`;
+    return `<div class="founder-screen-intro"><p class="eyebrow">Proof</p><h2>What actually happened?</h2><p>History is evidence, not authority. Runtime identity, releases, browser receipts, and evidence-trust surfaces must agree before a green claim survives.</p><div class="founder-proof-links"><a href="/control-room/evidence-trust.html">Evidence trust plane</a><a href="/control-room/notifications">Success notifications</a><a href="/version">Runtime identity</a></div></div>`;
   }
   return '';
 }

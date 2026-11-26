@@ -137,6 +137,7 @@ function sanitizeWorkflowRun(value: unknown): JsonRecord | undefined {
 
   const sanitized: JsonRecord = {};
   setIfDefined(sanitized, 'id', positiveInteger(workflowRun['id']));
+  setIfDefined(sanitized, 'run_attempt', positiveInteger(workflowRun['run_attempt']));
   setIfDefined(sanitized, 'name', boundedString(workflowRun['name'], 255));
   setIfDefined(sanitized, 'event', boundedString(workflowRun['event'], 64));
   setIfDefined(sanitized, 'status', boundedString(workflowRun['status'], 64));

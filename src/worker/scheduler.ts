@@ -17,6 +17,7 @@
 import { enqueueReconcile } from '../events/outbox.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { runReconcilerCycle } from './reconciler.js';
+import { runFounderNotificationDeliveryCycle } from '../services/founderNotificationDelivery.js';
 
 const ACTIVE_MISSION_INTERVAL_MS = 2 * 60 * 1_000;  // 2 minutes
 const NORMAL_RESYNC_INTERVAL_MS = 15 * 60 * 1_000;  // 15 minutes
@@ -178,6 +179,9 @@ export function startScheduler(): void {
 
   // Outbox worker poll
   setInterval(() => runReconcilerCycle().catch(console.error), RECONCILER_POLL_MS);
+
+  // Notification queue: opted-in devices only; disabled until configured.
+  setInterval(() => runFounderNotificationDeliveryCycle().catch(() => console.error('Founder notification cycle unavailable')), 60_000);
 
   // Active mission resync
   setInterval(() => enqueueActiveMissionResync().catch(console.error), ACTIVE_MISSION_INTERVAL_MS);
