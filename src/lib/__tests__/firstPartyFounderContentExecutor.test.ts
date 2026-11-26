@@ -210,6 +210,90 @@ function successFetch(expectedCopy: string) {
     );
 }
 
+describe('direct first-party founder X execution: app-key, duplicate and readback-unavailable coverage', () => {
+  const userId = '123456789';
+  const postId = '1999999999999999999';
+  const token = 'test-x-user-access-token';
+
+  const xEnv = (): NodeJS.ProcessEnv => ({
+    X_USER_ACCESS_TOKEN: token,
+    X_USER_ID: userId,
+  });
+
+  it('blocks app API keys without a user OAuth access token before reserving or posting', async () => {
+    const store = new MemoryStore();
+    const provider = vi.fn();
+    const result = await dispatchFirstPartyFounderContentPublishNow(xInput(), {
+      env: { X_API_KEY: 'not-a-user-token', X_USER_ID: userId },
+      now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com',
+      fetchImpl: provider as unknown as typeof fetch,
+      store,
+    });
+    expect(result.code).toBe('X_NOT_CONFIGURED');
+    expect(result.published).toBe(false);
+    expect(provider).not.toHaveBeenCalled();
+    expect(store.reservations.size).toBe(0);
+  });
+
+  it('binds X publication to exact founder approval, user identity, and provider readback', async () => {
+    const request = xInput();
+    const expectedCopy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const store = new MemoryStore();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: userId } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: postId, text: expectedCopy } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: postId, author_id: userId, text: expectedCopy, created_at: '2026-08-17T15:05:01.000Z' } }), { status: 200 }));
+    const options = {
+      env: xEnv(),
+      now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      store,
+    };
+    const result = await dispatchFirstPartyFounderContentPublishNow(request, options);
+    expect(result).toMatchObject({
+      code: 'PUBLISHED',
+      truthState: 'PUBLISHED',
+      published: true,
+      receipt: { platform: 'x', externalPostId: postId },
+    });
+    expect(store.finalized[0].result).toMatchObject({ platform: 'x', published: true });
+    expect(store.reservations.size).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(result)).not.toContain(token);
+    expect(JSON.stringify(store.finalized)).not.toContain(token);
+
+    const duplicate = await dispatchFirstPartyFounderContentPublishNow(request, options);
+    expect(duplicate.code).toBe('ACTION_ALREADY_RESERVED');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('consumes the X approval when write succeeds but readback cannot establish publication', async () => {
+    const request = xInput();
+    const expectedCopy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const store = new MemoryStore();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: userId } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: postId, text: expectedCopy } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response('readback not available', { status: 403 }));
+    const result = await dispatchFirstPartyFounderContentPublishNow(request, {
+      env: xEnv(),
+      now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      store,
+    });
+    expect(result.code).toBe('PROVIDER_OUTCOME_UNKNOWN');
+    expect(result.truthState).toBe('UNKNOWN');
+    expect(result.published).toBe(false);
+    expect(result.retrySafe).toBe(false);
+    expect(result.providerEvidence).toMatchObject({ postId, httpStatus: 403 });
+    expect(store.finalized[0].status).toBe('failed');
+    expect(store.reservations.size).toBe(1);
+  });
+});
+
 describe('direct first-party founder LinkedIn execution', () => {
   it('preserves exact approved copy, allows editorially optional proof, reserves once, and records publication only after readback', async () => {
     const request = input();

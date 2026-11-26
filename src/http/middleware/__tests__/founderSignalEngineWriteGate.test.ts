@@ -131,6 +131,49 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     expect(loadGrant).not.toHaveBeenCalled();
   });
 
+  it('routes only the named review-only campaign tool around standing-grant writes', async () => {
+    const loadGrant=vi.fn(async () => { throw new Error('grant must not be read'); });
+    const writePolicyAudit=vi.fn(async () => { throw new Error('audit must not be written'); });
+    const response=await request(buildApp({loadGrant,writePolicyAudit})).post('/mcp').send({
+      jsonrpc:'2.0',id:7,method:'tools/call',
+      params:{name:'plan_founder_signal_campaign',arguments:{requestedAction:'publish_or_send',
+        allowHubSpotWrite:true,source:{},strategy:{}}},
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(loadGrant).not.toHaveBeenCalled();
+    expect(writePolicyAudit).not.toHaveBeenCalled();
+  });
+
+  it('bypasses write authority for the named media handoff preview only', async () => {
+    const grantLookup=vi.fn(async () => { throw new Error('grant must not be read'); });
+    const audit=vi.fn(async () => { throw new Error('write audit must not occur'); });
+    const response=await request(buildApp({loadGrant:grantLookup,writePolicyAudit:audit}))
+      .post('/mcp').send({
+        jsonrpc:'2.0',id:9,method:'tools/call',
+        params:{name:'review_founder_signal_draft_handoff',
+          arguments:{requestedAction:'publish_or_send',allowHubSpotWrite:true}},
+      });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(grantLookup).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it('does not require standing write grants to read public GitHub source existence', async () => {
+    const loadGrant=vi.fn(async () => {throw new Error('Read-only source must not resolve grant');});
+    const writePolicyAudit=vi.fn(async () => {throw new Error('Read-only source must not persist audit');});
+    const response=await request(buildApp({loadGrant,writePolicyAudit})).post('/mcp').send({
+      jsonrpc:'2.0',id:9,method:'tools/call',params:{
+        name:'verify_founder_signal_public_source',arguments:{requestedAction:'publish_or_send',allowHubSpotWrite:true},
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.authorization).toBeNull();
+    expect(loadGrant).not.toHaveBeenCalled();
+    expect(writePolicyAudit).not.toHaveBeenCalled();
+  });
+
   it('blocks caller-supplied approval-looking text before loading the standing grant', async () => {
     const loadGrant = vi.fn(async () => grant);
     const response = await request(buildApp({ loadGrant })).post('/mcp').send(
