@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema_version": "juss/founder-ip-protection-registry@1",
   "authority": "FCR governance registry; does not grant access or execution authority",
   "inventory_status": "incomplete",
