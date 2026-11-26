@@ -5,7 +5,7 @@
   "registry": {
     "repository": "jussray/promptos",
     "manifestPath": "manifests/apps/founder-control-room.json",
-    "revision": "e8e16ba6c197dfbf5a36131d83a990effff20955",
+    "revision": "eaf8b831de197d97e40c52da885cee932b635f9e",
     "sourceRef": "feat/app-skill-registry-v2-20261125",
     "status": "candidate"
   },
@@ -210,6 +210,10 @@
   "plugins": [
     {
       "id": "github",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_connector_1p_1a69035c238881919c4190932b2df699",
+      "displayName": "GitHub",
+      "catalogStatus": "listed",
       "provider": "GitHub",
       "purpose": "Repository, PR, review, and CI evidence.",
       "mode": "operator-tooling",
@@ -230,6 +234,10 @@
     },
     {
       "id": "cloudflare",
+      "kind": "connector",
+      "canonicalPluginId": null,
+      "displayName": "Cloudflare",
+      "catalogStatus": "namespace-only",
       "provider": "Cloudflare",
       "purpose": "Worker, deployment, and runtime metadata.",
       "mode": "operator-tooling",
@@ -249,6 +257,10 @@
     },
     {
       "id": "neon",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69e0086d87088191a3edc052fa50c29f",
+      "displayName": "Neon",
+      "catalogStatus": "listed",
       "provider": "Neon",
       "purpose": "Database branch and schema inspection.",
       "mode": "operator-tooling",
@@ -266,8 +278,12 @@
       "secretsPolicy": "never-store-in-manifest"
     },
     {
-      "id": "openai-platform",
-      "provider": "OpenAI Platform",
+      "id": "openai-developers",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_connector_1p_32dba5a7095c8191adca04ee30276304",
+      "displayName": "OpenAI Developers",
+      "catalogStatus": "listed",
+      "provider": "OpenAI Developers",
       "purpose": "Model project and API configuration inspection.",
       "mode": "operator-tooling",
       "status": "declared",
@@ -279,6 +295,162 @@
       "capabilities": [
         "model-project.read",
         "model-config.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "atlassian",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_6a83901dde988191b3f3cefdcc19acfa",
+      "displayName": "Atlassian",
+      "catalogStatus": "listed",
+      "provider": "Atlassian",
+      "purpose": "Jira, Confluence, Bitbucket and internal engineering knowledge.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "jira.issue.read",
+        "confluence.page.read",
+        "bitbucket.repo.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest",
+      "resolutionNote": "Current catalog result is Atlassian; a distinct Rovo Legacy plugin entry was not found."
+    },
+    {
+      "id": "gmail",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_connector_1p_95d39881713c8191931482a62d6edff9",
+      "displayName": "Gmail",
+      "catalogStatus": "listed",
+      "provider": "Gmail",
+      "purpose": "Scoped mail search and thread evidence for founder operations.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "mail.search",
+        "mail.thread.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "google-calendar",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_connector_1p_f8509de903288191b14a160c6c5d20b0",
+      "displayName": "Google Calendar",
+      "catalogStatus": "listed",
+      "provider": "Google Calendar",
+      "purpose": "Availability and event evidence for scheduling and founder briefs.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "calendar.availability.read",
+        "calendar.event.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "asana",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69616780bd208191b4fb44ba44f72b61",
+      "displayName": "Asana",
+      "catalogStatus": "listed",
+      "provider": "Asana",
+      "purpose": "Project task and portfolio-work tracking.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "task.read",
+        "project.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "linear",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69a089a326dc8191b32a3f2553f5be2c",
+      "displayName": "Linear",
+      "catalogStatus": "listed",
+      "provider": "Linear",
+      "purpose": "Engineering issue, project, and cycle evidence.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "issue.read",
+        "project.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "notion",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69c18c28f1188191bf5b8445c4ab0a2e",
+      "displayName": "Notion",
+      "catalogStatus": "listed",
+      "provider": "Notion",
+      "purpose": "Knowledge base and decision-record retrieval.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "page.search",
+        "page.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "slack",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69a1d78e929881919bba0dbda1f6436d",
+      "displayName": "Slack",
+      "catalogStatus": "listed",
+      "provider": "Slack",
+      "purpose": "Workspace conversation and decision evidence.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "founder-control-room"
+      ],
+      "capabilities": [
+        "message.search",
+        "message.read"
       ],
       "writePolicy": "explicit-action-approval-required",
       "secretsPolicy": "never-store-in-manifest"
