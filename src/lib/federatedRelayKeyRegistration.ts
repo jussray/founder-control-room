@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from './supabaseClient.js';
 import type { FounderPermissionFederatedRelayKeyTarget } from './founderPermissionBroker.js';
 
 export const FEDERATED_RELAY_KEY_REGISTRATION_RECEIPT = 'juss/fcr-federated-relay-key-registration@v1' as const;
@@ -64,7 +63,7 @@ async function readKey(db: RelayKeyDatabase, keyId: string): Promise<{ row: Rela
 
 export async function registerFederatedRelayPublicKey(
   target: FounderPermissionFederatedRelayKeyTarget,
-  db: RelayKeyDatabase = supabase,
+  db: RelayKeyDatabase,
 ) {
   const existing = await readKey(db, target.keyId);
   if (existing.error) throw new Error('FCR_RELAY_KEY_LOOKUP_FAILED');
