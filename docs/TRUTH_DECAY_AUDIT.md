@@ -746,6 +746,14 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
 - Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
 
+## 2026-11-22 — Se'kret Bip adapter re-pin after consent-gate and site-map drift
+
+- Previously current: Se'kret Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` with `app/index.tsx` `e3430ef2` and `screens/WebWelcomeScreen.tsx` `9d3a1128`. It became stale when Bip main moved to `568d8c4f3bb2c01faf8f369857774d1bdde88205` and both blobs changed (`13201b51`, `41fcf511`).
+- Now (candidate): the Bip pin moves to `568d8c4f` after semantic review. The `app/index.tsx` change adds a re-consent redirect (tightens the gate); the welcome-screen change adds a public site-map link. The other five Bip blobs were re-read at `568d8c4f` and are unchanged. Chief stays at `20d34e25` (blobs still match).
+- Not proven: Bip deployment, runtime behavior, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.
+
 
 ## November 24, 2026 — notification intent is not delivery proof
 
