@@ -1446,7 +1446,7 @@ function renderPromptOsTab(mount) {
     <div class="panel" id="template-detail" style="display:none"></div>
     <div class="panel" id="promptos-command-intake-panel">
       <h2>Chief command intake</h2>
-      <p class="muted">Import a PromptOS <code>promptos/public-command-intent@v1</code> request. FCR authenticates this founder session and forwards the bounded proposal to Chief through the private service binding. Authority remains unresolved; this route never executes the request.</p>
+      <p class="muted">Import a PromptOS <code>promptos/public-command-intent@v1</code> request. FCR authenticates this founder session and forwards the bounded proposal to Chief through the private service binding. Authority remains unresolved; this route never executes the request. Send only a minimized project goal: never include API keys, access tokens, private prompts, or restricted personal records.</p>
       <form id="promptos-command-intake-form">
         <label>PromptOS command request JSON</label>
         <textarea class="code" id="promptos-command-intent-json" name="intentJson" rows="8" required placeholder='{"intent":{"schema":"promptos/public-command-intent@v1",...}}'></textarea>
@@ -1489,6 +1489,11 @@ function renderPromptOsTab(mount) {
         || intake?.executionAuthorized !== false
         || intake?.nextRequiredContract !== 'juss-v10/capability-plan@v1'
         || typeof intake?.project !== 'string'
+        || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(intake?.project ?? '')
+        || typeof intake?.commandId !== 'string'
+        || typeof intake?.capabilityId !== 'string'
+        || typeof intake?.requestedOutcome !== 'string'
+        || !intake.requestedOutcome.trim()
         || intake?.specialistProduct !== intake?.project
         || !/^[a-f0-9]{64}$/i.test(intake?.sourceIntentFingerprint ?? '')
         || !/^[a-f0-9]{64}$/i.test(intake?.chiefHandoffFingerprint ?? '')
