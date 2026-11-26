@@ -100,3 +100,17 @@ This is a targeted initial review of selected canonical files, not an exhaustive
 - `package.json` adds `verify:founder-ip-protection` and wires it into `npm test`.
 
 **Scope:** CI/source contract enforcement only. It does not intercept runtime provider calls, change provider settings, prove data isolation, establish ownership, or certify exports. Those remain open gates and must be implemented in each product's native runtime after its own preflight and local source review.
+
+
+## FCR provider preflight — read-only observation, 2026-11-26
+
+- **GitHub:** candidate branch is `feat/founder-ip-protection-standard`; current PR #1182 head observed separately. The exact candidate is still subject to current-head CI and review.
+- **Cloudflare identity:** one authenticated account was returned. Account identifiers and environment secrets are intentionally not copied into this document.
+- **Cloudflare Pages:** the `founder-control-room` project is connected to `jussray/founder-control-room`, production branch `main`. The latest preview deployment was triggered from candidate commit `0d39b0e09a673860416652dee1d37f2c90c07aa3` and was still in its initialize stage when observed. The latest canonical production deployment was from main commit `e4a9888f6384a38782a21585ddbe43a75f1e5fa8` and its deployment stages reported success. This does not prove the preview completed or that production contains this candidate.
+- **Cloudflare Worker:** a Worker named `founder-control-room` exists and has a scheduled handler. The list response did not establish its current source commit/deployed artifact parity, so Worker runtime parity remains UNKNOWN.
+- **Supabase identity:** the repository's code-owned FCR project reference `oojzfmmywbvficgybaxd` matched the connected project named `founder-control-room`, reported `ACTIVE_HEALTHY`.
+- **Supabase migrations:** the latest observed migration version was `20261123222318` (`register_truth_compass_external_read_identity_20261123`). This is provider migration history, not proof that the candidate has a migration or that any candidate schema is deployed.
+- **Supabase security advisors:** read-only security advisory returned 51 public tables with RLS enabled but no policies (INFO) and one leaked-password-protection-disabled warning. These are observed findings requiring owner-level classification and a bounded remediation plan; this source-only IP change does not authorize database/auth mutations. Do not infer public data exposure solely from the RLS-without-policy lint: inspect intended service-role-only access and grants before deciding.
+- **Supabase Edge Functions:** five functions were listed, including payment-related functions. Function inventory alone does not prove code/source parity, invocation authorization, or data handling.
+
+**Provider boundary:** no Cloudflare settings, routes, secrets, deployments, Supabase schemas, auth settings, functions, or data were changed. Provider/runtime claims remain separate from repository source and CI evidence.
