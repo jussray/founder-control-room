@@ -424,7 +424,7 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
 
   if (permissionRequest.actionTarget?.type === 'federated_relay_public_key_register') {
     try {
-      const effectReceipt = await registerFederatedRelayPublicKey(permissionRequest.actionTarget);
+      const effectReceipt = await registerFederatedRelayPublicKey(permissionRequest.actionTarget, supabase);
       return res.json({
         consumed: true,
         ...projection(asJsonRecord(data)),
