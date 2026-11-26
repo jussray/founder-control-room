@@ -848,6 +848,10 @@ The source-first publisher now includes an X (Twitter) user-context text adapter
 
 `src/founder-os-lab/projectAdapters.ts` now pins Se'kret Bip main `0765c804fc6d0ab4ad267d95f7cc5c7631843500` (`app/index.tsx` blob `e3430ef2c9bc99507f9040b90ec6d54977d28ca8`) and Chief AI main `20d34e257997c866836af06a30e6af7b6f8f0b8c` (`src/domain/capability-registry.js` blob `5b1c6e39a9ec675e03032a480ff00c2967479f22`, `config/founder-chief-pair.contract.json` blob `dd008420e1a91e78516b45d9e27de89344abf432`). Every other pinned blob was unchanged. The reviewed changes: Bip routes to an age gate before consent when its compliance check requires one; Chief adds non-authorizing continuity fingerprint, cookie and execution-slot markers (`actionAuthority: false`) and states the standalone-peers relationship and stricter posting-approval rules in the pair contract, which now matches FCR's own copy. The re-pin is evidence identity only. It proves no Bip or Chief deployment or runtime behavior and grants no merge, deploy, publication, or provider authority. Any further source or blob movement must fail closed until reviewed again.
 
+## Project adapter re-pin (November 22, 2026)
+
+`src/founder-os-lab/projectAdapters.ts` now pins Se'kret Bip main `568d8c4f3bb2c01faf8f369857774d1bdde88205`: `app/index.tsx` blob `13201b51df3477b3032d091365d37056e411c4e9` (restored sessions needing versioned terms/privacy re-consent are routed to the public consent screen before private routes) and `screens/WebWelcomeScreen.tsx` blob `41fcf511ff5298ddf3efd9426a37e02f8c4d3197` (adds a public site-map link). Both changes were semantically reviewed; the other five Bip blobs were re-read and are unchanged. Chief AI remains pinned to `20d34e257997c866836af06a30e6af7b6f8f0b8c` because its pinned blobs still match. The November 17 section above is historical provenance. Adapters remain preview-only and grant no merge, deploy, publication, runtime, or provider authority.
+
 ## Four-system Founder Operator contract (source candidate, October 15, 2026)
 
 `src/founder-os-lab/founderOperatorContract.ts` is **source-level staged code**, not wired to the live FCR Worker, GitHub provider or a production UI. The existing privileged V10 approval middleware, FCR authority envelope, PR merge gate, federated relay, and production launch authority remain canonical; this module cannot replace or bypass them.
@@ -866,3 +870,5 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
+
+Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.
