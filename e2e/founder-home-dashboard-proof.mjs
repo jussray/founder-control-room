@@ -564,6 +564,7 @@ console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR t
         'FCR visibly preserves the no-execution boundary');
       assert(await page.locator('#copy-promptos-command-intake').isEnabled(),
         'FCR exposes the returned intake for transfer back to PromptOS V6');
+      await page.screenshot({path:join(OUT_DIR,'promptos-chief-intake-success-'+viewport.width+'.png'),fullPage:true});
       const submittedCount=promptOsCommandIntakeRequests.length;
       await page.locator('#promptos-command-intent-json').fill('{not-json');
       await page.locator('#promptos-command-intake-form button[type=submit]').click();
