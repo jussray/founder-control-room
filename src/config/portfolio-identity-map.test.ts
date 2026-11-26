@@ -74,4 +74,20 @@ describe('portfolio identity map', () => {
       expect(carrier[2].length).toBeGreaterThan(0);
     }
   });
+  it('tracks Proof Core as a prototype without assigning its unresolved Base44 carrier', () => {
+    const proofCore = map.identities.find((identity) => identity.slug === 'proof-core');
+    expect(proofCore).toMatchObject({
+      slug: 'proof-core',
+      name: 'Proof Core',
+      role: 'standalone-os-prototype',
+      status: 'prototype',
+      carriers: [],
+    });
+
+    const unresolved = map.unresolvedCarriers.find(
+      ([platform, id]) => platform === 'base44' && id === '6a94aed27e712e8fd5058c2f',
+    );
+    expect(unresolved?.[2]).toContain('unproven');
+  });
+
 });
