@@ -1,5 +1,9 @@
 # Cloudflare Reasoning Contract
 
+## November 20, 2026 — Pages public root does not become the post-login founder destination
+
+`public/_worker.js` must route safe public `/` navigations to Pages assets, continue serving `/welcome` as the separate login page, and pass API-owned callback HTML/scripts through the verified `FCR_API` service identity boundary. The callback client (`src/http/routes/onboardingAssets/callbackJs.ts`) must clear one-time URL credentials and complete same-origin session verification before navigating to `/control-room/`; the pending OAuth consent redirect remains separate and takes precedence. Neither a local Pages fixture, a public landing page, nor successful browser redirects prove founder authorization, current Cloudflare bindings or a deployed Worker SHA. Exact-head and real provider/browser checks remain release gates.
+
 ## November 18, 2026 — founder-only ULTRATHINK distribution read consumer (source-only)
 
 `src/http/routes/founderOsSkills.ts` now mounts `GET /founder-os/distribution/skills` behind the existing `requireFounder` authorization. It requests only the fixed `juss-distribution` skill inventory using `FCR_DISTRIBUTION_READ_TOKEN`, a server-held secret declared **optional** in `wrangler.worker.toml`. The route rejects missing credentials, upstream non-200 responses, stale cache, malformed payloads, and repository or skill SHA mismatches against exact ULTRATHINK source `de476e73754ca9616cb7ed178e1ff9c2f84416ba`. Its success response contains only skill names, repository provenance, and the kernel status, never raw skill bodies or the token; it grants neither execution authority nor founder canonicalization.
@@ -365,3 +369,7 @@ The production Cloudflare credential diagnostic is founder-dispatched only. It c
 ## November 15, 2026 — Worker `[vars]`/secret collision boundary (candidate)
 
 `scripts/verify-worker-var-secret-collisions.mjs` compares names only: every top-level `[vars]` name in `wrangler.worker.toml` against (a) the `[secrets].required`/`optional` registries, offline, and (b) the provider secret-name list that the production Deploy and canonical Worker Reconcile authority gates already read with `wrangler secret list`. Any shared name exits non-zero and names the colliding names before any Supabase, Worker, secret or Pages mutation; values are never read or printed. Why: a name bound both as plain text and as a secret makes the first canonical `wrangler deploy` fail or leaves the runtime binding ambiguous, and the current provider Worker has never been uploaded from `wrangler.worker.toml`, so the first real deploy is untested. The gate proves only that the checked-in names and the read-back names were disjoint at gate time; it does not prove which value the runtime would use, credential validity, release, or runtime health.
+
+## Live exact-SHA proof propagation window
+
+Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.

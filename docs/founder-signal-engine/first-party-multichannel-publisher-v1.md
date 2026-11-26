@@ -169,3 +169,38 @@ Implement official OAuth/account connection adapters, starting with the already 
 Activation requires the operator to connect an authorized X account using official user-context OAuth and appropriate `tweet.read`, `tweet.write`, and `users.read` permissions, then install or rotate the token in the intended server secret store and bind `X_USER_ID` to the verified account. No OAuth consent flow, login shortcut, secret mutation, or live publication is performed by this source implementation. The source cap remains 270 characters and rejects media. If X normalizes URL text and exact text readback does not match the approved copy, the result remains UNKNOWN rather than falsely VERIFIED; the already consumed approval must never be retried blindly.
 
 Real activation proof requires exact-current-source CI, an active authenticated founder approval, provider target-account readback, exactly one controlled authorized post, and an observed post ID/permalink/timestamp bound to the approved content and reservation. Missing credentials or a missing destination-native receipt remains BLOCKED/UNKNOWN, not green.
+
+## Native Facebook Page text adapter — source implemented, not activated
+
+`src/lib/facebookPageFirstPartyAdapter.ts` is integrated with the existing
+`dispatchFirstPartyFounderContentPublishNow` authorization and durable execution
+reservation path. It supports **Page text posts only**, never personal profiles,
+image/video posts, automatic posting, or Facebook account authorization.
+
+The server-only deployment contract requires `META_PAGE_ACCESS_TOKEN`,
+`META_FACEBOOK_PAGE_ID`, `META_GRAPH_API_VERSION` (explicit `vN.N` format),
+and an explicitly verified `META_FACEBOOK_CHARACTER_LIMIT`. None of these are
+accepted from public client input. An official Page token must prove its identity
+through Graph `GET /me` before a write. The adapter then submits the exact
+approved text to `POST /{page-id}/feed` and independently reads the returned
+post using `GET /{page-id}_{post-id}`, checking Page author, exact message,
+publication status, provider permalink and timestamp.
+
+The existing approval hash, fresh authenticated founder intent, atomic
+idempotency reservation and provider readback remain mandatory. A rejected
+pre-write request is FAILED. A missing/mismatched response after an accepted
+write is UNKNOWN, consumes the existing authorization, and must never be
+retried blindly. No raw tokens or provider error bodies are included in receipts.
+
+**Not implemented / not claimed:** Meta OAuth login and callback, Page selection,
+secure token installation and refresh, verified live credentials, app review,
+a live Page post, media publishing, any deployment, or a public release. Native
+Meta API account permissions, Page role and app-review eligibility must be
+verified before activation. Existing Publora posts and drafts are untouched.
+
+Focused verification: Facebook Page adapter tests; first-party founder executor
+tests; shared first-party publisher tests; TypeScript and ESLint. Browser smoke
+for the existing Founder Signal Engine console checks only that the page renders;
+it does not prove Meta API publishing. Roll back by reverting this adapter,
+executor wiring, tests and configuration documentation; no external post was
+created by this source change.

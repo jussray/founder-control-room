@@ -45,4 +45,25 @@ describe('founder content lifecycle publication destination membrane', () => {
     expect(preflight).toContain('POST_COPY_HASH_MISMATCH');
     expect(preflight).toContain('published: false');
   });
+
+  it('fails closed on a mismatched or unconfigured Facebook Page before authoritative publication', () => {
+    const routeStart = source.indexOf("router.post('/posts/:postId/publish-now'");
+    const facebookProviderGuard = source.indexOf("(post.platform === 'facebook' && post.provider === 'facebook')", routeStart);
+    const configuredPage = source.indexOf('const configuredFacebookPageId', facebookProviderGuard);
+    const accountMismatch = source.indexOf('post.accountId !== configuredFacebookPageId', configuredPage);
+    const approvalGuard = source.indexOf('POST_APPROVAL_MISMATCH', accountMismatch);
+    const providerCall = source.indexOf('const result = await deps.publishNow', approvalGuard);
+
+    expect(facebookProviderGuard).toBeGreaterThan(routeStart);
+    expect(configuredPage).toBeGreaterThan(facebookProviderGuard);
+    expect(accountMismatch).toBeGreaterThan(configuredPage);
+    expect(approvalGuard).toBeGreaterThan(accountMismatch);
+    expect(providerCall).toBeGreaterThan(approvalGuard);
+    const preflight = source.slice(facebookProviderGuard, providerCall);
+    expect(preflight).toContain('process.env.META_FACEBOOK_PAGE_ID');
+    expect(preflight).toContain('/^[0-9]{1,24}$/');
+    expect(preflight).toContain('facebookMismatch');
+    expect(preflight).toContain('POST_DESTINATION_ACCOUNT_MISMATCH');
+    expect(preflight).toContain('published: false');
+  });
 });

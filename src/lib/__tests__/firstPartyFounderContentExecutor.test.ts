@@ -599,3 +599,125 @@ describe('direct first-party founder X execution', () => {
     expect(secondFetch).not.toHaveBeenCalled();
   });
 });
+
+
+function facebookInput(): FirstPartyFounderPublishInput {
+  const next = proposal();
+  next.public_payload.platform = 'facebook';
+  next.proposal_hash = hashPublicPayload(canonicalChiefIdentity(next));
+  const approved = approval(next);
+  approved.channels = ['facebook'];
+  const authority = authorizeFounderContentPublication({
+    proposal: next,
+    approval: approved,
+    now: '2026-08-17T15:05:00.000Z',
+  });
+  return {
+    ...input(),
+    proposal: next,
+    approval: approved,
+    confirmation: {
+      confirm_publication: true,
+      authorization_hash: authority.authorization_hash,
+      public_payload_hash: authority.public_payload_hash,
+    },
+  };
+}
+
+const FACEBOOK_PAGE_ID = '123456789';
+const FACEBOOK_POST_ID = `${FACEBOOK_PAGE_ID}_987654321`;
+const FACEBOOK_TOKEN = 'server-only-facebook-page-token';
+const facebookEnv: NodeJS.ProcessEnv = {
+  META_PAGE_ACCESS_TOKEN: FACEBOOK_TOKEN,
+  META_FACEBOOK_PAGE_ID: FACEBOOK_PAGE_ID,
+  META_GRAPH_API_VERSION: 'v27.0',
+  META_FACEBOOK_CHARACTER_LIMIT: '6000',
+};
+
+function facebookSuccessFetch(copy: string) {
+  return vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: FACEBOOK_PAGE_ID }), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: FACEBOOK_POST_ID }), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      id: FACEBOOK_POST_ID,
+      from: { id: FACEBOOK_PAGE_ID },
+      message: copy,
+      is_published: true,
+      created_time: '2026-08-17T15:05:01+0000',
+      permalink_url: 'https://www.facebook.com/123456789/posts/987654321',
+    }), { status: 200 }));
+}
+
+describe('native Facebook Page founder execution', () => {
+  it('uses the existing one-shot founder authorization, reservation, and verified receipt path', async () => {
+    const request = facebookInput();
+    const copy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const fetchMock = facebookSuccessFetch(copy);
+    const store = new MemoryStore();
+    const opts = {
+      env: facebookEnv, now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com', fetchImpl: fetchMock as unknown as typeof fetch, store,
+    };
+    const first = await dispatchFirstPartyFounderContentPublishNow(request, opts);
+    expect(first).toMatchObject({
+      code: 'PUBLISHED', ok: true, published: true, truthState: 'PUBLISHED',
+      receipt: { platform: 'facebook', externalPostId: FACEBOOK_POST_ID },
+    });
+    expect(store.finalized).toHaveLength(1);
+    expect(store.finalized[0]).toMatchObject({ status: 'succeeded', success: true });
+    expect(JSON.stringify(first)).not.toContain(FACEBOOK_TOKEN);
+
+    const secondFetch = vi.fn();
+    const second = await dispatchFirstPartyFounderContentPublishNow(request, {
+      ...opts, fetchImpl: secondFetch as unknown as typeof fetch,
+    });
+    expect(second.code).toBe('ACTION_ALREADY_RESERVED');
+    expect(secondFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unconfigured Facebook publishing before writing or reserving', async () => {
+    const store = new MemoryStore();
+    const fetchMock = vi.fn();
+    const blocked = await dispatchFirstPartyFounderContentPublishNow(facebookInput(), {
+      env: { META_FACEBOOK_PAGE_ID: FACEBOOK_PAGE_ID, META_GRAPH_API_VERSION: 'v27.0' },
+      now: '2026-08-17T15:05:00.000Z', executedBy: 'founder@example.com',
+      fetchImpl: fetchMock as unknown as typeof fetch, store,
+    });
+    expect(blocked.code).toBe('FACEBOOK_NOT_CONFIGURED');
+    expect(blocked.published).toBe(false);
+    expect(store.reservations.size).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('holds ambiguous Facebook readback and refuses blind duplicate publication', async () => {
+    const request = facebookInput();
+    const copy = (request.proposal.public_payload as Record<string, string>).draft_text;
+    const store = new MemoryStore();
+    const fetchMock = facebookSuccessFetch(copy);
+    // Overwrite only the last mocked provider response with a mismatched publisher.
+    fetchMock.mockReset()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: FACEBOOK_PAGE_ID }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: FACEBOOK_POST_ID }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: FACEBOOK_POST_ID,
+        from: { id: '999999999' },
+        message: copy,
+        is_published: true,
+        created_time: '2026-08-17T15:05:01+0000',
+        permalink_url: 'https://www.facebook.com/123456789/posts/987654321',
+      }), { status: 200 }));
+    const opts = {
+      env: facebookEnv, now: '2026-08-17T15:05:00.000Z',
+      executedBy: 'founder@example.com', fetchImpl: fetchMock as unknown as typeof fetch, store,
+    };
+    const first = await dispatchFirstPartyFounderContentPublishNow(request, opts);
+    expect(first).toMatchObject({ code: 'PROVIDER_OUTCOME_UNKNOWN', truthState: 'UNKNOWN', retrySafe: false });
+    expect(first.providerEvidence).toMatchObject({ postId: FACEBOOK_POST_ID });
+    const noReplayFetch = vi.fn();
+    const second = await dispatchFirstPartyFounderContentPublishNow(request, {
+      ...opts, fetchImpl: noReplayFetch as unknown as typeof fetch,
+    });
+    expect(second.code).toBe('ACTION_ALREADY_RESERVED');
+    expect(noReplayFetch).not.toHaveBeenCalled();
+  });
+});

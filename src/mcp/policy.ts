@@ -107,6 +107,23 @@ export function evaluateMcpPolicy(options: {
       reason: "Development-only MCP server is disabled in production.",
     };
   }
+  // A configured endpoint alone must not turn the founder's local vault into a
+  // network-accessible MCP source. Exact loopback + development + local secret
+  // are required before even the read-only tools can be used.
+  if (
+    server.id === "obsidian-approved-knowledge" &&
+    (
+      env.NODE_ENV !== "development" ||
+      env.MCP_OBSIDIAN_BRAIN_URL?.trim() !== "http://127.0.0.1:8789/mcp" ||
+      (env.JUSS_BRAIN_READ_TOKEN?.trim().length ?? 0) < 32
+    )
+  ) {
+    return {
+      decision: "deny",
+      risk,
+      reason: "Obsidian knowledge MCP requires the exact local development endpoint and reader credential.",
+    };
+  }
   if (server.monthlyBudgetUsd > 0) {
     return {
       decision: "requires_approval",

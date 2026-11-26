@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { externalSecuritySkillCatalog } from '../../founder-os-lab/externalSecuritySkillCatalog.js';
+import { listExternalSkills } from '../../lib/externalSkillIntake.js';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
 import {
   type FounderOsLabAction,
@@ -33,6 +35,29 @@ import { requireFounder } from '../middleware/requireFounder.js';
 
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
+
+// Static, metadata-only snapshot. The existing server-side founder gate runs first.
+founderOsSkillsRouter.get('/security-skills/catalog', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(externalSecuritySkillCatalog);
+});
+
+// Discovery only: no external code, secrets, execution or approval operations.
+founderOsSkillsRouter.get('/external-skills', (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const destination = req.query.destination;
+  if (destination !== undefined && destination !== 'fcr' && destination !== 'chief'
+      && destination !== 'promptos' && destination !== 'skills-library' && destination !== 'medusa') {
+    res.status(400).json({ error: 'invalid_destination' });
+    return;
+  }
+  res.json({
+    contract: 'juss/external-skill-discovery/v1',
+    executionAllowed: false,
+    skills: listExternalSkills(destination),
+  });
+});
+
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
