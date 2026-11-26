@@ -46,7 +46,7 @@ test('Quality Gate preserves coverage and release contracts with deterministic i
 });
 
 test('separate Playwright workflow builds once then runs the identical complete harness', () => {
-  const expected = 'npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs';
+  const expected = 'npm run verify:direct-browser && node e2e/pages-auth-callback-proof.mjs && node e2e/direct-browser-run.mjs && node e2e/truth-console-proof.mjs && node e2e/member-entry-proof.mjs && node e2e/founder-home-dashboard-proof.mjs';
   assert.equal(pkg.scripts['test:e2e:prepared'], expected);
   assert.equal(pkg.scripts['test:e2e'], 'npm run build && ' + expected);
   assert.match(playwright, /run: npm ci --no-audit --no-fund/);

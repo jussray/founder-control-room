@@ -31,6 +31,7 @@ const state = {
   promptTemplates: [],
   selectedTemplateId: null,
   selectedTemplate: null,
+  promptosCommandIntake: null,
   costs: null,
   agents: [],
   authorityLevels: [],
@@ -1443,7 +1444,75 @@ function renderPromptOsTab(mount) {
       <div id="template-list"></div>
     </div>
     <div class="panel" id="template-detail" style="display:none"></div>
+    <div class="panel" id="promptos-command-intake-panel">
+      <h2>Chief command intake</h2>
+      <p class="muted">Import a PromptOS <code>promptos/public-command-intent@v1</code> request. FCR authenticates this founder session and forwards the bounded proposal to Chief through the private service binding. Authority remains unresolved; this route never executes the request. Send only a minimized project goal: never include API keys, access tokens, private prompts, or restricted personal records.</p>
+      <form id="promptos-command-intake-form">
+        <label>PromptOS command request JSON</label>
+        <textarea class="code" id="promptos-command-intent-json" name="intentJson" rows="8" required placeholder='{"intent":{"schema":"promptos/public-command-intent@v1",...}}'></textarea>
+        <div style="margin-top:0.5rem"><button class="primary" type="submit" data-promptos-command-submit>Send proposal to Chief</button></div>
+      </form>
+      <div id="promptos-command-intake-result" aria-live="polite" style="margin-top:0.75rem">
+        ${state.promptosCommandIntake ? `<p class="notice">Chief proposal received. Authority is unresolved and execution is not authorized.</p><pre class="code">${escapeHtml(JSON.stringify(state.promptosCommandIntake, null, 2))}</pre>` : '<p class="muted">No Chief/FCR command intake received in this session.</p>'}
+      </div>
+      <div class="toolbar"><button type="button" id="copy-promptos-command-intake" ${state.promptosCommandIntake ? '' : 'disabled'}>Copy response for PromptOS V6</button></div>
+    </div>
   `));
+
+  mount.querySelector('#promptos-command-intake-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    guarded(async () => {
+      state.promptosCommandIntake = null;
+      const parsed = JSON.parse(mount.querySelector('#promptos-command-intent-json').value);
+      const intent = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.intent
+        ? parsed.intent
+        : parsed;
+      if (!intent || typeof intent !== 'object' || Array.isArray(intent)
+        || intent.schema !== 'promptos/public-command-intent@v1') {
+        throw new Error('Paste a PromptOS public-command-intent@v1 object.');
+      }
+      const response = await api('/promptos/command-intake', {
+        method: 'POST',
+        body: JSON.stringify({ intent }),
+      });
+      const intake = response?.intake;
+      if (response?.proposalOnly !== true
+        || response?.acceptedForAuthorityResolution !== false
+        || response?.executionAuthorized !== false
+        || response?.nextRequiredContract !== 'juss-v10/capability-plan@v1'
+        || intake?.contract !== 'juss/fcr-public-command-intake@v1'
+        || intake?.receivedFrom !== 'chief-ai-machine'
+        || intake?.acceptedForCapabilityPlanning !== true
+        || intake?.acceptedForAuthorityResolution !== false
+        || intake?.authorityState !== 'unresolved'
+        || intake?.actionAuthority !== false
+        || intake?.executionAuthorized !== false
+        || intake?.nextRequiredContract !== 'juss-v10/capability-plan@v1'
+        || typeof intake?.project !== 'string'
+        || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(intake?.project ?? '')
+        || typeof intake?.commandId !== 'string'
+        || typeof intake?.capabilityId !== 'string'
+        || typeof intake?.requestedOutcome !== 'string'
+        || !intake.requestedOutcome.trim()
+        || intake?.specialistProduct !== intake?.project
+        || !/^[a-f0-9]{64}$/i.test(intake?.sourceIntentFingerprint ?? '')
+        || !/^[a-f0-9]{64}$/i.test(intake?.chiefHandoffFingerprint ?? '')
+        || !/^[a-f0-9]{40}$/i.test(intake?.chiefReleaseSha ?? '')) {
+        throw new Error('FCR/Chief response did not preserve the proposal-only authority boundary.');
+      }
+      state.promptosCommandIntake = response;
+      setBanner('notice', 'Chief accepted the proposal for capability planning. FCR authority remains unresolved; no action was executed.');
+    });
+  });
+
+  mount.querySelector('#copy-promptos-command-intake').addEventListener('click', () => {
+    guarded(async () => {
+      if (!state.promptosCommandIntake?.intake) throw new Error('No Chief/FCR intake is available to copy.');
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
+      await navigator.clipboard.writeText(JSON.stringify(state.promptosCommandIntake, null, 2));
+      setBanner('notice', 'FCR/Chief proposal copied. Paste the response into PromptOS V6 to compile it.');
+    });
+  });
 
   mount.querySelector('#new-template-form').addEventListener('submit', (e) => {
     e.preventDefault();

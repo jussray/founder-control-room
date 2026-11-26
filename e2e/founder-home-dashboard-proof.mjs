@@ -101,6 +101,7 @@ const expectedInReview = FIXTURE.tasks.filter((t) => t.status === 'in_review').l
 const expectedLanded = FIXTURE.tasks.filter((t) => t.status === 'integrated' || t.status === 'deployed').length;
 
 function startServer(mode) {
+  const promptOsCommandIntakeRequests = [];
   const json = (res, status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP });
     res.end(JSON.stringify(body));
@@ -116,6 +117,41 @@ function startServer(mode) {
         : json(res, 200, { success: true, data: { founder: { email: FOUNDER_EMAIL } } });
     }
     if (mode === 'signed-out' && path.startsWith('/auth/')) return json(res, 401, { error: 'unauthenticated' });
+
+    if (req.method === 'POST' && path === '/promptos/command-intake') {
+      let raw = '';
+      req.on('data', (chunk) => { raw += chunk; });
+      req.on('end', () => {
+        let body;
+        try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'invalid JSON' }); }
+        promptOsCommandIntakeRequests.push(body);
+        return json(res, 200, {
+          intake: {
+            contract: 'juss/fcr-public-command-intake@v1',
+            receivedFrom: 'chief-ai-machine',
+            sourceIntentFingerprint: 'a'.repeat(64),
+            chiefHandoffFingerprint: 'b'.repeat(64),
+            project: 'promptos',
+            commandId: 'ai-mastery-v6',
+            capabilityId: 'ai-mastery-v6',
+            specialistProduct: 'promptos',
+            requestedOutcome: 'Proposal accepted for capability planning.',
+            acceptedForCapabilityPlanning: true,
+            acceptedForAuthorityResolution: false,
+            authorityState: 'unresolved',
+            actionAuthority: false,
+            executionAuthorized: false,
+            nextRequiredContract: 'juss-v10/capability-plan@v1',
+            chiefReleaseSha: 'c'.repeat(40),
+          },
+          proposalOnly: true,
+          acceptedForAuthorityResolution: false,
+          executionAuthorized: false,
+          nextRequiredContract: 'juss-v10/capability-plan@v1',
+        });
+      });
+      return;
+    }
 
     if (req.method === 'POST' && /^\/projects\/[^/]+\/missions$/.test(path)) {
       return setTimeout(() => json(res, 201, {
@@ -187,7 +223,7 @@ function startServer(mode) {
   });
 
   return new Promise((resolveServer) => {
-    server.listen(0, '127.0.0.1', () => resolveServer({ server, baseUrl: `http://127.0.0.1:${server.address().port}` }));
+    server.listen(0, '127.0.0.1', () => resolveServer({ server, baseUrl: `http://127.0.0.1:${server.address().port}`, promptOsCommandIntakeRequests }));
   });
 }
 
@@ -491,6 +527,65 @@ console.log('\n[8] Signed-out founder cannot view private screens');
     await page.screenshot({path:join(OUT_DIR,'founder-home-signed-out.png'),fullPage:true});
   });
   assert(pageErrors.length===0,'no JS exceptions signed-out: '+JSON.stringify(pageErrors));
+  server.close();
+}
+
+
+console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR to Chief without granting authority');
+{
+  const {server,baseUrl,promptOsCommandIntakeRequests}=await startServer('full');
+  for (const viewport of [{width:1280,height:900},{width:390,height:844}]) {
+    const priorCount=promptOsCommandIntakeRequests.length;
+    const {pageErrors,consoleErrors}=await withPage(browser,viewport,async(page)=>{
+      await page.goto(baseUrl+'/control-room/',{waitUntil:'load'});
+      await page.waitForSelector('.founder-home-grid',{state:'visible'});
+      await page.locator('.founder-screen-nav button').filter({hasText:/^PromptOS$/}).click();
+      await page.waitForSelector('#promptos-command-intake-form',{state:'visible'});
+      assert(promptOsCommandIntakeRequests.length===priorCount,'opening PromptOS never sends an intake automatically');
+      const intent = {
+        schema: 'promptos/public-command-intent@v1',
+        command: { id: 'ai-mastery-v6', token: '/ai-mastery-v6', category: 'ai-mastery', label: 'AI Mastery V6' },
+        arguments: 'Mode: workflow-optimizer. Outcome: connect the PromptOS V6 workflow to Chief.',
+        project: 'promptos',
+        capabilityId: 'ai-mastery-v6',
+        route: { owner: 'promptos', reasoningPlane: 'chief-ai-machine', specialistProduct: 'promptos', authorityPlane: 'founder-control-room' },
+        authorityCeiling: 'advisory-only',
+        execution: { status: 'not-executed', mutationAuthorized: false },
+        evidence: { contract: 'current-authority', staleOnStateChange: true },
+        catalogQuery: 'AI Mastery V6 workflow-optimizer',
+      };
+      await page.locator('#promptos-command-intent-json').fill(JSON.stringify({intent}));
+      await page.locator('#promptos-command-intake-form button[type=submit]').click();
+      await page.waitForFunction(()=>document.querySelector('#promptos-command-intake-result')?.textContent.includes('chief-ai-machine'));
+      const result=await page.locator('#promptos-command-intake-result').innerText();
+      assert(result.includes('proposalOnly')&&result.includes('authorityState')&&result.includes('unresolved'),
+        'FCR displays the returned Chief proposal-only intake and unresolved authority state');
+      assert(result.includes('executionAuthorized')&&result.includes('false'),
+        'FCR visibly preserves the no-execution boundary');
+      assert(await page.locator('#copy-promptos-command-intake').isEnabled(),
+        'FCR exposes the returned intake for transfer back to PromptOS V6');
+      await page.screenshot({path:join(OUT_DIR,'promptos-chief-intake-success-'+viewport.width+'.png'),fullPage:true});
+      const submittedCount=promptOsCommandIntakeRequests.length;
+      await page.locator('#promptos-command-intent-json').fill('{not-json');
+      await page.locator('#promptos-command-intake-form button[type=submit]').click();
+      await page.waitForFunction(()=>document.querySelector('#promptos-command-intake-result')?.textContent.includes('No Chief/FCR command intake received'));
+      assert(promptOsCommandIntakeRequests.length===submittedCount,'malformed JSON never reaches the Chief intake route');
+      await noOverflow(page,'PromptOS Chief intake '+viewport.width);
+      await page.screenshot({path:join(OUT_DIR,'promptos-chief-intake-'+viewport.width+'.png'),fullPage:true});
+    });
+    assert(pageErrors.length===0,'PromptOS Chief intake has no JS exceptions at '+viewport.width+': '+JSON.stringify(pageErrors));
+    assert(consoleErrors.length===0,'PromptOS Chief intake has no console errors at '+viewport.width+': '+JSON.stringify(consoleErrors));
+  }
+  assert(promptOsCommandIntakeRequests.length===2,'desktop and mobile each submit exactly one FCR command-intake request');
+  for (const request of promptOsCommandIntakeRequests) {
+    assert(Object.keys(request).join(',')==='intent','FCR sends only the intent envelope to its existing Chief RPC route');
+    assert(request.intent.schema==='promptos/public-command-intent@v1','FCR receives the established PromptOS command contract');
+    assert(request.intent.command?.id==='ai-mastery-v6'&&request.intent.command?.token==='/ai-mastery-v6','FCR receives the bounded AI Mastery V6 command identity');
+    assert(request.intent.project==='promptos'&&request.intent.route?.specialistProduct==='promptos','FCR receives matching project and specialist routing');
+    assert(request.intent.route?.owner==='promptos'&&request.intent.route?.reasoningPlane==='chief-ai-machine'&&request.intent.route?.authorityPlane==='founder-control-room','FCR receives the canonical three-plane routing contract');
+    assert(request.intent.authorityCeiling==='advisory-only'&&request.intent.execution.mutationAuthorized===false,
+      'FCR receives advisory-only, unexecuted PromptOS intent');
+  }
   server.close();
 }
 
