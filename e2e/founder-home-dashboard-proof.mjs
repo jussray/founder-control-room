@@ -540,6 +540,7 @@ console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR t
       await page.waitForSelector('.founder-home-grid',{state:'visible'});
       await page.locator('.founder-screen-nav button').filter({hasText:/^PromptOS$/}).click();
       await page.waitForSelector('#promptos-command-intake-form',{state:'visible'});
+      assert(promptOsCommandIntakeRequests.length===0,'opening PromptOS never sends an intake automatically');
       const intent = {
         schema: 'promptos/public-command-intent@v1',
         command: { id: 'ai-mastery-v6', token: '/ai-mastery-v6', category: 'ai-mastery', label: 'AI Mastery V6' },
@@ -562,6 +563,11 @@ console.log('\n[9] PromptOS sends a founder-authenticated proposal through FCR t
         'FCR visibly preserves the no-execution boundary');
       assert(await page.locator('#copy-promptos-command-intake').isEnabled(),
         'FCR exposes the returned intake for transfer back to PromptOS V6');
+      const submittedCount=promptOsCommandIntakeRequests.length;
+      await page.locator('#promptos-command-intent-json').fill('{not-json');
+      await page.locator('#promptos-command-intake-form button[type=submit]').click();
+      await page.waitForFunction(()=>document.querySelector('#promptos-command-intake-result')?.textContent.includes('No Chief/FCR command intake received'));
+      assert(promptOsCommandIntakeRequests.length===submittedCount,'malformed JSON never reaches the Chief intake route');
       await noOverflow(page,'PromptOS Chief intake '+viewport.width);
       await page.screenshot({path:join(OUT_DIR,'promptos-chief-intake-'+viewport.width+'.png'),fullPage:true});
     });
