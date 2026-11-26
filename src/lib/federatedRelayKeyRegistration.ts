@@ -77,13 +77,13 @@ export async function registerFederatedRelayPublicKey(target: FounderPermissionF
   }).select('key_id,member,algorithm,public_key_jwk,state,valid_from,valid_until,revoked_at,created_at').single();
 
   if (error || !data) {
-    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-    if (code === '23505') {
-      const winner = await readKey(target.keyId);
-      if (winner.error || !winner.row || !sameRegistration(winner.row, target)) {
-        throw new Error('FCR_RELAY_KEY_ID_CONFLICT');
-      }
+    const winner = await readKey(target.keyId);
+    if (!winner.error && winner.row && sameRegistration(winner.row, target)) {
       return receipt(winner.row, target, 'ALREADY_REGISTERED');
+    }
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    if (code === '23505' || (!winner.error && winner.row)) {
+      throw new Error('FCR_RELAY_KEY_ID_CONFLICT');
     }
     throw new Error('FCR_RELAY_KEY_INSERT_FAILED');
   }
