@@ -295,6 +295,12 @@ For public crawler and work-directory behavior, `.github/workflows/ci.yml` must 
 
 Agents must ensure `.github/workflows/ci.yml` uses `npm ci --no-audit --no-fund` for its four load-bearing Type check, Lint, Unit Tests, and Playwright e2e jobs, rather than installing unconstrained dependencies at verification time. Validate the exact checked-out SHA, required test execution, and lockfile compliance through source checks and GitHub CI. A reproducible install cannot grant merge authorization: retain systematic independent exact-head review and separately authenticated founder-final approval. Do not describe a source-only CI edit as a deployed or production-verified fix.
 
+## Juss-authored skills export — evidence gate (review-only)
+
+FCR must treat `skills/juss-authored/` as an inert, versioned proposal until a separately reviewed runtime adapter deliberately selects an exact skill version. Do not shadow the active FCR skill router, import the export as an auto-executing agent, or inherit authority from the separate Chief AI system.
+
+The `.github/workflows/ci.yml` `Python tests` lane must run the exported receipt and SHA-256 inventory validators and remain required by `Required Gate`. The proof scope is locally observable code and file consistency, not production integration. Current documentation-truth receipts, external action receipts, and exact-candidate founder-final review remain independently required before merge or release.
+
 ## CI queue economy without authority reduction
 
 For `main` pull requests, `.github/workflows/ci.yml` remains the load-bearing owner of typecheck, lint, tests, RLS, documentation truth, test discovery and Playwright, with terminal and AI-skill contracts also executed by its required `Test` job before `Required Gate`. The optional extended `.github/workflows/quality-gate.yml` now runs for `staging` pull requests only, retaining its build, coverage, Qodo and SonarQube lanes there. `.github/workflows/fcr-search-evidence-gate.yml` runs on the exact PR head and on `main` pushes, not on every feature-branch push. This saves duplicate runner allocations; it does not relax CodeQL, the required test-ledger check, independent review, founder-final approval or runtime deployment evidence. Success and queue reduction require new-head provider readback, not this source declaration.

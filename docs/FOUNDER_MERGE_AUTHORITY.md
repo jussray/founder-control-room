@@ -216,6 +216,12 @@ Exact-head FCR governance must treat changes to `.github/workflows/ci.yml` as tr
 
 For `main` pull requests, `.github/workflows/ci.yml` must still execute the guarded terminal, Juss Flow, production-authority and AI-skill contracts within its load-bearing `Test` job, alongside required exact-head checks before `Required Gate` can pass. `.github/workflows/quality-gate.yml` may run its extended duplicate tests on `staging` only; this must not waive CodeQL, the required test ledger, Playwright, exact-candidate founder-final approval, review, production deployment or live provider proof. Source-side queue consolidation alone grants no merge or release authority.
 
+## Juss-authored skills export — evidence gate (review-only)
+
+Changes under `skills/juss-authored/` must not silently replace `.agents/skills`, `.ai/skills`, `.claude/skills`, or FCR runtime routing. The repaired receipt validators establish structural and byte-integrity constraints only; a matching checksum does not prove provenance, runtime invocation, authenticated founder authority, or provider readback.
+
+The existing `.github/workflows/ci.yml` must run exported receipt and inventory checks inside the load-bearing `Python tests` job, and `Required Gate` must require that job's success. Merge of the export still requires current Documentation Truth, all exact-head checks, independent review, and a new founder-final approval bound to the precise PR, base, and head; neither source publication nor passing tests grants deployment authorization.
+
 Workflow YAML syntax belongs to the same exact-head source contract: `.github/workflows/ci.yml` must keep the `scripts/verify_workflow_yaml.py` step in the load-bearing `python-tests` job, which fails closed on any unparseable workflow file. A passing parse check is syntax evidence only; it cannot substitute for independent review, authenticated Founder Final, provider readback, or GitHub's own workflow acceptance.
 
 
