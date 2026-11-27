@@ -1140,7 +1140,8 @@
     {
       "path": "src/lib/founderSignalDraftHandoff.ts",
       "claims": [
-        "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority."
+        "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority.",
+        "`src/lib/founderSignalDraftHandoff.ts` portfolio review must hold missing or mismatched server-supplied product profile, pinned brand source, destination, or GitHub event/claim; it reuses the canonical offline draft preview, emits only a deterministic review key, requires independent evidence and grants no publication authority."
       ]
     },
     {
