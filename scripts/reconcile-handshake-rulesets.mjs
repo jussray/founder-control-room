@@ -228,7 +228,7 @@ async function requestGitHub(path, token, method = 'GET', body) {
 }
 
 async function collectProviderInput({ repository, prNumber, expectedMainSha,
-  expectedHeadSha, token }) {
+  expectedHeadSha, token, transport = requestGitHub }) {
   const parts = repository.split('/');
   requireTrue(parts.length === 2 && TARGETS[repository], 'invalid allowlisted repository');
   const root = '/repos/' + parts.map(encodeURIComponent).join('/');
@@ -237,13 +237,13 @@ async function collectProviderInput({ repository, prNumber, expectedMainSha,
     Number.isSafeInteger(prNumber) && prNumber > 0,
   'invalid input identity before provider read');
   const [main, pr, checks, envs, workflow, ...rulesets] = await Promise.all([
-    requestGitHub(root + '/branches/main', token),
-    requestGitHub(root + '/pulls/' + prNumber, token),
-    requestGitHub(root + '/commits/' + expectedHeadSha + '/check-runs?per_page=100', token),
-    requestGitHub(root + '/environments?per_page=100', token),
-    requestGitHub(root + '/contents/' + target.releaseWorkflowPath + '?ref=' +
+    transport(root + '/branches/main', token),
+    transport(root + '/pulls/' + prNumber, token),
+    transport(root + '/commits/' + expectedHeadSha + '/check-runs?per_page=100', token),
+    transport(root + '/environments?per_page=100', token),
+    transport(root + '/contents/' + target.releaseWorkflowPath + '?ref=' +
       expectedMainSha, token),
-    ...target.rulesetIds.map((id) => requestGitHub(root + '/rulesets/' + id, token)),
+    ...target.rulesetIds.map((id) => transport(root + '/rulesets/' + id, token)),
   ]);
   requireTrue(checks.total_count <= 100 && Array.isArray(checks.check_runs),
     'check-run result paginated or incomplete');
@@ -253,7 +253,7 @@ async function collectProviderInput({ repository, prNumber, expectedMainSha,
     'release workflow response unusable');
   let founderOnlyPolicy = '';
   if (repository === 'jussray/Sekret-Bip') {
-    const policy = await requestGitHub(root +
+    const policy = await transport(root +
       '/contents/docs/governance/main-governance-acceptance-probe.md?ref=' +
       expectedMainSha, token);
     requireTrue(policy.encoding === 'base64', 'founder-only policy unavailable');
@@ -273,20 +273,26 @@ function rootFor(repository) {
   return '/repos/' + repository.split('/').map(encodeURIComponent).join('/');
 }
 
+function storePrewriteBackup(receipt) {
+  mkdirSync('artifacts', { recursive: true });
+  writeFileSync('artifacts/handshake-ruleset-prewrite.json',
+    JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+}
+
 export async function reconcileProvider({
   repository, prNumber, expectedMainSha, expectedHeadSha, token, apply = false,
-  approvedPlanDigest = '', approvedHeadSha = '',
+  approvedPlanDigest = '', approvedHeadSha = '', transport = requestGitHub,
+  backupWriter = storePrewriteBackup,
 }) {
   const source = { repository, prNumber, expectedMainSha, expectedHeadSha, token };
-  const initial = buildRulesetPlan(await collectProviderInput(source));
+  const initial = buildRulesetPlan(await collectProviderInput({ ...source, transport }));
   if (!apply) return initial;
   verifyApproval(initial, { planDigest: approvedPlanDigest, headSha: approvedHeadSha });
-  const fresh = buildRulesetPlan(await collectProviderInput(source));
+  const fresh = buildRulesetPlan(await collectProviderInput({ ...source, transport }));
   requireTrue(initial.digest === fresh.digest, 'provider state changed before write');
   // Durable intent-before-effect: preserve exact provider payloads for inspected
   // recovery before any privileged mutation. Never include bearer credentials.
-  mkdirSync('artifacts', { recursive: true });
-  writeFileSync('artifacts/handshake-ruleset-prewrite.json', JSON.stringify({
+  backupWriter({
     contract: 'jussco/handshake-ruleset-prewrite@v1',
     repository, prNumber, expectedMainSha, expectedHeadSha,
     approvedPlanDigest: fresh.digest, applied: false,
@@ -295,28 +301,28 @@ export async function reconcileProvider({
       digest: fingerprint(normalizeRulesetPayload(u.before)) })),
     approvedAfterDigests: fresh.updates.map((u) => ({ id: u.id,
       digest: fingerprint(normalizeRulesetPayload(u.after)) })),
-  }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+  });
   const base = rootFor(repository);
   const written = [];
   try {
     for (const update of fresh.updates) {
       const [currentMain, currentPR] = await Promise.all([
-        requestGitHub(base + '/branches/main', token),
-        requestGitHub(base + '/pulls/' + prNumber, token),
+        transport(base + '/branches/main', token),
+        transport(base + '/pulls/' + prNumber, token),
       ]);
       requireTrue(currentMain.commit?.sha === expectedMainSha &&
         currentPR.state === 'open' && currentPR.head?.sha === expectedHeadSha &&
         currentPR.base?.sha === expectedMainSha, 'PR head/main moved during provider update');
       const path = base + '/rulesets/' + update.id;
-      const before = await requestGitHub(path, token);
+      const before = await transport(path, token);
       requireTrue(fingerprint(normalizeRulesetPayload(before)) ===
         fingerprint(normalizeRulesetPayload(update.before)),
       'ruleset changed during reconciliation: ' + update.id);
       // Track the intent before the external effect: a network failure after PUT
       // must never be mistaken for proof that no provider mutation occurred.
       written.push(update);
-      await requestGitHub(path, token, 'PUT', normalizeRulesetPayload(update.after));
-      const observed = await requestGitHub(path, token);
+      await transport(path, token, 'PUT', normalizeRulesetPayload(update.after));
+      const observed = await transport(path, token);
       requireTrue(fingerprint(normalizeRulesetPayload(observed)) ===
         fingerprint(normalizeRulesetPayload(update.after)),
       'provider readback differs from approved ruleset: ' + update.id);
@@ -329,7 +335,7 @@ export async function reconcileProvider({
     for (const update of [...written].reverse()) {
       try {
         const path = base + '/rulesets/' + update.id;
-        const now = await requestGitHub(path, token);
+        const now = await transport(path, token);
         const current = fingerprint(normalizeRulesetPayload(now));
         const beforeHash = fingerprint(normalizeRulesetPayload(update.before));
         const afterHash = fingerprint(normalizeRulesetPayload(update.after));
@@ -339,8 +345,8 @@ export async function reconcileProvider({
           rollbackErrors.push('concurrent change on ruleset ' + update.id);
           continue;
         }
-        await requestGitHub(path, token, 'PUT', normalizeRulesetPayload(update.before));
-        const restored = await requestGitHub(path, token);
+        await transport(path, token, 'PUT', normalizeRulesetPayload(update.before));
+        const restored = await transport(path, token);
         if (fingerprint(normalizeRulesetPayload(restored)) !==
             fingerprint(normalizeRulesetPayload(update.before))) {
           rollbackErrors.push('rollback readback mismatch on ruleset ' + update.id);
