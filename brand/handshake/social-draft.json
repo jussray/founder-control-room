@@ -1,0 +1,33 @@
+{
+  "schema": "fcr/handshake-social-draft@v1",
+  "project": "fcr",
+  "sourceRepository": "jussray/founder-control-room",
+  "channelGroup": "business_only",
+  "intendedAccountHandle": "@jussnco",
+  "accountConnection": "UNVERIFIED",
+  "publishAllowed": false,
+  "queueAllowed": false,
+  "owner": "jussray/founder-control-room",
+  "sourcePath": "brand/handshake/logo.svg",
+  "social": {
+    "question": "What is Founder Control Room?",
+    "answer": "Founder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation.",
+    "truthBoundary": "Source code documents the design; current live integrations and operational outcomes require separate verification.",
+    "copy": "What is Founder Control Room?\n\nFounder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation.\n\nSource code documents the design; current live integrations and operational outcomes require separate verification.\n\nProject evidence: https://github.com/jussray/founder-control-room\n\n#FounderControlRoom #AIOperations #ResponsibleAI #ProductEngineering #BuildInPublic",
+    "mediaAltText": "Founder at a control desk surrounded by cyan and violet workflow panels, under the FCR vector wordmark.",
+    "mediaPathLocal": "brand/handshake/handshake-cover.png (candidate file in downloadable kit, not publicly hosted)",
+    "mediaPublicUrl": null
+  },
+  "handshake": {
+    "name": "Founder Control Room",
+    "description": "Founder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation. Source code documents the design; current live integrations and operational outcomes require separate verification.",
+    "productUrl": "https://foundercontrolroom.org/",
+    "submissionState": "NOT_SUBMITTED"
+  },
+  "review": {
+    "exactMediaFounderApproval": false,
+    "liveBrandComparison": false,
+    "sourceCurrentness": false,
+    "providerAccountVerified": false
+  }
+}
