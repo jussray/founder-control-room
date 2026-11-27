@@ -20,10 +20,10 @@
   },
   "handshake": {
     "target": "Handshake AI Showcase project card",
-    "coverLocalOutput": "handshake-cover.png",
+    "coverLocalOutput": "handshake-cover.png (included in founder download ZIP, not yet hosted in repository)",
     "coverWidth": 1536,
     "coverHeight": 1024,
-    "coverSha256": "fb13c8253b13cc829efca1f43bde3880435dbd53227dd972fe7dc8b453454d72",
+    "coverSha256": "6b37529cec906a4a17a38091d03dc79412f15d40a98339576be069fdda52d7f9",
     "mediaPublicUrl": null,
     "externalSubmissionState": "NOT_SUBMITTED",
     "requireNativeConfirmation": true
