@@ -16,13 +16,23 @@
     "copy": "What is Founder Control Room?\n\nFounder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation.\n\nSource code documents the design; current live integrations and operational outcomes require separate verification.\n\nProject evidence: https://github.com/jussray/founder-control-room\n\n#FounderControlRoom #AIOperations #ResponsibleAI #ProductEngineering #BuildInPublic",
     "mediaAltText": "Founder at a control desk surrounded by cyan and violet workflow panels, under the FCR vector wordmark.",
     "mediaPathLocal": "brand/handshake/handshake-cover.png (candidate file in downloadable kit, not publicly hosted)",
-    "mediaPublicUrl": null
+    "mediaPublicUrl": null,
+    "mediaPackagePath": "Social/Founder_Control_Room_Social_Ad_4x5.png",
+    "mediaSha256": "9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33",
+    "mediaDimensions": [
+      1080,
+      1350
+    ],
+    "mediaPurpose": "social_ad",
+    "mediaState": "LOCAL_CANDIDATE_UNHOSTED"
   },
   "handshake": {
     "name": "Founder Control Room",
     "description": "Founder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation. Source code documents the design; current live integrations and operational outcomes require separate verification.",
     "productUrl": "https://foundercontrolroom.org/",
-    "submissionState": "NOT_SUBMITTED"
+    "submissionState": "NOT_SUBMITTED",
+    "coverPackagePath": "Handshake/Founder_Control_Room_Handshake_3x2.png",
+    "coverStatus": "LOCAL_CANDIDATE_UNHOSTED"
   },
   "review": {
     "exactMediaFounderApproval": false,
