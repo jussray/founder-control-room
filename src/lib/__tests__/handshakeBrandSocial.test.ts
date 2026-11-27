@@ -13,7 +13,7 @@ function fixture(project: HandshakeProject): HandshakeDraftRequest {
   const spec = HANDSHAKE_PROJECTS[project];
   const proof = project === 'bip' ? 'https://sekretbip.net/' : 'https://github.com/' + spec.repository;
   const altText = spec.name + ' portfolio image with branded logo.';
-  const MEDIA_URL = 'https://cdn.jussco.company/handshake/' + project + '/cover.png';
+  const MEDIA_URL = 'https://cdn.jussco.company/handshake/' + project + '/social-ad.png';
   return {
     project,
     audience: spec.audience,
@@ -29,11 +29,11 @@ function fixture(project: HandshakeProject): HandshakeDraftRequest {
     },
     mediaReview: {
       project, logoRepository: spec.repository, logoPath: spec.logoPath,
-      logoSha256: spec.expectedLogoSha256, coverSha256: spec.expectedCoverSha256,
-      founderReviewedExactMediaSha256: spec.expectedCoverSha256,
+      logoSha256: spec.expectedLogoSha256, assetVariant: 'social_ad', assetSha256: spec.expectedSocialAdSha256,
+      founderReviewedExactMediaSha256: spec.expectedSocialAdSha256,
       founderReviewReceiptId: 'founder-review-2026-11-26',
       mediaUrl: MEDIA_URL, altText,
-      dimensions: { width: 1536, height: 1024 }, publicReadbackVerified: true,
+      dimensions: { width: 1080, height: 1350 }, publicReadbackVerified: true,
     },
     draft: {
       platform: 'facebook', accountId: 'verified_jussnco_business',
@@ -80,7 +80,7 @@ describe('project-specific brand handoff', () => {
   });
   it('blocks a replacement cover not in the project manifest', () => {
     const request = fixture('sync');
-    request.mediaReview.coverSha256 = 'e'.repeat(64);
+    request.mediaReview.assetSha256 = 'e'.repeat(64);
     request.mediaReview.founderReviewedExactMediaSha256 = 'e'.repeat(64);
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
   });
@@ -98,6 +98,20 @@ describe('project-specific brand handoff', () => {
     const request = fixture('sync');
     request.mediaReview.mediaUrl = 'https://unrelated.example/handshake/sync/cover.png';
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
+  it('blocks accidentally sending a 3:2 Handshake cover into the 4:5 social media draft', () => {
+    const request = fixture('fcr');
+    request.mediaReview.assetVariant = 'handshake_cover';
+    request.mediaReview.assetSha256 = HANDSHAKE_PROJECTS.fcr.expectedCoverSha256;
+    request.mediaReview.founderReviewedExactMediaSha256 = HANDSHAKE_PROJECTS.fcr.expectedCoverSha256;
+    request.mediaReview.dimensions = { width: 1536, height: 1024 };
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/social_ad/);
+  });
+  it('blocks replacing a social-ad hash with the project Handshake cover hash', () => {
+    const request = fixture('bip');
+    request.mediaReview.assetSha256 = HANDSHAKE_PROJECTS.bip.expectedCoverSha256;
+    request.mediaReview.founderReviewedExactMediaSha256 = HANDSHAKE_PROJECTS.bip.expectedCoverSha256;
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
   });
   it('blocks personal account distribution', () => {
     const request = fixture('fcr');
@@ -117,9 +131,9 @@ describe('project-specific brand handoff', () => {
     request.draft.media = [{ type: 'image', url: 'https://other.example/ad.png', altText: 'another ad' }];
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/draft media must equal/);
   });
-  it('blocks non-3:2 image', () => {
+  it('blocks non-4:5 social ad', () => {
     const request = fixture('fcr');
     request.mediaReview.dimensions = { width: 1080, height: 1080 };
-    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/3:2/);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/4:5/);
   });
 });
