@@ -383,6 +383,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 
 | Secret | Referenced by | Requirement / boundary |
 |---|---|---|
+| `GITHUB_RULESET_ADMIN_TOKEN` | `handshake-ruleset-reconciliation.yml` | Existing source reference for the protected, founder-approved ruleset reconciliation job; the workflow requires a nonempty value for apply. This reference uses the GitHub-reserved `GITHUB_` secret prefix and is therefore a configuration defect, not proof of an installable Actions secret. A separately reviewed migration to a permitted secret name is required before apply. No value is provisioned, and this entry grants no ruleset mutation authority. |
 | `QODO_API_KEY` | `quality-gate.yml` | Optional Qodo workflow-contract integration; the job records missing configuration and keeps required repository gates separate. |
 | `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
 | `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
