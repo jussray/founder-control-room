@@ -131,8 +131,8 @@ function reconcileOneRuleset(existing, target, input, entries) {
   const scan = existing.rules.find((rule) => rule.type === 'code_scanning');
   requireTrue(status && deploy && pull && scan,
     'missing existing status, deployment, pull-request or code-scanning protections');
-  requireTrue(existing.rules.some((rule) => rule.type === 'deletion'),
-    'deletion protection missing');
+  // Rulesets are layered: each must preserve its own security rules unchanged.
+  // Aggregate deletion/force-push protections are checked before any plan is built.
   const selected = entries.map((entry) => {
     const old = status.parameters?.required_status_checks?.find((c) => c.context === entry.context);
     requireTrue(!old?.integration_id || old.integration_id === entry.integration_id,
@@ -174,6 +174,10 @@ export function buildRulesetPlan(input) {
   requireTrue(Array.isArray(input.rulesets) && input.rulesets.length === target.rulesetIds.length &&
     target.rulesetIds.every((id) => input.rulesets.filter((r) => r?.id === id).length === 1),
   'expected exact active ruleset IDs only');
+  const hasAggregate = (type) => input.rulesets.some((ruleset) =>
+    Array.isArray(ruleset.rules) && ruleset.rules.some((r) => r.type === type));
+  requireTrue(hasAggregate('deletion') && hasAggregate('non_fast_forward'),
+    'aggregate deletion and force-push protection missing');
   const updates = target.rulesetIds.map((id) =>
     reconcileOneRuleset(input.rulesets.find((rule) => rule.id === id), target, input, entries));
   const planSubject = {
@@ -346,7 +350,7 @@ async function main() {
     repository, prNumber: Number(arg('--pr')),
     expectedMainSha: arg('--main'),
     expectedHeadSha: arg('--head'),
-    token: apply ? process.env.GITHUB_RULESET_ADMIN_TOKEN : (process.env.GITHUB_TOKEN || process.env.GITHUB_RULESET_ADMIN_TOKEN),
+    token: process.env.GITHUB_RULESET_ADMIN_TOKEN || (!apply ? process.env.GITHUB_TOKEN : ''),
     apply,
     approvedPlanDigest: process.env.FOUNDER_APPROVED_PLAN_SHA256 || '',
     approvedHeadSha: process.env.FOUNDER_APPROVED_HEAD_SHA || '',
