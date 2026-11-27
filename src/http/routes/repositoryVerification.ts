@@ -128,112 +128,102 @@ repositoryVerificationRouter.post(
         });
       }
 
-      const requestedIds = Array.isArray(req.body?.findingIds)
-        ? req.body.findingIds.filter(
-            (id: unknown): id is string => typeof id === "string",
-          )
-        : null;
+      const userId = req.founder?.userId;
+      if (!userId) return res.status(403).json({ error: "founder_identity_required" });
 
-      let query = supabase
-        .from("repository_findings")
-        .select("id,fingerprint,title,detail,suggested_action,severity,mission_id")
-        .eq("project_id", project.id)
-        .eq("status", "open")
-        .is("mission_id", null);
-      if (requestedIds && requestedIds.length > 0) {
-        query = query.in("id", requestedIds);
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const input: unknown = req.body?.findingIds;
+      let requestedIds: string[] | null = null;
+      if (input !== undefined) {
+        if (!Array.isArray(input) || input.length < 1 || input.length > 100
+          || !input.every((id: unknown) => typeof id === "string" && uuid.test(id))) {
+          return res.status(400).json({ error: "invalid_repair_finding_ids" });
+        }
+        requestedIds = input.map((id: string) => id.toLowerCase());
+        if (new Set(requestedIds).size !== requestedIds.length) {
+          return res.status(400).json({ error: "duplicate_repair_finding_ids" });
+        }
       }
 
-      const { data: findings, error: findingError } = await query;
-      if (findingError) throw new Error(findingError.message);
-      if (!findings || findings.length === 0) {
-        return res.status(409).json({ error: "no_open_unassigned_findings" });
-      }
-
-      const { data: latestRun } = await supabase
+      const { data: latestRun, error: runError } = await supabase
         .from("repository_verification_runs")
-        .select("branch,commit_sha")
+        .select("id,branch,commit_sha,signature_verified,overall_status")
         .eq("project_id", project.id)
         .order("received_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const { data: manifest } = await supabase
-        .from("project_manifests")
-        .select("parsed_manifest")
-        .eq("project_id", project.id)
-        .is("superseded_at", null)
-        .order("observed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const buildAssist = manifest?.parsed_manifest?.buildAssist;
-      const highestRisk = findings.some((finding) =>
-        ["critical", "high"].includes(String(finding.severity)))
-        ? "high"
-        : "medium";
-      const description = [
-        "Repository verification found evidence drift. This mission is a proposal only.",
-        "No branch, integration, deployment, rollback, secret, or destructive action is authorized.",
-        "",
-        ...findings.map((finding) => (
-          `- ${finding.title}: ${finding.detail ?? "no detail"}\n  Suggested: ${finding.suggested_action ?? "inspect and prepare a bounded repair"}`
-        )),
-      ].join("\n");
-
-      const { data: mission, error: missionError } = await supabase
-        .from("missions")
-        .insert({
-          project_id: project.id,
-          title: `Repair repository verification drift (${findings.length})`,
-          description,
-          status: "proposed",
-          base_ref: latestRun?.branch ?? "main",
-          builder_agent: buildAssist?.enabled
-            ? buildAssist.preferredBuilder ?? null
-            : null,
-          risk_level: buildAssist?.riskLevel ?? highestRisk,
-          required_checks: findings.map((finding) => finding.fingerprint),
-          policy_snapshot: {
-            source: "repository_verification",
-            source_commit: latestRun?.commit_sha ?? null,
-            finding_ids: findings.map((finding) => finding.id),
-            requested_by_user_id: req.founder?.userId ?? null,
-            approvals_required: [
-              "create_sandbox_workspace",
-              "create_branch",
-              "integrate",
-              "deploy",
-              "rollback",
-            ],
-          },
-        })
-        .select("*")
-        .single();
-      if (missionError || !mission) {
-        throw new Error(missionError?.message ?? "mission_insert_failed");
+      if (runError) throw new Error("repair_evidence_read_failed");
+      if (!latestRun || latestRun.signature_verified !== true
+        || !["warning", "failed"].includes(latestRun.overall_status)
+        || !/^[a-f0-9]{40}$/.test(latestRun.commit_sha ?? "")
+        || /^0{40}$/.test(latestRun.commit_sha)) {
+        return res.status(409).json({ error: "repair_evidence_not_authoritative" });
       }
 
-      const { error: assignError } = await supabase
-        .from("repository_findings")
-        .update({ mission_id: mission.id })
-        .in("id", findings.map((finding) => finding.id));
-      if (assignError) throw new Error(assignError.message);
+      if (requestedIds === null) {
+        const { data: candidates, error: candidateError } = await supabase
+          .from("repository_findings")
+          .select("id")
+          .eq("project_id", project.id)
+          .eq("verification_run_id", latestRun.id)
+          .eq("status", "open")
+          .is("mission_id", null)
+          .order("id", { ascending: true })
+          .limit(101);
+        if (candidateError) throw new Error("repair_findings_read_failed");
+        if (!candidates?.length) {
+          return res.status(409).json({ error: "no_open_unassigned_findings" });
+        }
+        if (candidates.length > 100) {
+          return res.status(409).json({ error: "explicit_bounded_finding_selection_required" });
+        }
+        requestedIds = candidates.map((finding) => String(finding.id));
+      }
 
-      const { error: eventError } = await supabase.from("project_events").insert({
-        project_id: project.id,
-        event_type: "repository_repair_mission_proposed",
-        severity: "warning",
-        decision: "founder_review_required",
-        metadata: {
-          mission_id: mission.id,
-          finding_ids: findings.map((finding) => finding.id),
-          source_commit: latestRun?.commit_sha ?? null,
-          requested_by_user_id: req.founder?.userId ?? null,
+      // One database transaction owns the mission, findings and event. Never
+      // fall back to the predecessor's separate inserts if the RPC is missing.
+      const { data: reservation, error: reservationError } = await supabase.rpc(
+        "reserve_repository_repair_mission", {
+          p_project_id: project.id,
+          p_run_id: latestRun.id,
+          p_finding_ids: requestedIds,
+          p_requested_by_user_id: userId,
         },
-      });
-      if (eventError) throw new Error(eventError.message);
+      );
+      if (reservationError) {
+        if (["PGRST202", "42883"].includes(reservationError.code)) {
+          return res.status(503).json({ error: "atomic_repair_reservation_unavailable" });
+        }
+        if (["40001", "22023", "P0002"].includes(reservationError.code)) {
+          return res.status(409).json({ error: "repair_reservation_conflict_or_stale_evidence" });
+        }
+        throw new Error("repair_reservation_failed");
+      }
+      if (!reservation || typeof reservation.mission_id !== "string"
+        || !uuid.test(reservation.mission_id)
+        || typeof reservation.created !== "boolean"
+        || reservation.authority !== "proposal_only" || reservation.mutation_authorized !== false) {
+        throw new Error("repair_reservation_receipt_invalid");
+      }
 
-      return res.status(201).json({ mission, findings });
+      const [{ data: mission, error: missionError }, { data: findings, error: findingError }] =
+        await Promise.all([
+          supabase.from("missions").select("*").eq("project_id", project.id)
+            .eq("id", reservation.mission_id).maybeSingle(),
+          supabase.from("repository_findings")
+            .select("id,fingerprint,title,detail,suggested_action,severity,mission_id")
+            .eq("project_id", project.id).eq("mission_id", reservation.mission_id)
+            .in("id", requestedIds),
+        ]);
+      if (missionError || findingError || !mission || findings?.length !== requestedIds.length) {
+        return res.status(503).json({ error: "repair_reservation_readback_unavailable",
+          retryWithFindingIds: requestedIds });
+      }
+      return res.status(reservation.created ? 201 : 200).json({
+        mission, findings, created: reservation.created, authority: "proposal_only",
+        mutationAuthorized: false,
+      });
     } catch (error) {
       return res.status(500).json({
         error: "repository_mission_proposal_failed",
