@@ -95,7 +95,7 @@ function parsePublicRasterImageUrl(value: unknown): URL | null {
   try {
     const url = new URL(value);
     const path = url.pathname.toLowerCase();
-    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
+    if (url.protocol !== 'https:' || !url.hostname || url.port !== '' || url.username || url.password ||
       !(path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg'))) {
       return null;
     }
@@ -140,8 +140,14 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
   const sharedHost = url.hostname === 'cdn.jussco.company' || url.hostname === 'assets.jussco.company';
   const publoraHost = url.hostname === 'media.publora.com';
   const authenticatedUrlShape = !url.username && !url.password && !url.search && !url.hash;
-  const publoraFileMatches = url.pathname.startsWith('/images/') &&
-    decodeURIComponent(url.pathname).endsWith('-' + project.expectedSocialFileName);
+  let decodedPath = '';
+  try {
+    decodedPath = decodeURIComponent(url.pathname);
+  } catch {
+    fail('unapproved project media origin');
+  }
+  const publoraFileMatches = decodedPath.startsWith('/images/') &&
+    decodedPath.endsWith('-' + project.expectedSocialFileName);
   if (!authenticatedUrlShape) fail('unapproved project media origin');
   if (sharedHost && !url.pathname.toLowerCase().startsWith('/handshake/' + input.project + '/')) {
     fail('shared asset URL does not belong to selected project');
