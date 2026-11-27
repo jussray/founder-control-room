@@ -28,6 +28,24 @@ const FOLLOW_UP = Object.freeze({
   UNKNOWN_FRESHNESS: [6, 'RESOLVE_EVIDENCE_FRESHNESS', 'Resolve observation freshness before reusing the evidence.'],
 });
 
+function selectFailedRuns(runs, head) {
+  if (!Array.isArray(runs) || !/^[a-f0-9]{40}$/.test(head || '')) return [];
+  const latest = new Map();
+  for (const run of runs) {
+    if (!run || run.head_sha !== head || !Number.isSafeInteger(run.id) || run.id < 1 ||
+        !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1) continue;
+    const previous = latest.get(run.id);
+    if (!previous || run.run_attempt > previous.run_attempt) latest.set(run.id, run);
+    else if (run.run_attempt === previous.run_attempt &&
+      (run.status !== previous.status || run.conclusion !== previous.conclusion)) latest.set(run.id, {
+        id: run.id, run_attempt: run.run_attempt, status: 'unknown', conclusion: null
+      });
+  }
+  return [...latest.values()].filter(run => run.status === 'completed' && TERMINAL_FAILURES.has(run.conclusion))
+    .map(run => ({ runId: run.id, attempt: run.run_attempt, conclusion: run.conclusion }))
+    .sort((a,b) => a.runId - b.runId || a.attempt - b.attempt);
+}
+
 // This is a resumable observation proposal, never an execution or approval queue.
 // Run identities are sanitized environment declarations, not provider readback.
 export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
@@ -47,7 +65,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
   function propose(subject, observedState, followUp) {
     const [priority, action, instruction] = followUp;
     candidates.push({
-      taskFingerprint: hash({ sourceRepository, sourceSha, subject, observedState, action }),
+      taskFingerprint: hash({ sourceRepository, ...(subject.identityScope === 'public_exact_head' && subject.failedRun ? {} : { sourceSha }), subject, observedState, action }),
       subject, observedState, priority, action, instruction,
       owner: action === 'RESTORE_AUDIT_READ_ACCESS' ? 'AUTHORIZED_ACCESS_OWNER' : 'REPOSITORY_OPERATOR',
       authority: 'proposal_only', mutationAuthorized: false,
@@ -71,9 +89,26 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       : (/^[-\w.]+\/[-\w.]+$/.test(item.repository || '') ? item.repository : null);
     const head = !isPrivate && /^[a-f0-9]{40}$/.test(item.head || '') ? item.head : null;
     const observedState = Object.hasOwn(FOLLOW_UP, item.state) ? item.state : 'UNKNOWN';
-    propose({ scope: 'repository', repository, visibility: isPrivate ? 'private' : 'public', head,
-      identityScope: isPrivate ? 'run_local_alias' : 'public_exact_head' }, observedState,
-    FOLLOW_UP[observedState] || [3, 'RESOLVE_UNKNOWN_AUDIT_STATE', 'Resolve the unknown audit state before reusing the evidence.']);
+    const subject = { scope: 'repository', repository, visibility: isPrivate ? 'private' : 'public', head,
+      identityScope: isPrivate ? 'run_local_alias' : 'public_exact_head' };
+    // Public run routing is evidence only; never export private run IDs or log contents.
+    const failedRuns = !isPrivate && repository && head && observedState === 'FAILED_EXACT_HEAD'
+      && Array.isArray(item.failedRuns) ? item.failedRuns : [];
+    const distinct = new Map();
+    for (const run of failedRuns) {
+      if (!run || !Number.isSafeInteger(run.runId) || run.runId < 1 ||
+          !Number.isSafeInteger(run.attempt) || run.attempt < 1 || !TERMINAL_FAILURES.has(run.conclusion)) continue;
+      distinct.set(run.runId + ':' + run.attempt, { runId: run.runId, attempt: run.attempt, conclusion: run.conclusion });
+    }
+    if (distinct.size) {
+      for (const failedRun of distinct.values()) {
+        propose({ ...subject, failedRun }, observedState,
+          [1, 'INSPECT_EXACT_HEAD_FAILURE', 'Revalidate head, run and attempt; inspect failed job evidence before proposing a root-cause repair.']);
+      }
+    } else {
+      propose(subject, observedState,
+        FOLLOW_UP[observedState] || [3, 'RESOLVE_UNKNOWN_AUDIT_STATE', 'Resolve the unknown audit state before reusing the evidence.']);
+    }
   }
   if (candidates.length === 0) {
     propose({ scope: 'installation' }, state,
@@ -138,6 +173,24 @@ function selfTest() {
   assert.equal(failed.auditIdentity.sourceSha, identity.PORTFOLIO_AUDIT_SOURCE_SHA);
   assert.equal(failed.auditIdentity.runUrl, 'https://github.com/jussray/founder-control-room/actions/runs/1234/attempts/2');
   assert.equal(failed.auditIdentity.bindingState, 'ENVIRONMENT_DECLARED');
+  const failedRun = { head_sha: base.head, id: 123, run_attempt: 1, status: 'completed', conclusion: 'failure' };
+  const routedRuns = selectFailedRuns([failedRun, failedRun, { ...failedRun, id: 456 }], base.head);
+  assert.deepEqual(routedRuns, [
+    { runId: 123, attempt: 1, conclusion: 'failure' },
+    { runId: 456, attempt: 1, conclusion: 'failure' }
+  ]);
+  assert.deepEqual(selectFailedRuns([failedRun, { ...failedRun, run_attempt: 2, conclusion: 'success' }], base.head), []);
+  assert.deepEqual(selectFailedRuns([failedRun, { ...failedRun, run_attempt: 2, status: 'in_progress', conclusion: null }], base.head), []);
+  assert.deepEqual(selectFailedRuns([failedRun, { ...failedRun, conclusion: 'success' }], base.head), []);
+  assert.deepEqual(selectFailedRuns([{ ...failedRun, head_sha: 'c'.repeat(40) }, { ...failedRun, id: 0 }], base.head), []);
+  const routed = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, failedRuns: routedRuns }] }, identity);
+  assert.equal(routed.nextTasks.length, 2);
+  assert.equal(routed.nextTasks[0].subject.failedRun.attempt, 1);
+  assert.notEqual(routed.nextTasks[0].taskFingerprint, routed.nextTasks[1].taskFingerprint);
+  assert.deepEqual(routed.nextTasks, buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, failedRuns: routedRuns }] },
+    { ...identity, PORTFOLIO_AUDIT_SOURCE_SHA: 'd'.repeat(40) }).nextTasks);
+  assert.equal(buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, visibility: 'private',
+    repository: 'private-' + 'a'.repeat(12), failedRuns: routedRuns }] }, identity).nextAction.subject.failedRun, undefined);
   const pending = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'PENDING_EXACT_HEAD' }] }, identity);
   assert.equal(pending.nextAction.action, 'REOBSERVE_PENDING_EXACT_HEAD');
   const incomplete = buildAuditHandoff({ state: 'INCOMPLETE_COVERAGE', items: [item] }, identity);
@@ -291,6 +344,7 @@ async function main() {
         const matching = runs.filter((run) => run.head_sha === head);
         result.sampledExactHeadRuns = matching.length;
         result.sampledFailures = matching.filter((run) => TERMINAL_FAILURES.has(run.conclusion)).length;
+        if (!r.private) result.failedRuns = selectFailedRuns(matching, validHead);
         result.state = assess({ archived: r.archived, workflowCount: result.workflowCount,
           runs, head: validHead, headCommittedAt, now,
           truncated: !Number.isInteger(actionResponse.total_count) ||
