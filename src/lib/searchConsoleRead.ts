@@ -8,6 +8,36 @@ export const GSC_PAGES=[
  'https://www.foundercontrolroom.org/guardrails',
  'https://www.foundercontrolroom.org/mom8/'
 ];
+
+export const GSC_SITE_PROFILES = {
+ fcr: {
+   property: GSC_SITE,
+   pages: GSC_PAGES,
+ },
+ jussco: {
+   // Domain-property inspection covers both apex and www hostnames.
+   // Only URLs already declared in the current public Juss & Co sitemap are sampled.
+   property: 'sc-domain:jussco.company',
+   pages: [
+     'https://www.jussco.company/',
+     'https://www.jussco.company/services.html',
+     'https://www.jussco.company/work.html',
+     'https://www.jussco.company/licensing.html',
+     'https://www.jussco.company/creative-history.html',
+     'https://www.jussco.company/games/',
+   ],
+ },
+} as const;
+export type GscSiteKey = keyof typeof GSC_SITE_PROFILES;
+export function resolveGscSite(site: string|undefined): {
+ property: string; pages: readonly string[]; key: GscSiteKey;
+} {
+ const key = site ?? 'fcr';
+ if (key !== 'fcr' && key !== 'jussco')
+   throw new GscReadError('invalid_site_selection');
+ const profile = GSC_SITE_PROFILES[key];
+ return {key,property:profile.property,pages:profile.pages};
+}
 export class GscReadError extends Error {
  constructor(public readonly reason:string){super(reason);}
 }
@@ -61,11 +91,12 @@ export async function getGscAccessToken(secret:string,fetchFn:Fetcher=fetch):Pro
  finally{clearTimeout(timer);}
 }
 export async function readGscSnapshot(params:{
- token:string;fetchFn?:Fetcher;now?:()=>Date;
+ token:string;fetchFn?:Fetcher;now?:()=>Date;site?:GscSiteKey;
 }){
  const {token,fetchFn=fetch,now=()=>new Date()}=params;
+ const selected=resolveGscSite(params.site);
  if(typeof token!=='string'||token.length<20)throw new GscReadError('not_configured');
- const site=encodeURIComponent(GSC_SITE);
+ const site=encodeURIComponent(selected.property);
  const property=await read(fetchFn,'https://www.googleapis.com/webmasters/v3/sites/'+site,token);
  if(!text(property.permissionLevel)||property.permissionLevel==='siteUnverifiedUser')
    throw new GscReadError('provider_access_denied');
@@ -81,10 +112,10 @@ export async function readGscSnapshot(params:{
      warnings:count(v.warnings),type:text(v.type)};
  });
  const pages=[];
- for(const url of GSC_PAGES){
+ for(const url of selected.pages){
    try{
      const v=await read(fetchFn,'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
-       token,{inspectionUrl:url,siteUrl:GSC_SITE,languageCode:'en-US'});
+       token,{inspectionUrl:url,siteUrl:selected.property,languageCode:'en-US'});
      const result=record(record(v.inspectionResult).indexStatusResult);
      pages.push({url,status:'reported',verdict:text(result.verdict)??'UNKNOWN',
        coverageState:text(result.coverageState),indexingState:text(result.indexingState),
@@ -94,10 +125,10 @@ export async function readGscSnapshot(params:{
        indexingState:null,lastCrawlTime:null,pageFetchState:null});
    }
  }
- return {contract:GSC_CONTRACT,property:GSC_SITE,checkedAt:now().toISOString(),
-   propertyPermission:property.permissionLevel,sitemaps,pages,scope:'five_url_sample_only',
+ return {contract:GSC_CONTRACT,property:selected.property,checkedAt:now().toISOString(),
+   propertyPermission:property.permissionLevel,sitemaps,pages,scope:selected.key==='jussco'?'six_url_sample_only':'five_url_sample_only',
    indexedCount:null,limitations:[
      'Sitemaps processed does not mean their pages are indexed.',
-     'Five individually inspected URLs do not establish a full sitewide indexed-page count.',
+     'A sampled set of inspected URLs does not establish a full sitewide indexed-page count.',
      'Unavailable URL inspections are UNKNOWN, not NOT_INDEXED.']};
 }
