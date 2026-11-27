@@ -42,8 +42,8 @@
     "targetAudience": "business",
     "firstPartyMode": "draft",
     "publishAllowed": false,
-    "businessAccountBinding": "UNVERIFIED",
-    "publicMediaReadback": "UNVERIFIED",
+    "businessAccountBinding": "PUBLORA_INSTAGRAM_CONNECTED_FCR_PUBLISHING_UNVERIFIED",
+    "publicMediaReadback": "BYTES_NOT_INDEPENDENTLY_VERIFIED",
     "exactMediaReview": "REQUIRED",
     "nativePublicationReceipt": "NOT_PRESENT",
     "proofRoot": "https://github.com/jussray/founder-control-room",
@@ -54,11 +54,25 @@
       "height": 1350,
       "aspectRatio": "4:5",
       "sha256": "9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33",
-      "publicUrl": null,
+      "publicUrl": "https://media.publora.com/images/1795755717215-0-2e9edd36-Founder_Control_Room_Social_Ad_4x5.png",
       "approval": "PENDING_FOUNDER_EXACT_MEDIA_REVIEW",
-      "mediaSourceReadback": "NOT_VERIFIED"
+      "mediaSourceReadback": "PUBLORA_READY_METADATA_ONLY"
     },
-    "draftInputReady": false
+    "draftInputReady": false,
+    "providerDraft": {
+      "provider": "publora",
+      "platform": "instagram",
+      "businessChannel": "@jussnco",
+      "postGroupId": "6b090ec0f04b2c093e24636d",
+      "mediaId": "6b090ec5f04b2c093e2463c0",
+      "editorUrl": "https://app.publora.com/dashboard/editor?id=6b090ec0f04b2c093e24636d",
+      "state": "draft",
+      "mediaState": "ready",
+      "scheduled": false,
+      "published": false,
+      "verifiedSource": "Publora get_post metadata",
+      "assetByteParity": "UNVERIFIED"
+    }
   },
   "safety": "Public-source engineering claims only. No credentials, private receipts, or invented performance numbers."
 }
