@@ -1,11 +1,21 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { supabase } from '../../lib/supabaseClient.js';
 import { readCanonKnowledge, type CanonEvent } from '../../lib/canonKnowledge.js';
 import { requireFounder } from '../middleware/requireFounder.js';
 
 /** Authenticated historical bootstrap; deliberately cannot grant execution authority. */
 export const canonBootstrapRouter = Router();
-canonBootstrapRouter.use(requireFounder);
+// Per-process/IP protection supplements FCR's global limiter; production
+// distributed enforcement remains a separate Cloudflare/provider gate.
+const rateLimitCanonBootstrap = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded.' },
+});
+canonBootstrapRouter.use(rateLimitCanonBootstrap, requireFounder);
 canonBootstrapRouter.get('/bootstrap', async (req, res) => {
   res.set({ 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow' });
   const project = typeof req.query.project === 'string' ? req.query.project : '';
