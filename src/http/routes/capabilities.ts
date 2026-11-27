@@ -147,7 +147,7 @@ async function runPublicWebObservation(
     let observation;
     if (body.provider === 'firecrawl') {
       if (operation !== 'fetch' || body.urls !== undefined || body.query !== undefined ||
-        !['fcr','studio','truthweaverShop'].includes(String(body.target))) {
+        typeof body.target !== 'string' || !['fcr','studio','truthweaverShop'].includes(body.target)) {
         throw new PublicWebObservationError('public_web_invalid_request', 'Firecrawl requires a fixed public target and fetch operation.');
       }
       const result = await runFirecrawlObservation(body.target, {
