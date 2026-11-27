@@ -5,18 +5,31 @@
     "owner": "jussray",
     "meaning": "Observe progress from every repository owned by jussray; per-repository entries are privacy/output overlays, not an allowlist."
   },
-  "note": "Per-repository entries are optional privacy/output overlays. Repository scope is dynamic all_owned and must not be narrowed by this file. Review containsMinorOrSensitiveData, publicProofUrls, neverClaim, and neverExpose before a public draft is generated. See docs/founder-signal-engine/social-campaign-policy-v1.md.",
+  "note": "Per-repository entries are optional privacy/output overlays. Repository scope is dynamic all_owned and must not be narrowed by this file. Review containsMinorOrSensitiveData, publicProofUrls, neverClaim, and neverExpose before a public draft is generated. See docs/founder-signal-engine/social-campaign-policy-v1.md. Handshake brand-specific assets and draft-only handoff are declared per repo at brand/handshake/manifest.json; social pipeline remains dynamic all_owned, never expanded to publish.",
   "repositories": {
     "jussray/founder-control-room": {
       "containsMinorOrSensitiveData": false,
       "configuredMode": "ecosystem_only",
-      "publicProofUrls": [],
-      "neverClaim": ["publicly launched", "production complete", "SOC 2 certified"],
-      "neverExpose": ["tokens", "credentials", "private audit payloads", "internal infrastructure"]
+      "publicProofUrls": [
+        "https://github.com/jussray/founder-control-room"
+      ],
+      "neverClaim": [
+        "publicly launched",
+        "production complete",
+        "SOC 2 certified"
+      ],
+      "neverExpose": [
+        "tokens",
+        "credentials",
+        "private audit payloads",
+        "internal infrastructure"
+      ]
     },
     "jussray/Sekret-Bip": {
       "containsMinorOrSensitiveData": true,
-      "publicProofUrls": ["https://sekretbip.net"],
+      "publicProofUrls": [
+        "https://sekretbip.net"
+      ],
       "neverClaim": [],
       "neverExpose": [
         "teen records",
@@ -25,6 +38,24 @@
         "internal Supabase data"
       ],
       "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData is allowed only through sanitized_product_only when reviewed publicProofUrls and a non-empty neverExpose output denylist exist; otherwise classifyRepositoryForContent() blocks draft generation — see socialCampaignPolicy.ts."
+    },
+    "jussray/sync-party-game": {
+      "containsMinorOrSensitiveData": false,
+      "configuredMode": "ecosystem_only",
+      "publicProofUrls": [
+        "https://github.com/jussray/sync-party-game"
+      ],
+      "neverClaim": [
+        "live multiplayer verified",
+        "100% uptime",
+        "production complete"
+      ],
+      "neverExpose": [
+        "room tokens",
+        "private gameplay data",
+        "private player information",
+        "credentials"
+      ]
     }
   }
 }
