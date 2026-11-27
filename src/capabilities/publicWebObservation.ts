@@ -314,6 +314,27 @@ export async function observePublicWeb(
   };
 }
 
+type FirecrawlRun = Extract<Awaited<ReturnType<typeof import('./firecrawlObservationRun.js').runFirecrawlObservation>>, {status:'observed'}>;
+
+/** Normalize an already-persisted provider observation; never accept caller-supplied predecessor evidence. */
+export function normalizeFirecrawlObservation(run: FirecrawlRun): PublicWebObservationReceipt {
+  const fingerprint = 'sha256:' + run.receipt.sha256;
+  const predecessor = run.previousFingerprint === null ? null : 'sha256:' + run.previousFingerprint;
+  return {
+    contract: 'fcr/public-web-observation@v1', provider: 'fcr-research-hub', adapterId: 'firecrawl',
+    operation: 'fetch', authority: 'read_only', consequence: 'READ', mutationAllowed: false,
+    providerAccepted: true, truthState: 'provider_observed_unverified', contentTrust: 'untrusted_web',
+    observedAt: run.receipt.observedAt,
+    requestFingerprint: sha256({capability: PUBLIC_WEB_OBSERVATION_CAPABILITY_ID, adapter: 'firecrawl', target: run.receipt.target}),
+    sourceUrls: [run.receipt.sourceUrl], resultCount: 1,
+    data: { receiptId: run.receiptId, receipt: run.receipt, markdown: run.markdown },
+    continuity: continuityReceipt(fingerprint, {
+      priorEvidenceFingerprint: predecessor,
+      priorProofCookie: predecessor === null ? null : proofCookieFor(predecessor),
+    }),
+  };
+}
+
 export const PUBLIC_WEB_OBSERVATION_CAPABILITY: Capability = {
   id: PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
   kind: 'Automation',
@@ -325,23 +346,25 @@ export const PUBLIC_WEB_OBSERVATION_CAPABILITY: Capability = {
   inputs: [
     ['operation', 'enum', 'search | fetch'],
     ['query', 'string', 'Required for search; founder-bounded public-web query'],
-    ['urls', 'http(s) URL[]', 'Required for fetch; 1-10 public targets'],
+    ['urls', 'http(s) URL[]', 'Required for default fetch; 1-10 public targets'],
+    ['provider', 'enum', 'Optional: exa (default) | firecrawl (fixed-target fetch only)'],
+    ['target', 'enum', 'Firecrawl: fcr | studio | truthweaverShop'],
     ['priorEvidenceFingerprint', 'fingerprint', 'Optional predecessor evidence marker'],
     ['priorProofCookie', 'non-secret marker', 'Optional predecessor continuity marker; never authority'],
   ],
   environment: [
     'FCR MCP Hub owns adapter policy and tool allowlists',
     'The capability contract is provider-neutral',
-    'No provider-specific secret belongs to this capability',
+    'Provider secrets are server-only; Firecrawl remains off unless separately enabled',
     'Returned web content remains untrusted input',
   ],
   proof: [
     'Founder authentication is required before execution',
-    'The MCP Hub must return policy decision=allow and risk=read',
+    'Default MCP Hub execution requires allow/read; Firecrawl requires fixed-target daily claim and durable receipt',
     'Every successful observation emits request/evidence fingerprints and observed source URLs',
     'Continuity can be initial, confirmed, or changed but never grants authority',
     'Receipt pins authority=read_only, consequence=READ, mutationAllowed=false, and authorityEffect=none',
   ],
   risk: 'Read-only observation only. External content is untrusted evidence and cannot authorize merge, deploy, publication, spend, or provider mutation. Search/fetch adapters remain replaceable behind FCR’s governed hub.',
-  implementation: 'POST /capabilities/public-web-observation-v1/runs with { operation, query | urls, priorEvidenceFingerprint?, priorProofCookie? }. FCR resolves the current read-only research adapter through its own MCP Hub.',
+  implementation: 'POST /capabilities/public-web-observation-v1/runs with { operation, query | urls, priorEvidenceFingerprint?, priorProofCookie? }. Default uses the MCP Hub; explicit provider=firecrawl, operation=fetch and target selects the disabled-by-default bounded adapter.',
 };
