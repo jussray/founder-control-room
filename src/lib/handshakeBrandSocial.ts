@@ -89,7 +89,21 @@ export interface HandshakeDraftRequest {
 
 const SHA256 = /^[0-9a-f]{64}$/i;
 const ACCOUNT_PERSONAL = /(?:^|[\s:@/])(?:juss_fn_ray|juss_ray)(?:$|[\s/@])/i;
-const IMAGE_URL = /^https:\/\/[a-z0-9.-]+\/.+\.(?:png|jpe?g)(?:\?[^#]*)?$/i;
+// Parse user-supplied media URLs without backtracking over uncontrolled input.
+function parsePublicRasterImageUrl(value: unknown): URL | null {
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    const path = url.pathname.toLowerCase();
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
+      !(path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg'))) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
 const REVIEW_RECEIPT = /^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$/;
 
 function fail(reason: string): never {
@@ -118,10 +132,10 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
     fail('media hash must match pinned project logo and founder-reviewed exact social ad');
   }
   if (!REVIEW_RECEIPT.test(media.founderReviewReceiptId)) fail('missing founder visual review');
-  if (!media.publicReadbackVerified || !IMAGE_URL.test(media.mediaUrl)) {
+  const url = parsePublicRasterImageUrl(media.mediaUrl);
+  if (!media.publicReadbackVerified || !url) {
     fail('public raster media readback required');
   }
-  const url = new URL(media.mediaUrl);
   const productHost = new URL(project.productUrl).hostname;
   const sharedHost = url.hostname === 'cdn.jussco.company' || url.hostname === 'assets.jussco.company';
   const publoraHost = url.hostname === 'media.publora.com';
