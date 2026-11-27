@@ -196,3 +196,93 @@ export function reviewFounderSignalDraftHandoff(raw: unknown) {
     ],
   };
 }
+
+/** Server-resolved configuration only; never populate this profile from a request.
+ * This additional review lane does not authenticate the resolver or grant any
+ * scheduling, draft creation or publication authority. */
+export interface PortfolioSocialBrandProfile {
+  product: string;
+  repositories: readonly string[];
+  brandRepository: string;
+  brandPath: string;
+  brandSha: string;
+  brandHash: string;
+  destinations: readonly { platform: string; accountId: string }[];
+}
+
+const PORTFOLIO_EVENT_CLAIMS = new Map([
+  ['ci_passed', 'tested'],
+  ['pr_merged', 'merged'],
+  ['deployment_succeeded', 'deployed'],
+]);
+const PORTFOLIO_BRAND_KEYS = ['brandRepository', 'brandPath', 'brandSha', 'brandHash'] as const;
+const PORTFOLIO_KEYS = new Set<string>(['product', ...PORTFOLIO_BRAND_KEYS, 'event', 'eventId', 'claim', 'handoff']);
+const PORTFOLIO_REPO = /^jussray\/[A-Za-z0-9_.-]+$/;
+const PORTFOLIO_SHA = /^[a-f0-9]{40}$/;
+const PORTFOLIO_EVENT_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+type PortfolioReview = {
+  status: 'HOLD' | 'REVIEW_ONLY';
+  reason: string | null;
+  review: ReturnType<typeof reviewFounderSignalDraftHandoff> | null;
+  key: string | null;
+  publishAllowed: false;
+  independentEvidenceRequired: true;
+};
+
+export function reviewPortfolioFounderSignalDraftHandoff(
+  raw: unknown,
+  profile: PortfolioSocialBrandProfile | null,
+): PortfolioReview {
+  const hold = (reason: string): PortfolioReview => ({
+    status: 'HOLD', reason, review: null, key: null, publishAllowed: false,
+    independentEvidenceRequired: true,
+  });
+  const input = record(raw);
+  if (Object.keys(input).some(key => !PORTFOLIO_KEYS.has(key))) return hold('UNEXPECTED_PORTFOLIO_FIELD');
+  if (!profile || !Array.isArray(profile.repositories) || !Array.isArray(profile.destinations) ||
+      !/^[a-z0-9][a-z0-9-]{0,79}$/.test(profile.product) ||
+      !PORTFOLIO_REPO.test(profile.brandRepository) ||
+      !profile.repositories.includes(profile.brandRepository) ||
+      !profile.repositories.every(repo => PORTFOLIO_REPO.test(repo)) ||
+      !/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(profile.brandPath) ||
+      profile.brandPath.split('/').some(part => part === '.' || part === '..') ||
+      !PORTFOLIO_SHA.test(profile.brandSha) || !SHA256.test(profile.brandHash)) {
+    return hold('BRAND_PROFILE_UNVERIFIED');
+  }
+  if (input.product !== profile.product ||
+      PORTFOLIO_BRAND_KEYS.some(key => input[key] !== profile[key])) return hold('BRAND_MISMATCH');
+  const event = string(input.event);
+  const eventId = string(input.eventId);
+  if (!PORTFOLIO_EVENT_CLAIMS.has(event) || PORTFOLIO_EVENT_CLAIMS.get(event) !== input.claim ||
+      !PORTFOLIO_EVENT_ID.test(eventId)) return hold('EVENT_OR_CLAIM_INVALID');
+
+  const handoff = record(input.handoff);
+  const source = record(record(handoff.campaign).source);
+  const repo = string(source.repository);
+  const sha = string(source.commitSha).toLowerCase();
+  const platform = string(handoff.platform);
+  const account = string(handoff.accountId);
+  if (!PORTFOLIO_REPO.test(repo) || !profile.repositories.includes(repo) ||
+      !PORTFOLIO_SHA.test(sha)) return hold('PROJECT_MISMATCH');
+  if (!profile.destinations.some(d => d?.platform === platform && d?.accountId === account)) {
+    return hold('DESTINATION_MISMATCH');
+  }
+
+  let review: ReturnType<typeof reviewFounderSignalDraftHandoff>;
+  try {
+    review = reviewFounderSignalDraftHandoff(handoff);
+  } catch {
+    return hold('CANONICAL_HANDOFF_REJECTED');
+  }
+  if (review.status !== 'LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED' ||
+      !review.preview || review.preview.sourceRepository !== repo ||
+      review.preview.sourceCommitSha !== sha || review.accountId !== account ||
+      review.platform !== platform) return hold('CANONICAL_HANDOFF_HELD');
+
+  return {
+    status: 'REVIEW_ONLY', reason: null, review,
+    key: stableHash([profile.product, repo, sha, event, eventId, platform, account]),
+    publishAllowed: false, independentEvidenceRequired: true,
+  };
+}
