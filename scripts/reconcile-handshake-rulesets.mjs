@@ -7,6 +7,8 @@ export const TARGETS = Object.freeze({
     rulesetIds: [20819094, 28182360],
     requiredChecks: [
       'Required Gate', 'Verify test-ledger contract', 'CodeQL',
+      'GitGuardian Security Checks', 'Analyze (actions)',
+      'Analyze (javascript-typescript)', 'Analyze (python)',
       'Documentation truth gate', 'PR Continuity Exact-Head Gate',
     ],
     releaseEnvironments: ['founder-signal-engine-review', 'production', 'github-pages', 'copilot', 'expo-mobile'],
@@ -16,7 +18,9 @@ export const TARGETS = Object.freeze({
     rulesetIds: [27168673, 21250004],
     requiredChecks: [
       'deploy', 'Verify test-ledger contract', 'repository-truth',
-      'merge-membrane', 'Bearer', 'CodeQL', 'PR Continuity Exact-Head Gate',
+      'merge-membrane', 'Bearer', 'CodeQL', 'GitGuardian Security Checks',
+      'Analyze (actions)', 'Analyze (javascript-typescript)', 'Analyze (python)',
+      'PR Continuity Exact-Head Gate',
     ],
     releaseEnvironments: ['cloudflare-production', 'github-pages', 'Preview', 'login', 'Production'],
     releaseWorkflowPath: '.github/workflows/deploy-cloudflare.yml',
@@ -25,7 +29,7 @@ export const TARGETS = Object.freeze({
 
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-const KEYED_SCANNERS = Object.freeze({ CodeQL: 'github-advanced-security', Bearer: 'github-advanced-security' });
+const KEYED_SCANNERS = Object.freeze({ CodeQL: 'github-advanced-security', Bearer: 'github-advanced-security', 'GitGuardian Security Checks': 'gitguardian' });
 
 function requireTrue(ok, message) {
   if (!ok) throw new Error('GOVERNANCE_BLOCKED: ' + message);
