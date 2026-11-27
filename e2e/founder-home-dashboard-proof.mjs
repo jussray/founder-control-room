@@ -150,6 +150,7 @@ function startServer(mode) {
       '/dashboard/tasks': { tasks: FIXTURE.tasks },
       '/dashboard/activity': { activity: FIXTURE.activity },
       '/dashboard/costs': FIXTURE.costs,
+      '/dashboard/jusspay-observations': {state:'no_observations',scope:'latest_ingested_receipts',currency:'usd',receiptCount:0,availableReceiptCount:0,partial:false,newestObservedAt:null,observedGrossMinor:null,paymentOrders:0,refundHoldOrders:0,disputeHoldOrders:0,netRevenueMinor:null,settlementVerified:false,byProduct:[]},
       '/agents': { agents: FIXTURE.agents },
       '/authority-levels': { levels: FIXTURE.levels },
       '/promptos': { templates: FIXTURE.templates },

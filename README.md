@@ -895,3 +895,7 @@ Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b
 ### JussPay commerce observations (source candidate)
 
 `wrangler.worker.toml [secrets].optional` declares `JUSSPAY_RECEIPT_INGEST_KEY` as an optional server-held credential, never a public variable or boot requirement. The `/ingest/jusspay-receipts` route fails closed without the credential; it records redacted payment observations only, not charge, fulfillment or release authority. Source configuration is not proof of a deployed credential or receipt delivery.
+
+### Portfolio brand-bound draft review (candidate source)
+
+The portfolio brand-bound review helper compares a campaign's repository, product, pinned brand path/revision/hash, destination platform/account and declared GitHub event/claim to a separately supplied profile, then reuses the canonical offline handoff. Missing or mismatched inputs are held. Its deterministic review key is not a persistent deduplication reservation. It does not authenticate the profile resolver, prove GitHub events, inspect brand or media bytes, verify provider ownership, create drafts, schedule or publish. Live intake and profile resolution remain unconnected; independent evidence and exact approval are required.

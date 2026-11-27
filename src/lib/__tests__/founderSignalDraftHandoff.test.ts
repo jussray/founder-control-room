@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reviewFounderSignalDraftHandoff } from '../founderSignalDraftHandoff.js';
+import { reviewFounderSignalDraftHandoff, reviewPortfolioFounderSignalDraftHandoff } from '../founderSignalDraftHandoff.js';
 
 const SHA = 'a'.repeat(40);
 const MEDIA_SHA = 'b'.repeat(64);
@@ -147,5 +147,74 @@ describe('Founder Signal read-only draft handoff preview', () => {
     expect(x.providerDeliveryObserved).toBe(false);
     expect(x.authority.canSchedule).toBe(false);
     expect(x.authority.canMutateHubSpot).toBe(false);
+  });
+});
+
+describe('portfolio brand-bound draft handoff', () => {
+  const profile = {
+    product: 'founder-control-room',
+    repositories: ['jussray/founder-control-room'],
+    brandRepository: 'jussray/founder-control-room',
+    brandPath: 'public/brand.css',
+    brandSha: SHA,
+    brandHash: 'c'.repeat(64),
+    destinations: [{ platform: 'linkedin', accountId: 'founder-profile-01' }],
+  };
+  const packet = {
+    product: profile.product,
+    brandRepository: profile.brandRepository,
+    brandPath: profile.brandPath,
+    brandSha: profile.brandSha,
+    brandHash: profile.brandHash,
+    event: 'ci_passed',
+    eventId: '42',
+    claim: 'tested',
+    handoff: proposal(),
+  };
+
+  it('requires a server-supplied profile and never accepts one from the packet', () => {
+    expect(reviewPortfolioFounderSignalDraftHandoff(packet, null).status).toBe('HOLD');
+    expect(reviewPortfolioFounderSignalDraftHandoff({ ...packet, profile }, profile).status).toBe('HOLD');
+  });
+
+  it('retains the existing offline handoff and never grants publication authority', () => {
+    const result = reviewPortfolioFounderSignalDraftHandoff(packet, profile);
+    expect(result.status).toBe('REVIEW_ONLY');
+    expect(result.review?.preview?.sourceCommitSha).toBe(SHA);
+    expect(result.review?.authority.canPublish).toBe(false);
+    expect(result.publishAllowed).toBe(false);
+    expect(result.key).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('blocks brand changes, unrelated repository profiles and incorrect account routing', () => {
+    for (const change of [
+      { product: 'other-product' },
+      { brandHash: 'd'.repeat(64) },
+      { brandPath: 'other/brand.css' },
+      { handoff: proposal({ accountId: 'other-profile' }) },
+    ]) {
+      const result = reviewPortfolioFounderSignalDraftHandoff({ ...packet, ...change }, profile);
+      expect(result.status).toBe('HOLD');
+      expect(result.review).toBeNull();
+    }
+    expect(reviewPortfolioFounderSignalDraftHandoff(packet, { ...profile, repositories: ['jussray/other'] }).status).toBe('HOLD');
+  });
+
+  it('does not allow CI or merge events to claim deployed', () => {
+    for (const event of ['ci_passed', 'pr_merged']) {
+      expect(reviewPortfolioFounderSignalDraftHandoff({ ...packet, event, claim: 'deployed' }, profile).status).toBe('HOLD');
+    }
+  });
+
+  it('preserves canonical media rejection and emits no candidate key when held', () => {
+    const result = reviewPortfolioFounderSignalDraftHandoff({ ...packet, handoff: proposal({ media: [] }) }, profile);
+    expect(result.status).toBe('HOLD');
+    expect(result.key).toBeNull();
+  });
+
+  it('uses deterministic source, event and account identity for review deduplication', () => {
+    const result = reviewPortfolioFounderSignalDraftHandoff(packet, profile);
+    expect(reviewPortfolioFounderSignalDraftHandoff(packet, profile).key).toBe(result.key);
+    expect(reviewPortfolioFounderSignalDraftHandoff({ ...packet, eventId: '43' }, profile).key).not.toBe(result.key);
   });
 });
