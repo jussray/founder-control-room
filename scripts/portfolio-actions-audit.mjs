@@ -9,6 +9,8 @@ const MAX_PAGES = 20;
 const MAX_HEAD_RUNS = 100;
 const STALE_DAYS = 30;
 const MAX_NEXT_TASKS = 20;
+const MAX_JOB_INSPECTIONS = 20;
+const MAX_JOBS_PER_ATTEMPT = 100;
 const TERMINAL_FAILURES = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -28,12 +30,17 @@ const FOLLOW_UP = Object.freeze({
   UNKNOWN_FRESHNESS: [6, 'RESOLVE_EVIDENCE_FRESHNESS', 'Resolve observation freshness before reusing the evidence.'],
 });
 
-function selectFailedRuns(runs, head) {
+function latestExactRuns(runs, head) {
   if (!Array.isArray(runs) || !/^[a-f0-9]{40}$/.test(head || '')) return [];
   const latest = new Map();
   for (const run of runs) {
-    if (!run || run.head_sha !== head || !Number.isSafeInteger(run.id) || run.id < 1 ||
-        !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1) continue;
+    if (!run || run.head_sha !== head) continue;
+    if (!Number.isSafeInteger(run.id) || run.id < 1 ||
+        !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1) {
+      // Missing identity is not sufficient evidence of a successful current attempt.
+      latest.set(Symbol(), { status: 'completed', conclusion: 'unknown' });
+      continue;
+    }
     const previous = latest.get(run.id);
     if (!previous || run.run_attempt > previous.run_attempt) latest.set(run.id, run);
     else if (run.run_attempt === previous.run_attempt &&
@@ -41,7 +48,11 @@ function selectFailedRuns(runs, head) {
         id: run.id, run_attempt: run.run_attempt, status: 'unknown', conclusion: null
       });
   }
-  return [...latest.values()].filter(run => run.status === 'completed' && TERMINAL_FAILURES.has(run.conclusion))
+  return [...latest.values()];
+}
+
+function selectFailedRuns(runs, head) {
+  return latestExactRuns(runs, head).filter(run => run.status === 'completed' && TERMINAL_FAILURES.has(run.conclusion))
     .map(run => ({ runId: run.id, attempt: run.run_attempt, conclusion: run.conclusion }))
     .sort((a,b) => a.runId - b.runId || a.attempt - b.attempt);
 }
@@ -129,8 +140,8 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
   if (workflowCount === null) return 'UNKNOWN_WORKFLOW_COVERAGE';
   if (workflowCount === 0) return 'NO_WORKFLOWS';
   if (!head || !/^[a-f0-9]{40}$/.test(head)) return 'UNKNOWN_HEAD';
-  const exact = runs.filter((r) => r.head_sha === head);
-  if (exact.some((r) => TERMINAL_FAILURES.has(r.conclusion))) return 'FAILED_EXACT_HEAD';
+  const exact = latestExactRuns(runs, head);
+  if (exact.some((r) => r.status === 'completed' && TERMINAL_FAILURES.has(r.conclusion))) return 'FAILED_EXACT_HEAD';
   if (exact.some((r) => r.status !== 'completed')) return 'PENDING_EXACT_HEAD';
   if (exact.some((r) => r.conclusion === 'cancelled')) return 'CANCELLED_EXACT_HEAD';
   if (truncated) return 'INCOMPLETE_EXACT_HEAD_COVERAGE';
@@ -144,26 +155,59 @@ function assess({ archived, workflowCount, runs, head, headCommittedAt, now, tru
   if (age > STALE_DAYS) return 'STALE_SOURCE_30D';
   return 'OBSERVED_CHECKS_ONLY';
 }
+// Only fixed categories and numeric IDs leave this classifier. Job names, step
+// names and logs are untrusted evidence, not instructions or artifact content.
+function summarizeFailedJobs(payload, expectedHead, failure) {
+  const result = { runId: failure.runId, attempt: failure.attempt, state: 'INCOMPLETE_JOB_EVIDENCE', jobs: [] };
+  if (!payload || !Array.isArray(payload.jobs) || !Number.isSafeInteger(payload.total_count)
+      || payload.total_count !== payload.jobs.length || payload.jobs.length > MAX_JOBS_PER_ATTEMPT) return result;
+  const ids = new Set();
+  for (const job of payload.jobs) {
+    if (!job || job.head_sha !== expectedHead || job.run_id !== failure.runId || job.run_attempt !== failure.attempt ||
+        !Number.isSafeInteger(job.id) || job.id < 1 || ids.has(job.id) || job.status !== 'completed') return result;
+    ids.add(job.id);
+  }
+  const jobs = payload.jobs.filter(job => TERMINAL_FAILURES.has(job.conclusion));
+  result.jobs = jobs.map(job => {
+    const failedSteps = Array.isArray(job.steps) ? job.steps.filter(step => step && step.status === 'completed' &&
+      TERMINAL_FAILURES.has(step.conclusion) && Number.isSafeInteger(step.number) && step.number > 0) : [];
+    const step = failedSteps.sort((a,b) => a.number - b.number)[0];
+    const name = typeof step?.name === 'string' ? step.name.slice(0, 200) : '';
+    let category = 'UNCLASSIFIED_FAILURE';
+    if (job.conclusion === 'timed_out') category = 'TIMEOUT_REVIEW';
+    else if (job.conclusion === 'action_required') category = 'AUTHORITY_REVIEW';
+    else if (job.conclusion === 'startup_failure') category = 'STARTUP_REVIEW';
+    else if (/structured PR evidence fields/i.test(name)) category = 'PR_METADATA_REVIEW';
+    else if (/type.?check|typescript|\btsc\b/i.test(name)) category = 'TYPECHECK_REVIEW';
+    else if (/\blint\b|eslint/i.test(name)) category = 'LINT_REVIEW';
+    else if (/\btest\b|playwright|vitest|pytest/i.test(name)) category = 'TEST_REVIEW';
+    else if (/install dependencies|npm ci|setup node|setup python/i.test(name)) category = 'DEPENDENCY_SETUP_REVIEW';
+    return { jobId: job.id, conclusion: job.conclusion, firstFailedStep: step?.number ?? null, category };
+  }).sort((a,b) => a.jobId - b.jobId);
+  result.state = jobs.length ? 'FAILED_JOB_METADATA_OBSERVED' : 'NO_FAILED_JOB_METADATA';
+  return result;
+}
+
 function selfTest() {
   const base = { archived: false, workflowCount: 1, runs: [], head: 'a'.repeat(40),
     headCommittedAt: new Date().toISOString(), now: Date.now(), truncated: false };
   assert.equal(assess(base), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
   assert.equal(assess({ ...base, workflowCount: 0 }), 'NO_WORKFLOWS');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'failure' }] }), 'FAILED_EXACT_HEAD');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }] }), 'OBSERVED_CHECKS_ONLY');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }], truncated: true }), 'INCOMPLETE_EXACT_HEAD_COVERAGE');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'failure' }] }), 'FAILED_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'success' }] }), 'OBSERVED_CHECKS_ONLY');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'success' }], truncated: true }), 'INCOMPLETE_EXACT_HEAD_COVERAGE');
   assert.equal(assess({ ...base, archived: true }), 'ARCHIVED');
   assert.equal(assess({ ...base, workflowCount: null }), 'UNKNOWN_WORKFLOW_COVERAGE');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'cancelled' }] }), 'CANCELLED_EXACT_HEAD');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'in_progress', conclusion: null }] }), 'PENDING_EXACT_HEAD');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }],
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'cancelled' }] }), 'CANCELLED_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'in_progress', conclusion: null }] }), 'PENDING_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'success' }],
     headCommittedAt: new Date(base.now - 31 * 86_400_000).toISOString() }), 'STALE_SOURCE_30D');
   assert.equal(assess({ ...base, truncated: true }), 'INCOMPLETE_EXACT_HEAD_COVERAGE');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'skipped' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'neutral' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'weird' }] }), 'UNKNOWN_ACTION_CONCLUSION');
-  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }], headCommittedAt: '' }), 'UNKNOWN_FRESHNESS');
-  assert.equal(assess({ ...base, runs: [{ head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'failure' }] }), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'skipped' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'neutral' }] }), 'NO_SUCCESSFUL_EXACT_HEAD_RUN');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'weird' }] }), 'UNKNOWN_ACTION_CONCLUSION');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, id: 1, run_attempt: 1, status: 'completed', conclusion: 'success' }], headCommittedAt: '' }), 'UNKNOWN_FRESHNESS');
+  assert.equal(assess({ ...base, runs: [{ head_sha: 'b'.repeat(40), id: 1, run_attempt: 1, status: 'completed', conclusion: 'failure' }] }), 'NO_EXACT_HEAD_ACTION_EVIDENCE');
   const identity = { GITHUB_REPOSITORY: 'jussray/founder-control-room',
     PORTFOLIO_AUDIT_SOURCE_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '1234', GITHUB_RUN_ATTEMPT: '2' };
   const item = { repository: 'jussray/example', visibility: 'public', head: base.head, state: 'FAILED_EXACT_HEAD' };
@@ -174,6 +218,23 @@ function selfTest() {
   assert.equal(failed.auditIdentity.runUrl, 'https://github.com/jussray/founder-control-room/actions/runs/1234/attempts/2');
   assert.equal(failed.auditIdentity.bindingState, 'ENVIRONMENT_DECLARED');
   const failedRun = { head_sha: base.head, id: 123, run_attempt: 1, status: 'completed', conclusion: 'failure' };
+  const completedRetry = { ...failedRun, run_attempt: 2, conclusion: 'success' };
+  assert.equal(assess({ ...base, runs: [failedRun, completedRetry] }), 'OBSERVED_CHECKS_ONLY');
+  assert.equal(assess({ ...base, runs: [failedRun, { ...completedRetry, status: 'in_progress', conclusion: null }] }), 'PENDING_EXACT_HEAD');
+  assert.equal(assess({ ...base, runs: [{ head_sha: base.head, status: 'completed', conclusion: 'success' }] }), 'UNKNOWN_ACTION_CONCLUSION');
+  const failure = { runId: 123, attempt: 1, conclusion: 'failure' };
+  const job = { id: 99, run_id: 123, run_attempt: 1, head_sha: base.head, status: 'completed', conclusion: 'failure',
+    steps: [{ number: 4, status: 'completed', conclusion: 'failure', name: 'Require structured PR evidence fields' },
+      { number: 6, status: 'completed', conclusion: 'failure', name: 'untrusted secret-looking text' }] };
+  const diagnostic = summarizeFailedJobs({ total_count: 1, jobs: [job] }, base.head, failure);
+  assert.deepEqual(diagnostic.jobs, [{ jobId: 99, conclusion: 'failure', firstFailedStep: 4, category: 'PR_METADATA_REVIEW' }]);
+  assert.equal(diagnostic.state, 'FAILED_JOB_METADATA_OBSERVED');
+  assert.equal(JSON.stringify(diagnostic).includes('untrusted'), false);
+  assert.equal(summarizeFailedJobs({ total_count: 2, jobs: [job] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
+  assert.equal(summarizeFailedJobs({ total_count: 1, jobs: [{ ...job, run_attempt: 2 }] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
+  assert.equal(summarizeFailedJobs({ total_count: 2, jobs: [job, job] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
+  assert.equal(summarizeFailedJobs({ total_count: 1, jobs: [{ ...job, head_sha: 'b'.repeat(40) }] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
+  assert.equal(summarizeFailedJobs({ total_count: 0, jobs: [] }, base.head, failure).state, 'NO_FAILED_JOB_METADATA');
   const routedRuns = selectFailedRuns([failedRun, failedRun, { ...failedRun, id: 456 }], base.head);
   assert.deepEqual(routedRuns, [
     { runId: 123, attempt: 1, conclusion: 'failure' },
@@ -253,7 +314,7 @@ function selfTest() {
   assert.equal(trustStep.slice(trustStep.indexOf('\n')).includes('\n      - '), false,
     'no intervening action may separate trusted-main verification from credential minting');
   assert.match(trustStep, /set -euo pipefail/);
-  console.log('Portfolio classification regression: 16 assertions passed; this does NOT verify any external repository');
+  console.log('Portfolio classification and failed-job routing assertions passed; this does NOT verify any external repository');
   console.log('PORTFOLIO_HANDOFF_REGRESSION_PASSED');
 }
 
@@ -342,8 +403,9 @@ async function main() {
         if (!Array.isArray(actionResponse.workflow_runs)) throw new Error('INVALID_ACTION_RUN_LIST');
         const runs = actionResponse.workflow_runs;
         const matching = runs.filter((run) => run.head_sha === head);
-        result.sampledExactHeadRuns = matching.length;
-        result.sampledFailures = matching.filter((run) => TERMINAL_FAILURES.has(run.conclusion)).length;
+        const effective = latestExactRuns(matching, validHead);
+        result.sampledExactHeadRuns = effective.length;
+        result.sampledFailures = effective.filter((run) => run.status === 'completed' && TERMINAL_FAILURES.has(run.conclusion)).length;
         if (!r.private) result.failedRuns = selectFailedRuns(matching, validHead);
         result.state = assess({ archived: r.archived, workflowCount: result.workflowCount,
           runs, head: validHead, headCommittedAt, now,
@@ -360,6 +422,24 @@ async function main() {
       items.push(...await Promise.all(repos.slice(i, i + 6).map(observe)));
     }
     items.sort((a, b) => a.repository.localeCompare(b.repository));
+    // Deterministic bounded public diagnosis; do not export private job identities.
+    const queue = items.filter(item => item.visibility === 'public' && item.state === 'FAILED_EXACT_HEAD')
+      .flatMap(item => (item.failedRuns || []).map(failure => ({ item, failure })));
+    for (let i = 0; i < queue.length; i++) {
+      const { item, failure } = queue[i];
+      let diagnostic = { runId: failure.runId, attempt: failure.attempt, state: 'DEFERRED_JOB_INSPECTION_BUDGET', jobs: [] };
+      if (i < MAX_JOB_INSPECTIONS) {
+        try {
+          const key = item.repository.split('/').map(encodeURIComponent).join('/');
+          const payload = await api('/repos/' + key + '/actions/runs/' + failure.runId +
+            '/attempts/' + failure.attempt + '/jobs?per_page=' + MAX_JOBS_PER_ATTEMPT);
+          diagnostic = summarizeFailedJobs(payload, item.head, failure);
+        } catch {
+          diagnostic.state = 'JOB_EVIDENCE_READ_BLOCKED';
+        }
+      }
+      (item.failureDiagnostics ??= []).push(diagnostic);
+    }
     const nonArchived = items.filter((r) => !r.archived);
     const needsAttention = nonArchived.filter((r) => r.state !== 'OBSERVED_CHECKS_ONLY');
     state = accessible < expectedMinimum ? 'INCOMPLETE_COVERAGE'
@@ -391,6 +471,7 @@ async function main() {
       'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
+      'At most 20 public failed attempts receive job metadata triage; categories are hypotheses, not root-cause proof; logs are not exported',
       'Private names use per-run pseudonyms; private branch names and head SHAs are omitted'
     ]
   };
