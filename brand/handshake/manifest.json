@@ -1,0 +1,46 @@
+{
+  "schema": "fcr/handshake-brand-social@v1",
+  "slug": "fcr",
+  "product": "Founder Control Room",
+  "sourceRepository": "jussray/founder-control-room",
+  "publicProductUrl": "https://foundercontrolroom.org/",
+  "brand": {
+    "logoSource": "brand/handshake/logo.svg",
+    "logoFormat": "svg",
+    "logoWidth": 1200,
+    "logoHeight": 490,
+    "colors": [
+      "#55c8ff",
+      "#9b6bff",
+      "#c26bf5"
+    ],
+    "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
+    "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
+    "neverBorrowBrandFromOtherProjects": true
+  },
+  "handshake": {
+    "target": "Handshake AI Showcase project card",
+    "coverLocalOutput": "handshake-cover.png",
+    "coverWidth": 1536,
+    "coverHeight": 1024,
+    "coverSha256": "fb13c8253b13cc829efca1f43bde3880435dbd53227dd972fe7dc8b453454d72",
+    "mediaPublicUrl": null,
+    "externalSubmissionState": "NOT_SUBMITTED",
+    "requireNativeConfirmation": true
+  },
+  "social": {
+    "owner": "jussray/founder-control-room",
+    "adapter": "src/lib/handshakeBrandSocial.ts",
+    "existingClassification": "src/lib/socialCampaignPolicy.ts",
+    "existingPublisher": "src/lib/firstPartySocialPublisher.ts",
+    "targetAudience": "business",
+    "firstPartyMode": "draft",
+    "publishAllowed": false,
+    "businessAccountBinding": "UNVERIFIED",
+    "publicMediaReadback": "UNVERIFIED",
+    "exactMediaReview": "REQUIRED",
+    "nativePublicationReceipt": "NOT_PRESENT",
+    "proofRoot": "https://github.com/jussray/founder-control-room"
+  },
+  "safety": "Public-source engineering claims only. No credentials, private receipts, or invented performance numbers."
+}
