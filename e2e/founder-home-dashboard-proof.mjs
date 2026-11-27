@@ -324,13 +324,13 @@ console.log('\n[2] Old deep links migrate to five-screen routes on mobile');
     // Search & Evidence tile target (HOME_TILES) and the search-evidence.html
     // compatibility alias both resolve to the single guarded Search Console panel.
     await page.goto(baseUrl+'/control-room/?tab=truth-seo',{waitUntil:'load'});
-    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
+    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · sitemap processing and indexing'}).waitFor({state:'visible'});
     assert(new URL(page.url()).searchParams.get('screen')==='proof'
       &&new URL(page.url()).searchParams.get('view')==='truth-seo'
       &&new URL(page.url()).searchParams.get('tab')===null,
       'Search & Evidence tile target migrates to the canonical Proof Search Console panel');
     await page.goto(baseUrl+'/control-room/search-evidence.html',{waitUntil:'load'});
-    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
+    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · sitemap processing and indexing'}).waitFor({state:'visible'});
     assert(new URL(page.url()).searchParams.get('view')==='truth-seo',
       'search-evidence.html compatibility alias lands on the canonical Search Console panel');
     await noOverflow(page,'mobile Proof Search Console');
