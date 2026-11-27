@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { FOUNDER_SIGNAL_CAMPAIGN_TOOL, planFounderSignalCampaign } from '../../lib/founderSignalCampaignPlanner.js';
 import { FSE_HANDOFF_TOOL, reviewFounderSignalDraftHandoff } from '../../lib/founderSignalDraftHandoff.js';
 import { FSE_PUBLIC_SOURCE_TOOL, verifyFounderSignalPublicSource } from '../../lib/founderSignalPublicSourceCheck.js';
+import { getHandshakeBrandSpec, prepareHandshakeBrandSocialDraft, type HandshakeProject, type HandshakeDraftRequest } from '../../lib/handshakeBrandSocial.js';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
@@ -694,6 +695,43 @@ function publicSourceToolDefinition(): DbRecord {
   };
 }
 
+const HANDSHAKE_BRAND_SPEC_TOOL = 'get_handshake_brand_spec';
+const HANDSHAKE_BRAND_REVIEW_TOOL = 'review_handshake_brand_social_draft';
+
+function handshakeBrandSpecToolDefinition(): DbRecord {
+  return {
+    name: HANDSHAKE_BRAND_SPEC_TOOL,
+    title: 'Get Handshake Brand Spec (Read-Only)',
+    description: 'Return the exact project-owned logo and distinct Handshake/social asset hashes. This tool does not upload media, submit Handshake projects, or publish posts.',
+    inputSchema: {
+      type: 'object', additionalProperties: false, required: ['project'],
+      properties: { project: { type: 'string', enum: ['fcr', 'bip', 'sync'] } },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
+function handshakeBrandReviewToolDefinition(): DbRecord {
+  return {
+    name: HANDSHAKE_BRAND_REVIEW_TOOL,
+    title: 'Review Handshake-Branded Social Draft (Read-Only)',
+    description: 'Validate a project-owned 4:5 social ad with its exact founder-reviewed binary digest through FCR existing social classifier, output firewall and first-party draft validator. Never uploads or publishes media.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      required: ['project', 'evidence', 'audience', 'draft', 'mediaReview', 'businessAccountBindingVerified'],
+      properties: {
+        project: { type: 'string', enum: ['fcr', 'bip', 'sync'] },
+        audience: { type: 'string', enum: ['business', 'parents_educators_community'] },
+        businessAccountBindingVerified: { type: 'boolean' },
+        evidence: { type: 'object' },
+        draft: { type: 'object' },
+        mediaReview: { type: 'object' },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
 function toolDefinition(): DbRecord {
   return {
     name: TOOL_NAME,
@@ -1273,7 +1311,7 @@ export function createFounderSignalEngineMcpHandler(
       return;
     }
     if (body.method === 'tools/list') {
-      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition(), publicSourceToolDefinition()] }));
+      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition(), publicSourceToolDefinition(), handshakeBrandSpecToolDefinition(), handshakeBrandReviewToolDefinition()] }));
       return;
     }
     if (body.method !== 'tools/call') {
@@ -1282,6 +1320,41 @@ export function createFounderSignalEngineMcpHandler(
     }
 
     const params = isRecord(body.params) ? body.params : null;
+    if (params?.name === HANDSHAKE_BRAND_SPEC_TOOL) {
+      const args = params.arguments;
+      if (!isRecord(args) || Object.keys(args).some(key => key !== 'project') ||
+          !['fcr', 'bip', 'sync'].includes(String(args.project))) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand spec'));
+        return;
+      }
+      const spec = getHandshakeBrandSpec(args.project as HandshakeProject);
+      res.json(rpcResult(id, {
+        content: [{ type: 'text', text: 'Branded asset specification only. The media has not been externally hosted, approved for production, or submitted to Handshake.' }],
+        structuredContent: spec, isError: false,
+      }));
+      return;
+    }
+
+    if (params?.name === HANDSHAKE_BRAND_REVIEW_TOOL) {
+      const args = params.arguments;
+      if (!isRecord(args) || containsSecretLikeMaterial(args)) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand social draft', ['Invalid or potentially secret-bearing review input']));
+        return;
+      }
+      try {
+        const review = prepareHandshakeBrandSocialDraft(args as unknown as HandshakeDraftRequest);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'First-party draft validated. No external media, Handshake, or social provider calls were performed.' }],
+          structuredContent: review, isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand social draft', [
+          error instanceof Error ? error.message : 'Failed project, brand, or media review',
+        ]));
+      }
+      return;
+    }
+
     if (params?.name === FSE_PUBLIC_SOURCE_TOOL) {
       try {
         const check = await verifyFounderSignalPublicSource(params.arguments, {
