@@ -28,7 +28,7 @@ function fixture(repo) {
   }));
   const releaseWorkflow = repo === 'jussray/founder-control-room'
     ? 'on: workflow_call\njobs:\n  release:\n    environment: production\n    run: test "$current_main" = "$EXPECTED_HEAD_SHA"\n'
-    : 'on: push\nbranches: [main]\njobs:\n  deploy:\n    environment: Production\n    run: test "$TARGET_SHA" = "$current_main"\n';
+    : 'on:\n  push:\n    branches: [main]\njobs:\n  deploy:\n    environment: Production\n    run: test "$TARGET_SHA" = "$current_main"\n';
   return {
     repository: repo, expectedMainSha: SHA, observedMainSha: SHA, expectedHeadSha: 'b'.repeat(40),
     pullRequest: { state: 'open', draft: false, base: { sha: SHA }, head: { sha: 'b'.repeat(40) } },
