@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp, rm, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -12,6 +15,8 @@ const MAX_NEXT_TASKS = 20;
 const MAX_JOB_INSPECTIONS = 20;
 const MAX_JOBS_PER_ATTEMPT = 100;
 const MAX_REPAIR_PLAN_JOBS = 10;
+const MAX_HISTORY_BYTES = 2 * 1024 * 1024;
+const HISTORY_REPO = 'jussray/founder-control-room';
 const TERMINAL_FAILURES = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -85,6 +90,41 @@ function buildRepairPlan(diagnostic) {
   return { ...base, state: steps.some(step => step.kind === 'AUTHORITY_HOLD') ||
     diagnostic.jobs.some(job => job.category === 'AUTHORITY_REVIEW') ? 'AUTHORITY_HOLD' : 'EVIDENCE_REQUIRED',
     steps, omittedJobs: Math.max(0, diagnostic.jobs.length - steps.length) };
+}
+
+// Retained audit receipts are observations, never execution claims or locks.
+function reconcileRepairHistory(document, prior, binding) {
+  const info = { state: 'HISTORY_UNAVAILABLE', matchedTasks: 0, authority: 'observation_only',
+    executionLedger: false, mutationAuthorized: false };
+  if (!prior || !binding || prior.schema !== 'fcr/portfolio-actions-audit@v1' ||
+      prior.auditIdentity?.sourceRepository !== HISTORY_REPO ||
+      prior.auditIdentity?.runId !== String(binding.id) ||
+      prior.auditIdentity?.runAttempt !== String(binding.run_attempt) ||
+      prior.auditIdentity?.sourceSha !== binding.head_sha ||
+      document.auditIdentity?.sourceRepository !== HISTORY_REPO ||
+      prior.auditIdentity.runId === document.auditIdentity.runId ||
+      !Array.isArray(prior.nextTasks) || prior.nextTasks.length > MAX_NEXT_TASKS ||
+      !Number.isFinite(Date.parse(prior.observedAt)) ||
+      !Number.isFinite(Date.parse(document.observedAt)) ||
+      Date.parse(prior.observedAt) >= Date.parse(document.observedAt)) return info;
+  const { evidenceFingerprint, ...payload } = prior;
+  if (evidenceFingerprint !== hash(payload)) return info;
+  info.state = 'PRIOR_RECEIPT_MATCHED';
+  info.priorRunId = String(binding.id);
+  for (const task of document.nextTasks) {
+    if (task.subject?.identityScope !== 'public_exact_head' || !task.subject.failedRun) continue;
+    const previous = prior.nextTasks.filter(candidate => candidate?.taskFingerprint === task.taskFingerprint &&
+      candidate?.subject?.identityScope === 'public_exact_head' &&
+      JSON.stringify(candidate.subject) === JSON.stringify(task.subject) &&
+      candidate.action === task.action);
+    if (previous.length !== 1) continue;
+    const count = previous[0].recurrence?.consecutiveReceiptCount;
+    task.recurrence = { state: 'REOBSERVED_IN_PRIOR_RECEIPT',
+      consecutiveReceiptCount: Number.isSafeInteger(count) && count >= 2 && count < 10000 ? count + 1 : 2,
+      priorAuditRunId: info.priorRunId, executionAuthorized: false };
+    info.matchedTasks++;
+  }
+  return info;
 }
 
 // This is a resumable observation proposal, never an execution or approval queue.
@@ -328,6 +368,21 @@ function selfTest() {
   assert.equal(JSON.stringify(routedWithDiagnosis).includes('private log'), false);
   assert.equal(routedWithDiagnosis.nextAction.taskFingerprint,
     routed.nextTasks.find(task => task.subject.failedRun.runId === failure.runId).taskFingerprint);
+  const historyRun = { id: 1234, run_attempt: 2, head_sha: identity.PORTFOLIO_AUDIT_SOURCE_SHA };
+  const earlier = { schema: 'fcr/portfolio-actions-audit@v1', observedAt: '2026-01-01T00:00:00Z',
+    ...routedWithDiagnosis };
+  earlier.evidenceFingerprint = hash(earlier);
+  const current = () => ({ observedAt: '2026-01-02T00:00:00Z',
+    ...buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, failedRuns: [failure] }] },
+      { ...identity, GITHUB_RUN_ID: '5678' }) });
+  const next = current();
+  assert.equal(reconcileRepairHistory(next, earlier, historyRun).matchedTasks, 1);
+  assert.equal(next.nextTasks[0].recurrence.consecutiveReceiptCount, 2);
+  assert.equal(next.nextTasks[0].recurrence.executionAuthorized, false);
+  assert.equal(next.nextTasks.length, 1);
+  assert.equal(reconcileRepairHistory(current(), { ...earlier, observedAt: '2025-12-31T00:00:00Z' }, historyRun).state, 'HISTORY_UNAVAILABLE');
+  assert.equal(reconcileRepairHistory(current(), earlier, { ...historyRun, run_attempt: 3 }).state, 'HISTORY_UNAVAILABLE');
+  assert.equal(reconcileRepairHistory(current(), null, historyRun).state, 'HISTORY_UNAVAILABLE');
   const pending = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'PENDING_EXACT_HEAD' }] }, identity);
   assert.equal(pending.nextAction.action, 'REOBSERVE_PENDING_EXACT_HEAD');
   const incomplete = buildAuditHandoff({ state: 'INCOMPLETE_COVERAGE', items: [item] }, identity);
@@ -409,6 +464,8 @@ async function main() {
   let items = [];
   let accessible = 0;
   let discoveryComplete = false;
+  let priorReceipt = null;
+  let priorBinding = null;
   try {
     // A failed prerequisite uses the same writer without making any API call.
     if (process.argv.includes('--blocked-receipt')) throw new Error('AUDIT_DID_NOT_PRODUCE_RECEIPT');
@@ -431,6 +488,45 @@ async function main() {
         if (!response.ok) throw new Error('GITHUB_READ_STATUS_' + response.status);
         return await response.json();
       } finally { clearTimeout(timer); }
+    }
+    // Read one prior trusted-main audit artifact with the same read-only token.
+    // Failure to retrieve history must never hide current failures or imply novelty.
+    if (process.env.GITHUB_REPOSITORY === HISTORY_REPO && /^[1-9][0-9]*$/.test(process.env.GITHUB_RUN_ID || '')) {
+      let historyDir;
+      try {
+        const response = await api('/repos/' + HISTORY_REPO +
+          '/actions/workflows/portfolio-actions-audit.yml/runs?branch=main&status=completed&per_page=10');
+        const eligible = (Array.isArray(response.workflow_runs) ? response.workflow_runs : []).filter(run =>
+          Number.isSafeInteger(run.id) && run.id > 0 && String(run.id) !== process.env.GITHUB_RUN_ID &&
+          Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0 && run.head_branch === 'main' &&
+          run.status === 'completed' && ['push', 'schedule', 'workflow_dispatch'].includes(run.event) &&
+          run.repository?.full_name === HISTORY_REPO && run.head_repository?.full_name === HISTORY_REPO &&
+          /^[a-f0-9]{40}$/.test(run.head_sha || '') && Number.isFinite(Date.parse(run.created_at)));
+        eligible.sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
+        const prior = eligible[0];
+        if (prior) {
+          const name = 'portfolio-actions-audit-' + prior.id;
+          const metadata = await api('/repos/' + HISTORY_REPO + '/actions/runs/' + prior.id + '/artifacts?per_page=100');
+          const artifacts = (Array.isArray(metadata.artifacts) ? metadata.artifacts : []).filter(artifact =>
+            artifact.name === name && artifact.expired === false && Number.isSafeInteger(artifact.size_in_bytes) &&
+            artifact.size_in_bytes > 0 && artifact.size_in_bytes <= MAX_HISTORY_BYTES);
+          if (artifacts.length === 1) {
+            historyDir = await mkdtemp(join(tmpdir(), 'fcr-audit-history-'));
+            execFileSync('gh', ['run', 'download', String(prior.id), '--repo', HISTORY_REPO, '--name', name, '--dir', historyDir],
+              { env: { ...process.env, GH_TOKEN: token, GH_PROMPT_DISABLED: '1' }, timeout: 30000, stdio: 'ignore' });
+            const file = join(historyDir, 'receipt.json');
+            const size = (await stat(file)).size;
+            if (size > 0 && size <= MAX_HISTORY_BYTES) {
+              priorReceipt = JSON.parse(readFileSync(file, 'utf8'));
+              priorBinding = prior;
+            }
+          }
+        }
+      } catch {
+        // No raw provider errors or credentials are exported.
+      } finally {
+        if (historyDir) await rm(historyDir, { recursive: true, force: true }).catch(() => {});
+      }
     }
     const repos = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
@@ -551,10 +647,12 @@ async function main() {
       'Freshness is based on the default-branch head commit date, not other branch pushes',
       'Passing checks are NOT proof of successful deployed actions',
       'At most 20 public failed attempts receive job metadata triage; categories are hypotheses, not root-cause proof; logs are not exported',
-      'Private names use per-run pseudonyms; private branch names and head SHAs are omitted'
+      'Private names use per-run pseudonyms; private branch names and head SHAs are omitted',
+      'Recurrence is limited to the previous retained trusted-main receipt and does not suppress unresolved failures or reserve execution'
     ]
   };
   Object.assign(document, buildAuditHandoff(document, process.env));
+  document.repairHistory = reconcileRepairHistory(document, priorReceipt, priorBinding);
   document.evidenceFingerprint = hash(document);
   await mkdir('artifacts/portfolio-actions-audit', { recursive: true });
   await writeFile(RECEIPT, JSON.stringify(document, null, 2) + '\n', 'utf8');
