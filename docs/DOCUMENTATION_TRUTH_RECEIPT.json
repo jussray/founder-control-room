@@ -1091,6 +1091,30 @@
       ]
     },
     {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "`src/http/routes/n8nConveyor.ts` must report the canonical default provider set from `N8N_FOUNDER_CONTENT_DEFAULT_ENABLED_PROVIDERS`, not a hard-coded Buffer-only list; readiness is configuration evidence, not provider acceptance, publication or authority."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "claims": [
+        "`src/lib/n8nFounderContentReadiness.test.ts` must assert the nine default contract providers while preserving disabled, unconfigured transport and false Buffer probe readiness when credentials are absent; default allowlisting must not imply execution."
+      ]
+    },
+    {
+      "path": "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts",
+      "claims": [
+        "`src/lib/n8nProviderNeutralFounderContentOrchestrator.ts` must derive its default provider list from the canonical contract routes, retain explicit environment allowlist override and fail closed on invalid configuration; this does not authorize publication or prove provider-native execution."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "`wrangler.worker.toml` must explicitly allowlist the nine configured `N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS` lanes (buffer, meta, tiktok, x, youtube, pinterest, bluesky, mastodon, google_business) while retaining the pinned workflow identity and runtime version. Source configuration alone cannot prove a live provider credential, schedule, or publication; feature-held secrets and exact provider readback remain required."
+      ]
+    },
+    {
       "path": "src/futureyou/missionControl.ts",
       "claims": [
         "`src/futureyou/missionControl.ts`'s `buildMissionControlBrief` must add a `blindSpots` line naming the count whenever one or more `critical` or `error` severity activity events are older than 14 days and therefore excluded from `priorities`; an unresolved operational signal must never be silently dropped with no trace in the brief."

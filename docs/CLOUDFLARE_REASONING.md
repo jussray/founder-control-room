@@ -305,9 +305,9 @@ This source membrane does not prove the current Cloudflare required-secret set, 
 
 ### Founder Content n8n Worker activation boundary
 
-`wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, Buffer as the only enabled provider for this slice, expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held required binding names: `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.
+`wrangler.worker.toml` may express the reviewed Founder Content source intent with `N8N_FOUNDER_CONTENT_ENABLED=true`, the nine-provider explicit allowlist (Buffer, Meta, TikTok, X, YouTube, Pinterest, Bluesky, Mastodon and Google Business), expected workflow ID `fcrFounderContentV1`, and n8n runtime `2.32.6`. The canonical Worker also declares four provider-held feature binding names (optional for boot, required for feature activation): `N8N_FOUNDER_CONTENT_WEBHOOK_URL`, `N8N_FOUNDER_CONTENT_BEARER_TOKEN`, `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT`, and `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET`.
 
-Those source declarations and required names are not provider/runtime observations. A Wrangler dry-run, ordinary CI, or an isolated real-n8n proof cannot establish that the production Worker has those bindings, that the exact production workflow is published, that its HMAC identity matches, that the database migrations are applied, or that Buffer accepted a schedule. Canonical exact-main Deploy must fail closed on missing required binding names before Worker mutation, and any later `live`, `used`, `scheduled`, or `published` claim requires exact deployed Worker identity plus production n8n workflow/runtime identity and provider-native Buffer readback.
+Those source declarations and required names are not provider/runtime observations. A Wrangler dry-run, ordinary CI, or an isolated real-n8n proof cannot establish that the production Worker has those bindings, that the exact production workflow is published, that its HMAC identity matches, that the database migrations are applied, or that the selected provider accepted a schedule. Canonical exact-main Deploy must fail closed on missing required binding names before Worker mutation, and any later `live`, `used`, `scheduled`, or `published` claim requires exact deployed Worker identity plus production n8n workflow/runtime identity and provider-native Buffer readback.
 
 ## Durable release-proof Workflow boundary
 
@@ -373,3 +373,6 @@ The production Cloudflare credential diagnostic is founder-dispatched only. It c
 ## Live exact-SHA proof propagation window
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
+
+
+The provider allowlist is source configuration only. All nine contract providers are enabled by default when no explicit allowlist is set; an explicit valid allowlist overrides that set. Each provider still requires its own authorization and independent native readback. Buffer-specific readiness and proof cannot establish another provider's outcome.

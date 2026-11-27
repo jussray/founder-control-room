@@ -130,6 +130,29 @@ describe('sanitizeWebhookPayload', () => {
     expect(JSON.stringify(result)).not.toContain('password');
   });
 
+
+  it('retains only a single same-repository exact-head failed-check PR identity', () => {
+    const repo = { id: 42, full_name: 'jussray/example' };
+    const pr = { number: 7, head: { sha: SHA, repo: { id: 42 } }, base: { repo: { id: 42 } }, body: 'PRIVATE_MARKER' };
+    const raw = { action: 'completed', repository: repo, check_run: { status: 'completed', conclusion: 'failure', head_sha: SHA, pull_requests: [pr] } };
+    const result = sanitizeWebhookPayload('check_run', raw);
+    expect(result.check_run).toMatchObject({ remediation_pr_number: 7 });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_MARKER');
+    expect(JSON.stringify(result)).not.toContain('pull_requests');
+    for (const pull_requests of [
+      [],
+      [pr, { ...pr, number: 8 }],
+      [{ ...pr, head: { ...pr.head, sha: 'b'.repeat(40) } }],
+      [{ ...pr, head: { ...pr.head, repo: { id: 99 } } }],
+      [{ ...pr, base: { repo: { id: 99 } } }],
+      [{ ...pr, number: '7' }],
+    ]) {
+      expect(sanitizeWebhookPayload('check_run', { ...raw, check_run: { ...raw.check_run, pull_requests } }).check_run).not.toHaveProperty('remediation_pr_number');
+    }
+    expect(sanitizeWebhookPayload('check_run', { ...raw, check_run: { ...raw.check_run, conclusion: 'cancelled' } }).check_run).not.toHaveProperty('remediation_pr_number');
+    expect(sanitizeWebhookPayload('check_run', { ...raw, action: 'created' }).check_run).not.toHaveProperty('remediation_pr_number');
+  });
+
   it('keeps deployment metadata bounded while dropping unknown payload fields', () => {
     const result = sanitizeWebhookPayload('deployment_status', {
       action: 'created',
