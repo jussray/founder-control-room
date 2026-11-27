@@ -90,7 +90,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_RULESET_ADMIN_TOKEN: ${{ secrets.GITHUB_RULESET_ADMIN_TOKEN }}
+          GITHUB_RULESET_ADMIN_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN }}
           FOUNDER_APPROVED_PLAN_SHA256: ${{ inputs.approval_plan_sha256 }}
           FOUNDER_APPROVED_HEAD_SHA: ${{ inputs.expected_pr_head_sha }}
           TARGET_REPO: ${{ inputs.target_repository }}
