@@ -16,7 +16,8 @@
     ],
     "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
     "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
-    "neverBorrowBrandFromOtherProjects": true
+    "neverBorrowBrandFromOtherProjects": true,
+    "logoSha256": "e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6"
   },
   "handshake": {
     "target": "Handshake AI Showcase project card",
