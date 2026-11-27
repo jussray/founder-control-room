@@ -66,7 +66,7 @@ function checkReleaseEvidence(input, target) {
       source.includes('test "$current_main" = "$EXPECTED_HEAD_SHA"'),
     'release workflow must guard an exact current-main production deployment');
   } else {
-    requireTrue(source.includes('on: push') &&
+    requireTrue(source.includes('\n  push:') &&
       source.includes('branches: [main]') &&
       source.includes('environment: Production') &&
       source.includes('current_main') && source.includes('TARGET_SHA') &&
@@ -279,14 +279,23 @@ export async function reconcileProvider({
   const written = [];
   try {
     for (const update of fresh.updates) {
+      const [currentMain, currentPR] = await Promise.all([
+        requestGitHub(base + '/branches/main', token),
+        requestGitHub(base + '/pulls/' + prNumber, token),
+      ]);
+      requireTrue(currentMain.commit?.sha === expectedMainSha &&
+        currentPR.state === 'open' && currentPR.head?.sha === expectedHeadSha &&
+        currentPR.base?.sha === expectedMainSha, 'PR head/main moved during provider update');
       const path = base + '/rulesets/' + update.id;
       const before = await requestGitHub(path, token);
       requireTrue(fingerprint(normalizeRulesetPayload(before)) ===
         fingerprint(normalizeRulesetPayload(update.before)),
       'ruleset changed during reconciliation: ' + update.id);
+      // Track the intent before the external effect: a network failure after PUT
+      // must never be mistaken for proof that no provider mutation occurred.
+      written.push(update);
       await requestGitHub(path, token, 'PUT', normalizeRulesetPayload(update.after));
       const observed = await requestGitHub(path, token);
-      written.push(update);
       requireTrue(fingerprint(normalizeRulesetPayload(observed)) ===
         fingerprint(normalizeRulesetPayload(update.after)),
       'provider readback differs from approved ruleset: ' + update.id);
@@ -300,8 +309,12 @@ export async function reconcileProvider({
       try {
         const path = base + '/rulesets/' + update.id;
         const now = await requestGitHub(path, token);
-        if (fingerprint(normalizeRulesetPayload(now)) !==
-            fingerprint(normalizeRulesetPayload(update.after))) {
+        const current = fingerprint(normalizeRulesetPayload(now));
+        const beforeHash = fingerprint(normalizeRulesetPayload(update.before));
+        const afterHash = fingerprint(normalizeRulesetPayload(update.after));
+        // A failed PUT may have had no effect, or succeeded before timeout.
+        if (current === beforeHash) continue;
+        if (current !== afterHash) {
           rollbackErrors.push('concurrent change on ruleset ' + update.id);
           continue;
         }
