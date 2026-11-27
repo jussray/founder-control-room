@@ -18,6 +18,8 @@ export const HANDSHAKE_BRAND_CONTRACT = 'fcr/handshake-brand-social@v1' as const
 export const HANDSHAKE_PROJECTS = {
   fcr: {
     repository: 'jussray/founder-control-room',
+    expectedLogoSha256: 'e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6',
+    expectedCoverSha256: '6b37529cec906a4a17a38091d03dc79412f15d40a98339576be069fdda52d7f9',
     name: 'Founder Control Room',
     productUrl: 'https://foundercontrolroom.org/',
     logoPath: 'brand/handshake/logo.svg',
@@ -27,6 +29,8 @@ export const HANDSHAKE_PROJECTS = {
   },
   bip: {
     repository: 'jussray/Sekret-Bip',
+    expectedLogoSha256: '64355625d74ab72d80805d18647a0963d22b0b483c2daa5dbef91b3624beaf86',
+    expectedCoverSha256: '6329fbdfc57c9ddb4b3ab5491f37382e5924ab3dab2f303973850ccb89f3f914',
     name: 'Se’kret Bip',
     productUrl: 'https://sekretbip.net/',
     logoPath: 'brand/handshake/logo.svg',
@@ -36,6 +40,8 @@ export const HANDSHAKE_PROJECTS = {
   },
   sync: {
     repository: 'jussray/sync-party-game',
+    expectedLogoSha256: '8b8d76530f2fdef66f0145b312a96702a6b3d0b3733bad8fc6a959a246a96827',
+    expectedCoverSha256: 'ffe59a6338e37f5148463a7252d24e7e41df59747666cd63b7fc6edffb754a18',
     name: 'SYNC Party',
     productUrl: 'https://sync.jussco.company/',
     logoPath: 'brand/handshake/logo.svg',
@@ -96,8 +102,10 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
   if (media.project !== input.project || media.logoRepository !== project.repository ||
       media.logoPath !== project.logoPath) fail('cross-brand logo/media mismatch');
   if (!SHA256.test(media.logoSha256) || !SHA256.test(media.coverSha256) ||
+      media.logoSha256.toLowerCase() !== project.expectedLogoSha256 ||
+      media.coverSha256.toLowerCase() !== project.expectedCoverSha256 ||
       media.founderReviewedExactMediaSha256.toLowerCase() !== media.coverSha256.toLowerCase()) {
-    fail('media hash must match founder-reviewed exact cover');
+    fail('media hash must match pinned project logo and founder-reviewed exact cover');
   }
   if (!REVIEW_RECEIPT.test(media.founderReviewReceiptId)) fail('missing founder visual review');
   if (!media.publicReadbackVerified || !IMAGE_URL.test(media.mediaUrl)) {
