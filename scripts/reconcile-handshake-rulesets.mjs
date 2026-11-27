@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const TARGETS = Object.freeze({
@@ -232,6 +233,9 @@ async function collectProviderInput({ repository, prNumber, expectedMainSha,
   requireTrue(parts.length === 2 && TARGETS[repository], 'invalid allowlisted repository');
   const root = '/repos/' + parts.map(encodeURIComponent).join('/');
   const target = TARGETS[repository];
+  requireTrue(SHA.test(expectedMainSha || '') && SHA.test(expectedHeadSha || '') &&
+    Number.isSafeInteger(prNumber) && prNumber > 0,
+  'invalid input identity before provider read');
   const [main, pr, checks, envs, workflow, ...rulesets] = await Promise.all([
     requestGitHub(root + '/branches/main', token),
     requestGitHub(root + '/pulls/' + prNumber, token),
@@ -279,6 +283,19 @@ export async function reconcileProvider({
   verifyApproval(initial, { planDigest: approvedPlanDigest, headSha: approvedHeadSha });
   const fresh = buildRulesetPlan(await collectProviderInput(source));
   requireTrue(initial.digest === fresh.digest, 'provider state changed before write');
+  // Durable intent-before-effect: preserve exact provider payloads for inspected
+  // recovery before any privileged mutation. Never include bearer credentials.
+  mkdirSync('artifacts', { recursive: true });
+  writeFileSync('artifacts/handshake-ruleset-prewrite.json', JSON.stringify({
+    contract: 'jussco/handshake-ruleset-prewrite@v1',
+    repository, prNumber, expectedMainSha, expectedHeadSha,
+    approvedPlanDigest: fresh.digest, applied: false,
+    beforePayloads: fresh.updates.map((u) => ({ id: u.id,
+      payload: normalizeRulesetPayload(u.before),
+      digest: fingerprint(normalizeRulesetPayload(u.before)) })),
+    approvedAfterDigests: fresh.updates.map((u) => ({ id: u.id,
+      digest: fingerprint(normalizeRulesetPayload(u.after)) })),
+  }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
   const base = rootFor(repository);
   const written = [];
   try {
