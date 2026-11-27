@@ -17,6 +17,14 @@ const execFileAsync = promisify(execFile);
 const REPOSITORY = "jussray/founder-control-room";
 const VALID_OPS = ["preflight", "inspect", "test", "build", "verify", "merge_gate"];
 const VALID_APPROVAL_SOURCES = new Set(["founder"]);
+const VERIFY_RELAY_BUILD = [
+  "node",
+  [
+    "--input-type=module",
+    "-e",
+    "import { access } from 'node:fs/promises'; await access('dist/founder-os-lab/federatedRelayV31.js');",
+  ],
+];
 
 const [, , operation, ...rest] = process.argv;
 const flags = Object.fromEntries(
@@ -71,6 +79,7 @@ const STEPS = {
     ["npm", ["run", "lint"]],
     ["npm", ["run", "test"]],
     ["npm", ["run", "build"]],
+    VERIFY_RELAY_BUILD,
     ["npm", ["run", "test:e2e"]],
   ],
   merge_gate: [
@@ -79,6 +88,7 @@ const STEPS = {
     ["npm", ["run", "lint"]],
     ["npm", ["run", "test"]],
     ["npm", ["run", "build"]],
+    VERIFY_RELAY_BUILD,
     ["npm", ["run", "test:e2e"]],
   ],
 };
