@@ -1,0 +1,133 @@
+name: Handshake Ruleset Reconciliation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/reconcile-handshake-rulesets.mjs'
+      - 'scripts/reconcile-handshake-rulesets.test.mjs'
+      - '.github/workflows/handshake-ruleset-reconciliation.yml'
+      - 'docs/governance/HANDSHAKE_RULESET_RECONCILIATION.md'
+  workflow_dispatch:
+    inputs:
+      target_repository:
+        description: 'Allowlisted target GitHub repository'
+        required: true
+        type: choice
+        options:
+          - jussray/founder-control-room
+          - jussray/Sekret-Bip
+      pr_number:
+        description: 'Exact target pull request number'
+        required: true
+        type: number
+      expected_main_sha:
+        description: 'Exact current main commit (40 hexadecimal characters)'
+        required: true
+        type: string
+      expected_pr_head_sha:
+        description: 'Exact head commit under review (40 hexadecimal characters)'
+        required: true
+        type: string
+      approval_plan_sha256:
+        description: 'Founder-reviewed plan digest; required for apply only'
+        required: false
+        type: string
+      apply:
+        description: 'Apply after protected-environment founder approval and exact-plan match'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    name: Check immutable status/review/deployment reconciliation contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Verify source syntax and fail-closed plan tests
+        run: |
+          node --check scripts/reconcile-handshake-rulesets.mjs
+          node --test scripts/reconcile-handshake-rulesets.test.mjs
+
+  founder-authorized-provider-reconciliation:
+    name: Preview or apply founder-bound GitHub ruleset patch
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: source-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: founder-signal-engine-review
+    steps:
+      - name: Check out current trusted main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refuse stale workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Reconcile with exact provider readback
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_RULESET_ADMIN_TOKEN: ${{ secrets.GITHUB_RULESET_ADMIN_TOKEN }}
+          FOUNDER_APPROVED_PLAN_SHA256: ${{ inputs.approval_plan_sha256 }}
+          FOUNDER_APPROVED_HEAD_SHA: ${{ inputs.expected_pr_head_sha }}
+          TARGET_REPO: ${{ inputs.target_repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_MAIN: ${{ inputs.expected_main_sha }}
+          EXPECTED_HEAD: ${{ inputs.expected_pr_head_sha }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          args=(
+            --repo "$TARGET_REPO"
+            --pr "$PR_NUMBER"
+            --main "$EXPECTED_MAIN"
+            --head "$EXPECTED_HEAD"
+          )
+          if [[ "$APPLY" == "true" ]]; then
+            test -n "$GITHUB_RULESET_ADMIN_TOKEN"
+            test -n "$FOUNDER_APPROVED_PLAN_SHA256"
+            args+=(--apply)
+          fi
+          node scripts/reconcile-handshake-rulesets.mjs "${args[@]}" > "$RUNNER_TEMP/ruleset-reconciliation-receipt.json"
+          node --input-type=module - "$RUNNER_TEMP/ruleset-reconciliation-receipt.json" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const item = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          console.log(JSON.stringify({
+            repository: item.repository,
+            digest: item.digest,
+            applied: item.applied,
+            rulesets: item.applied ? item.updatedRulesetIds : item.candidatePayloads?.map(x => x.id),
+            providerReadback: item.providerReadback || 'NOT_APPLIED',
+          }));
+          NODE
+      - name: Preserve protected reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ruleset-reconcile-${{ github.run_id }}
+          path: ${{ runner.temp }}/ruleset-reconciliation-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
