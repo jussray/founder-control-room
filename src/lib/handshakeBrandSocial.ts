@@ -20,6 +20,7 @@ export const HANDSHAKE_PROJECTS = {
     repository: 'jussray/founder-control-room',
     expectedLogoSha256: 'e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6',
     expectedCoverSha256: '6b37529cec906a4a17a38091d03dc79412f15d40a98339576be069fdda52d7f9',
+    expectedSocialAdSha256: '9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33',
     name: 'Founder Control Room',
     productUrl: 'https://foundercontrolroom.org/',
     logoPath: 'brand/handshake/logo.svg',
@@ -31,6 +32,7 @@ export const HANDSHAKE_PROJECTS = {
     repository: 'jussray/Sekret-Bip',
     expectedLogoSha256: '64355625d74ab72d80805d18647a0963d22b0b483c2daa5dbef91b3624beaf86',
     expectedCoverSha256: '6329fbdfc57c9ddb4b3ab5491f37382e5924ab3dab2f303973850ccb89f3f914',
+    expectedSocialAdSha256: 'cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d',
     name: 'Se’kret Bip',
     productUrl: 'https://sekretbip.net/',
     logoPath: 'brand/handshake/logo.svg',
@@ -42,6 +44,7 @@ export const HANDSHAKE_PROJECTS = {
     repository: 'jussray/sync-party-game',
     expectedLogoSha256: '8b8d76530f2fdef66f0145b312a96702a6b3d0b3733bad8fc6a959a246a96827',
     expectedCoverSha256: 'ffe59a6338e37f5148463a7252d24e7e41df59747666cd63b7fc6edffb754a18',
+    expectedSocialAdSha256: '1ef557b582da64eae74b47f8b3a7f20c1118f701d3bc75a8beaa0a5693fbd16b',
     name: 'SYNC Party',
     productUrl: 'https://sync.jussco.company/',
     logoPath: 'brand/handshake/logo.svg',
@@ -59,7 +62,9 @@ export interface HandshakeMediaReview {
   logoRepository: string;
   logoPath: string;
   logoSha256: string;
-  coverSha256: string;
+  /** Distinguishes the 3:2 Handshake cover from the 4:5 social ad. */
+  assetVariant: 'handshake_cover' | 'social_ad';
+  assetSha256: string;
   /** Publicly reachable image/png or image/jpeg URL after uploading to a verified provider. */
   mediaUrl: string;
   altText: string;
@@ -101,11 +106,13 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
   if (ACCOUNT_PERSONAL.test(input.draft.accountId)) fail('personal account is not a business channel');
   if (media.project !== input.project || media.logoRepository !== project.repository ||
       media.logoPath !== project.logoPath) fail('cross-brand logo/media mismatch');
-  if (!SHA256.test(media.logoSha256) || !SHA256.test(media.coverSha256) ||
+  // A Handshake portfolio card must never masquerade as a social-media creative.
+  if (media.assetVariant !== 'social_ad') fail('social pipeline requires social_ad, not handshake_cover');
+  if (!SHA256.test(media.logoSha256) || !SHA256.test(media.assetSha256) ||
       media.logoSha256.toLowerCase() !== project.expectedLogoSha256 ||
-      media.coverSha256.toLowerCase() !== project.expectedCoverSha256 ||
-      media.founderReviewedExactMediaSha256.toLowerCase() !== media.coverSha256.toLowerCase()) {
-    fail('media hash must match pinned project logo and founder-reviewed exact cover');
+      media.assetSha256.toLowerCase() !== project.expectedSocialAdSha256 ||
+      media.founderReviewedExactMediaSha256.toLowerCase() !== media.assetSha256.toLowerCase()) {
+    fail('media hash must match pinned project logo and founder-reviewed exact social ad');
   }
   if (!REVIEW_RECEIPT.test(media.founderReviewReceiptId)) fail('missing founder visual review');
   if (!media.publicReadbackVerified || !IMAGE_URL.test(media.mediaUrl)) {
@@ -121,9 +128,9 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
       !url.pathname.startsWith('/brand/handshake/'))) {
     fail('unapproved project media origin');
   }
-  if (media.dimensions.width < 1200 ||
-      Math.abs(media.dimensions.width / media.dimensions.height - 1.5) > 0.01) {
-    fail('Handshake cover must be 3:2 and at least 1200px wide');
+  if (media.dimensions.width < 1080 ||
+      Math.abs(media.dimensions.width / media.dimensions.height - 0.8) > 0.01) {
+    fail('Social ad must be 4:5 and at least 1080px wide');
   }
   if (!media.altText.trim()) fail('media alt text required');
   if (input.draft.media && input.draft.media.length > 0) {
