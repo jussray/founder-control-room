@@ -885,11 +885,10 @@ The candidate rejects protected branch writes, noncanonical repository paths, un
 
 Worker Reconcile retries its exact-SHA API proof for about four minutes, and production Deploy waits read-only (up to about four minutes) for `api.foundercontrolroom.org/version` to report the exact deployed SHA before its unchanged fail-closed health, identity, SHA and grant checks. Two successful Reconcile deploys failed the earlier ~60-second window while the custom domain still served the prior version; minutes later both origins served the exact SHA. The wait proves nothing on its own.
 
+The provider allowlist is source configuration only. The nine contract providers are enabled by default when no explicit allowlist is set; an explicit valid allowlist narrows that set. Each provider still requires its own authorization and independent native readback. Buffer-specific readiness and proof cannot establish another provider's outcome.
+
 ### Facebook Page text capability (source-only)
 
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
-
-
-The provider allowlist is source configuration only. The nine contract providers are enabled by default when no explicit allowlist is set; an explicit valid allowlist narrows that set. Each provider still requires its own authorization and independent native readback. Buffer-specific readiness and proof cannot establish another provider's outcome.
 
 Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.
