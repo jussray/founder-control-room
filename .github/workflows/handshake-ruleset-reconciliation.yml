@@ -128,6 +128,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ruleset-reconcile-${{ github.run_id }}
-          path: ${{ runner.temp }}/ruleset-reconciliation-receipt.json
+          path: |
+            ${{ runner.temp }}/ruleset-reconciliation-receipt.json
+            artifacts/handshake-ruleset-prewrite.json
           if-no-files-found: warn
           retention-days: 30
