@@ -11,6 +11,7 @@ const STALE_DAYS = 30;
 const MAX_NEXT_TASKS = 20;
 const MAX_JOB_INSPECTIONS = 20;
 const MAX_JOBS_PER_ATTEMPT = 100;
+const MAX_REPAIR_PLAN_JOBS = 10;
 const TERMINAL_FAILURES = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -57,6 +58,35 @@ function selectFailedRuns(runs, head) {
     .sort((a,b) => a.runId - b.runId || a.attempt - b.attempt);
 }
 
+const REPAIR_RECIPES = Object.freeze({
+  PR_METADATA_REVIEW: ['PR_METADATA', 'Read the exact PR evidence gate and original failure log; supply truthful required sections only.', 'Re-run the evidence gate against the current PR event.'],
+  TYPECHECK_REVIEW: ['SOURCE_PATCH', 'Locate the first compiler diagnostic and reproduce with the repository typecheck command.', 'Run typecheck and the affected regression tests.'],
+  LINT_REVIEW: ['SOURCE_PATCH', 'Reproduce the exact lint diagnostic and make the smallest rule-compliant change.', 'Run the repository lint command and affected tests.'],
+  TEST_REVIEW: ['SOURCE_PATCH', 'Reproduce the first failing assertion or browser flow; distinguish infrastructure from behavior.', 'Run the failing test, then the required regression suite.'],
+  DEPENDENCY_SETUP_REVIEW: ['DEPENDENCY_REVIEW', 'Inspect the failing install or setup log and authoritative lockfile and action pins.', 'Run the same clean install and applicable repository checks.'],
+  TIMEOUT_REVIEW: ['INFRASTRUCTURE_REVIEW', 'Inspect timeout evidence and distinguish slow code from runner or provider capacity.', 'Reproduce or obtain provider recovery evidence before a bounded retry.'],
+  AUTHORITY_REVIEW: ['AUTHORITY_HOLD', 'Identify the missing approval or scoped permission; do not broaden it.', 'Require authorized owner resolution and fresh exact-head evidence.'],
+  STARTUP_REVIEW: ['INFRASTRUCTURE_REVIEW', 'Inspect workflow startup evidence before diagnosing source code.', 'Confirm workflow initialization and actual check execution.'],
+  UNCLASSIFIED_FAILURE: ['EVIDENCE_REVIEW', 'Inspect the original failed-job log and reproduce the first causal failure.', 'Obtain a scoped regression criterion before proposing a change.'],
+});
+
+function buildRepairPlan(diagnostic) {
+  const base = { authority: 'proposal_only', mutationAuthorized: false, rootCauseVerified: false,
+    requiresCurrentHeadRevalidation: true, requiresIndependentReview: true,
+    mergeAuthorized: false, deploymentAuthorized: false };
+  if (!diagnostic || diagnostic.state !== 'FAILED_JOB_METADATA_OBSERVED' || !diagnostic.jobs.length) {
+    return { ...base, state: 'INSUFFICIENT_JOB_EVIDENCE', steps: [], omittedJobs: 0 };
+  }
+  const steps = diagnostic.jobs.slice(0, MAX_REPAIR_PLAN_JOBS).map(job => {
+    const [kind, investigate, verify] = REPAIR_RECIPES[job.category] || REPAIR_RECIPES.UNCLASSIFIED_FAILURE;
+    return { jobId: job.jobId, firstFailedStep: job.firstFailedStep, category: job.category,
+      kind, investigate, verify, executionAllowed: false };
+  });
+  return { ...base, state: steps.some(step => step.kind === 'AUTHORITY_HOLD') ||
+    diagnostic.jobs.some(job => job.category === 'AUTHORITY_REVIEW') ? 'AUTHORITY_HOLD' : 'EVIDENCE_REQUIRED',
+    steps, omittedJobs: Math.max(0, diagnostic.jobs.length - steps.length) };
+}
+
 // This is a resumable observation proposal, never an execution or approval queue.
 // Run identities are sanitized environment declarations, not provider readback.
 export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
@@ -79,6 +109,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       taskFingerprint: hash({ sourceRepository, ...(subject.identityScope === 'public_exact_head' && subject.failedRun ? {} : { sourceSha }), subject, observedState, action }),
       subject, observedState, priority, action, instruction,
       ...(diagnostic ? { diagnostic } : {}),
+      ...(subject.failedRun ? { repairPlan: buildRepairPlan(diagnostic) } : {}),
       owner: action === 'RESTORE_AUDIT_READ_ACCESS' ? 'AUTHORIZED_ACCESS_OWNER' : 'REPOSITORY_OPERATOR',
       authority: 'proposal_only', mutationAuthorized: false,
       requiresCurrentHeadRevalidation: true,
@@ -142,10 +173,12 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       [7, 'REOBSERVE_CURRENT_HEAD', 'Reobserve current default-branch heads before the next task; Actions observations do not prove production behavior.']);
   }
   candidates.sort((a, b) => a.priority - b.priority || a.taskFingerprint.localeCompare(b.taskFingerprint));
-  const nextTasks = candidates.slice(0, MAX_NEXT_TASKS);
+  const distinctCandidates = [...new Map(candidates.map(candidate => [candidate.taskFingerprint, candidate])).values()];
+  const nextTasks = distinctCandidates.slice(0, MAX_NEXT_TASKS);
   return {
     auditIdentity, nextAction: nextTasks[0], nextTasks,
-    omittedNextTaskCount: Math.max(0, candidates.length - nextTasks.length),
+    omittedNextTaskCount: Math.max(0, distinctCandidates.length - nextTasks.length),
+    duplicateProposalsOmitted: candidates.length - distinctCandidates.length,
     handoffScope: 'default-branch-github-actions-observation-only',
     requiresCurrentHeadRevalidation: true,
   };
@@ -273,6 +306,25 @@ function selfTest() {
   const routedWithDiagnosis = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item,
     failedRuns: [failure], failureDiagnostics: [{ ...diagnostic, jobs: [{ ...diagnostic.jobs[0], raw: 'private log' }] }] }] }, identity);
   assert.equal(routedWithDiagnosis.nextAction.diagnostic.jobs[0].category, 'PR_METADATA_REVIEW');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.state, 'EVIDENCE_REQUIRED');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.steps[0].kind, 'PR_METADATA');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.rootCauseVerified, false);
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.steps[0].executionAllowed, false);
+  assert.equal(buildRepairPlan(null).state, 'INSUFFICIENT_JOB_EVIDENCE');
+  const authorityJob = { ...diagnostic.jobs[0], category: 'AUTHORITY_REVIEW' };
+  const manyJobs = Array.from({ length: 11 }, (_, i) => ({ ...diagnostic.jobs[0], jobId: i + 1 }));
+  const held = buildRepairPlan({ state: 'FAILED_JOB_METADATA_OBSERVED', jobs: [...manyJobs, authorityJob] });
+  assert.equal(held.state, 'AUTHORITY_HOLD');
+  assert.equal(held.steps.length, MAX_REPAIR_PLAN_JOBS);
+  assert.equal(held.omittedJobs, 2);
+  assert.equal(held.mergeAuthorized, false);
+  assert.equal(held.deploymentAuthorized, false);
+  for (const category of Object.keys(REPAIR_RECIPES)) {
+    const plan = buildRepairPlan({ state: 'FAILED_JOB_METADATA_OBSERVED', jobs: [{ ...diagnostic.jobs[0], category }] });
+    assert.equal(plan.steps[0].category, category);
+    assert.equal(plan.mutationAuthorized, false);
+    assert.equal(plan.steps[0].executionAllowed, false);
+  }
   assert.equal(JSON.stringify(routedWithDiagnosis).includes('private log'), false);
   assert.equal(routedWithDiagnosis.nextAction.taskFingerprint,
     routed.nextTasks.find(task => task.subject.failedRun.runId === failure.runId).taskFingerprint);
@@ -311,6 +363,9 @@ function selfTest() {
   const many = buildAuditHandoff({ state: 'ATTENTION', items: Array.from({ length: 25 }, (_, i) => ({ ...item, repository: 'jussray/repo-' + i })) }, identity);
   assert.equal(many.nextTasks.length, MAX_NEXT_TASKS);
   assert.equal(many.omittedNextTaskCount, 5);
+  const duplicateItems = buildAuditHandoff({ state: 'ATTENTION', items: [item, item] }, identity);
+  assert.equal(duplicateItems.nextTasks.length, 1);
+  assert.equal(duplicateItems.duplicateProposalsOmitted, 1);
   const ordered = buildAuditHandoff({ state: 'ATTENTION', items: [item, { ...item, repository: 'jussray/z' }] }, identity);
   const reversed = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, repository: 'jussray/z' }, item] }, identity);
   assert.deepEqual(ordered.nextTasks, reversed.nextTasks);
