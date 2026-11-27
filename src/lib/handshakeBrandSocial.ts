@@ -21,6 +21,7 @@ export const HANDSHAKE_PROJECTS = {
     expectedLogoSha256: 'e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6',
     expectedCoverSha256: '6b37529cec906a4a17a38091d03dc79412f15d40a98339576be069fdda52d7f9',
     expectedSocialAdSha256: '9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33',
+    expectedSocialFileName: 'Founder_Control_Room_Social_Ad_4x5.png',
     name: 'Founder Control Room',
     productUrl: 'https://foundercontrolroom.org/',
     logoPath: 'brand/handshake/logo.svg',
@@ -33,6 +34,7 @@ export const HANDSHAKE_PROJECTS = {
     expectedLogoSha256: '64355625d74ab72d80805d18647a0963d22b0b483c2daa5dbef91b3624beaf86',
     expectedCoverSha256: '6329fbdfc57c9ddb4b3ab5491f37382e5924ab3dab2f303973850ccb89f3f914',
     expectedSocialAdSha256: 'cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d',
+    expectedSocialFileName: 'Sekret_Bip_Social_Ad_4x5.png',
     name: 'Se’kret Bip',
     productUrl: 'https://sekretbip.net/',
     logoPath: 'brand/handshake/logo.svg',
@@ -45,6 +47,7 @@ export const HANDSHAKE_PROJECTS = {
     expectedLogoSha256: '8b8d76530f2fdef66f0145b312a96702a6b3d0b3733bad8fc6a959a246a96827',
     expectedCoverSha256: 'ffe59a6338e37f5148463a7252d24e7e41df59747666cd63b7fc6edffb754a18',
     expectedSocialAdSha256: '1ef557b582da64eae74b47f8b3a7f20c1118f701d3bc75a8beaa0a5693fbd16b',
+    expectedSocialFileName: 'SYNC_Party_Social_Ad_4x5.png',
     name: 'SYNC Party',
     productUrl: 'https://sync.jussco.company/',
     logoPath: 'brand/handshake/logo.svg',
@@ -121,10 +124,16 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
   const url = new URL(media.mediaUrl);
   const productHost = new URL(project.productUrl).hostname;
   const sharedHost = url.hostname === 'cdn.jussco.company' || url.hostname === 'assets.jussco.company';
+  const publoraHost = url.hostname === 'media.publora.com';
+  const authenticatedUrlShape = !url.username && !url.password && !url.search && !url.hash;
+  const publoraFileMatches = url.pathname.startsWith('/images/') &&
+    decodeURIComponent(url.pathname).endsWith('-' + project.expectedSocialFileName);
+  if (!authenticatedUrlShape) fail('unapproved project media origin');
   if (sharedHost && !url.pathname.toLowerCase().startsWith('/handshake/' + input.project + '/')) {
     fail('shared asset URL does not belong to selected project');
   }
-  if (!sharedHost && (url.hostname !== productHost ||
+  if (publoraHost && !publoraFileMatches) fail('unapproved project media origin');
+  if (!sharedHost && !publoraHost && (url.hostname !== productHost ||
       !url.pathname.startsWith('/brand/handshake/'))) {
     fail('unapproved project media origin');
   }
