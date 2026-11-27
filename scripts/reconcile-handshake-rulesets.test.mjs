@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TARGETS, buildRulesetPlan, normalizeRulesetPayload, verifyApproval,
+  TARGETS, buildRulesetPlan, normalizeRulesetPayload, verifyApproval, reconcileProvider,
 } from './reconcile-handshake-rulesets.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -41,6 +41,90 @@ function fixture(repo) {
     founderOnlyPolicy: 'Current phase: founder-only\nrequire_code_owner_review: false\nrequire_last_push_approval: false',
   };
 }
+
+function transportFor(input, { rejectSecondWrite = false } = {}) {
+  const base = '/repos/' + input.repository;
+  const live = new Map(input.rulesets.map((r) => [r.id, structuredClone(r)]));
+  let writes = 0;
+  let rejectedOnce = false;
+  const request = async (path, token, method = 'GET', body) => {
+    assert.equal(token, 'synthetic-scoped-token');
+    if (path === base + '/branches/main') return { commit: { sha: input.observedMainSha } };
+    if (path.startsWith(base + '/pulls/')) return structuredClone(input.pullRequest);
+    if (path.includes('/check-runs?')) return { total_count: input.checkRuns.length, check_runs: structuredClone(input.checkRuns) };
+    if (path === base + '/environments?per_page=100') return {
+      total_count: input.environments.length, environments: structuredClone(input.environments),
+    };
+    if (path.includes('/contents/' + TARGETS[input.repository].releaseWorkflowPath)) {
+      return { encoding: 'base64', content: Buffer.from(input.releaseWorkflow, 'utf8').toString('base64') };
+    }
+    if (path.includes('/contents/docs/governance/main-governance-acceptance-probe.md')) {
+      return { encoding: 'base64', content: Buffer.from(input.founderOnlyPolicy, 'utf8').toString('base64') };
+    }
+    const match = path.match(/\/rulesets\/(\d+)$/);
+    if (!match) throw new Error('unexpected provider path ' + path);
+    const id = Number(match[1]);
+    assert.equal(live.has(id), true);
+    if (method === 'GET') return structuredClone(live.get(id));
+    assert.equal(method, 'PUT');
+    writes++;
+    if (rejectSecondWrite && writes === 2 && !rejectedOnce) {
+      rejectedOnce = true;
+      throw new Error('synthetic second-ruleset provider failure');
+    }
+    live.set(id, { ...structuredClone(live.get(id)), ...structuredClone(body) });
+    return structuredClone(live.get(id));
+  };
+  return { request, live, original: structuredClone(input.rulesets), getWrites: () => writes };
+}
+
+describe('provider write boundary', () => {
+  it('preview performs no PUTs and returns exact provider-bound plan digest', async () => {
+    const source = fixture('jussray/founder-control-room');
+    const fake = transportFor(source);
+    const preview = await reconcileProvider({
+      repository: source.repository, prNumber: 1194,
+      expectedMainSha: source.expectedMainSha, expectedHeadSha: source.expectedHeadSha,
+      token: 'synthetic-scoped-token', apply: false, transport: fake.request,
+    });
+    assert.equal(preview.applied, false);
+    assert.equal(preview.digest, buildRulesetPlan(source).digest);
+    assert.equal(fake.getWrites(), 0);
+  });
+  it('rechecks and reads back every exact founder-approved PUT before reporting applied', async () => {
+    const source = fixture('jussray/founder-control-room');
+    const fake = transportFor(source);
+    const digest = buildRulesetPlan(source).digest;
+    const receipts = [];
+    const applied = await reconcileProvider({
+      repository: source.repository, prNumber: 1194,
+      expectedMainSha: source.expectedMainSha, expectedHeadSha: source.expectedHeadSha,
+      approvedPlanDigest: digest, approvedHeadSha: source.expectedHeadSha,
+      token: 'synthetic-scoped-token', apply: true, transport: fake.request,
+      backupWriter: (receipt) => receipts.push(receipt),
+    });
+    assert.equal(applied.applied, true);
+    assert.deepEqual(applied.updatedRulesetIds, TARGETS[source.repository].rulesetIds);
+    assert.equal(fake.getWrites(), 2);
+    assert.equal(receipts.length, 1);
+    assert.equal(receipts[0].beforePayloads.length, 2);
+  });
+  it('rolls back the first rule if the second provider update fails', async () => {
+    const source = fixture('jussray/founder-control-room');
+    const fake = transportFor(source, { rejectSecondWrite: true });
+    const digest = buildRulesetPlan(source).digest;
+    await assert.rejects(reconcileProvider({
+      repository: source.repository, prNumber: 1194,
+      expectedMainSha: source.expectedMainSha, expectedHeadSha: source.expectedHeadSha,
+      approvedPlanDigest: digest, approvedHeadSha: source.expectedHeadSha,
+      token: 'synthetic-scoped-token', apply: true, transport: fake.request,
+      backupWriter: () => {},
+    }), /rollback=verified for completed writes/);
+    for (const entry of fake.original) assert.deepEqual(fake.live.get(entry.id), entry);
+    assert.equal(fake.getWrites(), 3);
+  });
+});
+
 describe('governed Handshake ruleset reconciliation', () => {
   for (const repo of Object.keys(TARGETS)) {
     it('retains code scanning, history, signatures, bypass, conditions and review-thread protections for ' + repo, () => {
