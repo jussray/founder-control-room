@@ -73,11 +73,12 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
     bindingState: sourceRepository && sourceSha && runId && runAttempt ? 'ENVIRONMENT_DECLARED' : 'INCOMPLETE',
   };
   const candidates = [];
-  function propose(subject, observedState, followUp) {
+  function propose(subject, observedState, followUp, diagnostic = null) {
     const [priority, action, instruction] = followUp;
     candidates.push({
       taskFingerprint: hash({ sourceRepository, ...(subject.identityScope === 'public_exact_head' && subject.failedRun ? {} : { sourceSha }), subject, observedState, action }),
       subject, observedState, priority, action, instruction,
+      ...(diagnostic ? { diagnostic } : {}),
       owner: action === 'RESTORE_AUDIT_READ_ACCESS' ? 'AUTHORIZED_ACCESS_OWNER' : 'REPOSITORY_OPERATOR',
       authority: 'proposal_only', mutationAuthorized: false,
       requiresCurrentHeadRevalidation: true,
@@ -113,8 +114,23 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
     }
     if (distinct.size) {
       for (const failedRun of distinct.values()) {
+        const matchingDiagnostics = Array.isArray(item.failureDiagnostics) ? item.failureDiagnostics.filter(d =>
+          d?.runId === failedRun.runId && d.attempt === failedRun.attempt) : [];
+        const candidate = matchingDiagnostics.length === 1 ? matchingDiagnostics[0] : null;
+        // Only copy the closed enum and validated numeric metadata; never forward arbitrary strings.
+        const allowedStates = ['FAILED_JOB_METADATA_OBSERVED', 'NO_FAILED_JOB_METADATA', 'INCOMPLETE_JOB_EVIDENCE',
+          'JOB_EVIDENCE_READ_BLOCKED', 'DEFERRED_JOB_INSPECTION_BUDGET'];
+        const categories = ['UNCLASSIFIED_FAILURE', 'TIMEOUT_REVIEW', 'AUTHORITY_REVIEW', 'STARTUP_REVIEW',
+          'PR_METADATA_REVIEW', 'TYPECHECK_REVIEW', 'LINT_REVIEW', 'TEST_REVIEW', 'DEPENDENCY_SETUP_REVIEW'];
+        const diagnostic = candidate && allowedStates.includes(candidate.state) ? {
+          state: candidate.state,
+          jobs: Array.isArray(candidate.jobs) ? candidate.jobs.slice(0, MAX_JOBS_PER_ATTEMPT)
+            .filter(j => j && Number.isSafeInteger(j.jobId) && j.jobId > 0 && TERMINAL_FAILURES.has(j.conclusion) && categories.includes(j.category))
+            .map(j => ({ jobId: j.jobId, conclusion: j.conclusion, category: j.category,
+              firstFailedStep: Number.isSafeInteger(j.firstFailedStep) && j.firstFailedStep > 0 ? j.firstFailedStep : null })) : [],
+        } : null;
         propose({ ...subject, failedRun }, observedState,
-          [1, 'INSPECT_EXACT_HEAD_FAILURE', 'Revalidate head, run and attempt; inspect failed job evidence before proposing a root-cause repair.']);
+          [1, 'INSPECT_EXACT_HEAD_FAILURE', 'Revalidate head, run and attempt; inspect failed job logs before proposing a root-cause repair.'], diagnostic);
       }
     } else {
       propose(subject, observedState,
@@ -163,7 +179,7 @@ function summarizeFailedJobs(payload, expectedHead, failure) {
       || payload.total_count !== payload.jobs.length || payload.jobs.length > MAX_JOBS_PER_ATTEMPT) return result;
   const ids = new Set();
   for (const job of payload.jobs) {
-    if (!job || job.head_sha !== expectedHead || job.run_id !== failure.runId || job.run_attempt !== failure.attempt ||
+    if (!job || job.head_sha !== expectedHead || job.run_id !== failure.runId || (job.run_attempt != null && job.run_attempt !== failure.attempt) ||
         !Number.isSafeInteger(job.id) || job.id < 1 || ids.has(job.id) || job.status !== 'completed') return result;
     ids.add(job.id);
   }
@@ -229,6 +245,8 @@ function selfTest() {
   const diagnostic = summarizeFailedJobs({ total_count: 1, jobs: [job] }, base.head, failure);
   assert.deepEqual(diagnostic.jobs, [{ jobId: 99, conclusion: 'failure', firstFailedStep: 4, category: 'PR_METADATA_REVIEW' }]);
   assert.equal(diagnostic.state, 'FAILED_JOB_METADATA_OBSERVED');
+  const { run_attempt: omittedAttempt, ...documentedJobShape } = job;
+  assert.deepEqual(summarizeFailedJobs({ total_count: 1, jobs: [documentedJobShape] }, base.head, failure), diagnostic);
   assert.equal(JSON.stringify(diagnostic).includes('untrusted'), false);
   assert.equal(summarizeFailedJobs({ total_count: 2, jobs: [job] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
   assert.equal(summarizeFailedJobs({ total_count: 1, jobs: [{ ...job, run_attempt: 2 }] }, base.head, failure).state, 'INCOMPLETE_JOB_EVIDENCE');
@@ -252,6 +270,12 @@ function selfTest() {
     { ...identity, PORTFOLIO_AUDIT_SOURCE_SHA: 'd'.repeat(40) }).nextTasks);
   assert.equal(buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, visibility: 'private',
     repository: 'private-' + 'a'.repeat(12), failedRuns: routedRuns }] }, identity).nextAction.subject.failedRun, undefined);
+  const routedWithDiagnosis = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item,
+    failedRuns: [failure], failureDiagnostics: [{ ...diagnostic, jobs: [{ ...diagnostic.jobs[0], raw: 'private log' }] }] }] }, identity);
+  assert.equal(routedWithDiagnosis.nextAction.diagnostic.jobs[0].category, 'PR_METADATA_REVIEW');
+  assert.equal(JSON.stringify(routedWithDiagnosis).includes('private log'), false);
+  assert.equal(routedWithDiagnosis.nextAction.taskFingerprint,
+    routed.nextTasks.find(task => task.subject.failedRun.runId === failure.runId).taskFingerprint);
   const pending = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'PENDING_EXACT_HEAD' }] }, identity);
   assert.equal(pending.nextAction.action, 'REOBSERVE_PENDING_EXACT_HEAD');
   const incomplete = buildAuditHandoff({ state: 'INCOMPLETE_COVERAGE', items: [item] }, identity);
