@@ -44,7 +44,7 @@ export async function runFirecrawlMonitorCycle(deps:Dependencies) {
   if(deps.env.FCR_FIRECRAWL_MONITOR_ENABLED!=='true'||deps.env.FCR_FIRECRAWL_ENABLED!=='true'||now.getUTCHours()!==12||now.getUTCMinutes()!==0) return {status:'skipped' as const};
   const outcomes=[];
   for(const target of targets){
-    const result=await runFirecrawlObservation(target,{...deps,now:()=>now});
+    const result=await runFirecrawlObservation(target,deps);
     outcomes.push({target,status:result.status,...(result.status==='held'?{reason:result.reason}:{receiptId:result.receiptId,change:result.change})});
   }
   return {status:'attempted' as const,outcomes};
