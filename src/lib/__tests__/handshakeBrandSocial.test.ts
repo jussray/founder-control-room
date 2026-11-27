@@ -8,8 +8,6 @@ import {
 } from '../handshakeBrandSocial.js';
 
 const COMMIT = 'a'.repeat(40);
-const HASH = 'c'.repeat(64);
-const COVER = 'd'.repeat(64);
 // Asset URLs are project-scoped; never reuse another product's media URL.
 function fixture(project: HandshakeProject): HandshakeDraftRequest {
   const spec = HANDSHAKE_PROJECTS[project];
@@ -31,8 +29,8 @@ function fixture(project: HandshakeProject): HandshakeDraftRequest {
     },
     mediaReview: {
       project, logoRepository: spec.repository, logoPath: spec.logoPath,
-      logoSha256: HASH, coverSha256: COVER,
-      founderReviewedExactMediaSha256: COVER,
+      logoSha256: spec.expectedLogoSha256, coverSha256: spec.expectedCoverSha256,
+      founderReviewedExactMediaSha256: spec.expectedCoverSha256,
       founderReviewReceiptId: 'founder-review-2026-11-26',
       mediaUrl: MEDIA_URL, altText,
       dimensions: { width: 1536, height: 1024 }, publicReadbackVerified: true,
@@ -72,8 +70,19 @@ describe('project-specific brand handoff', () => {
   });
   it('blocks visual candidate without exact founder-reviewed media hash', () => {
     const request = fixture('sync');
-    request.mediaReview.founderReviewedExactMediaSha256 = HASH;
+    request.mediaReview.founderReviewedExactMediaSha256 = 'c'.repeat(64);
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media hash/);
+  });
+  it('blocks an unreviewed replacement logo even when the media URL is unchanged', () => {
+    const request = fixture('fcr');
+    request.mediaReview.logoSha256 = 'e'.repeat(64);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
+  });
+  it('blocks a replacement cover not in the project manifest', () => {
+    const request = fixture('sync');
+    request.mediaReview.coverSha256 = 'e'.repeat(64);
+    request.mediaReview.founderReviewedExactMediaSha256 = 'e'.repeat(64);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
   });
   it('blocks unverified public media even when a local image exists', () => {
     const request = fixture('fcr');
