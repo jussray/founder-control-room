@@ -116,6 +116,17 @@ describe('project-specific brand handoff', () => {
     request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/' + 'a'.repeat(2100) + '.png';
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
   });
+  it('rejects malicious nested suffix candidates without regex backtracking', () => {
+    const request = fixture('fcr');
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/' +
+      'a.jpg?'.repeat(1500) + '.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
+  it('rejects a port-substituted provider URL rather than trusting hostname only', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://media.publora.com:8443/images/12345-abc-SYNC_Party_Social_Ad_4x5.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
   it('rejects non-image URL schemes and extensions', () => {
     const request = fixture('sync');
     request.mediaReview.mediaUrl = 'http://cdn.jussco.company/handshake/sync/social-ad.png';
