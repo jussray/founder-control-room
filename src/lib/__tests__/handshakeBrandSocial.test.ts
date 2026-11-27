@@ -94,6 +94,23 @@ describe('project-specific brand handoff', () => {
     request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/cover.png';
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/asset URL does not belong/);
   });
+  it('accepts the product-specific ready-media CDN name from a provider transport', () => {
+    const request = fixture('fcr');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-Founder_Control_Room_Social_Ad_4x5.png';
+    const result = prepareHandshakeBrandSocialDraft(request);
+    expect(result.socialInput.mode).toBe('draft');
+    expect(result.reviewedDraft.media[0].url).toBe(request.mediaReview.mediaUrl);
+  });
+  it('blocks one product accidentally using another Publora image', () => {
+    const request = fixture('bip');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-SYNC_Party_Social_Ad_4x5.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
+  it('blocks provider media URLs with inline credentials or query tokens', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-SYNC_Party_Social_Ad_4x5.png?access_token=unsafe';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
   it('blocks unapproved media origin', () => {
     const request = fixture('sync');
     request.mediaReview.mediaUrl = 'https://unrelated.example/handshake/sync/cover.png';
