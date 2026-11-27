@@ -29,6 +29,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/typescript-behavior-tests/SKILL.md`](./skills/typescript-behavior-tests/SKILL.md) when writing, replacing, or retiring Jest/Vitest behavior tests
 - [`skills/typescript-strict-review/SKILL.md`](./skills/typescript-strict-review/SKILL.md) before merge-ready or ready-for-review claims on TypeScript changes
 - [`skills/product-design-gate/SKILL.md`](./skills/product-design-gate/SKILL.md) before Product Design audits, prototypes, visual QA, or design evidence claims
+- [`skills/cinematic-composition/SKILL.md`](./skills/cinematic-composition/SKILL.md) for every authorized app/page/site/screen/visual-agent task: one cohesive cinematic composition with independent product canon, accessible motion, performance and exact-head visual proof.
 - [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) before ChatGPT or another agent without a native Zapier connector invokes the Founder Signal Engine bridge
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
