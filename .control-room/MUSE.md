@@ -50,6 +50,20 @@ For repository work:
 - re-read mutable provider state before consequential actions;
 - treat merge as source integration evidence only.
 
+## Recurring GitHub App credential incidents
+
+For the portfolio Actions watch and any token-mint failure, use `docs/SECRETS.md` as the binding-provenance contract. Read the actual current run, attempt, exact head, failed job and first causal error; if any identity is unavailable, report it as UNKNOWN rather than emitting a blank SHA or recycling a diagnosis.
+
+- `APP_PRIVATE_KEY_SHAPE_INVALID` is a local effective-input normalization failure, not evidence that the original App key is invalid, revoked, expired, unchanged, or never replaced. Identical shape flags are not a credential fingerprint. Preserve founder-reported replacement history as USER-REPORTED, not independently verified.
+- A job declaring `environment: production` can resolve an environment secret ahead of an identically named repository or organization secret. Binding origin, authoritative scope and update timestamps are UNKNOWN until an authorized administrator checks metadata. Do not recommend another rotation or re-paste solely because parsing failed.
+- Separate four gates: binding provenance; RSA parsing; provider App/installation authentication; successful portfolio collection with actual coverage. A failure before authentication means authentication was NOT_ATTEMPTED. A skipped collection is not a fresh read of the installation portfolio. Any separately observed repositories require their own scope and timestamps.
+- For repeats, retain the incident identity and prior next gate, attach the new run/attempt and any material evidence change, and route unresolved evidence to the authorized operator or AutoFix as a proposal only. Do not equate an open repair PR, recurring red step or founder-only diagnostic with completed recovery; do not request secret material in chat.
+- The next action for unknown binding origin is metadata-only comparison of the production and repository Actions secret names/update times, not automatic credential replacement. Use the existing exact-main founder-only shape diagnostic only through its authorized command path; successful shape proof alone does not prove provider authentication or collection.
+
+### Observed example (historical, revalidate before reuse)
+
+On November 27, 2026 at 11:49 EST, [portfolio audit run 46036868469](https://github.com/jussray/founder-control-room/actions/runs/46036868469/job/140634434830) on `ea2229595606fa009d85e4a96afaac7e4f90dc8a` passed credential-free regression and trusted-main verification, failed effective-key normalization before provider authentication, and skipped portfolio collection. The founder reports replacing the key months earlier. Scope and update timestamps were not available to the inspecting connector. This supports a recurring parsing failure, not a finding that the original PEM must be replaced.
+
 ## Supabase lane
 
 Founder Control Room has its own Supabase trust boundary. Do not borrow Se’kret Bip credentials or treat another project as interchangeable.
