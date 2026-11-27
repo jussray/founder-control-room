@@ -71,7 +71,10 @@ def main():
     """)
     # A missing reservation implementation must fail before the candidate is installed.
     query(call(), failure="42883")
-    query((ROOT / "scripts/sql/repository-repair-reservation.sql").read_text())
+    candidate = ROOT / "scripts/sql/repository-repair-reservation.sql"
+    migration = ROOT / "supabase/migrations/20261127034100_repository_repair_reservation.sql"
+    assert migration.read_bytes() == candidate.read_bytes(), "Committed migration differs from tested candidate"
+    query(migration.read_text())
     query(f"""
     INSERT INTO public.projects (id,slug,name,repo_identifier) VALUES
       ('{P}','fixture-p','Fixture P','fixture/p'), ('{Q}','fixture-q','Fixture Q','fixture/q');
