@@ -192,6 +192,18 @@ describe('governed Handshake ruleset reconciliation', () => {
     const x=fixture('jussray/founder-control-room'); x.checkRuns=x.checkRuns.filter(x=>x.name!=='CodeQL');
     assert.throws(()=>buildRulesetPlan(x), /required check/i);
   });
+  it('rejects a newer failed attempt even when an earlier successful duplicate check exists', () => {
+    const x=fixture('jussray/founder-control-room');
+    x.checkRuns.push({ name: 'Required Gate', app: { id: 15368, slug: 'github-actions' },
+      status: 'completed', conclusion: 'failure' });
+    assert.throws(() => buildRulesetPlan(x), /failing or incomplete.*check/i);
+  });
+  it('rejects a red unrelated current-head CI check before governance mutation', () => {
+    const x=fixture('jussray/Sekret-Bip');
+    x.checkRuns.push({ name: 'production browser security proof',
+      app: { id: 15368, slug: 'github-actions' }, status: 'completed', conclusion: 'failure' });
+    assert.throws(() => buildRulesetPlan(x), /failing or incomplete.*check/i);
+  });
   it('requires a matching founder-bound immutable digest before applying', () => {
     const plan=buildRulesetPlan(fixture('jussray/Sekret-Bip'));
     assert.throws(()=>verifyApproval(plan,{ planDigest:'0'.repeat(64), headSha:plan.expectedHeadSha}),/approval/i);
