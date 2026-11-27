@@ -8,7 +8,7 @@ const SHA = 'a'.repeat(40);
 const rule = (type, parameters) => ({ type, ...(parameters ? { parameters } : {}) });
 const checks = (repo) => TARGETS[repo].requiredChecks.map((name) => ({
   name,
-  app: { id: name === 'CodeQL' || name === 'Bearer' ? 57789 : 15368, slug: name === 'CodeQL' || name === 'Bearer' ? 'github-advanced-security' : 'github-actions' },
+  app: { id: name === 'GitGuardian Security Checks' ? 46505 : name === 'CodeQL' || name === 'Bearer' ? 57789 : 15368, slug: name === 'GitGuardian Security Checks' ? 'gitguardian' : name === 'CodeQL' || name === 'Bearer' ? 'github-advanced-security' : 'github-actions' },
   status: 'completed', conclusion: 'success',
 }));
 function fixture(repo) {
@@ -162,6 +162,14 @@ describe('governed Handshake ruleset reconciliation', () => {
     for (const ruleset of x.rulesets) ruleset.rules = ruleset.rules.filter((r) =>
       r.type !== 'deletion' && r.type !== 'non_fast_forward');
     assert.throws(() => buildRulesetPlan(x), /aggregate deletion.*force-push/i);
+  });
+  it('preserves previously required security scanners as load-bearing PR checks', () => {
+    for (const repo of Object.keys(TARGETS)) {
+      for (const context of ['CodeQL', 'GitGuardian Security Checks',
+        'Analyze (actions)', 'Analyze (javascript-typescript)', 'Analyze (python)']) {
+        assert.equal(TARGETS[repo].requiredChecks.includes(context), true, repo + ': ' + context);
+      }
+    }
   });
   it('does not change FCR review count or bypass behavior', () => {
     const plan = buildRulesetPlan(fixture('jussray/founder-control-room'));
