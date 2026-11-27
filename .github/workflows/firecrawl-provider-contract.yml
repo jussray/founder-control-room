@@ -1,0 +1,17 @@
+name: Firecrawl provider contract
+on:
+  pull_request:
+    paths:
+      - 'tools/firecrawl/**'
+      - '.github/workflows/firecrawl-provider-contract.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tools/firecrawl/provider.test.mjs
