@@ -14,7 +14,7 @@ Bip's founder-only change to zero required approving reviews and disabled code-o
 ## Execution
 1. Merge the source workflow into trusted FCR main through its existing authorized GitHub merge path. Source PR and its CI alone cannot mutate provider rulesets.
 2. In GitHub Actions, open **Handshake Ruleset Reconciliation** and run `workflow_dispatch` with target repository, PR number and exact main/head SHAs, with `apply=false`. This performs read-only GitHub provider queries and returns candidate payloads with a SHA-256 plan digest.
-3. Review the candidate plan, obtain explicit founder approval bound to that digest and head, then rerun with `apply=true` and the same inputs. The trusted job requires the protected `founder-signal-engine-review` environment and a repository secret named `GITHUB_RULESET_ADMIN_TOKEN` with repository rules administration. **Never place tokens in code, PRs, issue text or frontend.**
+3. Review the candidate plan, obtain explicit founder approval bound to that digest and head, then rerun with `apply=true` and the same inputs. The trusted job requires the protected `founder-signal-engine-review` environment and a protected environment secret named `RULESET_ADMIN_TOKEN` (mapped to the internal `GITHUB_RULESET_ADMIN_TOKEN` environment variable) with repository rules administration. **Never place tokens in code, PRs, issue text or frontend.**
 4. The executor refetches live provider state immediately before each mutation, checks exact snapshot hashes, writes only allowlisted ruleset IDs, checks provider readback, and attempts limited compensation for an unsuccessful multi-ruleset write. Confirm enforcement with a negative and positive PR test before declaring the merge gate operational.
 
 ## What this does not do
