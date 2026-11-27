@@ -10,11 +10,12 @@ import {
 const COMMIT = 'a'.repeat(40);
 const HASH = 'c'.repeat(64);
 const COVER = 'd'.repeat(64);
-const MEDIA_URL = 'https://cdn.jussco.company/handshake/fcr-cover.png';
+// Asset URLs are project-scoped; never reuse another product's media URL.
 function fixture(project: HandshakeProject): HandshakeDraftRequest {
   const spec = HANDSHAKE_PROJECTS[project];
   const proof = project === 'bip' ? 'https://sekretbip.net/' : 'https://github.com/' + spec.repository;
   const altText = spec.name + ' portfolio image with branded logo.';
+  const MEDIA_URL = 'https://cdn.jussco.company/handshake/' + project + '/cover.png';
   return {
     project,
     audience: spec.audience,
@@ -78,6 +79,16 @@ describe('project-specific brand handoff', () => {
     const request = fixture('fcr');
     request.mediaReview.publicReadbackVerified = false;
     expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/readback/);
+  });
+  it('blocks cross-brand CDN media even with a forged boolean review flag', () => {
+    const request = fixture('bip');
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/cover.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/asset URL does not belong/);
+  });
+  it('blocks unapproved media origin', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://unrelated.example/handshake/sync/cover.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
   });
   it('blocks personal account distribution', () => {
     const request = fixture('fcr');
