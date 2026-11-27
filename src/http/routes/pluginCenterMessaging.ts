@@ -11,6 +11,7 @@ import {
 } from '../../lib/growthInboxReply.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { deduplicateAiInboxMessages } from '../../lib/aiInboxRouting.js';
+import { reconcileGithubInboxMessage, type GithubInboxProject } from '../../lib/githubInboxReconciliation.js';
 import {
   isDispatchAllowed,
   type CommunicationPurpose,
@@ -302,12 +303,16 @@ pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) =>
   if (!projectSlug || projectSlug !== status.projectSlug) {
     return res.status(403).json({ error: 'GMAIL_INBOX_PROJECT_SCOPE_MISMATCH' });
   }
+  const reconcileGithub = req.query.reconcileGithub === 'true';
+  if (req.query.reconcileGithub !== undefined && !reconcileGithub) {
+    return res.status(400).json({ error: 'GITHUB_INBOX_RECONCILE_OPTION_INVALID' });
+  }
   const requestedLimit = req.query.maxResults;
-  const maxResults = requestedLimit === undefined ? 15
+  const maxResults = requestedLimit === undefined ? (reconcileGithub ? 5 : 15)
     : typeof requestedLimit === 'string' && /^\d+$/.test(requestedLimit)
       ? Number(requestedLimit)
       : Number.NaN;
-  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 25) {
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > (reconcileGithub ? 5 : 25)) {
     return res.status(400).json({ error: 'GMAIL_INBOX_LIMIT_INVALID' });
   }
   const pageToken = req.query.pageToken;
@@ -322,6 +327,19 @@ pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) =>
     if (inbox.projectSlug !== projectSlug || inbox.accountId !== status.expectedAccount) {
       return res.status(502).json({ error: 'GMAIL_INBOX_PROVIDER_SCOPE_MISMATCH' });
     }
+    let githubReconciliation: Awaited<ReturnType<typeof reconcileGithubInboxMessage>>[] | undefined;
+    if (reconcileGithub) {
+      const { data, error } = await supabase.from('projects')
+        .select('id,slug,repo_provider,repo_identifier,status,verification_enabled')
+        .eq('slug', projectSlug).maybeSingle();
+      if (error || !data || data.slug !== projectSlug) throw new Error('GITHUB_INBOX_PROJECT_LOOKUP_FAILED');
+      const project = data as GithubInboxProject;
+      const { providerForProject } = await import('../../providers/providerFactory.js');
+      githubReconciliation = [];
+      for (const message of inbox.messages) {
+        githubReconciliation.push(await reconcileGithubInboxMessage(message, project, providerForProject));
+      }
+    }
     return res.json({
       contract: 'fcr/ai-inbox-observe@v1',
       mode: 'observe_only',
@@ -331,6 +349,7 @@ pluginCenterMessagingRouter.get('/ai-inbox', async (req: FounderRequest, res) =>
       nextPageToken: inbox.nextPageToken,
       messages: inbox.messages,
       decisions: deduplicateAiInboxMessages(inbox.messages),
+      ...(githubReconciliation ? { githubReconciliation } : {}),
     });
   } catch (error) {
     return res.status(502).json({ error: safeErrorCode(error) });
