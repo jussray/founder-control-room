@@ -2,6 +2,34 @@
 
 This contract applies before publishing, scheduling, sending, announcing, promoting, pitching, or otherwise presenting ecosystem work to the public, partners, customers, investors, collaborators, or internal stakeholders who may reasonably treat the communication as an execution claim.
 
+## Read-only Founder Signal Engine campaign proposal boundary (October 26, 2026)
+
+The authenticated `plan_founder_signal_campaign` MCP tool is an advisory text-and-media-direction proposal maker inside the existing Founder Signal Engine. Its 5W1H, founder-voice guidance, platform-native proposed copy, optional hashtags, and image/video/storyboard directions are **not** evidence that a real post was prepared in Buffer, that the media was generated or legally usable, that a social account was contacted, or that a customer, partner or audience result occurred. The input is caller-supplied and the output must remain `USER_SUPPLIED_UNVERIFIED`.
+
+Before any operator may convert this proposal to an actual Buffer or first-party lifecycle draft, a separate authorized executor must independently re-read exact public source/visibility, current platform/account capabilities, the finalized full text and account recipient, image/video license and rendered SHA, Visual Wonder artifact verdict, contextual privacy/reputation risk, latest approved founder copy/asset hash and runtime authority. For publication or schedule, obtain the exact Current You approval required by the canonical route. A review-only brief or continuity fingerprint cannot authorize provider writes. The Buffer milestone is still **draft-only**, with no automatic queue, share-now, scheduling or publication path.
+
+The founder's documented writing style is not an independently fetched record of recent posts; measured reach, inbound inquiries, customer conversions or partner interest require account-native evidence, compatible time windows and reconciliation. No lexical reputation filter can promise risk-free posts or guarantee external results. Preserve human approval, privacy, age-appropriate boundaries, correction mechanisms, and a clear hold when confidence or proof is insufficient. See `docs/founder-signal-engine/media-reputation-mcp-v1.md`.
+
+### Media-bearing campaign handoff truth boundary
+
+`review_founder_signal_draft_handoff` is a read-only preview that calls the canonical first-party publisher validator in `mode=draft` with no external adapter. It reconstructs the draft from the original campaign brief, checks declared media/rights/hash/verdict correlations, and always marks source, rights, visual inspection, account ownership, provider delivery and founder approval **unverified**. Any locally valid return includes `handoffReady=false` and zero permissions to create a Buffer draft, schedule, publish or contact a third party. Caller-provided checks cannot replace independent rights, media bytes, current destination and exact approval evidence; the existing lifecycle/Buffer source authority must independently verify its own gates before a provider write.
+
+### Public GitHub evidence: existence does not establish business proof
+
+`verify_founder_signal_public_source` is a bounded read-only public API check that distinguishes `VERIFIED_PUBLIC_GITHUB_COMMIT` from `HOLD_UNVERIFIED`. Its success is restricted to currently observed public repository visibility and the exact commit SHA/permalink, and must not be treated as current product behavior, approved content, deployment, security, customers, partners, company ownership, social delivery or actual performance. GitHub API unavailability and private repository visibility remain hold states, not permission to guess. Independently refresh public source verification when a planned campaign is prepared for authorized provider action; never accept caller-supplied check objects as approval.
+
+### Media-byte SHA verification does not verify ownership or permission
+
+The isolated `checkFounderSignalMediaBytes` stage can digest a bounded, already-supplied stream and inspect basic PNG/JPEG/WebP/MP4 signatures. It proves only **local byte equality** to a declared hash plus shallow container markers; no producer identity, actual public visibility, visual accuracy, licensing, release rights, account identity, founder permission, or Buffer provider action is established. It cannot be used as authorization to create a draft or publish. Production use requires a separate authenticated storage reader, full safe media decode, source/rights evidence, exact-payload approval and existing publication-truth policies.
+
+### Authenticated media reader interface is not production authorization
+
+The new FSE `checkAuthorizedFounderSignalMedia` contract ties an asserted server-owned principal/project scope and promoted FCR media registry status/rights records to an immutable versioned stream and byte check. It does **not** connect to live asset storage or independently authenticate the adapter, license receipt, decoded visual content, person, account, or approval. The result does not make an image or video public-safe and cannot create or schedule a Buffer post. Existing Current You and provider readback rules remain load-bearing.
+
+### FFmpeg output readback is not a publish-ready video
+
+The FSE local-process FFmpeg bridge now reopens a renderer-produced MP4 under an explicit trusted output root and independently compares its actual bytes, file size and SHA-256 against the renderer receipt. The result proves only a local byte/receipt match and shallow MP4 container markers; it does not prove video playback, rights, brand/canon, absence of misrepresentation, account access, Current You consent or actual delivery. A missing, symlinked, escaped or modified path fails closed. The verified local render still requires decoder/visual inspection, commercial-use rights, exact text/image approval, and provider-native draft readback through existing governed controls. No new Buffer authority.
+
 ## Required posting loop
 
 ```text
