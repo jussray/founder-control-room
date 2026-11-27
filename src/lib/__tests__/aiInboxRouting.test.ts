@@ -71,3 +71,32 @@ describe('AI Inbox response safety triage', () => {
     expect(decision.lane).toBe('review');
   });
 });
+
+describe('GitHub notification reconciliation', () => {
+  const github = { ...base, from: 'GitHub <notifications@github.com>', automated: true };
+  it.each([
+    '[GitHub] We had a problem billing your account',
+    '[GitHub] A third-party OAuth application has been added to your account',
+  ])('escalates account-level notices: %s', subject => {
+    const decision = classifyAiInboxMessage({ ...github, subject });
+    expect(decision.lane).toBe('money_security');
+    expect(decision.requiresHumanReview).toBe(true);
+    expect(decision.evidence).toBe('message_only');
+  });
+  it.each(['failed', 'cancelled', 'skipped', 'succeeded'])('reconciles %s runs against current provider state', conclusion => {
+    const decision = classifyAiInboxMessage({ ...github, subject: '[example/repo] PR run ' + conclusion + ': Verify' });
+    expect(decision.lane).toBe('ci_unverified');
+    expect(decision.requiresHumanReview).toBe(true);
+    expect(decision.evidence).toBe('message_only');
+  });
+  it('holds PR conversation updates for reconciliation even when automated', () => {
+    const decision = classifyAiInboxMessage({ ...github, subject: 'Re: [example/repo] Fix build (PR #12)' });
+    expect(decision.lane).toBe('project_updates');
+    expect(decision.requiresHumanReview).toBe(true);
+    expect(decision.evidence).toBe('message_only');
+  });
+  it('does not elevate a spoofed GitHub sender on a success notice', () => {
+    const decision = classifyAiInboxMessage({ ...github, from: 'notifications@github.com.example.org', subject: '[example/repo] Run succeeded: Verify' });
+    expect(decision.lane).toBe('automated_notice');
+  });
+});
