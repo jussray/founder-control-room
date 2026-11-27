@@ -20,3 +20,24 @@ h1{font-size:clamp(2.6rem,7vw,5rem);line-height:1.04;letter-spacing:-.05em;margi
 .project-panel label{display:block;margin:18px 0 8px}.project-panel input,.project-panel textarea{box-sizing:border-box;width:100%;padding:12px;border:1px solid rgba(188,162,255,.45);border-radius:10px;background:#11162c;color:var(--ink);font:inherit}
 .project-panel textarea{resize:vertical}.project-panel input:focus-visible,.project-panel textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
 .project-panel button{margin:8px 8px 0 0}.project-item{display:block;width:100%;text-align:left;overflow-wrap:anywhere}button:disabled{opacity:.55;cursor:wait}#project-feedback,#project-status{line-height:1.5;color:var(--muted)}
+
+
+/* Member workspace finish: same FCR atmosphere, preserved privacy and controls. */
+.container h1,.empty h2 { text-wrap: balance; }
+.intro { text-wrap: pretty; }
+.project-panel,.empty {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05),0 18px 45px rgba(0,4,24,.2);
+}
+.project-panel :is(input,textarea) { min-height: 44px; }
+.project-panel :is(input,textarea):focus-visible,
+.project-panel button:focus-visible,
+.topbar :is(a,button):focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .project-panel { padding: clamp(1rem, 4vw, 1.5rem); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .project-panel { background: #0d142b; }
+}
