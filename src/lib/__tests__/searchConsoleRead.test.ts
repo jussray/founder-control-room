@@ -48,7 +48,7 @@ describe('Search Console founder read model',()=>{
    expect(calls.some(x=>x.url.includes(encodeURIComponent('sc-domain:jussco.company')))).toBe(true);
  });
  it('rejects arbitrary Search Console property selections without any provider request',()=>{
-   expect(resolveGscSite('https://outside.example')).toThrowError('invalid_site_selection');
+   expect(() => resolveGscSite('https://outside.example')).toThrowError('invalid_site_selection');
    expect(resolveGscSite('jussco')).toMatchObject({property:'sc-domain:jussco.company'});
  });
  it('preserves unavailable inspection as UNKNOWN, not not-indexed',async()=>{
