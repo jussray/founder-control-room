@@ -36,7 +36,7 @@ export async function runFirecrawlObservation(target:unknown,deps:Dependencies) 
     }
     const change=previous===null?'initial':previous===observation.receipt.sha256?'unchanged':'changed';
     if(!await deps.store.persist(receiptId,{target:idTarget,day,status:'observed',receipt:observation.receipt,change})) return hold('RECEIPT_WRITE_UNVERIFIED');
-    return {status:'observed' as const,receiptId,change,receipt:observation.receipt,markdown:observation.markdown};
+    return {status:'observed' as const,receiptId,change,previousFingerprint:previous,receipt:observation.receipt,markdown:observation.markdown};
   } catch {return hold('OBSERVATION_OR_LEDGER_UNVERIFIED');}
 }
 export async function runFirecrawlMonitorCycle(deps:Dependencies) {
