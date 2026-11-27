@@ -212,6 +212,58 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(resolveProjectId).not.toHaveBeenCalled();
   });
 
+  it('validates a synthetic project-owned 4:5 social draft through existing FCR controls only', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('provider must not be called'); });
+    const resolveProjectId = vi.fn(async () => { throw new Error('db must not be read'); });
+    const app = buildApp({ fetchFn, resolveProjectId });
+    const source = 'https://github.com/jussray/founder-control-room';
+    const asset = '9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33';
+    const requestData = {
+      project: 'fcr', audience: 'business', businessAccountBindingVerified: true,
+      evidence: {
+        fullName: 'jussray/founder-control-room', visibility: 'public', archived: false,
+        exactHead: 'a'.repeat(40), recentCommitCount: 3, recentMergedPullRequests: 1,
+        policy: {
+          containsMinorOrSensitiveData: false, configuredMode: 'ecosystem_only',
+          publicProofUrls: [source], neverClaim: [], neverExpose: [],
+        },
+      },
+      mediaReview: {
+        project: 'fcr', logoRepository: 'jussray/founder-control-room',
+        logoPath: 'brand/handshake/logo.svg',
+        logoSha256: 'e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6',
+        assetVariant: 'social_ad', assetSha256: asset,
+        founderReviewedExactMediaSha256: asset,
+        founderReviewReceiptId: 'synthetic-review-receipt',
+        mediaUrl: 'https://cdn.jussco.company/handshake/fcr/cover.png',
+        altText: 'FCR project promotional artwork in blue and violet.',
+        dimensions: { width: 1080, height: 1350 }, publicReadbackVerified: true,
+      },
+      draft: {
+        platform: 'facebook', accountId: 'juss_and_co_facebook',
+        text: 'What is Founder Control Room? A governed AI operations project with auditable source and review-first release boundaries. Project source: ' + source,
+        traction: 'Repository code is present but not proof of a live launch.',
+        governanceAdvantage: 'Approval and evidence are kept separate.',
+        audienceValue: 'Review the real source and its proof limitations.',
+        investorSignal: 'Evidence-gated delivery, not invented outcomes.',
+        proofLinks: [{ label: 'Repository', url: source }],
+        platformCharacterLimit: 2000,
+      },
+    };
+    const response = await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call', {
+        name: 'review_handshake_brand_social_draft', arguments: requestData,
+      }));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.handshake.status).toBe('NOT_SUBMITTED');
+    expect(response.body.result.structuredContent.socialInput.mode).toBe('draft');
+    expect(response.body.result.structuredContent.socialInput.publishAllowed).toBe(false);
+    expect(response.body.result.structuredContent.reviewedDraft.media[0].url).toContain('/handshake/fcr/');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+  });
+
   it('rejects cross-brand social handoffs without any external provider or account access', async () => {
     const fetchFn = mockFetch(async () => { throw new Error('provider must not be called'); });
     const app = buildApp({ fetchFn });
