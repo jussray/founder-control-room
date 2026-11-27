@@ -165,3 +165,57 @@ body[data-fcr-entry="public"] .entry-actions .btn {min-height:46px}
   body[data-fcr-entry="welcome"] {background-attachment:scroll;place-items:start center}
   body[data-fcr-entry="public"] .entry-actions .btn {justify-content:center}
 }
+
+
+/* Finishing pass — retain the approved mountain scene and current palette.
+   Scope: public entrance + welcome; no dashboard, auth logic or asset changes. */
+body[data-fcr-entry="public"] .hero h1 {
+  text-wrap: balance;
+}
+body[data-fcr-entry="public"] .hero .sub {
+  line-height: 1.62;
+  text-wrap: pretty;
+}
+body[data-fcr-entry="public"] .cards {
+  gap: clamp(.85rem, 1.4vw, 1.15rem);
+}
+body[data-fcr-entry="public"] :is(.card, .panel, .stat, .banner) {
+  border-color: rgba(132, 170, 250, .38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .065), 0 14px 36px rgba(0, 4, 25, .16);
+}
+body[data-fcr-entry="public"] .card h3 {
+  line-height: 1.2;
+  text-wrap: balance;
+}
+body[data-fcr-entry="public"] .card p {
+  line-height: 1.56;
+}
+body[data-fcr-entry="public"] .navlinks a,
+body[data-fcr-entry="public"] .btn,
+body[data-fcr-entry="welcome"] .btn {
+  min-height: 44px;
+  justify-content: center;
+}
+body[data-fcr-entry="public"] :is(a.card, .navlinks a, .switch button, .btn, .auth-tabs button, .auth-btn):focus-visible,
+body[data-fcr-entry="welcome"] :is(a, button, input):focus-visible {
+  outline: 3px solid #a3e7ff;
+  outline-offset: 3px;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  body[data-fcr-entry="public"] .navlinks a,
+  body[data-fcr-entry="public"] .btn,
+  body[data-fcr-entry="welcome"] .btn {
+    transition: color .2s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  }
+}
+@media (max-width: 700px) {
+  body[data-fcr-entry="public"] .cards { padding-inline: .85rem; }
+  body[data-fcr-entry="public"] .hero .sub { max-width: 36ch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-fcr-entry="public"] :is(.navlinks a, .btn, .card),
+  body[data-fcr-entry="welcome"] .btn {
+    transition: none;
+    animation: none;
+  }
+}
