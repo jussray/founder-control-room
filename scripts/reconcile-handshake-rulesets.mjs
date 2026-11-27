@@ -97,6 +97,10 @@ function checkReleaseEvidence(input, target) {
 
 function verifiedRequiredChecks(input, target) {
   requireTrue(Array.isArray(input.checkRuns), 'check-run list missing');
+  // Do not reconcile a green predecessor and a red/re-running successor as green.
+  requireTrue(input.checkRuns.every((run) => run?.status === 'completed' &&
+    !['failure', 'cancelled', 'timed_out', 'action_required', 'stale'].includes(run.conclusion)),
+  'failing or incomplete current-head check runs exist');
   return target.requiredChecks.map((context) => {
     const matching = input.checkRuns.filter((run) => run?.name === context &&
       run?.status === 'completed' && run?.conclusion === 'success');
