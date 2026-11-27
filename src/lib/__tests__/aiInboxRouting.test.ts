@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { reconcileGithubInboxMessage } from '../githubInboxReconciliation.js';
 import { classifyAiInboxMessage, deduplicateAiInboxMessages } from '../aiInboxRouting.js';
 
 const base = {
@@ -98,5 +99,67 @@ describe('GitHub notification reconciliation', () => {
   it('does not elevate a spoofed GitHub sender on a success notice', () => {
     const decision = classifyAiInboxMessage({ ...github, from: 'notifications@github.com.example.org', subject: '[example/repo] Run succeeded: Verify' });
     expect(decision.lane).toBe('automated_notice');
+  });
+});
+
+describe('scoped GitHub inbox provider readback', () => {
+  const project = { id: 'p1', slug: 'alpha', repo_provider: 'github', repo_identifier: 'example/alpha', status: 'active', verification_enabled: true };
+  const head = '123abcd' + '0'.repeat(33);
+  const other = '987abcd' + '0'.repeat(33);
+  const message = { ...base, projectSlug: 'alpha', from: 'GitHub <notifications@github.com>', subject: '[example/alpha] Run succeeded: Verify - main (123abcd)' };
+  const reader = () => ({
+    resolveRef: vi.fn(async () => head),
+    listVerificationSignals: vi.fn(async () => [{ id: '1', name: 'Verify', commitSha: head, status: 'passed' as const, provider: 'github' }]),
+    observePullRequest: vi.fn(async () => ({ number: 12, repository: 'example/alpha', headRepository: 'example/alpha', baseRef: 'main', headRef: 'fix', baseSha: other, headSha: head, authorIdentity: 'fixture', state: 'open' as const, draft: false, merged: false })),
+    listReviewSignals: vi.fn(async () => []),
+  });
+  it('rejects a different repository or mailbox project without invoking the provider', async () => {
+    const make = vi.fn(reader);
+    for (const m of [{ ...message, subject: '[example/beta] Run succeeded: Verify - main (123abcd)' }, { ...message, projectSlug: 'beta' }]) {
+      expect((await reconcileGithubInboxMessage(m, project, make))?.status).toBe('blocked');
+    }
+    expect(make).not.toHaveBeenCalled();
+  });
+  it('does not trust sender suffix spoofing or non-GitHub subjects', async () => {
+    const make = vi.fn(reader);
+    expect(await reconcileGithubInboxMessage({ ...message, from: 'notifications@github.com.evil.example' }, project, make)).toBeNull();
+    expect(make).not.toHaveBeenCalled();
+  });
+  it('observes current checks without treating a successful email as incident closure', async () => {
+    const provider = reader();
+    const result = await reconcileGithubInboxMessage(message, project, () => provider);
+    expect(result).toMatchObject({ status: 'observed', headSha: head, checkCounts: { passed: 1 }, resolution: 'unverified' });
+    expect(provider.listVerificationSignals).toHaveBeenCalledWith('alpha', head);
+    expect(JSON.stringify(result)).not.toContain(message.accountId);
+    expect(JSON.stringify(result)).not.toContain(message.providerMessageId);
+  });
+  it('holds stale notifications and ambiguous PR run subjects without claiming green', async () => {
+    const provider = reader();
+    const make = vi.fn(() => provider);
+    expect((await reconcileGithubInboxMessage({ ...message, subject: '[example/alpha] Run succeeded: Verify - main (987abcd)' }, project, make))?.status).toBe('stale');
+    expect(provider.listVerificationSignals).not.toHaveBeenCalled();
+    expect((await reconcileGithubInboxMessage({ ...message, subject: '[example/alpha] PR run failed: Verify - Fix issue (123abcd)' }, project, make))?.status).toBe('blocked');
+    expect(make).toHaveBeenCalledTimes(1);
+  });
+  it('reads explicit PR identity, checks and review signals without merge authority', async () => {
+    const provider = reader();
+    const result = await reconcileGithubInboxMessage({ ...message, subject: 'Re: [example/alpha] Fix issue (PR #12)' }, project, () => provider);
+    expect(result).toMatchObject({ status: 'observed', prNumber: 12, prState: 'open', resolution: 'unverified', reviewCounts: {} });
+    expect(provider.observePullRequest).toHaveBeenCalledTimes(2);
+  });
+  it('rejects movement during readback and mixed-head provider signals', async () => {
+    const provider = reader();
+    provider.resolveRef.mockResolvedValueOnce(head).mockResolvedValueOnce(other);
+    expect((await reconcileGithubInboxMessage(message, project, () => provider))?.status).toBe('stale');
+    const mixed = reader();
+    mixed.listVerificationSignals.mockResolvedValueOnce([{ id: '1', name: 'Verify', commitSha: other, status: 'passed', provider: 'github' }]);
+    expect((await reconcileGithubInboxMessage(message, project, () => mixed))?.status).toBe('blocked');
+  });
+  it('redacts provider exceptions and never treats them as successful readback', async () => {
+    const provider = reader();
+    provider.resolveRef.mockRejectedValueOnce(new Error('private provider detail'));
+    const result = await reconcileGithubInboxMessage(message, project, () => provider);
+    expect(result).toMatchObject({ status: 'blocked', reason: 'provider_read_failed', resolution: 'unverified' });
+    expect(JSON.stringify(result)).not.toContain('private provider detail');
   });
 });
