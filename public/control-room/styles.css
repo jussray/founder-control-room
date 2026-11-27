@@ -575,3 +575,30 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
 @media(max-width:760px) {
   .topbar .founder-email { min-width:0; overflow-wrap:anywhere; }
 }
+
+
+/* Cinematic finishing pass: refine the existing Control Room shell, not its identity.
+   No route, component ownership, evidence status or action behavior changes. */
+.home { gap: clamp(1rem, 1.6vw, 1.35rem); }
+.hero-title { text-wrap: balance; line-height: 1.02; }
+.hero-lede { line-height: 1.62; text-wrap: pretty; }
+.panel h2 { line-height: 1.3; text-wrap: balance; }
+.panel, .card, .lane {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+.hero-cta, .chief-route, .capabilities-link {
+  min-height: 44px;
+  justify-content: center;
+}
+.hero-cta:focus-visible, .chief-route:focus-visible {
+  outline: 3px solid #93ddff;
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .hero-title { font-size: clamp(2.15rem, 8vw, 3.7rem); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar, .panel, .chief { backdrop-filter: none; }
+  .topbar { background: #080d25; }
+  .panel { background: var(--panel-solid); }
+}
