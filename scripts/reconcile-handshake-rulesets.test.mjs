@@ -63,6 +63,22 @@ describe('governed Handshake ruleset reconciliation', () => {
       assert.match(plan.digest, /^[a-f0-9]{64}$/);
     });
   }
+  it('preserves aggregate deletion protection when the secondary Bip ruleset does not own deletion', () => {
+    const x = fixture('jussray/Sekret-Bip');
+    x.rulesets[1].rules = x.rulesets[1].rules.filter((r) =>
+      r.type !== 'deletion' && r.type !== 'non_fast_forward' && r.type !== 'required_signatures');
+    const plan = buildRulesetPlan(x);
+    assert.equal(plan.updates.length, 2);
+    assert.equal(plan.updates[0].after.rules.some((r) => r.type === 'deletion'), true);
+    assert.equal(plan.updates[1].after.rules.some((r) => r.type === 'deletion'), false);
+    assert.deepEqual(plan.updates[1].after.bypass_actors, x.rulesets[1].bypass_actors);
+  });
+  it('fails closed if every ruleset has lost deletion or force-push protection', () => {
+    const x = fixture('jussray/founder-control-room');
+    for (const ruleset of x.rulesets) ruleset.rules = ruleset.rules.filter((r) =>
+      r.type !== 'deletion' && r.type !== 'non_fast_forward');
+    assert.throws(() => buildRulesetPlan(x), /aggregate deletion.*force-push/i);
+  });
   it('does not change FCR review count or bypass behavior', () => {
     const plan = buildRulesetPlan(fixture('jussray/founder-control-room'));
     assert.equal(plan.updates[0].after.rules.find(r => r.type === 'pull_request').parameters.required_approving_review_count, 0);
