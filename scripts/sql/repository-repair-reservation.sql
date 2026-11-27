@@ -20,6 +20,9 @@ DECLARE
   v_mission_ids uuid[];
   v_checks text[];
   v_risk text;
+  v_description text;
+  v_build_assist jsonb;
+  v_builder text;
   v_draft public.missions%ROWTYPE;
   v_mission public.missions%ROWTYPE;
   v_updated integer;
@@ -91,12 +94,36 @@ BEGIN
     RAISE EXCEPTION 'repair_findings_already_reserved' USING ERRCODE = '40001';
   END IF;
 
+  -- Restore repository-owned suggestions, never caller-supplied authority.
+  SELECT parsed_manifest->'buildAssist' INTO v_build_assist
+    FROM public.project_manifests
+    WHERE project_id = p_project_id AND superseded_at IS NULL
+      AND commit_sha = v_run.commit_sha AND validation_status = 'valid'
+    ORDER BY observed_at DESC, id DESC LIMIT 1;
+  IF v_build_assist->'enabled' = 'true'::jsonb
+    AND jsonb_typeof(v_build_assist->'preferredBuilder') = 'string'
+    AND length(btrim(v_build_assist->>'preferredBuilder')) BETWEEN 1 AND 100 THEN
+    v_builder := btrim(v_build_assist->>'preferredBuilder');
+  END IF;
+  -- Preferences can raise risk but never lower the observed severity.
+  IF v_build_assist->>'riskLevel' = 'high' THEN v_risk := 'high'; END IF;
+  SELECT 'Repository verification repair proposal. No execution authority is granted.'
+    || E'\n\n' || string_agg(
+      '- ' || left(coalesce(title, 'Untitled finding'), 300)
+      || E'\n  Evidence: ' || left(coalesce(detail, 'No detail'), 1000)
+      || E'\n  Suggested: ' || left(coalesce(suggested_action, 'Inspect exact evidence'), 1000),
+      E'\n' ORDER BY id)
+    INTO v_description
+    FROM public.repository_findings
+    WHERE project_id = p_project_id AND id = ANY(v_ids);
+
   -- Populate the existing column types rather than guessing enum/array types.
   SELECT * INTO v_draft FROM jsonb_populate_record(NULL::public.missions,
     jsonb_build_object(
       'project_id', p_project_id,
       'title', format('Repair repository verification drift (%s)', cardinality(v_ids)),
-      'description', 'Repository verification repair proposal. Inspect the exact evidence and obtain separate authorization before any execution.',
+      'description', v_description,
+      'builder_agent', v_builder,
       'status', 'proposed',
       'base_ref', v_run.branch,
       'risk_level', v_risk,
@@ -108,14 +135,15 @@ BEGIN
         'authority', 'proposal_only',
         'approvals_required', jsonb_build_array('create_sandbox_workspace',
           'create_branch', 'commit_patch', 'integrate', 'deploy', 'rollback'),
-        'mutation_authorized', false
+        'mutation_authorized', false,
+        'builder_preference_only', true
       )
     ));
 
   INSERT INTO public.missions (project_id, title, description, status, base_ref,
-    risk_level, required_checks, policy_snapshot)
+    risk_level, required_checks, policy_snapshot, builder_agent)
   VALUES (v_draft.project_id, v_draft.title, v_draft.description, v_draft.status,
-    v_draft.base_ref, v_draft.risk_level, v_draft.required_checks, v_draft.policy_snapshot)
+    v_draft.base_ref, v_draft.risk_level, v_draft.required_checks, v_draft.policy_snapshot, v_draft.builder_agent)
   RETURNING * INTO v_mission;
 
   UPDATE public.repository_findings SET mission_id = v_mission.id
