@@ -100,6 +100,10 @@ A caller cannot turn deterministic review off, weaken P2 handling, substitute mo
 
 ### Approved native GitHub human-review policy (source; live provider pending)
 
+**Live provider observation (2026-11-26, rulesets `20819094` and `28182360`):** The active GitHub `pull_request` rules for main still specify `required_approving_review_count: 0` — **zero native approving reviews**. This is the observed current enforcement, not proof that the one-review target below has been applied. Neither state grants automatic merge authority: the existing exact-head checks, independent deterministic review, and authenticated founder-final decision remain separate requirements. Provider rule activation requires an eligible reviewer, an authorized mutation, and fresh provider readback.
+
+
+
 The canonical **approved source policy** is `founder-plus-independent`: one native approving human review, with Code Owner and last-push approval required by the existing provider implementation. An eligible non-owner human with write authority must be verified before the provider ruleset is mutated. These source rules do not establish current live GitHub enforcement.
 
 This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
