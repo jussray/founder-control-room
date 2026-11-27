@@ -103,6 +103,16 @@ function approveVisualCandidate(input: HandshakeDraftRequest): void {
   if (!media.publicReadbackVerified || !IMAGE_URL.test(media.mediaUrl)) {
     fail('public raster media readback required');
   }
+  const url = new URL(media.mediaUrl);
+  const productHost = new URL(project.productUrl).hostname;
+  const sharedHost = url.hostname === 'cdn.jussco.company' || url.hostname === 'assets.jussco.company';
+  if (sharedHost && !url.pathname.toLowerCase().startsWith('/handshake/' + input.project + '/')) {
+    fail('shared asset URL does not belong to selected project');
+  }
+  if (!sharedHost && (url.hostname !== productHost ||
+      !url.pathname.startsWith('/brand/handshake/'))) {
+    fail('unapproved project media origin');
+  }
   if (media.dimensions.width < 1200 ||
       Math.abs(media.dimensions.width / media.dimensions.height - 1.5) > 0.01) {
     fail('Handshake cover must be 3:2 and at least 1200px wide');
