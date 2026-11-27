@@ -51,6 +51,7 @@ import { createWebchatHandoffRouter, createWebchatMessageHandler } from './route
 import { createSupabaseWebchatHandoffStore } from '../growth/webchatHandoffStore.js';
 import { supabase as webchatSupabase } from '../lib/supabaseClient.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleJussPayReceiptIngest } from './routes/jusspayReceipts.js';
 import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
@@ -215,6 +216,12 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
     handleBuildEventReceiptIngest,
+  );
+  app.post(
+    '/ingest/jusspay-receipts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '8kb' }),
+    handleJussPayReceiptIngest,
   );
   app.post(
     '/ingest/hair-commerce-receipts',

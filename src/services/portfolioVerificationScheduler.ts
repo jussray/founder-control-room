@@ -59,6 +59,19 @@ export async function enqueueDuePortfolioVerification(): Promise<number> {
     const lastRunAt = latestRunByProject.get(project.id) ?? 0;
     if (lastRunAt > 0 && now - lastRunAt < cadenceMs) continue;
 
+    // Completed work may be a terminal failure; throttle attempts without renewing evidence.
+    const { data: completedRows, error: completedError } = await supabase
+      .from("controller_outbox")
+      .select("completed_at")
+      .eq("controller", "ManifestController")
+      .eq("project_id", project.id)
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false })
+      .limit(1);
+    if (completedError) throw new Error(`verification_completion_read_failed:${completedError.message}`);
+    const lastCompletedAt = Date.parse(String(completedRows?.[0]?.completed_at ?? "")) || 0;
+    if (lastCompletedAt > 0 && now - lastCompletedAt < cadenceMs) continue;
+
     await enqueueReconcile({
       projectId: project.id,
       controller: "ManifestController",

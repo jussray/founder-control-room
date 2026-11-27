@@ -8,7 +8,7 @@
  * enqueues due repository verification, runs reconciliation, lets the
  * idempotent external-use scheduler claim at most one hourly search-and-email
  * digest, runs the bounded Juss & Co public-coverage watch when its cadence
- * is due, runs the hourly AI-provider change watch, and sends one founder
+ * is due, runs the hourly AI-provider change watch and opt-in GitHub inbox watch, and sends one founder
  * portfolio orientation on the eligible Monday cron tick. HTTP routes include
  * signed provider webhooks and repository
  * verification pings. The Bip proof ingress stays at the Worker edge because
@@ -54,6 +54,7 @@ const composed = composeWorkerHandler(
       { runMondayPortfolioOrientationCycle },
       { publishCloudflareRuntimeSignal },
       { runAiProviderChangeWatchCycle },
+      { runConfiguredGithubInboxWatch },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
@@ -62,6 +63,7 @@ const composed = composeWorkerHandler(
       import('../services/mondayPortfolioOrientation.js'),
       import('./cloudflareRuntimeSignal.js'),
       import('../external-use/aiProviderChangeWatchService.js'),
+      import('../lib/githubInboxWatch.js'),
     ]);
 
     return {
@@ -74,6 +76,7 @@ const composed = composeWorkerHandler(
           mondayOrientationResult,
           cloudflareRuntimeSignalResult,
           aiProviderChangeWatchResult,
+          githubInboxWatchResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
           runExternalUseHourlyCycle(new Date(), (env as unknown as ControlRoomWorkerEnv).FCR_EMAIL),
@@ -81,6 +84,11 @@ const composed = composeWorkerHandler(
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
           runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
+          runConfiguredGithubInboxWatch().then((result) => {
+            if (result.status !== 'skipped') console.log(JSON.stringify({ task: 'github-inbox-watch', ...result }));
+            if (result.status === 'blocked') throw new Error('github_inbox_watch_blocked:' + result.reason);
+            return result;
+          }),
         ]);
         assertScheduledTaskResults([
           { name: 'reconciler', result: reconcilerResult },
@@ -89,6 +97,7 @@ const composed = composeWorkerHandler(
           { name: 'monday-portfolio-orientation', result: mondayOrientationResult },
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
           { name: 'ai-provider-change-watch', result: aiProviderChangeWatchResult },
+          { name: 'github-inbox-watch', result: githubInboxWatchResult },
         ]);
       },
     };
