@@ -7,6 +7,7 @@ import {
 } from '../../capabilities/sharedCapabilityRuntime.js';
 import {
   observePublicWeb,
+  normalizeFirecrawlObservation,
   PUBLIC_WEB_OBSERVATION_CAPABILITY,
   PUBLIC_WEB_OBSERVATION_CAPABILITY_ID,
   PublicWebObservationError,
@@ -23,6 +24,8 @@ import {
 } from '../../capabilities/videoGraphicRender.js';
 import { localDocumentToMarkdownCapability } from '../../capabilities/localDocumentConversion.js';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
+import { runFirecrawlObservation } from '../../capabilities/firecrawlObservationRun.js';
+import { firecrawlEventStore } from '../../capabilities/firecrawlEventStore.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -138,14 +141,36 @@ async function runPublicWebObservation(
       priorEvidenceFingerprint: continuityValue(body.priorEvidenceFingerprint),
       priorProofCookie: continuityValue(body.priorProofCookie),
     };
-    const observation = await observePublicWeb({
-      operation,
-      query: typeof body.query === 'string' ? body.query : undefined,
-      urls: Array.isArray(body.urls)
-        ? body.urls.map((value) => typeof value === 'string' ? value : '')
-        : undefined,
-      continuity,
-    });
+    if (body.provider !== undefined && body.provider !== 'exa' && body.provider !== 'firecrawl') {
+      throw new PublicWebObservationError('public_web_invalid_request', 'Unknown observation provider.');
+    }
+    let observation;
+    if (body.provider === 'firecrawl') {
+      if (operation !== 'fetch' || body.urls !== undefined || body.query !== undefined ||
+        typeof body.target !== 'string' || !['fcr','studio','truthweaverShop'].includes(body.target)) {
+        throw new PublicWebObservationError('public_web_invalid_request', 'Firecrawl requires a fixed public target and fetch operation.');
+      }
+      const result = await runFirecrawlObservation(body.target, {
+        env: process.env, store: firecrawlEventStore(supabase),
+      });
+      if (result.status === 'held') {
+        const status = result.reason === 'DAILY_ATTEMPT_ALREADY_CLAIMED' ? 429
+          : ['DISABLED','MISSING_SERVER_CREDENTIAL'].includes(result.reason) ? 503 : 502;
+        return res.status(status).set('Cache-Control', 'no-store').json({
+          code: 'firecrawl_observation_held', reason: result.reason,
+        });
+      }
+      observation = normalizeFirecrawlObservation(result);
+    } else {
+      observation = await observePublicWeb({
+        operation,
+        query: typeof body.query === 'string' ? body.query : undefined,
+        urls: Array.isArray(body.urls)
+          ? body.urls.map((value) => typeof value === 'string' ? value : '')
+          : undefined,
+        continuity,
+      });
+    }
     const sharedResult = finalizeSharedReadOnlyCapabilityRun(sharedInvocation, observation);
 
     return res.status(200).set('Cache-Control', 'no-store').json({

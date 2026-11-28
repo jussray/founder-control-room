@@ -1,0 +1,37 @@
+name: Firecrawl provider contract
+on:
+  pull_request:
+    paths:
+      - 'tools/firecrawl/**'
+      - 'src/**/firecrawl*.ts'
+      - 'src/capabilities/publicWebObservation.ts'
+      - 'src/http/routes/capabilities.ts'
+      - 'src/worker/cf-entry.ts'
+      - 'wrangler.worker.toml'
+      - '.github/workflows/firecrawl-provider-contract.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test tools/firecrawl/provider.test.mjs
+
+  integration-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npx --no-install vitest run src/lib/__tests__/firecrawlPublicSource.test.ts src/capabilities/__tests__/firecrawlObservationRun.test.ts src/http/routes/__tests__/capabilities.integration.test.ts

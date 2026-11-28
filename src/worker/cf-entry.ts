@@ -55,6 +55,9 @@ const composed = composeWorkerHandler(
       { publishCloudflareRuntimeSignal },
       { runAiProviderChangeWatchCycle },
       { runConfiguredGithubInboxWatch },
+      { runFirecrawlMonitorCycle },
+      { firecrawlEventStore },
+      { supabase },
     ] = await Promise.all([
       import('./reconciler.js'),
       import('../services/portfolioVerificationScheduler.js'),
@@ -64,6 +67,9 @@ const composed = composeWorkerHandler(
       import('./cloudflareRuntimeSignal.js'),
       import('../external-use/aiProviderChangeWatchService.js'),
       import('../lib/githubInboxWatch.js'),
+      import('../capabilities/firecrawlObservationRun.js'),
+      import('../capabilities/firecrawlEventStore.js'),
+      import('../lib/supabaseClient.js'),
     ]);
 
     return {
@@ -76,6 +82,7 @@ const composed = composeWorkerHandler(
           mondayOrientationResult,
           cloudflareRuntimeSignalResult,
           aiProviderChangeWatchResult,
+          firecrawlMonitorResult,
           githubInboxWatchResult,
         ] = await Promise.allSettled([
           runReconcilerCycle(),
@@ -84,8 +91,9 @@ const composed = composeWorkerHandler(
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
           runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
+          runFirecrawlMonitorCycle({ env: process.env, store: firecrawlEventStore(supabase) }),
           runConfiguredGithubInboxWatch().then((result) => {
-            if (result.status !== 'skipped') console.log(JSON.stringify({ task: 'github-inbox-watch', ...result }));
+            // Durable inbox evidence is retained by the watch; failures surface through the scheduled-task gate.
             if (result.status === 'blocked') throw new Error('github_inbox_watch_blocked:' + result.reason);
             return result;
           }),
@@ -98,6 +106,7 @@ const composed = composeWorkerHandler(
           { name: 'cloudflare-runtime-signal', result: cloudflareRuntimeSignalResult },
           { name: 'ai-provider-change-watch', result: aiProviderChangeWatchResult },
           { name: 'github-inbox-watch', result: githubInboxWatchResult },
+          { name: 'firecrawl-monitor', result: firecrawlMonitorResult },
         ]);
       },
     };

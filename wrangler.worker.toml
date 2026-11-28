@@ -61,6 +61,9 @@ custom_domain = true
 # the Pages origin so browser sessions and relative /control-room redirects
 # remain same-origin from the founder's point of view.
 [vars]
+# Public-source observation and scheduled monitor remain inactive until an approved activation.
+FCR_FIRECRAWL_ENABLED = "false"
+FCR_FIRECRAWL_MONITOR_ENABLED = "false"
 ENVIRONMENT = "production"
 SUPABASE_URL = "https://oojzfmmywbvficgybaxd.supabase.co"
 SUPABASE_PROJECT_REF = "oojzfmmywbvficgybaxd"
@@ -125,6 +128,7 @@ required = [
 # to deploy or boot. Install on the founder-control-room Worker first, then
 # move the name into [secrets].required in the feature's activation change.
 optional = [
+  "FCR_FIRECRAWL_API_KEY",
   "GITHUB_PRIVATE_KEY",
   "FCR_REMOTE_MCP_READ_TOKEN",
   "FCR_DISTRIBUTION_READ_TOKEN",

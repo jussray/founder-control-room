@@ -340,3 +340,8 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 ### JussPay commerce observations (source candidate)
 
 `wrangler.worker.toml [secrets].optional` declares `JUSSPAY_RECEIPT_INGEST_KEY` as an optional server-held credential, never a public variable or boot requirement. The `/ingest/jusspay-receipts` route fails closed without the credential; it records redacted payment observations only, not charge, fulfillment or release authority. Source configuration is not proof of a deployed credential or receipt delivery.
+
+
+### Firecrawl public-source observation (inactive candidate)
+
+`wrangler.worker.toml` must declare FCR_FIRECRAWL_API_KEY only in the optional server-held secret registry, keep FCR_FIRECRAWL_ENABLED and FCR_FIRECRAWL_MONITOR_ENABLED false until approved activation, and never treat configuration as proof of deployed credentials, receipt persistence, provider acceptance, or publication authority. The existing Worker cron can invoke the bounded daily monitor only when both enablement flags are true; it shares the manual path's durable per-target daily claim. No new production schedule, credential or deployment is established by this source change. Runtime evidence and an approved activation are required before promotion.

@@ -23,6 +23,7 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
+        "`wrangler.worker.toml` must declare FCR_FIRECRAWL_API_KEY only in the optional server-held secret registry, keep FCR_FIRECRAWL_ENABLED and FCR_FIRECRAWL_MONITOR_ENABLED false until approved activation, and never treat configuration as proof of deployed credentials, receipt persistence, provider acceptance, or publication authority.",
         "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization.",
         "`wrangler.worker.toml [secrets].optional` declares `JUSSPAY_RECEIPT_INGEST_KEY` as an optional server-held credential, never a public variable or boot requirement. The `/ingest/jusspay-receipts` route fails closed without the credential; it records redacted payment observations only, not charge, fulfillment or release authority. Source configuration is not proof of a deployed credential or receipt delivery.",
         "`wrangler.worker.toml [secrets].optional` must contain `JUSSPAY_RECEIPT_INGEST_KEY` as a server-held feature credential that is never a boot-essential binding or a public runtime variable."
