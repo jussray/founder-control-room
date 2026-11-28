@@ -57,6 +57,16 @@ describe('bounded Firecrawl capability run',()=>{
     expect((await runFirecrawlMonitorCycle({store:s,env:enabled,fetchFn,now:()=>new Date('2026-11-27T13:00:00Z')})).status).toBe('skipped');
     expect(fetchFn).not.toHaveBeenCalled();
   });
+  it('reports scheduled provider failures without treating duplicate claims as failures',async()=>{
+    const s=store(), fetchFn=vi.fn<typeof fetch>().mockImplementation(async()=>new Response(null,{status:503}));
+    const deps={store:s,env:enabled,fetchFn,now};
+    const first=await runFirecrawlMonitorCycle(deps);
+    expect(first.status).toBe('failed');
+    if(first.status!=='skipped') expect(first.outcomes).toEqual(['fcr','studio','truthweaverShop'].map(target=>({target,status:'held',reason:'PROVIDER_HTTP_FAILURE'})));
+    const second=await runFirecrawlMonitorCycle(deps);
+    expect(second.status).toBe('attempted');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
   it('scheduled and manual runs share a daily budget',async()=>{
     const s=store(), fetchFn=provider(), deps={store:s,env:enabled,fetchFn,now};
     await runFirecrawlObservation('fcr',deps);

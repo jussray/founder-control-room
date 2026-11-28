@@ -34,7 +34,7 @@ export async function runFirecrawlObservation(target:unknown,deps:Dependencies) 
       if(!await deps.store.persist(receiptId,{target:idTarget,day,status:'held',reason:observation.reason})) return hold('RECEIPT_WRITE_UNVERIFIED');
       return hold(observation.reason);
     }
-    const change=previous===null?'initial':previous===observation.receipt.sha256?'unchanged':'changed';
+    const change:'initial'|'unchanged'|'changed'=previous===null?'initial':previous===observation.receipt.sha256?'unchanged':'changed';
     if(!await deps.store.persist(receiptId,{target:idTarget,day,status:'observed',receipt:observation.receipt,change})) return hold('RECEIPT_WRITE_UNVERIFIED');
     return {status:'observed' as const,receiptId,change,previousFingerprint:previous,receipt:observation.receipt,markdown:observation.markdown};
   } catch {return hold('OBSERVATION_OR_LEDGER_UNVERIFIED');}
@@ -42,10 +42,14 @@ export async function runFirecrawlObservation(target:unknown,deps:Dependencies) 
 export async function runFirecrawlMonitorCycle(deps:Dependencies) {
   const now=(deps.now??(()=>new Date()))();
   if(deps.env.FCR_FIRECRAWL_MONITOR_ENABLED!=='true'||deps.env.FCR_FIRECRAWL_ENABLED!=='true'||now.getUTCHours()!==12||now.getUTCMinutes()!==0) return {status:'skipped' as const};
-  const outcomes=[];
+  const outcomes: Array<
+    | {target:FirecrawlTarget;status:'held';reason:string}
+    | {target:FirecrawlTarget;status:'observed';receiptId:string;change:'initial'|'unchanged'|'changed'}
+  > = [];
   for(const target of targets){
     const result=await runFirecrawlObservation(target,deps);
-    outcomes.push({target,status:result.status,...(result.status==='held'?{reason:result.reason}:{receiptId:result.receiptId,change:result.change})});
+    if(result.status==='held') outcomes.push({target,status:'held',reason:result.reason});
+    else outcomes.push({target,status:'observed',receiptId:result.receiptId,change:result.change});
   }
   const failed=outcomes.some(outcome=>outcome.status==='held'&&outcome.reason!=='DAILY_ATTEMPT_ALREADY_CLAIMED');
   return {status:failed?'failed' as const:'attempted' as const,outcomes};
