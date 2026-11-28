@@ -320,11 +320,7 @@ async function readJsonResponse(response: globalThis.Response): Promise<JsonReco
     throw new ProjectEvidenceAgentError('OpenAI response body was empty or malformed', 'OPENAI_INVALID_RESPONSE', response.status);
   }
   if (!response.ok) {
-    const errorRecord = isRecord(payload.error) ? payload.error : null;
-    const message = errorRecord && typeof errorRecord.message === 'string'
-      ? errorRecord.message
-      : `OpenAI request failed with status ${response.status}`;
-    throw new ProjectEvidenceAgentError(message, 'OPENAI_HTTP_ERROR', response.status);
+    throw new ProjectEvidenceAgentError(`OpenAI request failed with status ${response.status}`, 'OPENAI_HTTP_ERROR', response.status);
   }
   return payload;
 }
@@ -426,7 +422,7 @@ export function createProjectEvidenceAgent(dependencies: ProjectEvidenceDependen
           throw new ProjectEvidenceAgentError('OpenAI project evidence audit timed out', 'OPENAI_TIMEOUT');
         }
         throw new ProjectEvidenceAgentError(
-          error instanceof Error ? error.message : 'OpenAI project evidence audit failed',
+          'OpenAI project evidence audit failed',
           'OPENAI_REQUEST_FAILED',
         );
       } finally {
