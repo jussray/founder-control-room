@@ -160,7 +160,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.result.protocolVersion).toBe('2025-06-18');
     expect(listed.status).toBe(200);
-    expect(listed.body.result.tools).toHaveLength(4);
+    expect(listed.body.result.tools).toHaveLength(6);
     expect(listed.body.result.tools[3]).toMatchObject({
       name: 'verify_founder_signal_public_source',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
@@ -182,11 +182,109 @@ describe('Founder Signal Engine remote MCP', () => {
         openWorldHint: true,
       },
     });
+    expect(listed.body.result.tools[4]).toMatchObject({
+      name: 'get_handshake_brand_spec',
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(listed.body.result.tools[5]).toMatchObject({
+      name: 'review_handshake_brand_social_draft',
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
     expect(listed.body.result.tools[0].inputSchema.additionalProperties).toBe(false);
     expect(listed.body.result.tools[0].inputSchema.properties.automationCandidate).toMatchObject({
       type: 'object',
       additionalProperties: false,
     });
+  });
+
+  it('returns the exact named brand without calling any provider or database', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('provider must not be called'); });
+    const resolveProjectId = vi.fn(async () => { throw new Error('db must not be read'); });
+    const app = buildApp({ fetchFn, resolveProjectId });
+    const response = await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call', { name: 'get_handshake_brand_spec', arguments: { project: 'bip' } }));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.name).toBe('Se’kret Bip');
+    expect(response.body.result.structuredContent.handshakeSubmission).toBe('NOT_SUBMITTED');
+    expect(response.body.result.structuredContent.publishingEnabled).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+  });
+
+  it('validates a synthetic project-owned 4:5 social draft through existing FCR controls only', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('provider must not be called'); });
+    const resolveProjectId = vi.fn(async () => { throw new Error('db must not be read'); });
+    const app = buildApp({ fetchFn, resolveProjectId });
+    const source = 'https://github.com/jussray/founder-control-room';
+    const asset = '9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33';
+    const requestData = {
+      project: 'fcr', audience: 'business', businessAccountBindingVerified: true,
+      evidence: {
+        fullName: 'jussray/founder-control-room', visibility: 'public', archived: false,
+        exactHead: 'a'.repeat(40), recentCommitCount: 3, recentMergedPullRequests: 1,
+        policy: {
+          containsMinorOrSensitiveData: false, configuredMode: 'ecosystem_only',
+          publicProofUrls: [source], neverClaim: [], neverExpose: [],
+        },
+      },
+      mediaReview: {
+        project: 'fcr', logoRepository: 'jussray/founder-control-room',
+        logoPath: 'brand/handshake/logo.svg',
+        logoSha256: 'e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6',
+        assetVariant: 'social_ad', assetSha256: asset,
+        founderReviewedExactMediaSha256: asset,
+        founderReviewReceiptId: 'synthetic-review-receipt',
+        mediaUrl: 'https://cdn.jussco.company/handshake/fcr/cover.png',
+        altText: 'FCR project promotional artwork in blue and violet.',
+        dimensions: { width: 1080, height: 1350 }, publicReadbackVerified: true,
+      },
+      draft: {
+        platform: 'facebook', accountId: 'juss_and_co_facebook',
+        text: 'What is Founder Control Room? A governed AI operations project with auditable source and review-first release boundaries. Project source: ' + source,
+        traction: 'Repository code is present but not proof of a live launch.',
+        governanceAdvantage: 'Approval and evidence are kept separate.',
+        audienceValue: 'Review the real source and its proof limitations.',
+        investorSignal: 'Evidence-gated delivery, not invented outcomes.',
+        proofLinks: [{ label: 'Repository', url: source }],
+        platformCharacterLimit: 2000,
+      },
+    };
+    const response = await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call', {
+        name: 'review_handshake_brand_social_draft', arguments: requestData,
+      }));
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent.handshake.status).toBe('NOT_SUBMITTED');
+    expect(response.body.result.structuredContent.socialInput.mode).toBe('draft');
+    expect(response.body.result.structuredContent.socialInput.publishAllowed).toBe(false);
+    expect(response.body.result.structuredContent.reviewedDraft.media[0].url).toContain('/handshake/fcr/');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(resolveProjectId).not.toHaveBeenCalled();
+  });
+
+  it('rejects cross-brand social handoffs without any external provider or account access', async () => {
+    const fetchFn = mockFetch(async () => { throw new Error('provider must not be called'); });
+    const app = buildApp({ fetchFn });
+    const response = await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call', {
+        name: 'review_handshake_brand_social_draft',
+        arguments: { project: 'bip', evidence: { fullName: 'jussray/sync-party-game' } },
+      }));
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toMatch(/Invalid Handshake brand social draft/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown or excessive brand spec arguments', async () => {
+    const app = buildApp();
+    const response = await request(app).post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(rpc('tools/call', { name: 'get_handshake_brand_spec', arguments: { project: 'fcr', accessToken: 'never' } }));
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toMatch(/Invalid Handshake brand spec/);
   });
 
   it('plans native image/video and hashtag packages through the MCP with no provider writes', async () => {

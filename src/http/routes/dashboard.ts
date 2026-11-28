@@ -21,6 +21,7 @@ import {
   type ProofStatus,
 } from '../../proof-engine/readiness.js';
 import { truthConsoleRouter } from './truthConsole.js';
+import { summarizeJussPayObservations } from '../../fcrCommerce/jusspayObservationSummary.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireFounder);
@@ -258,3 +259,18 @@ dashboardRouter.post('/manual-analysis', async (req: FounderRequest, res) => {
 // Seven-screen truth console: founder-authenticated and backed by the existing
 // evidence/reconciliation/truth/continuity spine rather than a parallel proof system.
 dashboardRouter.use('/truth', truthConsoleRouter);
+
+// Founder-only, read-only bounded ledger summary. This is not Stripe settlement.
+dashboardRouter.get('/jusspay-observations', async (_req: FounderRequest, res) => {
+  res.set('Cache-Control','no-store');
+  const unavailable=()=>res.status(503).json({state:'unavailable',error:'receipt_ledger_unavailable'});
+  try {
+    const {data:project,error:projectError}=await supabase.from('projects').select('id').eq('slug','jusspay').eq('status','active').maybeSingle();
+    if(projectError||!project?.id)return unavailable();
+    const {data,count,error}=await supabase.from('provider_events').select('payload',{count:'exact'})
+      .eq('project_id',project.id).eq('provider','system').eq('event_type','jusspay_commerce_receipt')
+      .eq('processing_status','processed').order('received_at',{ascending:false}).order('id',{ascending:false}).limit(500);
+    if(error||!Array.isArray(data)||typeof count!=='number')return unavailable();
+    return res.json(summarizeJussPayObservations(data.map(row=>row.payload),count));
+  }catch{return unavailable();}
+});

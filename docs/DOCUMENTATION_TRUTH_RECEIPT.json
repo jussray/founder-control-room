@@ -23,7 +23,9 @@
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization."
+        "`wrangler.worker.toml [secrets].optional` must declare `FCR_DISTRIBUTION_READ_TOKEN` only as an optional server-held feature secret, never as a public [vars] binding or boot-required value. The `GET /founder-os/distribution/skills` founder-only route must fail closed if that secret is absent, and source declaration alone must never be claimed as a deployed credential, successful authenticated API response, or canonicalization.",
+        "`wrangler.worker.toml [secrets].optional` declares `JUSSPAY_RECEIPT_INGEST_KEY` as an optional server-held credential, never a public variable or boot requirement. The `/ingest/jusspay-receipts` route fails closed without the credential; it records redacted payment observations only, not charge, fulfillment or release authority. Source configuration is not proof of a deployed credential or receipt delivery.",
+        "`wrangler.worker.toml [secrets].optional` must contain `JUSSPAY_RECEIPT_INGEST_KEY` as a server-held feature credential that is never a boot-essential binding or a public runtime variable."
       ]
     },
     {
@@ -40,7 +42,8 @@
         "`.github/workflows/ci.yml` must require the migration-lint job in Required Gate, verify current PR-base ancestry, classify Supabase and RLS schema changes across the exact base-to-head range, and boot an isolated local Supabase stack before executing db lint with --fail-on error when applicable; a missing local PostgreSQL instance or continue-on-error must never be reported as migration validation.",
         "`.github/workflows/ci.yml` must explicitly verify that the exact-SHA migration scope step output is true or false; a missing, malformed, or unevaluated decision cannot skip every database lint step while leaving Required Gate green.",
         "`.github/workflows/ci.yml` must run `scripts/verify_workflow_yaml.py .` on the exact head inside the `python-tests` job, parsing every `.github/workflows/*.yml` and `*.yaml` file with `yaml.safe_load` and failing closed on any parse error, unreadable file, or empty workflow set; this is YAML syntax evidence only, not GitHub workflow acceptance, schema validation, or merge authority.",
-        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state."
+        "The Cloudflare bridge authority contract job in `.github/workflows/ci.yml` must run the collision verifier unit tests and the offline [vars]/[secrets] registry check on the exact head. This proves the checked-in config only, not provider state.",
+        "`.github/workflows/ci.yml` must handle `merge_group` `checks_requested`, verify the exact queue candidate via `github.event.merge_group.head_sha`, and use `github.event.merge_group.base_sha` for Documentation Truth, Test Discovery, and Migration Lint on merge-group events. All three must validate SHA shape and ancestry; PRs retain live-target resolution and pushes retain before-SHA scope. Required Gate and Playwright must remain required. Source support alone cannot prove a real queue run or its required check identities."
       ]
     },
     {
@@ -1139,7 +1142,8 @@
     {
       "path": "src/lib/founderSignalDraftHandoff.ts",
       "claims": [
-        "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority."
+        "`src/lib/founderSignalDraftHandoff.ts` must rebuild a canonical campaign, hold stale or reputation-blocked drafts, accept only bounded public-safe media references, and call the existing first-party publisher validator in mode draft. It never verifies media bytes or rights and returns handoffReady false, no Buffer/local-draft, schedule, publish, or provider authority.",
+        "`src/lib/founderSignalDraftHandoff.ts` portfolio review must hold missing or mismatched server-supplied product profile, pinned brand source, destination, or GitHub event/claim; it reuses the canonical offline draft preview, emits only a deterministic review key, requires independent evidence and grants no publication authority."
       ]
     },
     {
@@ -1172,6 +1176,13 @@
       "path": "src/lib/mediaFfmpegRender.ts",
       "claims": [
         "The existing `src/lib/mediaFfmpegRender.ts` local renderer remains the independent receipt producer: its generated MP4 and FFprobe/sha256 receipt can now be tested against a separate read-only FSE byte-inspection bridge, but neither code path proves release permission or social distribution."
+      ]
+    },
+    {
+      "path": "src/services/mondayPortfolioOrientation.ts",
+      "claims": [
+        "A passing Monday orientation receipt cannot become VERIFIED without a verified signature, valid exact commit SHA, registered repository/provider identity and a separately observed matching default-branch head; missing head evidence remains UNKNOWN and a mismatching observed head makes a passing signed receipt STALE.",
+        "The Monday orientation loader pages active projects and queries the newest receipt and highest-priority open finding for each project rather than relying on a portfolio-wide 500-row cap; head-observation availability is separate from runtime proof, and no provider mutation, deployment or email-delivery authority follows."
       ]
     }
   ]

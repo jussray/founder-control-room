@@ -51,6 +51,8 @@ function fakeClient(rejectReceipt = false) {
       eq(_k: string, _v: unknown) { return q; },
       order(_k: string, _v: unknown) { return q; },
       limit(_n: number) { return q; },
+      in(_k: string, _v: unknown[]) { return q; },
+      range(_start: number, _end: number) { return q; },
       then(resolve: (result: { data: unknown[]; error: null }) => unknown) {
         const data = name === 'projects'
           ? [{ id: 'fcr', slug: 'founder-control-room', repo_identifier: 'jussray/founder-control-room' }]

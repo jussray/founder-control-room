@@ -1,0 +1,78 @@
+{
+  "schema": "fcr/handshake-brand-social@v1",
+  "slug": "fcr",
+  "product": "Founder Control Room",
+  "sourceRepository": "jussray/founder-control-room",
+  "publicProductUrl": "https://foundercontrolroom.org/",
+  "brand": {
+    "logoSource": "brand/handshake/logo.svg",
+    "logoFormat": "svg",
+    "logoWidth": 1200,
+    "logoHeight": 490,
+    "colors": [
+      "#55c8ff",
+      "#9b6bff",
+      "#c26bf5"
+    ],
+    "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
+    "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
+    "neverBorrowBrandFromOtherProjects": true,
+    "logoSha256": "e10e42f73a1b65255894e4c43dc04c47d406b8461c4b50ed3e1003d54363dbf6"
+  },
+  "handshake": {
+    "target": "Handshake AI Showcase project card",
+    "coverLocalOutput": "handshake-cover.png (included in founder download ZIP, not yet hosted in repository)",
+    "coverWidth": 1536,
+    "coverHeight": 1024,
+    "coverSha256": "6b37529cec906a4a17a38091d03dc79412f15d40a98339576be069fdda52d7f9",
+    "mediaPublicUrl": null,
+    "externalSubmissionState": "NOT_SUBMITTED",
+    "requireNativeConfirmation": true,
+    "coverPackagePath": "Handshake/Founder_Control_Room_Handshake_3x2.png",
+    "coverDimensions": [
+      1536,
+      1024
+    ]
+  },
+  "social": {
+    "owner": "jussray/founder-control-room",
+    "adapter": "src/lib/handshakeBrandSocial.ts",
+    "existingClassification": "src/lib/socialCampaignPolicy.ts",
+    "existingPublisher": "src/lib/firstPartySocialPublisher.ts",
+    "targetAudience": "business",
+    "firstPartyMode": "draft",
+    "publishAllowed": false,
+    "businessAccountBinding": "PUBLORA_INSTAGRAM_CONNECTED_FCR_PUBLISHING_UNVERIFIED",
+    "publicMediaReadback": "BYTES_NOT_INDEPENDENTLY_VERIFIED",
+    "exactMediaReview": "REQUIRED",
+    "nativePublicationReceipt": "NOT_PRESENT",
+    "proofRoot": "https://github.com/jussray/founder-control-room",
+    "adCreative": {
+      "source": "founder-delivered download package only; not committed, hosted or published",
+      "packagePath": "Social/Founder_Control_Room_Social_Ad_4x5.png",
+      "width": 1080,
+      "height": 1350,
+      "aspectRatio": "4:5",
+      "sha256": "9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33",
+      "publicUrl": "https://media.publora.com/images/1795755717215-0-2e9edd36-Founder_Control_Room_Social_Ad_4x5.png",
+      "approval": "PENDING_FOUNDER_EXACT_MEDIA_REVIEW",
+      "mediaSourceReadback": "PUBLORA_READY_METADATA_ONLY"
+    },
+    "draftInputReady": false,
+    "providerDraft": {
+      "provider": "publora",
+      "platform": "instagram",
+      "businessChannel": "@jussnco",
+      "postGroupId": "6b090ec0f04b2c093e24636d",
+      "mediaId": "6b090ec5f04b2c093e2463c0",
+      "editorUrl": "https://app.publora.com/dashboard/editor?id=6b090ec0f04b2c093e24636d",
+      "state": "draft",
+      "mediaState": "ready",
+      "scheduled": false,
+      "published": false,
+      "verifiedSource": "Publora get_post metadata",
+      "assetByteParity": "UNVERIFIED"
+    }
+  },
+  "safety": "Public-source engineering claims only. No credentials, private receipts, or invented performance numbers."
+}

@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/portfolio-pr-triage.mjs'
+      - 'scripts/portfolio-pr-triage.test.mjs'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/portfolio-actions-audit.mjs'
+      - 'scripts/portfolio-pr-triage.mjs'
+      - 'scripts/portfolio-pr-triage.test.mjs'
       - 'scripts/mint-portfolio-github-app-token.mjs'
       - '.github/workflows/portfolio-actions-audit.yml'
   schedule:
@@ -50,6 +54,8 @@ jobs:
           node-version: '24'
       - name: Exercise source classifications
         run: node scripts/portfolio-actions-audit.mjs --self-test
+      - name: Exercise bounded open-PR triage without credentials
+        run: node --test scripts/portfolio-pr-triage.test.mjs
       - name: Validate read-only audit token permissions without credentials
         run: node scripts/mint-portfolio-github-app-token.mjs --self-test-token-profiles
 
@@ -122,7 +128,7 @@ jobs:
             '- Next action: ' + safe(action?.action),
             '- Next owner: ' + safe(action?.owner),
             '- Source/run bindings: recorded in the attached receipt; revalidate before use.',
-            '- This audit observes default-branch Actions only; it does not prove Cloudflare, production, or unmerged repair branches.',
+            '- This audit observes default-branch Actions and bounded open PRs; it does not establish root cause, merge authority, or production behavior.',
             '- Audit evidence and next-task proposals grant no execution authority.',
           ];
           appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');

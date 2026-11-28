@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 21, 2026 — Merge-queue CI event support (source only)
+
+The load-bearing `.github/workflows/ci.yml` now listens for `merge_group` `checks_requested` events and verifies the exact candidate from `github.event.merge_group.head_sha`, not a prior pull-request head. Documentation Truth, Test Discovery, and Migration Lint each use the event-bound `github.event.merge_group.base_sha` on merge-group runs and retain SHA validation and ancestry checks. Pull-request runs still resolve the live target branch; push runs still use their exact push-before SHA. The existing Required Gate and Playwright jobs remain mandatory. This is committed source compatibility, not proof that GitHub's provider-side merge queue is enabled or that a real merge-group candidate passed its required check names. Neither branch protection nor merge/deployment authority changes here.
+
 ## November 20, 2026 — public front door and founder callback remain separate (PR #837 candidate)
 
 The candidate Pages routing in `public/_worker.js` serves the public `/` landing page from Pages assets while `/welcome` is the founder sign-in door and `/control-room/` is the founder workspace entry. API-generated `/auth/callback`, `/assets/auth-callback.js` and `/assets/control-room.css` must still pass through the identity-checked API binding, not public static assets. After a successful same-origin `/auth/session` handoff, `src/http/routes/onboardingAssets/callbackJs.ts` routes the founder into `/control-room/` instead of returning them to the public landing page; an active OAuth consent request still takes precedence. The updated Playwright callback proof checks the route and mock session handoff but does not establish a live login, live cookie permissions, Cloudflare Access coverage or production deployment.
@@ -116,6 +120,10 @@ At predecessor candidate `82d0e7139d3876e166844de64e17b4a770c23b90`, the isolate
 ## November 2, 2026: project-owned Monday founder orientation candidate
 
 Existing PR #894 is the carrier for FCR's Monday 08:00 America/New_York founder orientation. It reuses the single per-minute Cloudflare Worker scheduler and adds no ChatGPT automation slot or competing cron owner. Verification freshness is measured from the repository observation timestamp (scanned_at), not packet ingestion time, so delayed stale evidence cannot become current merely by arriving late; invalid and future observation times fail closed to UNKNOWN.
+
+Historical scope: the preceding paragraph describes the original #894 candidate; the successor evidence contract below governs the repair.
+
+The successor Monday-orientation repair requires a fresh passing receipt with a verified signature, a valid exact commit SHA, matching registered repository/provider, and an independently observed matching default-branch head before classifying a project as VERIFIED. Preview-only, wrong-repository, wrong-provider, unsigned or unavailable current-head evidence cannot establish VERIFIED; a passing signed receipt for a different branch or moved head is STALE when current-head evidence is available. Receipt age still uses scanned_at. The loader pages active projects and selects the newest receipt and highest-priority open finding per project, avoiding portfolio-wide 500-row truncation. HEAD_OBSERVED, PARTIAL and RECEIPTS_ONLY describe repository-head observations, not runtime availability or deployment proof. Provider read failures leave the affected passing project UNKNOWN; existing high/critical findings and at-most-once email safeguards remain intact. These are candidate source contracts, not a claim that a live provider or scheduled email was observed.
 
 This remains source-candidate truth only until exact-head CI and Playwright pass, the protected migration is applied through the normal release path, the current Worker is deployed with its project-scoped email binding, and a real scheduled receipt is observed. It grants no automatic merge, deploy, publication, provider mutation, or cross-project authority.
 
@@ -890,3 +898,12 @@ Worker Reconcile retries its exact-SHA API proof for about four minutes, and pro
 Native Facebook Page text support is implemented in the first-party content path. It remains unactivated until account identity and permissions are verified and a destination-native receipt is observed; source code and tests do not establish a connected Page or live post. Media publishing is not supported.
 
 Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.
+
+
+### JussPay commerce observations (source candidate)
+
+`wrangler.worker.toml [secrets].optional` declares `JUSSPAY_RECEIPT_INGEST_KEY` as an optional server-held credential, never a public variable or boot requirement. The `/ingest/jusspay-receipts` route fails closed without the credential; it records redacted payment observations only, not charge, fulfillment or release authority. Source configuration is not proof of a deployed credential or receipt delivery.
+
+### Portfolio brand-bound draft review (candidate source)
+
+The portfolio brand-bound review helper compares a campaign's repository, product, pinned brand path/revision/hash, destination platform/account and declared GitHub event/claim to a separately supplied profile, then reuses the canonical offline handoff. Missing or mismatched inputs are held. Its deterministic review key is not a persistent deduplication reservation. It does not authenticate the profile resolver, prove GitHub events, inspect brand or media bytes, verify provider ownership, create drafts, schedule or publish. Live intake and profile resolution remain unconnected; independent evidence and exact approval are required.

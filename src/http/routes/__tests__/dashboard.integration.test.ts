@@ -346,3 +346,34 @@ describe('GET /dashboard/costs', () => {
     ]);
   });
 });
+
+describe('GET /dashboard/jusspay-observations',()=>{
+ it('requires a founder session',async()=>{
+  expect((await request(buildApp()).get('/dashboard/jusspay-observations')).status).toBe(401);
+ });
+ it('returns an explicit unavailable state for failed ledger reads',async()=>{
+  authSuccess();
+  supabaseMock.from.mockImplementation((table:string)=>{
+   if(table==='founder_users')return founderUsersRow();
+   if(table==='projects'){const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:{id:PROJECT_ID},error:null})};return q;}
+   if(table==='provider_events'){const q={select:()=>q,eq:()=>q,order:()=>q,limit:async()=>({data:null,count:null,error:{message:'private fixture error'}})};return q;}
+   return {};
+  });
+  const res=await request(buildApp()).get('/dashboard/jusspay-observations').set('Authorization',BEARER);
+  expect(res.status).toBe(503);
+  expect(res.body).toEqual({state:'unavailable',error:'receipt_ledger_unavailable'});
+ });
+ it('returns observed empty, not a fabricated revenue total',async()=>{
+  authSuccess();
+  supabaseMock.from.mockImplementation((table:string)=>{
+   if(table==='founder_users')return founderUsersRow();
+   if(table==='projects'){const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:{id:PROJECT_ID},error:null})};return q;}
+   if(table==='provider_events'){const q={select:()=>q,eq:()=>q,order:()=>q,limit:async()=>({data:[],count:0,error:null})};return q;}
+   return {};
+  });
+  const res=await request(buildApp()).get('/dashboard/jusspay-observations').set('Authorization',BEARER);
+  expect(res.status).toBe(200);
+  expect(res.body).toMatchObject({state:'no_observations',observedGrossMinor:null,netRevenueMinor:null,settlementVerified:false});
+  expect(res.headers['cache-control']).toBe('no-store');
+ });
+});
