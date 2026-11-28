@@ -60,6 +60,42 @@ describe('project evidence tool', () => {
 });
 
 describe('OpenAI project evidence agent', () => {
+  it('redacts provider response bodies and transport exception details', async () => {
+    const privateMarker = 'PRIVATE_PROMPT_AND_SECRET_MARKER';
+    const providerFailure = vi.fn(async () => new Response(JSON.stringify({
+      error: { message: privateMarker },
+    }), { status: 401, headers: { 'content-type': 'application/json' } }));
+    const providerRun = createProjectEvidenceAgent({
+      env: { OPENAI_API_KEY: 'test-key' },
+      fetchFn: providerFailure as unknown as typeof fetch,
+    });
+
+    await expect(providerRun({
+      goal: 'Find the launch blocker',
+      repository: 'jussray/founder-control-room',
+      ref: 'main',
+      environment: 'canonical production',
+    })).rejects.toMatchObject({
+      message: 'OpenAI request failed with status 401',
+      code: 'OPENAI_HTTP_ERROR',
+      status: 401,
+    });
+
+    const transportFailure = vi.fn(async () => { throw new Error(privateMarker); });
+    const transportRun = createProjectEvidenceAgent({
+      env: { OPENAI_API_KEY: 'test-key' },
+      fetchFn: transportFailure as unknown as typeof fetch,
+    });
+    await expect(transportRun({
+      goal: 'Find the launch blocker',
+      repository: 'jussray/founder-control-room',
+      ref: 'main',
+      environment: 'canonical production',
+    })).rejects.toMatchObject({
+      message: 'OpenAI project evidence audit failed',
+      code: 'OPENAI_REQUEST_FAILED',
+    });
+  });
   it('executes only the read-only evidence function and replays its output before the final answer', async () => {
     const bodies: Array<Record<string, unknown>> = [];
     const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
