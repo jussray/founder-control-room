@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp, rm, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { createPullScanBudget, scanPullRequests } from './portfolio-pr-triage.mjs';
 
 const RECEIPT = 'artifacts/portfolio-actions-audit/receipt.json';
 const MAX_PAGES = 20;
@@ -11,6 +15,9 @@ const STALE_DAYS = 30;
 const MAX_NEXT_TASKS = 20;
 const MAX_JOB_INSPECTIONS = 20;
 const MAX_JOBS_PER_ATTEMPT = 100;
+const MAX_REPAIR_PLAN_JOBS = 10;
+const MAX_HISTORY_BYTES = 2 * 1024 * 1024;
+const HISTORY_REPO = 'jussray/founder-control-room';
 const TERMINAL_FAILURES = new Set(['failure', 'timed_out', 'startup_failure', 'action_required']);
 const hash = (value) => 'sha256:' + createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -57,6 +64,70 @@ function selectFailedRuns(runs, head) {
     .sort((a,b) => a.runId - b.runId || a.attempt - b.attempt);
 }
 
+const REPAIR_RECIPES = Object.freeze({
+  PR_METADATA_REVIEW: ['PR_METADATA', 'Read the exact PR evidence gate and original failure log; supply truthful required sections only.', 'Re-run the evidence gate against the current PR event.'],
+  TYPECHECK_REVIEW: ['SOURCE_PATCH', 'Locate the first compiler diagnostic and reproduce with the repository typecheck command.', 'Run typecheck and the affected regression tests.'],
+  LINT_REVIEW: ['SOURCE_PATCH', 'Reproduce the exact lint diagnostic and make the smallest rule-compliant change.', 'Run the repository lint command and affected tests.'],
+  TEST_REVIEW: ['SOURCE_PATCH', 'Reproduce the first failing assertion or browser flow; distinguish infrastructure from behavior.', 'Run the failing test, then the required regression suite.'],
+  DEPENDENCY_SETUP_REVIEW: ['DEPENDENCY_REVIEW', 'Inspect the failing install or setup log and authoritative lockfile and action pins.', 'Run the same clean install and applicable repository checks.'],
+  TIMEOUT_REVIEW: ['INFRASTRUCTURE_REVIEW', 'Inspect timeout evidence and distinguish slow code from runner or provider capacity.', 'Reproduce or obtain provider recovery evidence before a bounded retry.'],
+  AUTHORITY_REVIEW: ['AUTHORITY_HOLD', 'Identify the missing approval or scoped permission; do not broaden it.', 'Require authorized owner resolution and fresh exact-head evidence.'],
+  STARTUP_REVIEW: ['INFRASTRUCTURE_REVIEW', 'Inspect workflow startup evidence before diagnosing source code.', 'Confirm workflow initialization and actual check execution.'],
+  UNCLASSIFIED_FAILURE: ['EVIDENCE_REVIEW', 'Inspect the original failed-job log and reproduce the first causal failure.', 'Obtain a scoped regression criterion before proposing a change.'],
+});
+
+function buildRepairPlan(diagnostic) {
+  const base = { authority: 'proposal_only', mutationAuthorized: false, rootCauseVerified: false,
+    requiresCurrentHeadRevalidation: true, requiresIndependentReview: true,
+    mergeAuthorized: false, deploymentAuthorized: false };
+  if (!diagnostic || diagnostic.state !== 'FAILED_JOB_METADATA_OBSERVED' || !diagnostic.jobs.length) {
+    return { ...base, state: 'INSUFFICIENT_JOB_EVIDENCE', steps: [], omittedJobs: 0 };
+  }
+  const steps = diagnostic.jobs.slice(0, MAX_REPAIR_PLAN_JOBS).map(job => {
+    const [kind, investigate, verify] = REPAIR_RECIPES[job.category] || REPAIR_RECIPES.UNCLASSIFIED_FAILURE;
+    return { jobId: job.jobId, firstFailedStep: job.firstFailedStep, category: job.category,
+      kind, investigate, verify, executionAllowed: false };
+  });
+  return { ...base, state: steps.some(step => step.kind === 'AUTHORITY_HOLD') ||
+    diagnostic.jobs.some(job => job.category === 'AUTHORITY_REVIEW') ? 'AUTHORITY_HOLD' : 'EVIDENCE_REQUIRED',
+    steps, omittedJobs: Math.max(0, diagnostic.jobs.length - steps.length) };
+}
+
+// Retained audit receipts are observations, never execution claims or locks.
+function reconcileRepairHistory(document, prior, binding) {
+  const info = { state: 'HISTORY_UNAVAILABLE', matchedTasks: 0, authority: 'observation_only',
+    executionLedger: false, mutationAuthorized: false };
+  if (!prior || !binding || prior.schema !== 'fcr/portfolio-actions-audit@v1' ||
+      prior.auditIdentity?.sourceRepository !== HISTORY_REPO ||
+      prior.auditIdentity?.runId !== String(binding.id) ||
+      prior.auditIdentity?.runAttempt !== String(binding.run_attempt) ||
+      prior.auditIdentity?.sourceSha !== binding.head_sha ||
+      document.auditIdentity?.sourceRepository !== HISTORY_REPO ||
+      prior.auditIdentity.runId === document.auditIdentity.runId ||
+      !Array.isArray(prior.nextTasks) || prior.nextTasks.length > MAX_NEXT_TASKS ||
+      !Number.isFinite(Date.parse(prior.observedAt)) ||
+      !Number.isFinite(Date.parse(document.observedAt)) ||
+      Date.parse(prior.observedAt) >= Date.parse(document.observedAt)) return info;
+  const { evidenceFingerprint, ...payload } = prior;
+  if (evidenceFingerprint !== hash(payload)) return info;
+  info.state = 'PRIOR_RECEIPT_MATCHED';
+  info.priorRunId = String(binding.id);
+  for (const task of document.nextTasks) {
+    if (task.subject?.identityScope !== 'public_exact_head' || !task.subject.failedRun) continue;
+    const previous = prior.nextTasks.filter(candidate => candidate?.taskFingerprint === task.taskFingerprint &&
+      candidate?.subject?.identityScope === 'public_exact_head' &&
+      JSON.stringify(candidate.subject) === JSON.stringify(task.subject) &&
+      candidate.action === task.action);
+    if (previous.length !== 1) continue;
+    const count = previous[0].recurrence?.consecutiveReceiptCount;
+    task.recurrence = { state: 'REOBSERVED_IN_PRIOR_RECEIPT',
+      consecutiveReceiptCount: Number.isSafeInteger(count) && count >= 2 && count < 10000 ? count + 1 : 2,
+      priorAuditRunId: info.priorRunId, executionAuthorized: false };
+    info.matchedTasks++;
+  }
+  return info;
+}
+
 // This is a resumable observation proposal, never an execution or approval queue.
 // Run identities are sanitized environment declarations, not provider readback.
 export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
@@ -79,6 +150,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       taskFingerprint: hash({ sourceRepository, ...(subject.identityScope === 'public_exact_head' && subject.failedRun ? {} : { sourceSha }), subject, observedState, action }),
       subject, observedState, priority, action, instruction,
       ...(diagnostic ? { diagnostic } : {}),
+      ...(subject.failedRun ? { repairPlan: buildRepairPlan(diagnostic) } : {}),
       owner: action === 'RESTORE_AUDIT_READ_ACCESS' ? 'AUTHORIZED_ACCESS_OWNER' : 'REPOSITORY_OPERATOR',
       authority: 'proposal_only', mutationAuthorized: false,
       requiresCurrentHeadRevalidation: true,
@@ -94,7 +166,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       [0, 'RECONCILE_INSTALLATION_COVERAGE', 'Reconcile the installation repository inventory before claiming portfolio coverage.']);
   }
   for (const item of items) {
-    if (item.archived || item.state === 'ARCHIVED' || item.state === 'OBSERVED_CHECKS_ONLY') continue;
+    if (item.archived || item.state === 'ARCHIVED') continue;
     const isPrivate = item.visibility === 'private';
     const repository = isPrivate
       ? (/^private-[a-f0-9]{12}$/.test(item.repository || '') ? item.repository : null)
@@ -103,6 +175,27 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
     const observedState = Object.hasOwn(FOLLOW_UP, item.state) ? item.state : 'UNKNOWN';
     const subject = { scope: 'repository', repository, visibility: isPrivate ? 'private' : 'public', head,
       identityScope: isPrivate ? 'run_local_alias' : 'public_exact_head' };
+    // PR observation intentionally exports only bounded aggregate counts, even for public repositories.
+    // A follow-up must independently acquire the live PR identity before any repair.
+    const triage = item.pullTriage;
+    if (triage && ['ATTENTION', 'INCOMPLETE', 'OBSERVED_CHECKS_ONLY'].includes(triage.state)) {
+      const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 10000 ? value : 0;
+      const prSubject = { scope: 'repository_pull_requests', repository,
+        visibility: isPrivate ? 'private' : 'public', head: null,
+        identityScope: isPrivate ? 'run_local_alias' : 'public_repository' };
+      const counts = { runnerlessIncidents: count(triage.runnerlessIncidents),
+        runnerlessFailures: count(triage.runnerlessFailures),
+        unclassifiedFailures: count(triage.unclassifiedFailures),
+        incompletePulls: count(triage.incompletePulls) };
+      const diagnostic = { scope: 'bounded_pr_aggregate', ...counts, rootCauseVerified: false };
+      if (counts.runnerlessIncidents > 0) propose(prSubject, 'PR_RUNNER_EXECUTION_UNOBSERVED',
+        [1, 'REVIEW_RUNNER_EXECUTION_INCIDENT', 'Acquire authorized current PR and job identities; inspect runner or provider execution evidence before any retry or source change.'], diagnostic);
+      if (counts.unclassifiedFailures > 0) propose(prSubject, 'PR_FAILURE_UNCLASSIFIED',
+        [1, 'INSPECT_PR_FAILURE_EVIDENCE', 'Acquire current PR identity and reproduce the first observed causal defect before proposing a focused repair.'], diagnostic);
+      if (triage.state === 'INCOMPLETE') propose(prSubject, 'PR_OBSERVATION_INCOMPLETE',
+        [2, 'COMPLETE_PR_OBSERVATION', 'Resolve bounded coverage, read access, or head freshness; do not claim all PR checks were inspected.'], diagnostic);
+    }
+    if (item.state === 'OBSERVED_CHECKS_ONLY') continue;
     // Public run routing is evidence only; never export private run IDs or log contents.
     const failedRuns = !isPrivate && repository && head && observedState === 'FAILED_EXACT_HEAD'
       && Array.isArray(item.failedRuns) ? item.failedRuns : [];
@@ -142,11 +235,13 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       [7, 'REOBSERVE_CURRENT_HEAD', 'Reobserve current default-branch heads before the next task; Actions observations do not prove production behavior.']);
   }
   candidates.sort((a, b) => a.priority - b.priority || a.taskFingerprint.localeCompare(b.taskFingerprint));
-  const nextTasks = candidates.slice(0, MAX_NEXT_TASKS);
+  const distinctCandidates = [...new Map(candidates.map(candidate => [candidate.taskFingerprint, candidate])).values()];
+  const nextTasks = distinctCandidates.slice(0, MAX_NEXT_TASKS);
   return {
     auditIdentity, nextAction: nextTasks[0], nextTasks,
-    omittedNextTaskCount: Math.max(0, candidates.length - nextTasks.length),
-    handoffScope: 'default-branch-github-actions-observation-only',
+    omittedNextTaskCount: Math.max(0, distinctCandidates.length - nextTasks.length),
+    duplicateProposalsOmitted: candidates.length - distinctCandidates.length,
+    handoffScope: 'default-branch-and-bounded-open-pr-github-actions-observation-only',
     requiresCurrentHeadRevalidation: true,
   };
 }
@@ -273,9 +368,43 @@ function selfTest() {
   const routedWithDiagnosis = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item,
     failedRuns: [failure], failureDiagnostics: [{ ...diagnostic, jobs: [{ ...diagnostic.jobs[0], raw: 'private log' }] }] }] }, identity);
   assert.equal(routedWithDiagnosis.nextAction.diagnostic.jobs[0].category, 'PR_METADATA_REVIEW');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.state, 'EVIDENCE_REQUIRED');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.steps[0].kind, 'PR_METADATA');
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.rootCauseVerified, false);
+  assert.equal(routedWithDiagnosis.nextAction.repairPlan.steps[0].executionAllowed, false);
+  assert.equal(buildRepairPlan(null).state, 'INSUFFICIENT_JOB_EVIDENCE');
+  const authorityJob = { ...diagnostic.jobs[0], category: 'AUTHORITY_REVIEW' };
+  const manyJobs = Array.from({ length: 11 }, (_, i) => ({ ...diagnostic.jobs[0], jobId: i + 1 }));
+  const held = buildRepairPlan({ state: 'FAILED_JOB_METADATA_OBSERVED', jobs: [...manyJobs, authorityJob] });
+  assert.equal(held.state, 'AUTHORITY_HOLD');
+  assert.equal(held.steps.length, MAX_REPAIR_PLAN_JOBS);
+  assert.equal(held.omittedJobs, 2);
+  assert.equal(held.mergeAuthorized, false);
+  assert.equal(held.deploymentAuthorized, false);
+  for (const category of Object.keys(REPAIR_RECIPES)) {
+    const plan = buildRepairPlan({ state: 'FAILED_JOB_METADATA_OBSERVED', jobs: [{ ...diagnostic.jobs[0], category }] });
+    assert.equal(plan.steps[0].category, category);
+    assert.equal(plan.mutationAuthorized, false);
+    assert.equal(plan.steps[0].executionAllowed, false);
+  }
   assert.equal(JSON.stringify(routedWithDiagnosis).includes('private log'), false);
   assert.equal(routedWithDiagnosis.nextAction.taskFingerprint,
     routed.nextTasks.find(task => task.subject.failedRun.runId === failure.runId).taskFingerprint);
+  const historyRun = { id: 1234, run_attempt: 2, head_sha: identity.PORTFOLIO_AUDIT_SOURCE_SHA };
+  const earlier = { schema: 'fcr/portfolio-actions-audit@v1', observedAt: '2026-01-01T00:00:00Z',
+    ...routedWithDiagnosis };
+  earlier.evidenceFingerprint = hash(earlier);
+  const current = () => ({ observedAt: '2026-01-02T00:00:00Z',
+    ...buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, failedRuns: [failure] }] },
+      { ...identity, GITHUB_RUN_ID: '5678' }) });
+  const next = current();
+  assert.equal(reconcileRepairHistory(next, earlier, historyRun).matchedTasks, 1);
+  assert.equal(next.nextTasks[0].recurrence.consecutiveReceiptCount, 2);
+  assert.equal(next.nextTasks[0].recurrence.executionAuthorized, false);
+  assert.equal(next.nextTasks.length, 1);
+  assert.equal(reconcileRepairHistory(current(), { ...earlier, observedAt: '2025-12-31T00:00:00Z' }, historyRun).state, 'HISTORY_UNAVAILABLE');
+  assert.equal(reconcileRepairHistory(current(), earlier, { ...historyRun, run_attempt: 3 }).state, 'HISTORY_UNAVAILABLE');
+  assert.equal(reconcileRepairHistory(current(), null, historyRun).state, 'HISTORY_UNAVAILABLE');
   const pending = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'PENDING_EXACT_HEAD' }] }, identity);
   assert.equal(pending.nextAction.action, 'REOBSERVE_PENDING_EXACT_HEAD');
   const incomplete = buildAuditHandoff({ state: 'INCOMPLETE_COVERAGE', items: [item] }, identity);
@@ -290,7 +419,21 @@ function selfTest() {
   assert.equal(fallback.nextAction.action, 'INSPECT_BLOCKED_AUDIT');
   const observed = buildAuditHandoff({ state: 'OBSERVED_CHECKS_ONLY', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY' }] }, identity);
   assert.equal(observed.nextAction.action, 'REOBSERVE_CURRENT_HEAD');
-  assert.equal(observed.handoffScope, 'default-branch-github-actions-observation-only');
+  assert.equal(observed.handoffScope, 'default-branch-and-bounded-open-pr-github-actions-observation-only');
+  const prTriage = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY',
+    visibility: 'private', repository: 'private-' + 'a'.repeat(12), pullTriage: {
+      state: 'ATTENTION', runnerlessIncidents: 1, runnerlessFailures: 13, unclassifiedFailures: 0, incompletePulls: 0,
+      raw: 'private-run-identity' } }] }, identity);
+  assert.equal(prTriage.nextTasks.length, 1);
+  assert.equal(prTriage.nextAction.action, 'REVIEW_RUNNER_EXECUTION_INCIDENT');
+  assert.equal(prTriage.nextAction.diagnostic.runnerlessFailures, 13);
+  assert.equal(prTriage.nextAction.subject.head, null);
+  assert.equal(prTriage.nextAction.mutationAuthorized, false);
+  assert.equal(JSON.stringify(prTriage).includes('private-run-identity'), false);
+  const incompletePr = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY',
+    pullTriage: { state: 'INCOMPLETE', runnerlessIncidents: 1, runnerlessFailures: 2, unclassifiedFailures: 1, incompletePulls: 1 } }] }, identity);
+  assert.deepEqual(incompletePr.nextTasks.map(task => task.action).sort(),
+    ['COMPLETE_PR_OBSERVATION', 'INSPECT_PR_FAILURE_EVIDENCE', 'REVIEW_RUNNER_EXECUTION_INCIDENT']);
   const repeat = buildAuditHandoff({ state: 'ATTENTION', items: [item], observedAt: 'tomorrow' }, { ...identity, GITHUB_RUN_ID: '5678' });
   assert.equal(repeat.nextAction.taskFingerprint, failed.nextAction.taskFingerprint);
   assert.notEqual(buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, head: 'c'.repeat(40) }] }, identity)
@@ -311,6 +454,9 @@ function selfTest() {
   const many = buildAuditHandoff({ state: 'ATTENTION', items: Array.from({ length: 25 }, (_, i) => ({ ...item, repository: 'jussray/repo-' + i })) }, identity);
   assert.equal(many.nextTasks.length, MAX_NEXT_TASKS);
   assert.equal(many.omittedNextTaskCount, 5);
+  const duplicateItems = buildAuditHandoff({ state: 'ATTENTION', items: [item, item] }, identity);
+  assert.equal(duplicateItems.nextTasks.length, 1);
+  assert.equal(duplicateItems.duplicateProposalsOmitted, 1);
   const ordered = buildAuditHandoff({ state: 'ATTENTION', items: [item, { ...item, repository: 'jussray/z' }] }, identity);
   const reversed = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, repository: 'jussray/z' }, item] }, identity);
   assert.deepEqual(ordered.nextTasks, reversed.nextTasks);
@@ -354,6 +500,8 @@ async function main() {
   let items = [];
   let accessible = 0;
   let discoveryComplete = false;
+  let priorReceipt = null;
+  let priorBinding = null;
   try {
     // A failed prerequisite uses the same writer without making any API call.
     if (process.argv.includes('--blocked-receipt')) throw new Error('AUDIT_DID_NOT_PRODUCE_RECEIPT');
@@ -376,6 +524,45 @@ async function main() {
         if (!response.ok) throw new Error('GITHUB_READ_STATUS_' + response.status);
         return await response.json();
       } finally { clearTimeout(timer); }
+    }
+    // Read one prior trusted-main audit artifact with the same read-only token.
+    // Failure to retrieve history must never hide current failures or imply novelty.
+    if (process.env.GITHUB_REPOSITORY === HISTORY_REPO && /^[1-9][0-9]*$/.test(process.env.GITHUB_RUN_ID || '')) {
+      let historyDir;
+      try {
+        const response = await api('/repos/' + HISTORY_REPO +
+          '/actions/workflows/portfolio-actions-audit.yml/runs?branch=main&status=completed&per_page=10');
+        const eligible = (Array.isArray(response.workflow_runs) ? response.workflow_runs : []).filter(run =>
+          Number.isSafeInteger(run.id) && run.id > 0 && String(run.id) !== process.env.GITHUB_RUN_ID &&
+          Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0 && run.head_branch === 'main' &&
+          run.status === 'completed' && ['push', 'schedule', 'workflow_dispatch'].includes(run.event) &&
+          run.repository?.full_name === HISTORY_REPO && run.head_repository?.full_name === HISTORY_REPO &&
+          /^[a-f0-9]{40}$/.test(run.head_sha || '') && Number.isFinite(Date.parse(run.created_at)));
+        eligible.sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
+        const prior = eligible[0];
+        if (prior) {
+          const name = 'portfolio-actions-audit-' + prior.id;
+          const metadata = await api('/repos/' + HISTORY_REPO + '/actions/runs/' + prior.id + '/artifacts?per_page=100');
+          const artifacts = (Array.isArray(metadata.artifacts) ? metadata.artifacts : []).filter(artifact =>
+            artifact.name === name && artifact.expired === false && Number.isSafeInteger(artifact.size_in_bytes) &&
+            artifact.size_in_bytes > 0 && artifact.size_in_bytes <= MAX_HISTORY_BYTES);
+          if (artifacts.length === 1) {
+            historyDir = await mkdtemp(join(tmpdir(), 'fcr-audit-history-'));
+            execFileSync('gh', ['run', 'download', String(prior.id), '--repo', HISTORY_REPO, '--name', name, '--dir', historyDir],
+              { env: { ...process.env, GH_TOKEN: token, GH_PROMPT_DISABLED: '1' }, timeout: 30000, stdio: 'ignore' });
+            const file = join(historyDir, 'receipt.json');
+            const size = (await stat(file)).size;
+            if (size > 0 && size <= MAX_HISTORY_BYTES) {
+              priorReceipt = JSON.parse(readFileSync(file, 'utf8'));
+              priorBinding = prior;
+            }
+          }
+        }
+      } catch {
+        // No raw provider errors or credentials are exported.
+      } finally {
+        if (historyDir) await rm(historyDir, { recursive: true, force: true }).catch(() => {});
+      }
     }
     const repos = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
@@ -446,6 +633,20 @@ async function main() {
       items.push(...await Promise.all(repos.slice(i, i + 6).map(observe)));
     }
     items.sort((a, b) => a.repository.localeCompare(b.repository));
+    // Same trusted read-only audit credential; no source mutation and no raw PR data retained.
+    // Prioritize repositories already reporting failures. A shared budget makes omissions explicit.
+    const pullBudget = createPullScanBudget();
+    const itemByAlias = new Map(items.map(item => [item.repository, item]));
+    const pullTargets = repos.filter(r => !r.archived).map(r => ({
+      raw: r, item: itemByAlias.get(r.private ? privateName(String(r.full_name || '')) : String(r.full_name || ''))
+    })).filter(entry => entry.item);
+    const priority = entry => entry.item.state === 'FAILED_EXACT_HEAD' ? (entry.raw.private ? 0 : 1) : 2;
+    pullTargets.sort((a, b) => priority(a) - priority(b) || String(a.raw.full_name).localeCompare(String(b.raw.full_name)));
+    for (let i = 0; i < pullTargets.length; i += 4) {
+      await Promise.all(pullTargets.slice(i, i + 4).map(async ({ raw, item }) => {
+        item.pullTriage = await scanPullRequests(String(raw.full_name || ''), api, pullBudget);
+      }));
+    }
     // Deterministic bounded public diagnosis; do not export private job identities.
     const queue = items.filter(item => item.visibility === 'public' && item.state === 'FAILED_EXACT_HEAD')
       .flatMap(item => (item.failedRuns || []).map(failure => ({ item, failure })));
@@ -465,7 +666,7 @@ async function main() {
       (item.failureDiagnostics ??= []).push(diagnostic);
     }
     const nonArchived = items.filter((r) => !r.archived);
-    const needsAttention = nonArchived.filter((r) => r.state !== 'OBSERVED_CHECKS_ONLY');
+    const needsAttention = nonArchived.filter((r) => r.state !== 'OBSERVED_CHECKS_ONLY' || r.pullTriage?.state !== 'OBSERVED_CHECKS_ONLY');
     state = accessible < expectedMinimum ? 'INCOMPLETE_COVERAGE'
       : needsAttention.length > 0 ? 'ATTENTION' : 'OBSERVED_CHECKS_ONLY';
     reason = accessible < expectedMinimum ? 'INSTALLATION_ACCESS_BELOW_ACCOUNT_INVENTORY' : '';
@@ -494,12 +695,16 @@ async function main() {
       'Accessible installation repositories can be fewer than the authenticated user portfolio',
       'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
+      'Open PR observation is bounded to 100 repositories, 20 PRs per repository, 60 PR heads and 60 failed-run job reads per audit; omissions remain incomplete',
+      'PR runnerless counts are observation patterns, not verified provider root causes; no PR identities or raw job logs are exported by the PR scanner',
       'Passing checks are NOT proof of successful deployed actions',
       'At most 20 public failed attempts receive job metadata triage; categories are hypotheses, not root-cause proof; logs are not exported',
-      'Private names use per-run pseudonyms; private branch names and head SHAs are omitted'
+      'Private names use per-run pseudonyms; private branch names and head SHAs are omitted',
+      'Recurrence is limited to the previous retained trusted-main receipt and does not suppress unresolved failures or reserve execution'
     ]
   };
   Object.assign(document, buildAuditHandoff(document, process.env));
+  document.repairHistory = reconcileRepairHistory(document, priorReceipt, priorBinding);
   document.evidenceFingerprint = hash(document);
   await mkdir('artifacts/portfolio-actions-audit', { recursive: true });
   await writeFile(RECEIPT, JSON.stringify(document, null, 2) + '\n', 'utf8');

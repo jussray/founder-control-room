@@ -1507,8 +1507,12 @@ function renderTemplateDetail(mount) {
 
 async function loadCosts() {
   await trackedRead('costs', async () => {
-    const data = await api('/dashboard/costs');
-    state.costs = data;
+    const [costs, observations] = await Promise.allSettled([
+      api('/dashboard/costs'), api('/dashboard/jusspay-observations')
+    ]);
+    state.jusspayObservations = observations.status === 'fulfilled' ? observations.value : { state: 'unavailable' };
+    if (costs.status === 'rejected') throw costs.reason;
+    state.costs = costs.value;
   });
 }
 
@@ -1517,10 +1521,22 @@ function renderAnalyticsTab(mount) {
     <div class="panel">
       <div class="toolbar"><button id="refresh-costs">Refresh</button></div>
       <div id="analytics-body"></div>
+      <section id="jusspay-observations" aria-label="JussPay commerce observations"></section>
     </div>
   `));
 
   mount.querySelector('#refresh-costs').addEventListener('click', () => guarded(loadCosts));
+
+  const obs = state.jusspayObservations;
+  const observationPanel = mount.querySelector('#jusspay-observations');
+  const money = (minor) => Number.isSafeInteger(minor) && minor >= 0 ? new Intl.NumberFormat('en-US', {style:'currency',currency:'USD'}).format(minor / 100) : 'Not observed';
+  const observed = obs?.state === 'observed';
+  const coverage = observed ? (obs.partial ? 'Partial: latest ' + obs.receiptCount + ' of ' + obs.availableReceiptCount + ' received receipts' : obs.receiptCount + ' received receipts') : (obs?.state === 'no_observations' ? 'No payment observations received' : 'Receipt ledger unavailable');
+  observationPanel.innerHTML = '<h2>JussPay commerce observations</h2><p class="muted">' + escapeHtml(coverage) + '</p>' +
+    '<p>Observed gross: <strong>' + escapeHtml(observed ? money(obs.observedGrossMinor) : 'Not observed') + '</strong></p>' +
+    (observed ? '<p>Paid orders: ' + escapeHtml(obs.paymentOrders) + ' · Refund holds: ' + escapeHtml(obs.refundHoldOrders) + ' · Dispute holds: ' + escapeHtml(obs.disputeHoldOrders) + '</p>' +
+      (Array.isArray(obs.byProduct) ? obs.byProduct.map(p => '<div class="card" style="cursor:default"><div class="title">' + escapeHtml(p.product) + ' — ' + escapeHtml(money(p.observedGrossMinor)) + '</div><div class="meta">' + escapeHtml(p.paymentOrders) + ' paid · ' + escapeHtml(p.refundHoldOrders) + ' refund holds · ' + escapeHtml(p.disputeHoldOrders) + ' dispute holds</div></div>').join('') : '') : '') +
+    '<p class="muted">Net revenue and settlement are not verified. Receipt coverage does not establish payment or fulfillment completeness.</p>';
 
   const body = mount.querySelector('#analytics-body');
   if (!state.costs) { body.innerHTML = '<p class="muted">Loading…</p>'; return; }

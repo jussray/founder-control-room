@@ -126,3 +126,69 @@ describe('browser bridge recovery policy', () => {
     expect(decision.executionAuthorized).toBe(false);
   });
 });
+
+describe('operation-specific browser capability routing', () => {
+  const input = {
+    directCapabilitySufficient: false,
+    browserOnlyInteractionRequired: true,
+    operaConnectorAvailable: true,
+    operaLiveSessionExposed: true,
+    operaRetryCount: 0,
+    providerPageEvidence: 'observed_ready' as const,
+    alternateAuthenticatedBridgeAvailable: true,
+    alternateAuthenticatedBridgeLive: true,
+    genericBrowserAvailable: true,
+    genericBrowserSufficient: true,
+    requestedOperation: 'mutate' as const,
+  };
+
+  it('does not route a mutation through read-only or unproven browser bridges', () => {
+    const decision = decideBrowserBridgeRecovery(input);
+    expect(decision.route).toBe('unavailable');
+    expect(decision.executionAuthorized).toBe(false);
+  });
+
+  it('selects a live alternate with explicit mutation support over read-only Opera', () => {
+    const decision = decideBrowserBridgeRecovery({
+      ...input, operaMutationSupported: false, alternateMutationSupported: true,
+    });
+    expect(decision.route).toBe('authenticated_browser_bridge');
+    expect(decision.executionAuthorized).toBe(false);
+  });
+
+  it('prefers Opera only when it is live and explicitly supports the mutation', () => {
+    const decision = decideBrowserBridgeRecovery({
+      ...input, operaMutationSupported: true, alternateMutationSupported: true,
+    });
+    expect(decision.route).toBe('opera');
+    expect(decision.executionAuthorized).toBe(false);
+  });
+
+  it('requires independently observed provider readiness before routing a mutation', () => {
+    const decision = decideBrowserBridgeRecovery({
+      ...input, providerPageEvidence: 'founder_reported_ready', operaMutationSupported: true,
+    });
+    expect(decision.route).toBe('unavailable');
+    expect(decision.executionAuthorized).toBe(false);
+  });
+
+  it('requires both mutation support and an authenticated generic browser session', () => {
+    expect(decideBrowserBridgeRecovery({
+      ...input, genericMutationSupported: true,
+    }).route).toBe('unavailable');
+    const decision = decideBrowserBridgeRecovery({
+      ...input, genericMutationSupported: true, genericBrowserAuthenticated: true,
+    });
+    expect(decision.route).toBe('generic_browser_automation');
+    expect(decision.executionAuthorized).toBe(false);
+  });
+
+  it('preserves direct capability priority and read-only routing', () => {
+    expect(decideBrowserBridgeRecovery({
+      ...input, directCapabilitySufficient: true,
+    }).route).toBe('direct_capability');
+    expect(decideBrowserBridgeRecovery({
+      ...input, requestedOperation: 'observe',
+    }).route).toBe('opera');
+  });
+});

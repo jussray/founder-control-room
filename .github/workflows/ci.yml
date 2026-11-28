@@ -5,13 +5,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
 
 concurrency:
   group: fcr-ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
@@ -221,6 +223,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
           PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
         run: |
           set -euo pipefail
@@ -229,6 +232,8 @@ jobs:
             test -n "$BASE_REF"
             git check-ref-format "refs/heads/${BASE_REF}"
             live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            live_base_sha="$MERGE_GROUP_BASE_SHA"
           else
             live_base_sha="$PUSH_BEFORE_SHA"
           fi
@@ -314,6 +319,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
           PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
         run: |
           set -euo pipefail
@@ -322,6 +328,8 @@ jobs:
             test -n "$BASE_REF"
             git check-ref-format "refs/heads/${BASE_REF}"
             live_base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            live_base_sha="$MERGE_GROUP_BASE_SHA"
           else
             live_base_sha="$PUSH_BEFORE_SHA"
           fi
@@ -370,6 +378,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
           PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
         run: |
           set -euo pipefail
@@ -379,6 +388,8 @@ jobs:
             test -n "$BASE_REF"
             git check-ref-format "refs/heads/${BASE_REF}"
             base_sha="$(git ls-remote --heads origin "refs/heads/${BASE_REF}" | awk 'NR == 1 {print $1}')"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            base_sha="$MERGE_GROUP_BASE_SHA"
           else
             base_sha="$PUSH_BEFORE_SHA"
           fi

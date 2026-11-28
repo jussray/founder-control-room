@@ -1,5 +1,9 @@
 # Founder Merge Authority
 
+## Merge-queue candidate authority and evidence
+
+The load-bearing `.github/workflows/ci.yml` must trigger on `merge_group` `checks_requested` and bind its exact candidate to `github.event.merge_group.head_sha`; a prior PR-head check cannot prove the queued combined candidate. Documentation Truth, Test Discovery, and Migration Lint must evaluate the merge-group event's `base_sha` with the existing full-SHA and ancestor safeguards, without treating a historical PR base or push-before SHA as a merge-group base. The native queue may proceed only when the provider-observed required check names and exact queued candidate have completed successfully, including Required Gate and Playwright; source changes and earlier green PR checks do not authorize integration. Preserve the independent founder-final approval boundary for in-app merges and the existing founder-selected native auto-merge distinction. A missing or red queue check means blocked, not silently approved.
+
 ## Simulator-staged edits are not merge approvals
 
 The existing `POST /approvals/:missionId/patch` may write a bounded simulator-staged `repository-source` edit only after authenticated mission checks, current provider branch identity, pinned policy SHA, live source hashes and idempotent reservation. The GitHub provider must reject moved heads before its non-forced mission-branch commit. A staged artifact or successful sandbox branch patch is not a deterministic independent review, founder-final approval, exact-head merge authorization, Playwright production witness, or deployment authority.
