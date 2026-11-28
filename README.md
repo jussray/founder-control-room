@@ -1,5 +1,9 @@
 # Founder Control Room
 
+## November 21, 2026 — Merge-queue CI event support (source only)
+
+The load-bearing `.github/workflows/ci.yml` now listens for `merge_group` `checks_requested` events and verifies the exact candidate from `github.event.merge_group.head_sha`, not a prior pull-request head. Documentation Truth, Test Discovery, and Migration Lint each use the event-bound `github.event.merge_group.base_sha` on merge-group runs and retain SHA validation and ancestry checks. Pull-request runs still resolve the live target branch; push runs still use their exact push-before SHA. The existing Required Gate and Playwright jobs remain mandatory. This is committed source compatibility, not proof that GitHub's provider-side merge queue is enabled or that a real merge-group candidate passed its required check names. Neither branch protection nor merge/deployment authority changes here.
+
 ## November 20, 2026 — public front door and founder callback remain separate (PR #837 candidate)
 
 The candidate Pages routing in `public/_worker.js` serves the public `/` landing page from Pages assets while `/welcome` is the founder sign-in door and `/control-room/` is the founder workspace entry. API-generated `/auth/callback`, `/assets/auth-callback.js` and `/assets/control-room.css` must still pass through the identity-checked API binding, not public static assets. After a successful same-origin `/auth/session` handoff, `src/http/routes/onboardingAssets/callbackJs.ts` routes the founder into `/control-room/` instead of returning them to the public landing page; an active OAuth consent request still takes precedence. The updated Playwright callback proof checks the route and mock session handoff but does not establish a live login, live cookie permissions, Cloudflare Access coverage or production deployment.

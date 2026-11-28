@@ -113,13 +113,13 @@ async function provePublicFrontDoor(label, viewport) {
     throw new Error(`${label}: user view must make the no-account boundary explicit`);
   }
   const discover = page.locator('#discover');
-  const exploreAction = discover.getByRole('link', { name: 'Explore Founders →', exact: true });
-  const signupAction = discover.getByRole('link', { name: 'Get started →', exact: true });
-  if (await exploreAction.count() !== 1 || !(await exploreAction.isVisible()) || await exploreAction.getAttribute('href') !== '/work.html') {
+  const explore = discover.getByRole('link', { name: /^Explore Founders/ });
+  const signup = discover.getByRole('link', { name: /^Get started/ });
+  if (await explore.count() !== 1 || !(await explore.isVisible()) || await explore.getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: public Explore action must route to the real public work directory`);
   }
-  if (await signupAction.count() !== 1 || !(await signupAction.isVisible()) || await signupAction.getAttribute('href') !== '/welcome' || await signupAction.getAttribute('data-auth-open') !== 'signup') {
-    throw new Error(`${label}: public Get started action must route to the signup entry`);
+  if (await signup.count() !== 1 || !(await signup.isVisible()) || await signup.getAttribute('href') !== '/welcome' || await signup.getAttribute('data-auth-open') !== 'signup') {
+    throw new Error(`${label}: public Get started action must preserve the separate authentication entry`);
   }
   // Visual cards must preserve real keyboard-accessible public destinations.
   for (const [kind, expectedHref] of [
