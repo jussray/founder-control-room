@@ -1177,6 +1177,13 @@
       "claims": [
         "The existing `src/lib/mediaFfmpegRender.ts` local renderer remains the independent receipt producer: its generated MP4 and FFprobe/sha256 receipt can now be tested against a separate read-only FSE byte-inspection bridge, but neither code path proves release permission or social distribution."
       ]
+    },
+    {
+      "path": "src/services/mondayPortfolioOrientation.ts",
+      "claims": [
+        "A passing Monday orientation receipt cannot become VERIFIED without a verified signature, valid exact commit SHA, registered repository/provider identity and a separately observed matching default-branch head; missing head evidence remains UNKNOWN and a mismatching observed head makes a passing signed receipt STALE.",
+        "The Monday orientation loader pages active projects and queries the newest receipt and highest-priority open finding for each project rather than relying on a portfolio-wide 500-row cap; head-observation availability is separate from runtime proof, and no provider mutation, deployment or email-delivery authority follows."
+      ]
     }
   ]
 }

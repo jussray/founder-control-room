@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { createPullScanBudget, scanPullRequests } from './portfolio-pr-triage.mjs';
 
 const RECEIPT = 'artifacts/portfolio-actions-audit/receipt.json';
 const MAX_PAGES = 20;
@@ -165,7 +166,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
       [0, 'RECONCILE_INSTALLATION_COVERAGE', 'Reconcile the installation repository inventory before claiming portfolio coverage.']);
   }
   for (const item of items) {
-    if (item.archived || item.state === 'ARCHIVED' || item.state === 'OBSERVED_CHECKS_ONLY') continue;
+    if (item.archived || item.state === 'ARCHIVED') continue;
     const isPrivate = item.visibility === 'private';
     const repository = isPrivate
       ? (/^private-[a-f0-9]{12}$/.test(item.repository || '') ? item.repository : null)
@@ -174,6 +175,27 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
     const observedState = Object.hasOwn(FOLLOW_UP, item.state) ? item.state : 'UNKNOWN';
     const subject = { scope: 'repository', repository, visibility: isPrivate ? 'private' : 'public', head,
       identityScope: isPrivate ? 'run_local_alias' : 'public_exact_head' };
+    // PR observation intentionally exports only bounded aggregate counts, even for public repositories.
+    // A follow-up must independently acquire the live PR identity before any repair.
+    const triage = item.pullTriage;
+    if (triage && ['ATTENTION', 'INCOMPLETE', 'OBSERVED_CHECKS_ONLY'].includes(triage.state)) {
+      const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 10000 ? value : 0;
+      const prSubject = { scope: 'repository_pull_requests', repository,
+        visibility: isPrivate ? 'private' : 'public', head: null,
+        identityScope: isPrivate ? 'run_local_alias' : 'public_repository' };
+      const counts = { runnerlessIncidents: count(triage.runnerlessIncidents),
+        runnerlessFailures: count(triage.runnerlessFailures),
+        unclassifiedFailures: count(triage.unclassifiedFailures),
+        incompletePulls: count(triage.incompletePulls) };
+      const diagnostic = { scope: 'bounded_pr_aggregate', ...counts, rootCauseVerified: false };
+      if (counts.runnerlessIncidents > 0) propose(prSubject, 'PR_RUNNER_EXECUTION_UNOBSERVED',
+        [1, 'REVIEW_RUNNER_EXECUTION_INCIDENT', 'Acquire authorized current PR and job identities; inspect runner or provider execution evidence before any retry or source change.'], diagnostic);
+      if (counts.unclassifiedFailures > 0) propose(prSubject, 'PR_FAILURE_UNCLASSIFIED',
+        [1, 'INSPECT_PR_FAILURE_EVIDENCE', 'Acquire current PR identity and reproduce the first observed causal defect before proposing a focused repair.'], diagnostic);
+      if (triage.state === 'INCOMPLETE') propose(prSubject, 'PR_OBSERVATION_INCOMPLETE',
+        [2, 'COMPLETE_PR_OBSERVATION', 'Resolve bounded coverage, read access, or head freshness; do not claim all PR checks were inspected.'], diagnostic);
+    }
+    if (item.state === 'OBSERVED_CHECKS_ONLY') continue;
     // Public run routing is evidence only; never export private run IDs or log contents.
     const failedRuns = !isPrivate && repository && head && observedState === 'FAILED_EXACT_HEAD'
       && Array.isArray(item.failedRuns) ? item.failedRuns : [];
@@ -219,7 +241,7 @@ export function buildAuditHandoff({ state, reason, items = [] }, env = {}) {
     auditIdentity, nextAction: nextTasks[0], nextTasks,
     omittedNextTaskCount: Math.max(0, distinctCandidates.length - nextTasks.length),
     duplicateProposalsOmitted: candidates.length - distinctCandidates.length,
-    handoffScope: 'default-branch-github-actions-observation-only',
+    handoffScope: 'default-branch-and-bounded-open-pr-github-actions-observation-only',
     requiresCurrentHeadRevalidation: true,
   };
 }
@@ -397,7 +419,21 @@ function selfTest() {
   assert.equal(fallback.nextAction.action, 'INSPECT_BLOCKED_AUDIT');
   const observed = buildAuditHandoff({ state: 'OBSERVED_CHECKS_ONLY', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY' }] }, identity);
   assert.equal(observed.nextAction.action, 'REOBSERVE_CURRENT_HEAD');
-  assert.equal(observed.handoffScope, 'default-branch-github-actions-observation-only');
+  assert.equal(observed.handoffScope, 'default-branch-and-bounded-open-pr-github-actions-observation-only');
+  const prTriage = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY',
+    visibility: 'private', repository: 'private-' + 'a'.repeat(12), pullTriage: {
+      state: 'ATTENTION', runnerlessIncidents: 1, runnerlessFailures: 13, unclassifiedFailures: 0, incompletePulls: 0,
+      raw: 'private-run-identity' } }] }, identity);
+  assert.equal(prTriage.nextTasks.length, 1);
+  assert.equal(prTriage.nextAction.action, 'REVIEW_RUNNER_EXECUTION_INCIDENT');
+  assert.equal(prTriage.nextAction.diagnostic.runnerlessFailures, 13);
+  assert.equal(prTriage.nextAction.subject.head, null);
+  assert.equal(prTriage.nextAction.mutationAuthorized, false);
+  assert.equal(JSON.stringify(prTriage).includes('private-run-identity'), false);
+  const incompletePr = buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, state: 'OBSERVED_CHECKS_ONLY',
+    pullTriage: { state: 'INCOMPLETE', runnerlessIncidents: 1, runnerlessFailures: 2, unclassifiedFailures: 1, incompletePulls: 1 } }] }, identity);
+  assert.deepEqual(incompletePr.nextTasks.map(task => task.action).sort(),
+    ['COMPLETE_PR_OBSERVATION', 'INSPECT_PR_FAILURE_EVIDENCE', 'REVIEW_RUNNER_EXECUTION_INCIDENT']);
   const repeat = buildAuditHandoff({ state: 'ATTENTION', items: [item], observedAt: 'tomorrow' }, { ...identity, GITHUB_RUN_ID: '5678' });
   assert.equal(repeat.nextAction.taskFingerprint, failed.nextAction.taskFingerprint);
   assert.notEqual(buildAuditHandoff({ state: 'ATTENTION', items: [{ ...item, head: 'c'.repeat(40) }] }, identity)
@@ -597,6 +633,20 @@ async function main() {
       items.push(...await Promise.all(repos.slice(i, i + 6).map(observe)));
     }
     items.sort((a, b) => a.repository.localeCompare(b.repository));
+    // Same trusted read-only audit credential; no source mutation and no raw PR data retained.
+    // Prioritize repositories already reporting failures. A shared budget makes omissions explicit.
+    const pullBudget = createPullScanBudget();
+    const itemByAlias = new Map(items.map(item => [item.repository, item]));
+    const pullTargets = repos.filter(r => !r.archived).map(r => ({
+      raw: r, item: itemByAlias.get(r.private ? privateName(String(r.full_name || '')) : String(r.full_name || ''))
+    })).filter(entry => entry.item);
+    const priority = entry => entry.item.state === 'FAILED_EXACT_HEAD' ? (entry.raw.private ? 0 : 1) : 2;
+    pullTargets.sort((a, b) => priority(a) - priority(b) || String(a.raw.full_name).localeCompare(String(b.raw.full_name)));
+    for (let i = 0; i < pullTargets.length; i += 4) {
+      await Promise.all(pullTargets.slice(i, i + 4).map(async ({ raw, item }) => {
+        item.pullTriage = await scanPullRequests(String(raw.full_name || ''), api, pullBudget);
+      }));
+    }
     // Deterministic bounded public diagnosis; do not export private job identities.
     const queue = items.filter(item => item.visibility === 'public' && item.state === 'FAILED_EXACT_HEAD')
       .flatMap(item => (item.failedRuns || []).map(failure => ({ item, failure })));
@@ -616,7 +666,7 @@ async function main() {
       (item.failureDiagnostics ??= []).push(diagnostic);
     }
     const nonArchived = items.filter((r) => !r.archived);
-    const needsAttention = nonArchived.filter((r) => r.state !== 'OBSERVED_CHECKS_ONLY');
+    const needsAttention = nonArchived.filter((r) => r.state !== 'OBSERVED_CHECKS_ONLY' || r.pullTriage?.state !== 'OBSERVED_CHECKS_ONLY');
     state = accessible < expectedMinimum ? 'INCOMPLETE_COVERAGE'
       : needsAttention.length > 0 ? 'ATTENTION' : 'OBSERVED_CHECKS_ONLY';
     reason = accessible < expectedMinimum ? 'INSTALLATION_ACCESS_BELOW_ACCOUNT_INVENTORY' : '';
@@ -645,6 +695,8 @@ async function main() {
       'Accessible installation repositories can be fewer than the authenticated user portfolio',
       'Only the first 100 exact-head runs are inspected; missing pagination or counts is incomplete',
       'Freshness is based on the default-branch head commit date, not other branch pushes',
+      'Open PR observation is bounded to 100 repositories, 20 PRs per repository, 60 PR heads and 60 failed-run job reads per audit; omissions remain incomplete',
+      'PR runnerless counts are observation patterns, not verified provider root causes; no PR identities or raw job logs are exported by the PR scanner',
       'Passing checks are NOT proof of successful deployed actions',
       'At most 20 public failed attempts receive job metadata triage; categories are hypotheses, not root-cause proof; logs are not exported',
       'Private names use per-run pseudonyms; private branch names and head SHAs are omitted',
