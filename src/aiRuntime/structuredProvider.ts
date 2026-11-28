@@ -91,10 +91,9 @@ function retryableStatus(status: number): boolean {
   return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
-function providerErrorMessage(provider: StructuredProviderName, payload: unknown, status: number): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
-    return payload.error.message;
-  }
+function providerErrorMessage(provider: StructuredProviderName, status: number): string {
+  // Provider error bodies are untrusted and may echo submitted prompts or secrets.
+  // Keep only the provider identity and HTTP status in the caller-visible error.
   return `${provider} request failed with status ${status}`;
 }
 
@@ -303,8 +302,10 @@ async function runProvider(
         true,
       );
     }
+    // Transport exceptions can include URLs, proxy details, or secret-bearing diagnostics.
+    // Do not forward provider/network exception text across this boundary.
     throw new StructuredProviderError(
-      error instanceof Error ? error.message : `${config.provider} request failed`,
+      `${config.provider} request failed`,
       config.provider,
       `${prefix(config.provider)}_REQUEST_FAILED`,
       null,
@@ -335,7 +336,7 @@ async function runProvider(
 
   if (!response.ok) {
     throw new StructuredProviderError(
-      providerErrorMessage(config.provider, payload, response.status),
+      providerErrorMessage(config.provider, response.status),
       config.provider,
       `${prefix(config.provider)}_HTTP_ERROR`,
       response.status,
