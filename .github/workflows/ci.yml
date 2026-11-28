@@ -90,6 +90,15 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
+          FCR_SCALABILITY_RECEIPT: '1'
+      - name: Upload synthetic scalability receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-scalability-smoke-receipt
+          path: fcr-scalability-smoke-receipt.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify guarded terminal and AI skill contracts (required)
         run: |
           npm run verify:terminal-contract
