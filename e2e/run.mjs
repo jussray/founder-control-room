@@ -359,6 +359,43 @@ async function runGuardedTerminalProof(page) {
     !workspaceReceipt.includes('providerAccepted'),
     'Git status is a repository observation, never claimed as external provider acceptance',
   );
+  // Exercise the *shipped* Control Room terminal tab with this same real
+  // browser session and server, not an uninvoked standalone test fixture.
+  // The five-screen shell hides legacy .tabs; use its public deep link,
+  // which maps ?tab=terminal to the visible Control > Execution view.
+  await page.goto(`${BASE_URL}/control-room/?tab=terminal`);
+  await page.waitForSelector('.founder-subnav button[data-control-view="execution"][aria-current="page"]');
+  await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
+  await page.click('#terminal-load-commands');
+  await page.waitForSelector('#terminal-commands .card[data-id="git.head"]');
+  await page.click('#terminal-commands .card[data-id="git.head"]');
+  assert(await page.locator('#terminal-run-form input[name="confirmWrite"]').count() === 0,
+    'shipped terminal UI does not render the legacy write confirmation');
+  assert((await page.locator('#terminal-run-panel').innerText()).includes('Read-only commands only'),
+    'shipped terminal UI explains that verify/write needs separate L99 authority');
+
+  await page.fill('#terminal-run-form input[name="missionId"]', terminalMissionId);
+  await page.fill('#terminal-run-form input[name="expectedCommitSha"]', REAL_REPO_HEAD_SHA);
+  const terminalPost = page.waitForRequest((req) =>
+    req.method() === 'POST' &&
+    new URL(req.url()).pathname === `/terminal/${TERMINAL_PROOF_REPO}/run`);
+  await page.click('#terminal-run-form button[type="submit"]');
+  const submitted = (await terminalPost).postDataJSON();
+  assert(
+    Object.keys(submitted).sort().join(',') === ['commandId', 'missionId', 'expectedCommitSha'].sort().join(','),
+    'legacy confirmWrite is absent from the actual browser request payload',
+  );
+  assert(submitted.commandId === 'git.head' && submitted.expectedCommitSha === REAL_REPO_HEAD_SHA,
+    'shipped browser request remains bound to the selected read-only command and exact head');
+  const actualTerminalResult = await waitForText(page, '#terminal-run-result', '"status": "passed"');
+  assert(actualTerminalResult.includes('"status": "passed"'),
+    'shipped terminal tab executes the real read-only route and shows its persisted result');
+
+  // Return to the same authenticated workspace to exercise patch-commit and retry.
+  await page.goto(`${BASE_URL}/control-room/github-workspace.html?project=${TERMINAL_PROOF_REPO}`);
+  await page.click('#load-project');
+  await waitForText(page, '#result', TERMINAL_PROOF_REPO);
+
   // Exercise the *same page's* editor, mission branch patch ledger, and
   // idempotent retry. GitHub is the isolated local REST fixture here.
   const proofPath = 'docs/fcr-workspace-browser-proof.txt';
@@ -387,6 +424,8 @@ async function runGuardedTerminalProof(page) {
     'same browser proposal reused its idempotency key and returned the first commit receipt');
   assert(repoAfterPatch?.branches.get('terminal-proof')?.sha === patchedHead,
     'replayed patch did not create another Git commit');
+
+
 }
 
 async function verifyLogoutAndProtectedBoundary(page, priorSessionCookie) {

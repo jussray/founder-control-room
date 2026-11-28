@@ -7,10 +7,11 @@
 // app; a separate gateway Worker + service binding would duplicate it and
 // reintroduce the relay pattern wrangler.toml's own comments say was excluded.
 //
-// Reuses whatever founder-gating auth middleware server.ts already applies
-// upstream of this mount point — this file implements no auth of its own.
+// The router owns its founder gate; upstream mount order is not authority.
 
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
+import { requireFounder } from "../middleware/requireFounder.js";
 import { Octokit } from "@octokit/rest";
 import {
   parseDecisionPackage,
@@ -46,6 +47,12 @@ function octokit(env: GhEnv): Octokit {
 }
 
 export const portableConsoleRouter = Router();
+// A bounded per-IP pre-authentication budget is independent of upstream mounts.
+portableConsoleRouter.use(
+  rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Portable console rate limited' } }),
+  requireFounder,
+);
 
 // ---------------------------------------------------------------------------
 // repo_* tools — trigger and poll the real repo-cycle.yml workflow. This is

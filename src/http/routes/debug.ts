@@ -9,11 +9,21 @@
  * - Never exposes key values, only boolean presence
  * - Does not perform any AI call
  * - Does not mutate any state
- * - Safe to call from Playwright in CI with real secrets wired
+ * - Provider metadata requires an authenticated allowlisted founder
  */
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
+import { requireFounder } from '../middleware/requireFounder.js';
 
 export const debugRouter = Router();
+
+// Apply a bounded unauthenticated budget even if the router is mounted alone.
+// Authentication follows this limiter; throttling never grants founder access.
+debugRouter.use(
+  rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Provider inspection rate limited' } }),
+  requireFounder,
+);
 
 debugRouter.get('/provider', (_req, res) => {
   const openaiKeyPresent = typeof process.env.OPENAI_API_KEY === 'string' &&

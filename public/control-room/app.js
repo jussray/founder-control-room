@@ -1615,7 +1615,7 @@ function showTerminalRunForm(mount, commandId) {
     <form id="terminal-run-form">
       <label>Mission ID</label><input name="missionId" required />
       <label>Expected commit SHA (40 hex)</label><input name="expectedCommitSha" class="mono" required />
-      <label><input type="checkbox" name="confirmWrite" style="width:auto; display:inline-block; margin-right:0.4rem;" />Confirm write-risk command</label>
+      <p class="muted">Read-only commands only. Verify/write actions require a separate, exact-scope L99 approval receipt.</p>
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Run</button></div>
     </form>
     <div id="terminal-run-result">${lastRun ? `<pre>${escapeHtml(JSON.stringify(lastRun, null, 2))}</pre>` : ''}</div>
@@ -1630,7 +1630,6 @@ function showTerminalRunForm(mount, commandId) {
           commandId,
           missionId: values.missionId,
           expectedCommitSha: values.expectedCommitSha,
-          confirmWrite: values.confirmWrite === 'on',
         }),
       });
       state.terminal.lastRun = { commandId, result };

@@ -1,57 +1,23 @@
 /**
- * Provider verification E2E suite.
- *
- * Verifies:
- * 1. Server is live and /health returns { ok: true }
- * 2. /_debug/provider returns a real provider (not mock, not fallback)
- * 3. The provider name is one of the governed real provider lanes
- * 4. Required env keys are present in the runtime (key existence only — never values)
- *
- * This is the Control Room end-to-end evidence artifact.
- * Do not expand to other repos until this suite passes with real artifacts.
+ * Anonymous provider-debug boundary proof on the running FCR server.
+ * Authenticated provider selection is verified separately behind the founder gate.
  */
 import { test, expect } from '@playwright/test';
 
-test.describe('Control Room – server baseline', () => {
+test.describe('Control Room – provider debug boundary', () => {
   test('GET /health returns ok', async ({ request }) => {
     const res = await request.get('/health');
     expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-  });
-});
-
-test.describe('Control Room – provider verification', () => {
-  test('GET /_debug/provider returns real provider name', async ({ request }) => {
-    const res = await request.get('/_debug/provider');
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-
-    // Must declare a known real provider.
-    expect(['openai', 'perplexity', 'deepseek']).toContain(body.provider);
-
-    // Must not be flagged as mock or fallback.
-    expect(body.mock).toBe(false);
-    expect(body.fallback).toBe(false);
+    expect((await res.json()).ok).toBe(true);
   });
 
-  test('/_debug/provider shows required key presence', async ({ request }) => {
+  test('GET /_debug/provider rejects anonymous callers without metadata', async ({ request }) => {
     const res = await request.get('/_debug/provider');
+    expect(res.status()).toBe(401);
     const body = await res.json();
-
-    // At least one governed AI provider key must be set in the CI/runtime environment.
-    const hasKey = body.openaiKeyPresent === true ||
-      body.perplexityKeyPresent === true ||
-      body.deepseekKeyPresent === true;
-    expect(hasKey).toBe(true);
-  });
-
-  test('/_debug/provider never exposes key values', async ({ request }) => {
-    const res = await request.get('/_debug/provider');
-    const raw = await res.text();
-
-    // Ensure the response body contains no secret-shaped provider key strings.
-    expect(raw).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
-    expect(raw).not.toMatch(/pplx-[A-Za-z0-9_-]{20,}/);
+    expect(body).toEqual({ error: 'Founder session required' });
+    for (const field of ['provider', 'mock', 'fallback', 'openaiKeyPresent', 'perplexityKeyPresent', 'deepseekKeyPresent', 'nodeEnv']) {
+      expect(body).not.toHaveProperty(field);
+    }
   });
 });
