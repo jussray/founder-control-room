@@ -31,6 +31,12 @@ export interface BrowserBridgeRecoveryInput {
   alternateAuthenticatedBridgeLive: boolean;
   genericBrowserAvailable: boolean;
   genericBrowserSufficient: boolean;
+  requestedOperation?: 'observe' | 'mutate';
+  /** Capability observations from trusted runtime discovery, not user authority. */
+  operaMutationSupported?: boolean;
+  alternateMutationSupported?: boolean;
+  genericMutationSupported?: boolean;
+  genericBrowserAuthenticated?: boolean;
 }
 
 export interface BrowserBridgeRecoveryDecision {
@@ -88,7 +94,24 @@ export function decideBrowserBridgeRecovery(
     };
   }
 
-  if (input.operaConnectorAvailable && input.operaLiveSessionExposed) {
+  // Availability is not sufficient for mutation. The selector remains non-authorizing.
+  // Undefined operation preserves legacy observation routing only.
+  const operation = input.requestedOperation ?? 'observe';
+  const mutation = operation === 'mutate';
+  if ((operation !== 'observe' && !mutation) ||
+      (mutation && input.providerPageEvidence !== 'observed_ready')) {
+    return {
+      ...base,
+      route: 'unavailable',
+      classification: 'UNAVAILABLE',
+      retryOperaBridge: false,
+      reason: 'Browser mutation requires current observed provider readiness and a known operation.',
+      nextGate: 'Observe the exact authenticated provider subject and rediscover operation support; action authority remains separate.',
+    };
+  }
+
+  if (input.operaConnectorAvailable && input.operaLiveSessionExposed &&
+      (!mutation || input.operaMutationSupported === true)) {
     return {
       ...base,
       route: 'opera',
@@ -103,7 +126,8 @@ export function decideBrowserBridgeRecovery(
     && !input.operaLiveSessionExposed
     && isBridgeSessionFailure(input.operaConnectorError);
 
-  if (input.alternateAuthenticatedBridgeAvailable && input.alternateAuthenticatedBridgeLive) {
+  if (input.alternateAuthenticatedBridgeAvailable && input.alternateAuthenticatedBridgeLive &&
+      (!mutation || input.alternateMutationSupported === true)) {
     return {
       ...base,
       route: 'authenticated_browser_bridge',
@@ -116,7 +140,8 @@ export function decideBrowserBridgeRecovery(
     };
   }
 
-  if (input.genericBrowserAvailable && input.genericBrowserSufficient) {
+  if (input.genericBrowserAvailable && input.genericBrowserSufficient &&
+      (!mutation || (input.genericMutationSupported === true && input.genericBrowserAuthenticated === true))) {
     return {
       ...base,
       route: 'generic_browser_automation',
@@ -147,7 +172,9 @@ export function decideBrowserBridgeRecovery(
     route: 'unavailable',
     classification: 'UNAVAILABLE',
     retryOperaBridge: false,
-    reason: 'No sufficient direct capability or usable browser execution surface is currently available.',
+    reason: mutation
+      ? 'No live browser surface with demonstrated support for the requested mutation is available.'
+      : 'No sufficient direct capability or usable browser execution surface is currently available.',
     nextGate: 'Wait for fresh runtime capability evidence or resolve a different bounded provider path.',
   };
 }
