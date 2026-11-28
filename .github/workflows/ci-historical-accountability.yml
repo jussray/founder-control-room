@@ -9,6 +9,12 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  # Cancel superseded runs for the same pull request only; push, schedule and
+  # dispatch runs get a unique group (run_id) and are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   historical-ci-evidence:
     name: Verify historical CI evidence
