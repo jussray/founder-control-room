@@ -7,6 +7,7 @@ on:
       - 'scripts/verify-ai-skills-readme-paths.mjs'
       - 'test/verify-ai-skills-readme-paths.test.mjs'
       - '.github/workflows/ai-skills-readme-paths.yml'
+      - 'package.json'
   push:
     paths:
       - '.ai-skills/**'
@@ -14,8 +15,17 @@ on:
       - 'scripts/verify-ai-skills-readme-paths.mjs'
       - 'test/verify-ai-skills-readme-paths.test.mjs'
       - '.github/workflows/ai-skills-readme-paths.yml'
+      - 'package.json'
 permissions:
   contents: read
+
+concurrency:
+  # Cancel superseded runs for the same pull request only; push, schedule and
+  # dispatch runs get a unique group (run_id) and are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 jobs:
   verify-readme-paths:
     name: AI Skills README paths
@@ -24,7 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+      - name: Verify exact checked-out commit
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s actual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'

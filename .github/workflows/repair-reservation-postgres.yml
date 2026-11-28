@@ -1,0 +1,57 @@
+name: Repair reservation PostgreSQL proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/sql/repository-repair-reservation.sql'
+      - 'scripts/test_repository_repair_reservation.py'
+      - 'supabase/migrations/*repository_repair_reservation.sql'
+      - 'supabase/migrations/20260711030127_init_control_room_schema.sql'
+      - 'supabase/migrations/20260711211416_reconciliation.sql'
+      - 'supabase/migrations/20260715102916_federated_repository_verification.sql'
+      - '.github/workflows/repair-reservation-postgres.yml'
+      - 'supabase/migrations/20260715225222_enforce_free_first_repair_missions.sql'
+      - 'supabase/migrations/20260715230035_scope_repair_mission_policy_trigger.sql'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reservation:
+    name: Isolated PostgreSQL reservation and contention
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Confirm candidate and initialize local database
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          sudo systemctl start postgresql
+          sudo -n -u postgres createdb -h /var/run/postgresql -p 5432 fcr_repair_reservation_ci
+      - name: Set up repository-pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+      - name: Generate local migration candidate without connecting to Supabase
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          existing=(supabase/migrations/*_repository_repair_reservation.sql)
+          if [ "${#existing[@]}" -eq 0 ]; then
+            supabase migration new repository_repair_reservation
+            existing=(supabase/migrations/*_repository_repair_reservation.sql)
+            test "${#existing[@]}" -eq 1
+            cp scripts/sql/repository-repair-reservation.sql "${existing[0]}"
+          fi
+          test "${#existing[@]}" -eq 1
+          cmp scripts/sql/repository-repair-reservation.sql "${existing[0]}"
+          printf 'GENERATED_MIGRATION_PATH=%s\n' "${existing[0]}"
+          sha256sum "${existing[0]}"
+      - name: Run application schema subset and concurrency tests
+        run: python3 scripts/test_repository_repair_reservation.py --disposable-ci-db

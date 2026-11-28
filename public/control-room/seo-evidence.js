@@ -35,36 +35,64 @@ function section(parent,title,items){
  parent.append(group);
 }
 export async function renderSeoIntelligence(root){
- const view=panel(root,'Search Console · indexing and sitemap health',
-   'Read-only Google Search Console evidence for the published FCR website. Sitemap processing and indexing are separate.');
- const state=node('p','Checking authorized Search Console connection…','muted');
- state.setAttribute('role','status');state.setAttribute('aria-live','polite');
- view.append(state);
- try{
-   const data=await request(BASE+'/seo');
-   state.textContent='Observed '+String(data.checkedAt??'unknown')+' · '+String(data.property??'unknown');
-   section(view,'Submitted sitemaps',(data.sitemaps??[]).map(item=>{
-     const article=node('article','','truth-evidence-card');
-     article.append(row('Path',item.path),row('Pending',item.isPending===true?'Yes':
-       item.isPending===false?'No':'Unknown'),row('Errors',item.errors),
-       row('Warnings',item.warnings),row('Last submitted',item.lastSubmitted),
-       row('Last downloaded',item.lastDownloaded));
-     return article;
-   }));
-   section(view,'Google URL inspection · fixed five-page sample',(data.pages??[]).map(item=>{
-     const article=node('article','','truth-evidence-card');
-     article.append(row('URL',item.url),row('Inspection',item.status),
-       row('Google verdict',item.verdict),row('Coverage',item.coverageState),
-       row('Indexing policy',item.indexingState),row('Last crawl',item.lastCrawlTime));
-     return article;
-   }));
-   section(view,'Evidence limits',(data.limitations??[]).map(str=>node('p',str,'muted')));
-   view.append(node('p','Sitewide indexed-page count: Not available from this API sample.','muted'));
-   view.append(node('p','SEO: confirm canonical URLs, crawlable pages, structured data, and sitemap accuracy. AEO/GEO: only verified public claims should be made AI-discoverable; private app content stays excluded.','muted'));
- }catch(e){
-   state.textContent='Search Console not connected or unavailable: '+String(e.message??'provider_unavailable');
-   view.append(node('p','The panel does not invent sitemap or indexing results. An authorized Google Search Console OAuth connection with webmasters.readonly access is required.','muted'));
+ const view=panel(root,'Search Console · sitemap processing and indexing',
+   'Read-only Google Search Console snapshots. A submitted sitemap does not prove that Google indexed its URLs.');
+ const label=node('label','Published property to inspect');
+ const siteSelect=node('select');
+ siteSelect.setAttribute('aria-label','Published Search Console site');
+ for(const option of [
+   {value:'jussco',title:'Juss & Co · jussco.company'},
+   {value:'fcr',title:'Founder Control Room · foundercontrolroom.org'}
+ ]){
+   const item=node('option',option.title);
+   item.value=option.value;
+   siteSelect.append(item);
  }
+ siteSelect.value='jussco';
+ label.append(siteSelect);
+ const state=node('p','Not checked. Provider connection status unknown.','muted');
+ state.setAttribute('role','status');
+ state.setAttribute('aria-live','polite');
+ const results=node('div');
+ view.append(label,state,results);
+ let readSequence=0;
+ const refresh=async()=>{
+   const id=++readSequence,selected=siteSelect.value;
+   results.replaceChildren();
+   state.textContent='Reading authorized '+(selected==='jussco'?'Juss & Co':'Founder Control Room')+' Search Console data…';
+   siteSelect.disabled=true;
+   try{
+     const data=await request(BASE+'/seo?site='+encodeURIComponent(selected));
+     if(id!==readSequence)return;
+     const expected=selected==='jussco'?'sc-domain:jussco.company':'https://www.foundercontrolroom.org/';
+     if(data.property!==expected)throw Error('PROPERTY_MISMATCH');
+     state.textContent='Observed '+String(data.checkedAt??'unknown')+' · '+String(data.property);
+     section(results,'Submitted sitemaps',(data.sitemaps??[]).map(item=>{
+       const article=node('article','','truth-evidence-card');
+       article.append(row('Path',item.path),row('Pending',item.isPending===true?'Yes':
+         item.isPending===false?'No':'Unknown'),row('Errors',item.errors),
+         row('Warnings',item.warnings),row('Last submitted',item.lastSubmitted),
+         row('Last downloaded',item.lastDownloaded));
+       return article;
+     }));
+     section(results,'Google URL inspection · sampled published pages',(data.pages??[]).map(item=>{
+       const article=node('article','','truth-evidence-card');
+       article.append(row('URL',item.url),row('Inspection',item.status),
+         row('Google verdict',item.verdict),row('Coverage',item.coverageState),
+         row('Indexing policy',item.indexingState),row('Last crawl',item.lastCrawlTime));
+       return article;
+     }));
+     section(results,'Evidence limits',(data.limitations??[]).map(str=>node('p',str,'muted')));
+     results.append(node('p','Property-wide indexed-page count: not available from these sampled Google inspections.','muted'));
+     results.append(node('p','SEO: verify canonical pages and sitemap accuracy. AEO/GEO: publish only evidence-backed claims; never expose private app content.','muted'));
+   }catch(e){
+     if(id!==readSequence)return;
+     state.textContent='Search Console not connected or unavailable: '+String(e.message??'provider_unavailable');
+     results.append(node('p','Google Search Console read-only OAuth access to the selected property is required. No sitemap or indexing status has been inferred.','muted'));
+   }finally{if(id===readSequence)siteSelect.disabled=false;}
+ };
+ siteSelect.addEventListener('change',()=>void refresh());
+ await refresh();
 }
 function evidenceFields(parent,index){
  const group=node('fieldset');

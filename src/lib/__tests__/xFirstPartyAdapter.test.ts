@@ -133,3 +133,41 @@ describe('X first-party OAuth user-context publication adapter', () => {
     }
   });
 });
+
+// Coverage carried forward from PR #1027's parallel adapter tests, expressed against
+// main's canonical adapter error codes.
+describe('X first-party adapter pre-network and readback-unavailable boundaries', () => {
+  it('rejects an absent user-context token before any network request', async () => {
+    const fetchImpl = vi.fn();
+    await expect(createXFirstPartyAdapter({
+      accessToken: '', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_PUBLICATION_INPUT_REJECTED', truthState: 'FAILED',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a configured user id that disagrees with the approved account before network access', async () => {
+    const fetchImpl = vi.fn();
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId: '222222222', fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_PUBLICATION_INPUT_REJECTED', truthState: 'FAILED',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('preserves UNKNOWN and the post id when provider readback is inaccessible', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: { id: userId } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { id: postId, text: copy } }, 201))
+      .mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
+    await expect(createXFirstPartyAdapter({
+      accessToken: 'test-only-token', userId, fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).publish(prepared)).rejects.toMatchObject({
+      code: 'X_READBACK_REJECTED', truthState: 'UNKNOWN', retrySafe: false,
+      evidence: { postId, httpStatus: 403 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+});

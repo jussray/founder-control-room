@@ -55,6 +55,7 @@ const requiredAssets = [
   'control-room/search-evidence.html',
   'control-room/search-evidence.js',
   'control-room/security.js',
+  'control-room/security-skill-catalog.mjs',
   'control-room/security.css',
   'control-room/quickscan.html',
   'control-room/quickscan.js',

@@ -130,6 +130,34 @@ Repository code and tests can prove validation, character ceilings, prompt rejec
 
 They do not prove a live social account is connected or that a real post was published. Live proof requires one controlled post per platform and a retained destination permalink receipt.
 
+## X direct-publishing adapter (code implemented, live connectivity unverified)
+
+X uses the existing **founder authorization + durable idempotency reservation**
+in `src/lib/firstPartyFounderContentExecutor.ts`, and the
+`src/lib/xFirstPartyAdapter.ts` adapter. Both are text-only.
+
+- The developer API key or app bearer token is **not** posting authority.
+  Configure `X_USER_ACCESS_TOKEN` from user-context OAuth 2.0 PKCE with
+  `tweet.write`, `tweet.read`, and `users.read`, plus the numeric
+  `X_USER_ID`. Use `offline.access` only if automatic token renewal is
+  separately implemented and authorized. This version does not manage refresh.
+- Secrets live only in the server-side secret store. Do not copy the same
+  credentials into Juss & Co frontend or GitHub source.
+- The adapter uses GET `/2/users/me` to verify the authenticated user
+  **before** POST `/2/tweets`; a mismatch blocks the write.
+- It only reports `PUBLISHED` after GET `/2/tweets/:id` matches the exact
+  post ID, text, author ID and provider timestamp.
+- Ambiguous writes, missing readback, and readback mismatches return
+  `UNKNOWN` and consume the reservation. Do not auto-retry.
+- X API calls may incur usage charges; budget confirmation, founder approval
+  and a controlled real post are still required before claiming a live outcome.
+- Cross-site distribution: Juss & Co may link to FCR-generated public
+  receipts or submit an authorized draft. It must not gain implicit
+  write permissions from sharing a developer API key.
+- Current verification: repository implementation, regression tests added;
+  **production token, app permission scopes, billing limits and live post
+  receipts have not been independently verified**.
+
 ## Next gate
 
 Implement official OAuth/account connection adapters, starting with the already connected LinkedIn identity, then run one founder-approved controlled LinkedIn post through the new engine. Expand to Facebook, Instagram, Threads, X, Bluesky, Mastodon, Pinterest, TikTok, and YouTube only after each platform's exact permissions and rollback path are verified.

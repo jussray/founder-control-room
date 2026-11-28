@@ -17,6 +17,46 @@ Before planning, editing, or claiming completion, establish and state:
 
 Inspect repository and runtime truth for unknowns. Ask only when a missing answer materially changes the safe solution or authority. Re-run 5W1H after red-team/OODA findings change the plan. Finish by mapping the result, evidence, remaining blocker, and next owner back to all six questions.
 
+## Internal self-answer and bounded continuation
+
+For each new founder reply, use the existing 5W1H, ULTRATHINK, Devil/Red Team, and OODA sequence as a **decision loop**, not six questions sent back to the founder. Answer your own decision-changing questions first from the current request, already supplied facts, and freshly observed evidence inside the specifically authorized repository/provider scope.
+
+Classify each unresolved question before acting:
+
+- `ANSWERED`: the user has answered it or current scoped evidence settles it; reuse that answer, with provenance and freshness.
+- `AUTHORIZED_LOOKUP`: a narrow read of a source explicitly in this task's scope can settle it; read it, then reclassify. Connector availability alone grants no access permission.
+- `SAFE_DEFAULT`: a low-impact, reversible assumption preserves the user's outcome; label it `INFERRED`, state the falsifier, and verify before broadening.
+- `FOUNDER_GATE`: only the founder can provide a missing recipient, private-source permission, binding preference, credential, or new consequential approval; ask at most one precise question when needed, and continue any independent authorized lane.
+- `BLOCKED`: necessary evidence, tool, access, or mandatory safety/authority gate is absent; report the exact blocker without inventing success.
+
+Repeat `OBSERVE → INTERNAL QUESTION → ANSWER OR AUTHORIZED READ → DEVIL/RED TEAM → SMALLEST AUTHORIZED ACTION → TEST → RE-OBSERVE → CONTINUE OR STOP`. Recheck moving GitHub heads and provider state before consequential actions. Keep the loop bounded to the current response/task: no unattended monitoring, background execution, or implied future delivery. Do not repeat resolved questions, search unrelated private accounts, infer consent from silence, self-approve, or quietly turn an assumption into merge/deploy/publication authority.
+
+Apply named plugins only in their proper domain: Product Design's full workflow requires supported Work Mode; Frontend Design Premium must pair with Frontend Design for actual UI work; Codex Material Themes requires an explicit theme request and founder-performed import; Codex Coordinator needs its enabled shared-checkout task board and real parallel work; Codex Dev Workflows uses the focused task workflow. Naming a plugin does not prove invocation or installation, and this contract does not modify third-party plugin code.
+
+Domain-specific routing added by the founder (2026-11-24), applied only when the current scoped task actually involves that domain:
+
+- **Data:** For KPIs, trends, SQL, dashboards, analysis, reporting, forecasts, market sizing, and data-quality questions, load the focused Data skill and preserve input lineage, metric definitions, freshness, assumptions, and reproducible calculations. Never invent source values or turn an analytical recommendation into execution authority.
+- **Shopify App Builder:** For Shopify app development use the relevant authentication, Admin GraphQL, embedded UI, merchant billing, webhook, or accessibility skill. Keep merchant-scoped tokens, customer data, Shopify app billing, storefront checkout, and JussPay/Stripe payments in their distinct trust boundaries. Do not install apps, activate billing, mutate orders, or publish without the applicable approval.
+- **Stripe:** For payments, subscriptions, invoices, or Connect, select the Stripe workflow and, before payment integration code, its implementation planner. Separate test mode from live mode; require exact account authority, confirmed prices, payment/webhook tests, explicit go-live approval, and independent reconciliation. No automatic live charges.
+- **AWS Core:** When an actual AWS workload is in scope, use the AWS service/skill suited to that workload. Scope account, region, roles, security, availability, infrastructure changes, estimated cost, and rollback before changing resources. A configured AWS connector never implies deployment or spend approval.
+- **Game Development Studio:** For 3D assets, textures, game audio, GLB/PBR/USDZ, or Blender workflows, start with capability discovery and the asset-production skill. Preserve original bytes, license, source hashes, validation evidence, and engine import criteria. Paid providers require explicit invocation and spend ceiling; generation alone is not game readiness.
+- **Faceless Video Maker:** For authorized faceless reels or cinematic production, select the relevant script, scene, AI-visual-prompt, or ambient-video workflow. Preserve brand canon, aspect ratio, timings, media licensing, accessible captions, visual consistency, and actual render evidence. A storyboard or provider job is not a finished video; no automatic publishing or paid rendering.
+
+Routing is **conditional**, not blanket invocation of all six plugins on every request. Named skills must actually be available in the current host before use. They provide methods, not new permissions, cross-provider identity, production proof, or a bypass of the founder's review gates.
+
+Canonical cross-agent details: [Founder AI Operator Workflow V1](../../../docs/FOUNDER_AI_OPERATOR_WORKFLOW_V1.md), section **Self-answer and continue contract**. The founder's latest explicit instruction and existing stronger security/release contracts remain authoritative.
+
+## Goal continuation and parallel lanes
+
+Treat `/Goal cont til fully done and launched`, `begin`, and `@5w1h` as instructions to resume the existing scoped objective, not to create another goal or silently widen authority. Preserve the full definition of done. Use FCR for coordination and the authorized ledger, Chief for decision gates, SOL for continuity, and the owning repositories and providers for execution and independent evidence, only where those integrations are actually configured.
+
+- Discover relevant available plugins and skills at task entry and on scope change; invoke the applicable authorized capabilities, not every plugin indiscriminately. Record actual invocations, unavailable capabilities and evidence limits.
+- Run independent authorized lanes in parallel when the host supports it. Use single-writer ownership per mutable resource, expected-head leases, dependency ordering and fresh readback. Never claim parallel agents, unattended execution or tool use that did not happen.
+- Hold only the blocked lane; keep advancing independent authorized lanes. Do not repeat unchanged failures blindly. Classify no-step runner failures, stale/missing checks, provider-identity mismatches and denied authority separately from code defects.
+- Preserve `AUTHORED`, `OBSERVED`, `USER-REPORTED`, `INFERRED`, `VERIFIED`, `UNKNOWN`, `BLOCKED`, and `STALE` as distinct evidence states. A receipt, CI green, merge, provider acceptance, deploy or HTTP 200 is not equivalent to verified launch.
+- For launch completion require actual product-specific acceptance criteria, exact deployed identity, authorized release, applicable security/privacy checks, and independent runtime/user-flow proof. Never weaken required checks, signatures, independent review, or release gates to obtain green.
+- Persist receipts through existing authorized FCR interfaces only after acknowledgment and readback. If unavailable mark `NOT_PERSISTED` and return a resumable receipt. Keep the goal open until its full completion criteria are proven; stop each execution at a real authority/evidence/capability boundary. Scheduled continuation requires an explicitly authorized supported mechanism; do not promise background work or create duplicate automation.
+
 ## Repository identity
 
 **Repository:** `jussray/founder-control-room`

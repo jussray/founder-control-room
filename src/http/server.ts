@@ -51,6 +51,7 @@ import { createWebchatHandoffRouter, createWebchatMessageHandler } from './route
 import { createSupabaseWebchatHandoffStore } from '../growth/webchatHandoffStore.js';
 import { supabase as webchatSupabase } from '../lib/supabaseClient.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
+import { handleJussPayReceiptIngest } from './routes/jusspayReceipts.js';
 import { handleFederatedRelayV3 } from './routes/federatedRelayV3.js';
 import {
   handleProofOfShipCommitLookup,
@@ -217,6 +218,12 @@ export function createServer(options: CreateServerOptions = {}) {
     handleBuildEventReceiptIngest,
   );
   app.post(
+    '/ingest/jusspay-receipts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '8kb' }),
+    handleJussPayReceiptIngest,
+  );
+  app.post(
     '/ingest/hair-commerce-receipts',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
@@ -278,6 +285,13 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   app.post(
     '/mcp/founder-signal-engine',
+    rateLimit({
+      windowMs: 60 * 1_000,
+      limit: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Rate limit exceeded.' },
+    }),
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
     requireFounderSignalEngineMcpToken,

@@ -10,11 +10,12 @@ const htmlPath = resolve(here, '../public/control-room/security.html');
 const cssPath = resolve(here, '../public/control-room/security.css');
 const jsPath = resolve(here, '../public/control-room/security.js');
 
-const html = (await readFile(htmlPath, 'utf8'))
-  .replace('<link rel="stylesheet" href="/control-room/security.css" />', '')
-  .replace('<script type="module" src="/control-room/security.js"></script>', '');
+const html = await readFile(htmlPath, 'utf8');
 const css = await readFile(cssPath, 'utf8');
 const js = await readFile(jsPath, 'utf8');
+const catalogJs = await readFile(resolve(here, '../public/control-room/security-skill-catalog.mjs'), 'utf8');
+const catalog = JSON.parse(await readFile(resolve(here, '../docs/security-skill-catalog.v1.json'), 'utf8'));
+const fixtureOrigin = 'http://security-posture.test';
 
 const stageNames = [
   'Inventory and Ownership',
@@ -203,19 +204,29 @@ const fixture = {
   },
 };
 
-async function installFetchFixture(page) {
-  await page.evaluate((securityFixture) => {
-    window.fetch = async (input) => {
-      const path = typeof input === 'string' ? input : input.url;
-      const status = path === '/security-posture' ? 200 : 404;
-      const body = status === 200 ? securityFixture : { error: 'fixture_not_found' };
-      return {
-        ok: status === 200,
-        status,
-        async json() { return body; },
-      };
-    };
-  }, fixture);
+async function installRouteFixture(page) {
+  const resources = new Map([
+    ['/control-room/security.html', { contentType: 'text/html', body: html }],
+    ['/control-room/security.css', { contentType: 'text/css', body: css }],
+    ['/control-room/security.js', { contentType: 'text/javascript', body: js }],
+    ['/control-room/security-skill-catalog.mjs', { contentType: 'text/javascript', body: catalogJs }],
+    ['/security-posture', { contentType: 'application/json', body: JSON.stringify(fixture) }],
+    ['/founder-os/security-skills/catalog', { contentType: 'application/json', body: JSON.stringify(catalog) }],
+  ]);
+  await page.route('**/*', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin !== fixtureOrigin || request.method() !== 'GET') {
+      await route.abort();
+      return;
+    }
+    if (url.pathname === '/favicon.ico') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    const resource = resources.get(url.pathname);
+    await route.fulfill(resource ? { status: 200, ...resource } : { status: 404, body: 'Not found' });
+  });
 }
 
 async function proveViewport(browser, { name, width, height, isMobile = false }) {
@@ -226,12 +237,15 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   page.on('pageerror', error => pageErrors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 
-  await page.setContent(html, { waitUntil: 'domcontentloaded' });
-  await page.addStyleTag({ content: css });
-  await installFetchFixture(page);
-  await page.addScriptTag({ content: js, type: 'module' });
+  // Navigate a real document origin so browser module resolution stays intact.
+  await installRouteFixture(page);
+  const response = await page.goto(fixtureOrigin + '/control-room/security.html');
+  assert.equal(response.status(), 200, `${name}: security document served`);
 
   await page.getByRole('heading', { name: 'Security posture without the green-check theater.' }).waitFor({ state: 'visible' });
+  const library = page.locator('#security-skill-library');
+  await library.getByRole('heading', { name: 'Security Skills Library' }).waitFor({ state: 'visible' });
+  assert.equal(await library.locator('article').count(), 3, `${name}: imported catalog module renders all records`);
   assert.equal(await page.locator('.stage-card').count(), 10, `${name}: V1-V10 ladder renders all stages`);
   assert.equal(await page.locator('.project-card:not(.crypto-entry-card):not(.crypto-review-card):not(.pqc-provider-card)').count(), 9, `${name}: registered portfolio renders all project cards`);
   assert.equal(await page.locator('.project-card[data-target-version="10"]').count(), 3, `${name}: V10 target count is visible`);

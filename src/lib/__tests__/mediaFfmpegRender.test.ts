@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { inspectFounderSignalLocalFfmpegRender } from '../founderSignalLocalRenderInspection.js';
 
 import {
   FFMPEG_RENDER_CONTRACT,
@@ -147,6 +148,18 @@ describe('ffmpeg render adapter', () => {
       expect(resultA.probe.durationSec).toBeGreaterThan(1.8);
       expect(resultA.probe.durationSec).toBeLessThan(2.3);
       expect(resultA.probe.frameCount).toBe(48);
+
+      // Genuine local-process integration: inspect the ffmpeg-produced MP4
+      // against its render receipt without calling a storage or social provider.
+      const localReadback = await inspectFounderSignalLocalFfmpegRender(resultA, {
+        trustedOutputRoot: dir,
+      });
+      expect(localReadback.status).toBe('LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF');
+      expect(localReadback.observedSha256).toBe(resultA.sha256);
+      expect(localReadback.bytesObserved).toBe(resultA.bytes);
+      expect(localReadback.decodedVideoValidated).toBe(false);
+      expect(localReadback.grantsPublicationAuthority).toBe(false);
+
 
       const collision = await renderFfmpegTimelineV1({ ...spec, segments: [{ ...spec.segments[0], imagePath: outA }, spec.segments[1]] }, outA);
       expect(collision.kind).toBe('REJECTED');

@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'src/lib/aiInboxRouting.ts'
+      - 'src/lib/githubInboxReconciliation.ts'
+      - 'src/lib/githubInboxWatch.ts'
+      - 'src/worker/cf-entry.ts'
       - 'src/lib/__tests__/aiInboxRouting.test.ts'
       - 'src/lib/growthInboxReply.ts'
       - 'src/lib/__tests__/growthInboxReply.test.ts'
@@ -14,6 +17,12 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  # Cancel superseded runs for the same pull request only; push, schedule and
+  # dispatch runs get a unique group (run_id) and are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   focused:
@@ -34,4 +43,4 @@ jobs:
       - name: Run AI Inbox focused tests
         run: npx vitest run src/lib/__tests__/aiInboxRouting.test.ts src/lib/__tests__/growthInboxReply.test.ts src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts
       - name: Lint AI Inbox changes
-        run: npx eslint src/lib/aiInboxRouting.ts src/lib/__tests__/aiInboxRouting.test.ts src/lib/growthInboxReply.ts src/lib/__tests__/growthInboxReply.test.ts src/http/routes/pluginCenterMessaging.ts src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts --max-warnings 0
+        run: npx eslint src/lib/aiInboxRouting.ts src/lib/githubInboxReconciliation.ts src/lib/githubInboxWatch.ts src/worker/cf-entry.ts src/lib/__tests__/aiInboxRouting.test.ts src/lib/growthInboxReply.ts src/lib/__tests__/growthInboxReply.test.ts src/http/routes/pluginCenterMessaging.ts src/http/routes/__tests__/pluginCenterMessaging.integration.test.ts --max-warnings 0

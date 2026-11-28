@@ -112,8 +112,14 @@ async function provePublicFrontDoor(label, viewport) {
   if (!/No account is required to explore the public FCR world/i.test(userCopy)) {
     throw new Error(`${label}: user view must make the no-account boundary explicit`);
   }
-  if (await page.locator('#discover a.btn').getAttribute('href') !== '/work.html') {
+  const discover = page.locator('#discover');
+  const explore = discover.getByRole('link', { name: /^Explore Founders/ });
+  const signup = discover.getByRole('link', { name: /^Get started/ });
+  if (await explore.count() !== 1 || !(await explore.isVisible()) || await explore.getAttribute('href') !== '/work.html') {
     throw new Error(`${label}: public Explore action must route to the real public work directory`);
+  }
+  if (await signup.count() !== 1 || !(await signup.isVisible()) || await signup.getAttribute('href') !== '/welcome' || await signup.getAttribute('data-auth-open') !== 'signup') {
+    throw new Error(`${label}: public Get started action must preserve the separate authentication entry`);
   }
   // Visual cards must preserve real keyboard-accessible public destinations.
   for (const [kind, expectedHref] of [

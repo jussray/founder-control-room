@@ -1,0 +1,70 @@
+name: Obsidian Local Knowledge Branch Proof
+
+on:
+  push:
+    branches:
+      - feat/obsidian-approved-knowledge-local-20261125
+    paths:
+      - src/mcp/defaultRegistry.ts
+      - src/mcp/policy.ts
+      - src/mcp/__tests__/obsidianKnowledgeBoundary.test.ts
+      - .github/workflows/obsidian-local-knowledge-proof.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  focused:
+    name: Exact-head policy and MCP verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Validate exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies without package mutations
+        run: npm ci --no-audit --no-fund
+      - name: Test Obsidian and existing MCP policy
+        run: npx vitest run src/mcp/__tests__/obsidianKnowledgeBoundary.test.ts src/mcp/__tests__/policy.test.ts src/mcp/__tests__/hub.test.ts
+      - name: Verify MCP contracts
+        run: npm run verify:mcp
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+
+  full-suite:
+    name: Exact-head full repository unit suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Validate exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies without package mutations
+        run: npm ci --no-audit --no-fund
+      - name: Run repository test command
+        run: npm test
+        env:
+          NODE_ENV: test

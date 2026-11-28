@@ -1,0 +1,149 @@
+{
+  "schema_version": "juss/founder-ip-protection-registry@1",
+  "authority": "FCR governance registry; does not grant access or execution authority",
+  "inventory_status": "incomplete",
+  "last_reviewed": "2026-11-26",
+  "systems": [
+    {
+      "id": "fcr",
+      "repository": "jussray/founder-control-room",
+      "product_role": "portfolio governance, approvals, evidence and release gates",
+      "license_file": "LICENSE",
+      "license_posture": "proprietary",
+      "copyright_notice": "Juss Ray",
+      "ownership_status": "repository_notice_observed_chain_of_title_not_independently_verified",
+      "enforcement_owner": "FCR",
+      "data_boundary": "FCR-native operational state only; no peer runtime, customer data, or credentials absorbed"
+    },
+    {
+      "id": "chief",
+      "repository": "jussray/chief-ai-machine",
+      "product_role": "reasoning, research, capability selection and recommendations",
+      "license_file": "LICENSE",
+      "license_posture": "proprietary",
+      "copyright_notice": "Juss Ray",
+      "ownership_status": "repository_notice_observed_chain_of_title_not_independently_verified",
+      "enforcement_owner": "Chief",
+      "data_boundary": "Standalone Chief data and credentials; no execution or approval authority"
+    },
+    {
+      "id": "promptos",
+      "repository": "jussray/promptos",
+      "product_role": "standalone prompt, skill and instruction governance",
+      "license_file": "LICENSE",
+      "license_posture": "proprietary",
+      "copyright_notice": "Juss Ray",
+      "ownership_status": "repository_notice_observed_chain_of_title_not_independently_verified",
+      "enforcement_owner": "PromptOS",
+      "data_boundary": "Standalone catalog, prompts, workflows and product data"
+    },
+    {
+      "id": "solcontinuity",
+      "repository": "jussray/solcontinuity",
+      "product_role": "independent continuity evaluation and verification",
+      "license_file": "LICENSE",
+      "license_posture": "apache-2.0",
+      "copyright_notice": "SolContinuity contributors",
+      "ownership_status": "contributor_chain_of_title_unknown",
+      "enforcement_owner": "SolContinuity",
+      "data_boundary": "Standalone continuity evidence; no founder approval or release authority"
+    }
+  ],
+  "integration_inventory": {
+    "status": "incomplete",
+    "known_integration_records": [],
+    "unverified_scope": [
+      "AI model providers",
+      "connected plugins and MCP servers",
+      "external API adapters",
+      "telemetry and observability sinks",
+      "CI artifact retention",
+      "cloud storage and backup providers"
+    ],
+    "rule": "An empty list means not inventoried, not that no integrations exist."
+  },
+  "permission_defaults": {
+    "default_decision": "deny",
+    "purpose_bound_access": true,
+    "cross_product_access": "explicit_scoped_contract_required",
+    "training_on_confidential_or_restricted_data": "deny_unless_explicitly_approved_and_contractually_supported",
+    "publication_or_sublicensing": "separate_written_founder_approval_required",
+    "permission_is_not_ownership": true,
+    "unknown_provider_posture": "deny_confidential_and_restricted_data_flows"
+  },
+  "evidence_requirements": [
+    "exact_repository_and_commit_sha",
+    "asset_and_contributor_provenance",
+    "license_and_third_party_notice_review",
+    "provider_product_plan_and_terms_review_date",
+    "data_classes_and_fields_transmitted",
+    "training_and_retention_posture_with_source_evidence",
+    "server_side_identity_and_isolation_tests",
+    "export_import_restore_and_provider_exit_test",
+    "access_approval_revocation_and_audit_evidence"
+  ],
+  "controls": [
+    {
+      "id": "IP-001",
+      "name": "ownership-and-provenance",
+      "status": "partial",
+      "owner": "each_standalone_repository",
+      "evidence": [
+        "repository LICENSE and source history"
+      ],
+      "gap": "contributor and third-party chain-of-title review is incomplete"
+    },
+    {
+      "id": "IP-002",
+      "name": "explicit-licensing-and-permissions",
+      "status": "partial",
+      "owner": "FCR plus each standalone repository",
+      "evidence": [
+        "FCR exact-candidate approval contracts",
+        "Chief commercial-use review gate",
+        "PromptOS product-boundary contract"
+      ],
+      "gap": "normalized asset-recipient-purpose-operation-expiry-revocation grants are not yet proven across all systems"
+    },
+    {
+      "id": "IP-003",
+      "name": "AI-training-and-provider-data-use",
+      "status": "unknown",
+      "owner": "each provider integration owner",
+      "evidence": [],
+      "gap": "provider, plan, terms, training, retention, and transmitted data inventory is incomplete"
+    },
+    {
+      "id": "IP-004",
+      "name": "confidentiality-and-data-isolation",
+      "status": "partial",
+      "owner": "each standalone repository",
+      "evidence": [
+        "FCR project isolation and secret guardrails",
+        "Chief Sauce Guard and privacy contracts",
+        "PromptOS standalone product boundary",
+        "SolContinuity independent evidence boundary"
+      ],
+      "gap": "complete runtime tracing and cross-product negative tests are not yet evidenced"
+    },
+    {
+      "id": "IP-005",
+      "name": "portability-and-continuity",
+      "status": "unknown",
+      "owner": "each standalone repository",
+      "evidence": [],
+      "gap": "export, restore, provider-exit, and deletion behavior are not yet tested portfolio-wide"
+    },
+    {
+      "id": "IP-006",
+      "name": "auditability-and-enforcement",
+      "status": "partial",
+      "owner": "FCR governance; local enforcement by each product",
+      "evidence": [
+        "FCR guardrail registry and evidence contracts",
+        "repository-local CI and test contracts"
+      ],
+      "gap": "one complete integration register and provider/runtime readback are not yet available"
+    }
+  ]
+}

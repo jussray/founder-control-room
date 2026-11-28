@@ -1,5 +1,9 @@
 # Truth Decay Audit: When a True Claim Becomes Unsafe to Reuse
 
+## Monday orientation: signed receipt is not current-head proof
+
+The successor Monday-orientation repair requires a fresh passing receipt with a verified signature, a valid exact commit SHA, matching registered repository/provider, and an independently observed matching default-branch head before classifying a project as VERIFIED. Preview-only, wrong-repository, wrong-provider, unsigned or unavailable current-head evidence cannot establish VERIFIED; a passing signed receipt for a different branch or moved head is STALE when current-head evidence is available. Receipt age still uses scanned_at. The loader pages active projects and selects the newest receipt and highest-priority open finding per project, avoiding portfolio-wide 500-row truncation. HEAD_OBSERVED, PARTIAL and RECEIPTS_ONLY describe repository-head observations, not runtime availability or deployment proof. Provider read failures leave the affected passing project UNKNOWN; existing high/critical findings and at-most-once email safeguards remain intact. These are candidate source contracts, not a claim that a live provider or scheduled email was observed.
+
 ## November 17, 2026: silent exclusion is its own truth-decay failure mode
 
 An excluded fact is not the same as a false one, but a founder-facing read model that drops a load-bearing signal without saying so produces the same practical harm as stale evidence: the founder believes the brief is complete when it is not. `buildMissionControlBrief` (`src/futureyou/missionControl.ts`) already names every other reason evidence is withheld from `priorities` — stale, invalid, or future-dated observation times all surface in `blindSpots` — but a `critical`/`error` activity event aging past 14 days was dropped with no trace. A 20-day-old unresolved critical failure and a never-happened one were indistinguishable in the brief. The fix adds the missing `blindSpots` line; it does not change what counts as stale, does not resurface the event into `priorities`, and does not imply the underlying issue was ever resolved — only that its continued absence from the dashboard is now disclosed rather than silent.
@@ -87,6 +91,34 @@ An independent [StoryEngine main read](https://api.github.com/repos/jussray/Stor
 
 Refreshing the FCR pin selects that independently observed dependency subject only. The successor FCR head remains UNKNOWN for federation until live-ref equality, immutable checkout, runtime identity, directive/receipt binding, replay safety, and the complete browser witness execute successfully for the new pair. Predecessor green remains historical, and no production, merge, deploy, or provider authority transfers.
 
+
+## October 26, 2026: local FFmpeg output byte readback is not live media distribution
+
+`inspectFounderSignalLocalFfmpegRender` binds a locally accessible FFmpeg output path (confined to a trusted server-owned directory) and renderer receipt digest/byte count to actual MP4 file bytes, with path and race safeguards. The result is only `LOCAL_FFMPEG_RECEIPT_BYTE_MATCH__NOT_RELEASE_PROOF`; synthetic MP4 tests prove byte matching, and the conditional FFmpeg integration test exercises a real rendered file where the binaries are available. Neither result authenticates renderer receipt provenance, image rights, playable decoder output, visual truth, publication approval, or a social provider. Cloudflare R2 listed zero buckets and Supabase project discovery failed in the audit, so no live media storage provider can be claimed or invented. No storage or Buffer publication mutation took place.
+
+## October 26, 2026: authenticated reader interface does not mean real media verified
+
+The additive FSE media reader boundary validates caller-independent server principal/project/registry metadata only when supplied by a **future trusted and audited implementation**. In the current PR it is dependency-injected with synthetic tests and is **not connected to a production storage provider**. Byte hashes and registry claims are distinct from full decode, copyright permission, identity consent, reputational safety, verified brand provenance, publication or business impact. No CHECK status can be treated as send, draft, upload or publish authority. Provider account readbacks and exact Current You approval remain unknown.
+
+## October 26, 2026: new media byte check is isolated, not a trusted asset pipeline
+
+An additive FSE helper computes SHA-256 directly over bounded streamed asset bytes and checks basic PNG/JPEG/WebP/MP4 byte markers, but does not authenticate the stream's origin, successfully decode the media, prove human identity or copyright permission, or inspect safety/accuracy. It cannot convert earlier user-declared license hashes or visual-verdict JSON into trusted provider evidence. It is not connected to production Media Router/Buffer and has no permission to create drafts or publish. A verified hash or familiar file signature alone must not be relabeled `MEDIA_VERIFIED` or `READY_TO_PUBLISH`.
+
+## October 26, 2026: live public GitHub commit existence, not claim verification
+
+The new authenticated MCP `verify_founder_signal_public_source` makes fixed-host read-only public GitHub API requests and confirms one public repository identity and the exact SHA/permalink of one Git commit. Response state `VERIFIED_PUBLIC_GITHUB_COMMIT` does not prove whether the commit is currently `main`, merged, deployed, safe, used or accompanied by rendered media or business outcomes. HTTP errors, unavailable API, rate limits, private repos and stale/mismatched commits fail closed as `HOLD_UNVERIFIED`. Observed source existence is time-scoped and is **not an approval or permission** for Buffer/HubSpot/social provider writes. A later producer must reverify the relevant evidence and authority at execution time.
+
+## October 26, 2026: local media handoff is not authenticated asset proof
+
+The additive `review_founder_signal_draft_handoff` MCP preview uses the existing first-party social publisher's **draft-mode structural validation**. Source URL, render SHA, image/video rights receipt, alternate text, media verdict and account labels remain self-attested until independent authenticated provider/asset checks occur. No draft is actually stored, no media is uploaded, no Buffer action executes, and a user-created verdict JSON cannot grant release approval. Even `LOCAL_DRAFT_SHAPE_VALID__PROVIDER_UNVERIFIED` means only a locally consistent copy/media proposal. If any source, account, rights, finished caption or asset changes after review, prior fingerprints and approval checks require renewal.
+
+## October 26, 2026: Founder Signal Engine campaign planner is not a published social campaign
+
+The new `plan_founder_signal_campaign` MCP tool produces founder-review **editorial proposals** from caller-supplied public GitHub identifiers and brief content. Its output is `USER_SUPPLIED_UNVERIFIED`; neither a source link nor a 40-character SHA independently confirms repository visibility, product behavior, audience response, or publication. Documented founder voice and editorial rules are not live social-history readback. A content continuity fingerprint is not a tracking cookie or permission to contact anyone.
+
+Prepared media is `NOT_RENDERED`: an image/video direction, storyboard, alt-text note, tag list or generated preview cannot stand in for a rights-cleared, source-matched rendered asset that has passed the existing `visual-wonder-contract.cjs` proof and quality checks. Brand/reputation heuristics reduce risk but cannot certify that a public post is harmless or commercially effective. The source planner grants no Buffer, scheduling, sending, publication, HubSpot, credential or AI invocation authority.
+
+Any later planned → rendered → approved → Buffer draft → provider-observed → HubSpot/FCR-recorded → measured promotion must retain the existing distinct provider, runtime, exact payload/approval, privacy and temporal evidence gates. Outcomes and partner/customer impact remain UNKNOWN until independently observed and reconciled. Source edits alone do not activate a workflow.
 
 ## October 24, 2026: founder-dock privacy boundary and StoryEngine peer movement
 
@@ -745,3 +777,11 @@ A skipped `pull_request_target` copy of the exact-head job shared the name of th
 - Previously current: Se'kret Bip `dbd9e98ae691fec06e50abe6ef56353202b81726` and Chief `99d3b7c3f14bae43d3de61f0fcbe2cf46af2ed1e`. Both became stale when each repository's main moved: Bip `app/index.tsx` changed (`e33bf509` → `e3430ef2`); Chief `capability-registry.js` (`abb2daf0` → `5b1c6e39`) and the pair contract (`7aaff727` → `dd008420`) changed. The live freshness checks failed closed, as designed.
 - Now (candidate): pins move to Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` and Chief `20d34e257997c866836af06a30e6af7b6f8f0b8c` after a semantic review of each changed blob. All twelve pinned blobs were re-read from the source repositories at those heads.
 - Not proven: Bip or Chief deployment, runtime behavior, served MCP reachability, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+## 2026-11-22 — Se'kret Bip adapter re-pin after consent-gate and site-map drift
+
+- Previously current: Se'kret Bip `0765c804fc6d0ab4ad267d95f7cc5c7631843500` with `app/index.tsx` `e3430ef2` and `screens/WebWelcomeScreen.tsx` `9d3a1128`. It became stale when Bip main moved to `568d8c4f3bb2c01faf8f369857774d1bdde88205` and both blobs changed (`13201b51`, `41fcf511`).
+- Now (candidate): the Bip pin moves to `568d8c4f` after semantic review. The `app/index.tsx` change adds a re-consent redirect (tightens the gate); the welcome-screen change adds a public site-map link. The other five Bip blobs were re-read at `568d8c4f` and are unchanged. Chief stays at `20d34e25` (blobs still match).
+- Not proven: Bip deployment, runtime behavior, or any merge, deploy, publication, or provider authority. Earlier pins remain historical provenance.
+
+Source-pin refresh: Se’kret Bip main `392c23bfed4026d01e2bd018c93ace27f8a8819b` and Chief main `f3e66f60e12804e616b4b0cd718194792b741725` were inspected on 2026-11-25. All seven Bip and five Chief required contract blob SHAs match their existing audited values exactly. This preserves the preview-only contract; any later contract blob drift must fail closed. No runtime, merge, deployment, publication or provider-write authority is established by this source comparison.

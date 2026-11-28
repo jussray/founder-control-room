@@ -121,10 +121,10 @@ export function buildFounderSignalModel(activity, source = DEFAULT_SOURCE) {
       id: 'github',
       label: 'GitHub',
       ...stage(
-        'complete',
-        `PR #${source.pr} merged at ${source.commit}`,
+        'pending',
+        `Source reference: PR #${source.pr} at ${source.commit}. A merge against live GitHub main is not independently verified here.`,
         null,
-        'Preserve the exact source PR and commit.',
+        'Check the exact PR merge state and source SHA against current GitHub main before marking source proof complete.',
       ),
     },
     {

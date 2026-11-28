@@ -1,4 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
+import { FOUNDER_SIGNAL_CAMPAIGN_TOOL, planFounderSignalCampaign } from '../../lib/founderSignalCampaignPlanner.js';
+import { FSE_HANDOFF_TOOL, reviewFounderSignalDraftHandoff } from '../../lib/founderSignalDraftHandoff.js';
+import { FSE_PUBLIC_SOURCE_TOOL, verifyFounderSignalPublicSource } from '../../lib/founderSignalPublicSourceCheck.js';
+import { getHandshakeBrandSpec, prepareHandshakeBrandSocialDraft, type HandshakeProject, type HandshakeDraftRequest } from '../../lib/handshakeBrandSocial.js';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
@@ -576,6 +580,155 @@ function founderSignalContentPolicyContract(): DbRecord {
         publicProofLinkRequired: false,
       },
     },
+  };
+}
+
+function campaignToolDefinition(): DbRecord {
+  const boundedText = (maxLength: number) => ({ type: 'string', minLength: 1, maxLength });
+  return {
+    name: FOUNDER_SIGNAL_CAMPAIGN_TOOL,
+    title: 'Plan Founder Signal Campaign (Read-Only)',
+    description: 'Advisory end-to-end platform-native copy/hashtags/media brief and reputation review. Caller-supplied data is NOT independently verified. No media rendering, AI jobs, provider calls, storage, publication or scheduling.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      required: ['source', 'strategy', 'topics', 'platforms'],
+      properties: {
+        source: { type: 'object', additionalProperties: false,
+          required: ['repository', 'commitSha', 'proofUrl', 'visibility'],
+          properties: { repository: boundedText(100), commitSha: boundedText(40),
+            proofUrl: { type: 'string', format: 'uri' },
+            visibility: { type: 'string', enum: ['public'] } },
+        },
+        strategy: { type: 'object', additionalProperties: false,
+          required: ['intent', 'audience', 'observation', 'fact', 'audienceValue', 'truthBoundary', 'callToAction', 'thesis'],
+          properties: { intent: { type: 'string', enum: ['proof-update', 'conversation-research', 'personal-founder', 'offer'] },
+            audience: boundedText(180), observation: boundedText(220), fact: boundedText(260),
+            audienceValue: boundedText(220), truthBoundary: boundedText(240),
+            callToAction: boundedText(140), thesis: boundedText(150) },
+        },
+        topics: { type: 'array', minItems: 3, maxItems: 10,
+          items: { type: 'string', pattern: '^[A-Za-z][A-Za-z0-9]{2,23}$' } },
+        platforms: { type: 'array', minItems: 1, maxItems: 11, uniqueItems: true,
+          items: { type: 'string', enum: ['linkedin', 'facebook', 'instagram', 'threads',
+            'x', 'tiktok', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business'] } },
+        mediaPreference: { type: 'string', enum: ['auto', 'image', 'video', 'carousel', 'none'] },
+        recentPosts: { type: 'array', maxItems: 15,
+          items: { type: 'object', additionalProperties: false,
+            required: ['thesis', 'publicPostUrl'],
+            properties: { thesis: boundedText(150), publicPostUrl: { type: 'string', format: 'uri' } } },
+        },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
+function handoffToolDefinition(): DbRecord {
+  return {
+    name: FSE_HANDOFF_TOOL,
+    title: 'Review Founder Signal Draft Handoff (Read-Only)',
+    description: 'Reconstruct one platform campaign from the original brief; inspect caller-attested media/rights metadata and validate the exact draft shape against the existing first-party post contract. This tool cannot authenticate evidence, store drafts, render media, call providers or grant release authority.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['campaign', 'platform', 'accountId'],
+      properties: {
+        campaign: campaignToolDefinition().inputSchema,
+        platform: { type: 'string', enum: [
+          'linkedin', 'facebook', 'instagram', 'threads', 'x', 'tiktok',
+          'youtube', 'pinterest', 'bluesky', 'mastodon', 'google_business',
+        ] },
+        accountId: { type: 'string', minLength: 3, maxLength: 120 },
+        platformCharacterLimit: { type: 'integer', minimum: 1, maximum: 5000 },
+        media: {
+          type: 'array', maxItems: 4,
+          items: {
+            type: 'object', additionalProperties: false,
+            required: ['type', 'url', 'sha256', 'altText', 'rights', 'visualVerdict'],
+            properties: {
+              type: { type: 'string', enum: ['image', 'video'] },
+              url: { type: 'string', format: 'uri' },
+              sha256: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+              altText: { type: 'string', minLength: 15, maxLength: 280 },
+              rights: {
+                type: 'object', additionalProperties: false,
+                required: ['basis', 'receiptUrl', 'permissionGranted'],
+                properties: {
+                  basis: { type: 'string', enum: ['original', 'licensed', 'owner-provided'] },
+                  receiptUrl: { type: 'string', format: 'uri' },
+                  permissionGranted: { type: 'boolean' },
+                },
+              },
+              visualVerdict: {
+                type: 'object', additionalProperties: false,
+                required: ['contract', 'state', 'artifactSha256'],
+                properties: {
+                  contract: { type: 'string', enum: ['juss/visual-wonder-artifact-verdict'] },
+                  state: { type: 'string', enum: ['PASSED'] },
+                  artifactSha256: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
+function publicSourceToolDefinition(): DbRecord {
+  return {
+    name: FSE_PUBLIC_SOURCE_TOOL,
+    title: 'Verify Public Founder Signal GitHub Commit (Read-Only)',
+    description: 'Independently check publicly accessible GitHub repository visibility and exact immutable commit SHA using bounded unauthenticated GET readbacks to api.github.com. Never proves post claims, launch, media rights, publishing or user outcomes.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      required: ['repository', 'commitSha', 'proofUrl'],
+      properties: {
+        repository: { type: 'string', pattern: '^jussray/[A-Za-z0-9_.-]{1,80}$' },
+        commitSha: { type: 'string', pattern: '^[a-fA-F0-9]{40}$' },
+        proofUrl: { type: 'string', format: 'uri' },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  };
+}
+
+const HANDSHAKE_BRAND_SPEC_TOOL = 'get_handshake_brand_spec';
+const HANDSHAKE_BRAND_REVIEW_TOOL = 'review_handshake_brand_social_draft';
+
+function handshakeBrandSpecToolDefinition(): DbRecord {
+  return {
+    name: HANDSHAKE_BRAND_SPEC_TOOL,
+    title: 'Get Handshake Brand Spec (Read-Only)',
+    description: 'Return the exact project-owned logo and distinct Handshake/social asset hashes. This tool does not upload media, submit Handshake projects, or publish posts.',
+    inputSchema: {
+      type: 'object', additionalProperties: false, required: ['project'],
+      properties: { project: { type: 'string', enum: ['fcr', 'bip', 'sync'] } },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  };
+}
+
+function handshakeBrandReviewToolDefinition(): DbRecord {
+  return {
+    name: HANDSHAKE_BRAND_REVIEW_TOOL,
+    title: 'Review Handshake-Branded Social Draft (Read-Only)',
+    description: 'Validate a project-owned 4:5 social ad with its exact founder-reviewed binary digest through FCR existing social classifier, output firewall and first-party draft validator. Never uploads or publishes media.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      required: ['project', 'evidence', 'audience', 'draft', 'mediaReview', 'businessAccountBindingVerified'],
+      properties: {
+        project: { type: 'string', enum: ['fcr', 'bip', 'sync'] },
+        audience: { type: 'string', enum: ['business', 'parents_educators_community'] },
+        businessAccountBindingVerified: { type: 'boolean' },
+        evidence: { type: 'object' },
+        draft: { type: 'object' },
+        mediaReview: { type: 'object' },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   };
 }
 
@@ -1158,7 +1311,7 @@ export function createFounderSignalEngineMcpHandler(
       return;
     }
     if (body.method === 'tools/list') {
-      res.json(rpcResult(id, { tools: [toolDefinition()] }));
+      res.json(rpcResult(id, { tools: [toolDefinition(), campaignToolDefinition(), handoffToolDefinition(), publicSourceToolDefinition(), handshakeBrandSpecToolDefinition(), handshakeBrandReviewToolDefinition()] }));
       return;
     }
     if (body.method !== 'tools/call') {
@@ -1167,8 +1320,90 @@ export function createFounderSignalEngineMcpHandler(
     }
 
     const params = isRecord(body.params) ? body.params : null;
+    if (params?.name === HANDSHAKE_BRAND_SPEC_TOOL) {
+      const args = params.arguments;
+      if (!isRecord(args) || Object.keys(args).some(key => key !== 'project') ||
+          !['fcr', 'bip', 'sync'].includes(String(args.project))) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand spec'));
+        return;
+      }
+      const spec = getHandshakeBrandSpec(args.project as HandshakeProject);
+      res.json(rpcResult(id, {
+        content: [{ type: 'text', text: 'Branded asset specification only. The media has not been externally hosted, approved for production, or submitted to Handshake.' }],
+        structuredContent: spec, isError: false,
+      }));
+      return;
+    }
+
+    if (params?.name === HANDSHAKE_BRAND_REVIEW_TOOL) {
+      const args = params.arguments;
+      if (!isRecord(args) || containsSecretLikeMaterial(args)) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand social draft', ['Invalid or potentially secret-bearing review input']));
+        return;
+      }
+      try {
+        const review = prepareHandshakeBrandSocialDraft(args as unknown as HandshakeDraftRequest);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'First-party draft validated. No external media, Handshake, or social provider calls were performed.' }],
+          structuredContent: review, isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid Handshake brand social draft', [
+          error instanceof Error ? error.message : 'Failed project, brand, or media review',
+        ]));
+      }
+      return;
+    }
+
+    if (params?.name === FSE_PUBLIC_SOURCE_TOOL) {
+      try {
+        const check = await verifyFounderSignalPublicSource(params.arguments, {
+          fetchFn: dependencies.fetchFn,
+        });
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Public GitHub source check completed. Existence of a commit is not evidence of deployment, product claims, customers or publication.' }],
+          structuredContent: check,
+          isError: false,
+        }));
+      } catch {
+        res.status(503).json(rpcError(id, -32008, 'Public GitHub source verification unavailable'));
+      }
+      return;
+    }
+
+    if (params?.name === FSE_HANDOFF_TOOL) {
+      try {
+        const result = reviewFounderSignalDraftHandoff(params.arguments);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Offline shape review only. No media bytes or licensing checked; no draft created, approved or published.' }],
+          structuredContent: result,
+          isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid draft handoff proposal', [
+          error instanceof Error ? error.message : 'Input validation failed',
+        ]));
+      }
+      return;
+    }
+
+    if (params?.name === FOUNDER_SIGNAL_CAMPAIGN_TOOL) {
+      try {
+        const kit = planFounderSignalCampaign(params.arguments);
+        res.json(rpcResult(id, {
+          content: [{ type: 'text', text: 'Review-only campaign prepared from user-supplied claims. No provider calls; evidence remains unverified.' }],
+          structuredContent: kit,
+          isError: false,
+        }));
+      } catch (error) {
+        res.status(400).json(rpcError(id, -32602, 'Invalid campaign brief', [
+          error instanceof Error ? error.message : 'Input validation failed',
+        ]));
+      }
+      return;
+    }
     if (!params || params.name !== TOOL_NAME) {
-      res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      res.status(400).json(rpcError(id, -32602, 'Unknown Founder Signal Engine tool'));
       return;
     }
 

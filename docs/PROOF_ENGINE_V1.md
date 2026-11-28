@@ -50,13 +50,13 @@ Allowed statuses:
 - unknown: 0.25
 - blocked: 0
 
-The score is the rounded average across current signals.
+The score is the rounded average across effective current signals. A claimed `verified` signal is downgraded to `blocked` when its evidence is blank, its `checkedAt` is missing/invalid/future-dated, or its verification is older than one hour. A missing signal set is blocked rather than reporting conditional readiness. The event ingestion time is never substituted for the verifier's `checkedAt`.
 
 Launch status:
 
 - `ready`: score is 100 and no blocker exists
 - `conditional`: evidence exists but is incomplete or warning-bearing
-- `blocked`: at least one current signal is blocked
+- `blocked`: at least one signal is blocked, a claimed verification fails freshness/evidence checks, or no proof signals exist
 
 A healthy provider connection is not proof that its product surface is launch-ready. For example, an active Supabase project with unresolved security advisor warnings must be represented as `warning` or `blocked`, not `verified`.
 

@@ -36,6 +36,60 @@ If any load-bearing target/base/head/scope/review/provider/runtime identity move
 
 Never defend a previous answer against contradictory live evidence. Re-read first. If the prior conclusion was stale or wrong, correct it explicitly and preserve the former state as historical provenance rather than quietly rewriting history.
 
+## Self-answer and continue contract
+
+**Founder directive (2026-11-24):** After a founder reply, an AI operator should answer its own 5W1H and decision-changing questions using already supplied facts and expressly authorized evidence, rather than repeatedly interrupting the founder. This is a workflow rule, not permission to search across the founder's private accounts or authorize provider actions.
+
+1. Form the minimum internal questions needed to select and falsify the next step: WHO owns the decision, WHAT outcome is requested, WHERE the authoritative target is, WHEN the state was observed, WHY this action is necessary, HOW the smallest proof and rollback work.
+2. Classify each as `ANSWERED`, `AUTHORIZED_LOOKUP`, `SAFE_DEFAULT`, `FOUNDER_GATE`, or `BLOCKED`. Use current conversation evidence first; refresh only the sources explicitly in scope. An available connector or remembered account is not consent.
+3. Resolve `ANSWERED` without asking again. For `AUTHORIZED_LOOKUP`, make the narrow read and reclassify. For `SAFE_DEFAULT`, use a labeled, reversible assumption only if it cannot silently affect permissions, private data, identity, money, publication, or production state.
+4. Run a Devil/Red Team premise attack and a selected-plan attack; identify a falsifier and the strongest contradictory evidence. Re-orient rather than defend stale conclusions.
+5. Continue the authorized implementation through a focused regression check, exact-head CI where applicable, and scoped runtime readback. Preserve separate `AUTHORED`, `OBSERVED`, `INFERRED`, `VERIFIED`, and `BLOCKED` receipts. Do not claim unrun tools or background work.
+6. For a `FOUNDER_GATE`, ask at most one material missing question; never infer new permission or a sensitive recipient. Continue independent authorized tasks while holding only the gated action. For `BLOCKED`, report the smallest verified unblocker and stop that lane.
+
+**Tool and plugin routing:** Use Product Design only for a real design task and in supported Work Mode; pair Frontend Design Premium with Frontend Design when implementing UI; use Codex Material Themes only on a real appearance/theme request and leave manual import to the founder; use Codex Coordinator only under an explicitly enabled shared worktree/active-claim contract; choose the relevant Codex Dev Workflows skill for engineering work. None of these tools inherits authority from its name, and third-party plugin code is unchanged.
+
+### Expanded task-skill matrix (founder directive, 2026-11-24)
+
+The internal self-answer loop must select only the appropriate available skill for an authorized task, and never treat a plugin name as execution, an installed workflow, a data source, or permission to access unrelated content.
+
+| Scope trigger | Skill family | Specific proof / authority boundary |
+| --- | --- | --- |
+| Metrics, data quality, KPIs, SQL, report, dashboard | **Data** | Use a focused analytical skill; inspect trusted inputs, grain, freshness, calculation lineage, and verifiable outputs. No fabricated metrics or unsanctioned data access. |
+| Shopify merchant app, Admin GraphQL, auth, embedded UI, merchant billing | **Shopify App Builder** | Use the corresponding focused app skill; enforce HMAC/OAuth, merchant isolation, versioned API behavior, and billing confirmation. Preserve store/customer privacy. |
+| Checkout, subscriptions, invoicing, payment distribution | **Stripe** | Use Stripe's integration planner before coding a payment flow, then focused documentation and test-mode proof. No automatic live charges or unapproved account/billing changes. |
+| AWS cloud service, IaC, serverless, infrastructure, Bedrock | **AWS Core** | Match AWS region/account/service; apply least privilege, rollback, cost and security checks. No implicit AWS deployments, provisioning, or spend. |
+| 3D, textures, sound assets, Blender, GLB/PBR/USDZ | **Game Development Studio** | Discover capabilities, preserve source/licensing/provenance, validate bytes, prove engine compatibility, and obtain an explicit spend ceiling for paid provider calls. |
+| Faceless reels, cinematic scenes, AI prompts, ambient-video plans | **Faceless Video Maker** | Preserve canon, media rights, prompt and render provenance, captioning and preview checks. No automatic publication or paid rendering. |
+
+Apply Product Design, Frontend Design Premium, Codex Material Themes, Codex Coordinator, and Codex Dev Workflows as already routed above. A payment or publication blocker holds only that external effect; independent authorized design, testing, drafting, and analysis may proceed. The same bounded 5W1H, red-team, evidence, and rollback discipline applies, without assuming that all integrations are installed or live.
+
+**Stop:** When the outcome is verified to its stated scope or a hard gate prevents another authorized step, deliver the current result, source, rollback, and exact next gate. Never spin indefinitely, schedule work implicitly, claim future delivery, or use an agent's self-answer to self-approve a merge, deployment, provider mutation, publication, spend, or destructive action.
+
+## Goal continuation and parallel lanes
+
+Treat `/Goal cont til fully done and launched`, `begin`, and `@5w1h` as instructions to resume the existing scoped objective, not to create another goal or silently widen authority. Preserve the full definition of done. Use FCR for coordination and the authorized ledger, Chief for decision gates, SOL for continuity, and the owning repositories and providers for execution and independent evidence, only where those integrations are actually configured.
+
+- Discover relevant available plugins and skills at task entry and on scope change; invoke the applicable authorized capabilities, not every plugin indiscriminately. Record actual invocations, unavailable capabilities and evidence limits.
+- Run independent authorized lanes in parallel when the host supports it. Use single-writer ownership per mutable resource, expected-head leases, dependency ordering and fresh readback. Never claim parallel agents, unattended execution or tool use that did not happen.
+- Hold only the blocked lane; keep advancing independent authorized lanes. Do not repeat unchanged failures blindly. Classify no-step runner failures, stale/missing checks, provider-identity mismatches and denied authority separately from code defects.
+- Preserve `AUTHORED`, `OBSERVED`, `USER-REPORTED`, `INFERRED`, `VERIFIED`, `UNKNOWN`, `BLOCKED`, and `STALE` as distinct evidence states. A receipt, CI green, merge, provider acceptance, deploy or HTTP 200 is not equivalent to verified launch.
+- For launch completion require actual product-specific acceptance criteria, exact deployed identity, authorized release, applicable security/privacy checks, and independent runtime/user-flow proof. Never weaken required checks, signatures, independent review, or release gates to obtain green.
+- Persist receipts through existing authorized FCR interfaces only after acknowledgment and readback. If unavailable mark `NOT_PERSISTED` and return a resumable receipt. Keep the goal open until its full completion criteria are proven; stop each execution at a real authority/evidence/capability boundary. Scheduled continuation requires an explicitly authorized supported mechanism; do not promise background work or create duplicate automation.
+
+### Reusable operator prompt
+
+```text
+/Goal CONTINUE the existing authorized objective until the full definition of done is independently proven, including launch where requested.
+@5w1h: Resolve Who / What / Where / When / Why / How internally from current scoped evidence; ask only for a material founder gate.
+ULTRATHINK / DEVIL / GODMODE: Challenge the premise, attack the plan, choose the smallest reversible causal fix, execute, test, independently re-observe and adapt.
+Use FCR coordination, Chief decision gates, SOL continuity, and the owning project/provider boundaries where configured. Discover and invoke all relevant available authorized plugins and skills. Parallelize independent lanes with single-writer ownership; hold only the blocked lane.
+Do not invent authority, execution, signatures, approvals, persistence or launch proof. Keep the complete objective open, preserve existing infrastructure and history, and stop the current run at a genuine capability or authority boundary.
+Return REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE with exact identities, actual tool receipts, evidence classifications, and the next smallest authorized action.
+```
+
+This prompt invokes the existing contract; it is not a new permission, agent runtime, or release mechanism.
+
 ## Challenge / contradiction protocol
 
 When the founder says a conclusion looks wrong, provides newer evidence, or current provider data contradicts the last report:

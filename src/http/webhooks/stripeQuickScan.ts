@@ -1,27 +1,18 @@
 /**
  * QuickScan Stripe Payment Link webhook.
  *
- * Verifies the raw request against `STRIPE_QUICKSCAN_WEBHOOK_SECRET`, then
- * hands a `checkout.session.completed` event to the QuickScan engine as the
- * sole route that may mark a prospect paid without a founder-typed evidence
- * string. When `STRIPE_QUICKSCAN_PAYMENT_LINK_ID` is configured, the engine
- * also requires the session's own `payment_link` to match it, so a
- * same-price checkout completed on an unrelated Stripe product cannot
- * satisfy this prospect's payment truth. Every other outcome — wrong
- * event type, unconfigured secret,
- * unmatched prospect, a business-rule refusal from the engine, a replayed
- * event id — is acknowledged with 200 so Stripe does not retry a delivery
- * this endpoint has already durably handled or intentionally ignored; only
- * an unverifiable request (bad or missing signature) is rejected with 400.
+ * Verifies the raw request, loads and persists prospect state through the
+ * FCR-owned durable store, and records processed Stripe event ids so replay
+ * protection survives a worker/process restart.
  */
 
 import type { Request, Response } from 'express';
 import { markPaidFromVerifiedStripeEvent } from '../../quickscan/engine.js';
 import {
-  getQuickScanProspect,
-  isStripeEventProcessed,
-  markStripeEventProcessed,
-  saveQuickScanProspect,
+  getQuickScanProspectDurable,
+  isStripeEventProcessedDurable,
+  markStripeEventProcessedDurable,
+  saveQuickScanProspectDurable,
 } from '../../quickscan/store.js';
 import { parseStripeCheckoutCompletedEvent, verifyStripeWebhookSignature } from '../../quickscan/stripeWebhook.js';
 
@@ -50,39 +41,48 @@ export async function handleStripeQuickScanWebhook(req: Request, res: Response):
     return;
   }
 
-  if (isStripeEventProcessed(event.eventId)) {
-    res.status(200).json({ ok: true, applied: false, code: 'DUPLICATE_EVENT' });
-    return;
-  }
-
-  if (!event.clientReferenceId) {
-    res.status(200).json({ ok: true, applied: false, code: 'MISSING_CLIENT_REFERENCE_ID' });
-    return;
-  }
-
-  const prospect = getQuickScanProspect(event.clientReferenceId);
-  if (!prospect) {
-    res.status(200).json({ ok: true, applied: false, code: 'PROSPECT_NOT_FOUND' });
-    return;
-  }
-
   try {
+    if (await isStripeEventProcessedDurable(event.eventId)) {
+      res.status(200).json({ ok: true, applied: false, code: 'DUPLICATE_EVENT' });
+      return;
+    }
+
+    if (!event.clientReferenceId) {
+      res.status(200).json({ ok: true, applied: false, code: 'MISSING_CLIENT_REFERENCE_ID' });
+      return;
+    }
+
+    const prospect = await getQuickScanProspectDurable(event.clientReferenceId);
+    if (!prospect) {
+      res.status(200).json({ ok: true, applied: false, code: 'PROSPECT_NOT_FOUND' });
+      return;
+    }
+
     const expectedPaymentLinkId = process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID?.trim() || undefined;
-    markPaidFromVerifiedStripeEvent(prospect, event, 'stripe-webhook', { expectedPaymentLinkId });
-    saveQuickScanProspect(prospect);
-    markStripeEventProcessed(event.eventId);
+    try {
+      markPaidFromVerifiedStripeEvent(prospect, event, 'stripe-webhook', { expectedPaymentLinkId });
+    } catch (error) {
+      res.status(200).json({
+        ok: true,
+        applied: false,
+        code: 'TRANSITION_REFUSED',
+        detail: error instanceof Error ? error.message : 'blocked',
+      });
+      return;
+    }
+
+    // Persist the payment transition before acknowledging the event as
+    // processed. A failed write returns 500 so Stripe can retry delivery.
+    await saveQuickScanProspectDurable(prospect);
+    await markStripeEventProcessedDurable(event.eventId);
+
     res.status(200).json({
       ok: true,
       applied: true,
       prospectId: prospect.id,
       lifecycleState: prospect.lifecycleState,
     });
-  } catch (error) {
-    res.status(200).json({
-      ok: true,
-      applied: false,
-      code: 'TRANSITION_REFUSED',
-      detail: error instanceof Error ? error.message : 'blocked',
-    });
+  } catch {
+    res.status(500).json({ ok: false, code: 'QUICKSCAN_WEBHOOK_PERSISTENCE_FAILED' });
   }
 }

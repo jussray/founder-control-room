@@ -9,6 +9,26 @@ const ALL_ACTIVE_PROJECTS = [...ACTIVE_PROJECT_SLUGS];
  * this registry or returned by the API.
  */
 export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
+  // Local opt-in connector. The credential and both Obsidian vaults stay
+  // outside GitHub. policy.ts requires the exact loopback URL, development
+  // runtime, and a configured reader secret; no production use.
+  {
+    id: "obsidian-approved-knowledge",
+    label: "Obsidian — Approved Knowledge",
+    role: "founder-reviewed-read-only-reference",
+    endpointEnv: "MCP_OBSIDIAN_BRAIN_URL",
+    authTokenEnv: "JUSS_BRAIN_READ_TOKEN",
+    enabledProjects: ["founder-control-room", "chief-ai-machine", "promptos"],
+    allowedToolPatterns: ["get_approved_knowledge", "search_approved_knowledge"],
+    deniedToolPatterns: [
+      "*create*", "*update*", "*delete*", "*write*", "*apply*",
+      "approve_*", "*publish*", "*deploy*", "*merge*", "*execute*",
+      "*revoke*", "*remove*", "*upload*",
+    ],
+    defaultRisk: "read",
+    developmentOnly: true,
+    monthlyBudgetUsd: 0,
+  },
   {
     id: "github",
     label: "GitHub MCP",

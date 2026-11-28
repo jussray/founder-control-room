@@ -18,6 +18,9 @@ export interface ProofEngineSnapshot {
   generatedAt: string;
 }
 
+// Match the existing one-hour evidence freshness lease; expiry is fail-closed.
+const READINESS_MAX_AGE_MS = 60 * 60 * 1000;
+
 const WEIGHT: Record<ProofStatus, number> = {
   verified: 1,
   warning: 0.5,
@@ -30,10 +33,28 @@ export function buildProofEngineSnapshot(
   signals: ProofSignal[],
   now = new Date(),
 ): ProofEngineSnapshot {
-  const boundedSignals = signals.map((signal) => ({
-    ...signal,
-    evidence: signal.evidence.filter(Boolean).slice(0, 20),
-  }));
+  const checkedNow = now.getTime();
+  const bounded = signals.map((signal) => {
+    const evidence = signal.evidence
+      .filter((ref): ref is string => typeof ref === 'string' && ref.trim().length > 0)
+      .slice(0, 20);
+    let invalidReason: string | null = null;
+
+    // A source-reported "verified" status alone is insufficient to establish freshness.
+    if (signal.status === 'verified') {
+      const checkedAtMs = signal.checkedAt ? Date.parse(signal.checkedAt) : NaN;
+      if (!evidence.length) invalidReason = 'missing evidence';
+      else if (!Number.isFinite(checkedAtMs)) invalidReason = 'missing or invalid verification time';
+      else if (checkedAtMs > checkedNow) invalidReason = 'future-dated verification';
+      else if (checkedNow - checkedAtMs > READINESS_MAX_AGE_MS) invalidReason = 'stale verification';
+    }
+
+    return {
+      signal: { ...signal, evidence, status: invalidReason ? 'blocked' as const : signal.status },
+      invalidReason,
+    };
+  });
+  const boundedSignals = bounded.map((item) => item.signal);
   const score = boundedSignals.length === 0
     ? 0
     : Math.round(
@@ -41,9 +62,10 @@ export function buildProofEngineSnapshot(
           boundedSignals.length) *
           100,
       );
-  const blockers = boundedSignals
-    .filter((signal) => signal.status === 'blocked')
-    .map((signal) => `${signal.provider}: ${signal.label}`);
+  const blockers = bounded
+    .filter((item) => item.signal.status === 'blocked')
+    .map(({ signal, invalidReason }) => `${signal.provider}: ${signal.label}${invalidReason ? ` (${invalidReason})` : ''}`);
+  if (boundedSignals.length === 0) blockers.push('proof-engine: no proof signals observed');
   const status = blockers.length > 0 ? 'blocked' : score === 100 ? 'ready' : 'conditional';
 
   return {

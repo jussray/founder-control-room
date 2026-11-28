@@ -58,9 +58,12 @@ describe('Founder Signal Engine operator evidence model', () => {
       event('founder_signal_engine_end_to_end_proof_complete', { endToEndProofComplete: true }),
     ]);
 
-    expect(model.complete).toBe(true);
-    expect(model.firstBlocker).toBeNull();
-    expect(model.stages.every((stage) => stage.status === 'complete')).toBe(true);
+    // A complete set of downstream audit events cannot prove a GitHub merge.
+    // This operator view requires independent current-main source verification.
+    expect(model.stages.find((stage) => stage.id === 'github')?.status).toBe('pending');
+    expect(model.stages.find((stage) => stage.id === 'control-room')?.status).toBe('complete');
+    expect(model.complete).toBe(false);
+    expect(model.firstBlocker?.id).toBe('github');
     expect(model.source).toEqual(DEFAULT_SOURCE);
   });
 

@@ -11,6 +11,12 @@ vi.mock('../../lib/evidenceGatewayReview.js', async (importOriginal) => {
   return { ...actual, reviewEvidence: mocks.review };
 });
 
+const gscMocks=vi.hoisted(()=>({token:vi.fn(),snapshot:vi.fn()}));
+vi.mock('../../lib/searchConsoleRead.js',async(importOriginal)=>{
+  const original=await importOriginal<typeof import('../../lib/searchConsoleRead.js')>();
+  return {...original,getGscAccessToken:gscMocks.token,readGscSnapshot:gscMocks.snapshot};
+});
+
 const { intelligenceRouter } = await import('./truthSeoEvidence.js');
 function createApp() {
   const app = express();
@@ -25,6 +31,8 @@ const input = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  gscMocks.token.mockReset();
+  gscMocks.snapshot.mockReset();
   vi.stubEnv('CF_ACCOUNT_ID', 'a'.repeat(32));
   vi.stubEnv('FCR_EVIDENCE_GATEWAY_ID', 'fcr-evidence');
   vi.stubEnv('FCR_EVIDENCE_GATEWAY_TOKEN', 'test-only-gateway-token');
@@ -65,5 +73,32 @@ describe('canonical Truth Console AI review', () => {
     expect(response.status).toBe(503);
     expect(response.body.error).toBe('fcr_gateway_not_configured');
     expect(mocks.review).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Search Console multi-site allowlist and isolated cache',()=>{
+  it('rejects untrusted site selectors before asking Google for credentials',async()=>{
+    const denied=await request(createApp()).get('/dashboard/truth/intelligence/seo?site=https://outside.example');
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toBe('invalid_site_selection');
+    expect(gscMocks.token).not.toHaveBeenCalled();
+    expect(gscMocks.snapshot).not.toHaveBeenCalled();
+  });
+  it('reads Juss & Co from its own property without returning the cached FCR result',async()=>{
+    vi.stubEnv('FCR_GSC_OAUTH_JSON','test-bounded-auth-secret');
+    gscMocks.token.mockResolvedValue('test-token-with-length');
+    gscMocks.snapshot.mockImplementation(async (input:{site:string})=>({
+      property:input.site==='jussco'?'sc-domain:jussco.company':'https://www.foundercontrolroom.org/',
+      checkedAt:'2026-11-26T00:00:00Z',sitemaps:[],pages:[],indexedCount:null
+    }));
+    const jussco=await request(createApp()).get('/dashboard/truth/intelligence/seo?site=jussco');
+    const fcr=await request(createApp()).get('/dashboard/truth/intelligence/seo?site=fcr');
+    expect(jussco.status).toBe(200);
+    expect(fcr.status).toBe(200);
+    expect(jussco.body.property).toBe('sc-domain:jussco.company');
+    expect(fcr.body.property).toBe('https://www.foundercontrolroom.org/');
+    expect(gscMocks.snapshot).toHaveBeenCalledWith({token:'test-token-with-length',site:'jussco'});
+    expect(gscMocks.snapshot).toHaveBeenCalledWith({token:'test-token-with-length',site:'fcr'});
   });
 });

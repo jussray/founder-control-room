@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { externalSecuritySkillCatalog } from '../../founder-os-lab/externalSecuritySkillCatalog.js';
 import { listExternalSkills } from '../../lib/externalSkillIntake.js';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
 import {
@@ -34,6 +35,12 @@ import { requireFounder } from '../middleware/requireFounder.js';
 
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
+
+// Static, metadata-only snapshot. The existing server-side founder gate runs first.
+founderOsSkillsRouter.get('/security-skills/catalog', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json(externalSecuritySkillCatalog);
+});
 
 // Discovery only: no external code, secrets, execution or approval operations.
 founderOsSkillsRouter.get('/external-skills', (req, res) => {
