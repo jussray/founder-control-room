@@ -40,14 +40,28 @@ export function classifyAiInboxMessage(message: AiInboxMessage): AiInboxDecision
   }
   const subject = message.subject.toLowerCase().slice(0, 2048);
   const from = (message.from ?? '').toLowerCase().slice(0, 512);
+  // Header identity is a routing hint only; the GitHub API must reconcile it.
+  const sender = (from.match(/<([^<>]+)>\s*$/)?.[1] ?? from).trim();
+  const githubNotice = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@github\.com$/.test(sender);
+  const githubRun = githubNotice && /\b(?:pr )?run (?:failed|cancelled|canceled|skipped|succeeded|timed out|action required)\s*:/.test(subject);
+  const githubPr = githubNotice && /\[[a-z0-9_.-]+\/[a-z0-9_.-]+\].*\(pr #\d+\)/.test(subject);
   let lane: AiInboxLane = 'review';
   let reason = 'Unclassified inbound message; human review required';
   if (/unsubscribe|remove me from (this|your) list|stop emailing/.test(subject)) {
     lane = 'suppression_review';
     reason = 'Possible opt-out; do not dispatch until suppression is reviewed';
-  } else if (/payment (failed|declined)|billing (failed|problem)|invoice overdue|subscription (expir|deactiv)|security alert|security insight|domains without hsts|unauthorized sign.in|account compromised|\b(?:is|has been)\s+(?:frozen|suspended)\b/.test(subject)) {
+  } else if (/payment (failed|declined)|billing (failed|problem)|problem billing|invoice overdue|subscription (expir|deactiv)|security alert|security insight|domains without hsts|unauthorized sign.in|account compromised|\b(?:is|has been)\s+(?:frozen|suspended)\b/.test(subject)) {
     lane = 'money_security';
     reason = 'Financial or security risk signaled by message, not independently verified';
+  } else if (githubNotice && /third-party oauth application has been added|new sign.in|new ssh key|new personal access token/.test(subject)) {
+    lane = 'money_security';
+    reason = 'Account security notification; independently verify provider state';
+  } else if (githubRun) {
+    lane = 'ci_unverified';
+    reason = 'GitHub run notification; reconcile exact current head and check status before closure';
+  } else if (githubPr) {
+    lane = 'project_updates';
+    reason = 'GitHub pull request notification; reconcile current PR and review state';
   } else if (/delivery (failed|status notification)|undeliverable|action required|approval requested/.test(subject)) {
     lane = 'human_action';
     reason = 'Potential action requested';
@@ -75,7 +89,7 @@ export function classifyAiInboxMessage(message: AiInboxMessage): AiInboxDecision
     projectId: message.projectId?.trim() || null,
     projectSlug: message.projectSlug?.trim() || null,
     evidence: 'message_only',
-    requiresHumanReview: lane === 'money_security' || lane === 'human_action' || lane === 'ci_unverified' || lane === 'review' || lane === 'reply_candidate' || lane === 'suppression_review',
+    requiresHumanReview: githubPr || lane === 'money_security' || lane === 'human_action' || lane === 'ci_unverified' || lane === 'review' || lane === 'reply_candidate' || lane === 'suppression_review',
     reason,
   };
 }

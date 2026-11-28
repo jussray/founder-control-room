@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -84,5 +84,66 @@ describe("reconciliation reliability", () => {
     expect(manifestController).not.toContain("createBranch(");
     expect(manifestController).not.toContain("integrate(");
     expect(manifestController).not.toContain("deploy(");
+  });
+});
+
+const fixture = vi.hoisted(() => ({
+  rows: {} as Record<string, Array<Record<string, unknown>>>,
+  enqueue: vi.fn(async (_entry: unknown) => "queued"),
+}));
+
+vi.mock("../../events/outbox.js", () => ({ enqueueReconcile: fixture.enqueue }));
+vi.mock("../../lib/supabaseClient.js", () => ({
+  supabase: {
+    from(table: string) {
+      let rows = [...(fixture.rows[table] ?? [])];
+      const query = {
+        select: (_columns: string) => query,
+        eq: (key: string, value: unknown) => { rows = rows.filter(row => row[key] === value); return query; },
+        not: (key: string, _operator: string, value: unknown) => { rows = rows.filter(row => row[key] !== value); return query; },
+        is: (key: string, value: unknown) => { rows = rows.filter(row => row[key] === value); return query; },
+        in: (key: string, values: unknown[]) => { rows = rows.filter(row => values.includes(row[key])); return query; },
+        order: (key: string, options: { ascending: boolean }) => {
+          rows.sort((a, b) => (options.ascending ? 1 : -1) * String(a[key]).localeCompare(String(b[key])));
+          return query;
+        },
+        limit: (count: number) => { rows = rows.slice(0, count); return query; },
+        then: (resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => unknown) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve),
+      };
+      return query;
+    },
+  },
+}));
+
+describe("portfolio verification cadence after terminal work", () => {
+  const project = {
+    id: "fixture-project", slug: "fixture", status: "active",
+    verification_enabled: true, repo_identifier: "example/repository",
+    verification_cadence_minutes: 15,
+  };
+
+  it.each([
+    { name: "recent completed work without evidence", minutesAgo: 1, pending: false, freshReceipt: false, expected: 0 },
+    { name: "expired completion cooldown", minutesAgo: 16, pending: false, freshReceipt: false, expected: 1 },
+    { name: "pending work", minutesAgo: null, pending: true, freshReceipt: false, expected: 0 },
+    { name: "no work or evidence", minutesAgo: null, pending: false, freshReceipt: false, expected: 1 },
+    { name: "fresh verification evidence", minutesAgo: null, pending: false, freshReceipt: true, expected: 0 },
+  ])("respects cadence for $name", async ({ minutesAgo, pending, freshReceipt, expected }) => {
+    const now = Date.now();
+    fixture.enqueue.mockClear();
+    fixture.rows = {
+      projects: [project],
+      controller_outbox: pending || minutesAgo !== null ? [{
+        project_id: project.id, controller: "ManifestController",
+        completed_at: pending ? null : new Date(now - (minutesAgo ?? 0) * 60_000).toISOString(),
+      }] : [],
+      repository_verification_runs: freshReceipt ? [{
+        project_id: project.id, received_at: new Date(now).toISOString(),
+      }] : [],
+    };
+    const { enqueueDuePortfolioVerification } = await import("../portfolioVerificationScheduler.js");
+    expect(await enqueueDuePortfolioVerification()).toBe(expected);
+    expect(fixture.enqueue).toHaveBeenCalledTimes(expected);
   });
 });

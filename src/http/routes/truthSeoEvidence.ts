@@ -11,17 +11,23 @@ const readLimit=rateLimit({windowMs:60_000,limit:12,standardHeaders:true,
   legacyHeaders:false,message:{error:'monitoring_rate_limited'}});
 const aiLimit=rateLimit({windowMs:60_000,limit:5,standardHeaders:true,
   legacyHeaders:false,message:{error:'review_rate_limited'}});
-let cached:{expires:number;payload:unknown}|null=null;
-intelligenceRouter.get('/seo',readLimit,async (_req,res)=>{
- res.set('Cache-Control','no-store');
+const cached=new Map<'fcr'|'jussco',{expires:number;payload:unknown}>();
+intelligenceRouter.get('/seo',readLimit,async (req,res)=>{
+ res.set('Cache-Control','private, no-store');
+ const requested=req.query.site;
+ const site=requested===undefined||requested==='fcr'?'fcr':
+   requested==='jussco'?'jussco':null;
+ if(site===null)return res.status(400).json({state:'blocked',error:'invalid_site_selection'});
  if(!process.env.FCR_GSC_OAUTH_JSON)return res.status(503).json({
    state:'not_configured',error:'search_console_connection_required',
    detail:'Configure server-held Google OAuth refresh credentials with webmasters.readonly and property access.'});
  try{
-   if(cached&&cached.expires>Date.now())return res.json(cached.payload);
+   const cacheKey=site === 'jussco'?'jussco':'fcr';
+   const prior=cached.get(cacheKey);
+   if(prior&&prior.expires>Date.now())return res.json(prior.payload);
    const token=await getGscAccessToken(process.env.FCR_GSC_OAUTH_JSON);
-   const payload=await readGscSnapshot({token});
-   cached={expires:Date.now()+15*60_000,payload};
+   const payload=await readGscSnapshot({token,site:cacheKey});
+   cached.set(cacheKey,{expires:Date.now()+15*60_000,payload});
    return res.json(payload);
  }catch(e){
    const reason=e instanceof GscReadError?e.reason:'provider_unavailable';

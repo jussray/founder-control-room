@@ -150,6 +150,7 @@ function startServer(mode) {
       '/dashboard/tasks': { tasks: FIXTURE.tasks },
       '/dashboard/activity': { activity: FIXTURE.activity },
       '/dashboard/costs': FIXTURE.costs,
+      '/dashboard/jusspay-observations': {state:'no_observations',scope:'latest_ingested_receipts',currency:'usd',receiptCount:0,availableReceiptCount:0,partial:false,newestObservedAt:null,observedGrossMinor:null,paymentOrders:0,refundHoldOrders:0,disputeHoldOrders:0,netRevenueMinor:null,settlementVerified:false,byProduct:[]},
       '/agents': { agents: FIXTURE.agents },
       '/authority-levels': { levels: FIXTURE.levels },
       '/promptos': { templates: FIXTURE.templates },
@@ -324,13 +325,20 @@ console.log('\n[2] Old deep links migrate to five-screen routes on mobile');
     // Search & Evidence tile target (HOME_TILES) and the search-evidence.html
     // compatibility alias both resolve to the single guarded Search Console panel.
     await page.goto(baseUrl+'/control-room/?tab=truth-seo',{waitUntil:'load'});
-    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
+    await page.locator('[data-truth-screen] h2').filter({hasText:/^Search Console · /}).waitFor({state:'visible'});
+    const sitePicker=page.locator('[data-truth-screen] select[aria-label="Published Search Console site"]');
+    await sitePicker.waitFor({state:'visible'});
+    assert((await sitePicker.inputValue())==='jussco',
+      'Search Console panel defaults to the allowlisted Juss & Co property');
+    const options=await sitePicker.locator('option').evaluateAll(nodes=>nodes.map(node=>node.value));
+    assert(JSON.stringify(options)===JSON.stringify(['jussco','fcr']),
+      'Search Console limits browser property selection to Juss & Co and Founder Control Room');
     assert(new URL(page.url()).searchParams.get('screen')==='proof'
       &&new URL(page.url()).searchParams.get('view')==='truth-seo'
       &&new URL(page.url()).searchParams.get('tab')===null,
       'Search & Evidence tile target migrates to the canonical Proof Search Console panel');
     await page.goto(baseUrl+'/control-room/search-evidence.html',{waitUntil:'load'});
-    await page.locator('[data-truth-screen] h2').filter({hasText:'Search Console · indexing and sitemap health'}).waitFor({state:'visible'});
+    await page.locator('[data-truth-screen] h2').filter({hasText:/^Search Console · /}).waitFor({state:'visible'});
     assert(new URL(page.url()).searchParams.get('view')==='truth-seo',
       'search-evidence.html compatibility alias lands on the canonical Search Console panel');
     await noOverflow(page,'mobile Proof Search Console');

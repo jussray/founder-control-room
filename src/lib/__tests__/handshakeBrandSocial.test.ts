@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'vitest';
+import {
+  HANDSHAKE_PROJECTS,
+  getHandshakeBrandSpec,
+  prepareHandshakeBrandSocialDraft,
+  type HandshakeDraftRequest,
+  type HandshakeProject,
+} from '../handshakeBrandSocial.js';
+
+const COMMIT = 'a'.repeat(40);
+// Asset URLs are project-scoped; never reuse another product's media URL.
+function fixture(project: HandshakeProject): HandshakeDraftRequest {
+  const spec = HANDSHAKE_PROJECTS[project];
+  const proof = project === 'bip' ? 'https://sekretbip.net/' : 'https://github.com/' + spec.repository;
+  const altText = spec.name + ' portfolio image with branded logo.';
+  const MEDIA_URL = 'https://cdn.jussco.company/handshake/' + project + '/social-ad.png';
+  return {
+    project,
+    audience: spec.audience,
+    businessAccountBindingVerified: true,
+    evidence: {
+      fullName: spec.repository, visibility: 'public', archived: false,
+      exactHead: COMMIT, recentCommitCount: 4, recentMergedPullRequests: 2,
+      policy: {
+        containsMinorOrSensitiveData: project === 'bip',
+        publicProofUrls: [proof], neverClaim: [],
+        neverExpose: project === 'bip' ? ['teen records', 'private reflections'] : [],
+      },
+    },
+    mediaReview: {
+      project, logoRepository: spec.repository, logoPath: spec.logoPath,
+      logoSha256: spec.expectedLogoSha256, assetVariant: 'social_ad', assetSha256: spec.expectedSocialAdSha256,
+      founderReviewedExactMediaSha256: spec.expectedSocialAdSha256,
+      founderReviewReceiptId: 'founder-review-2026-11-26',
+      mediaUrl: MEDIA_URL, altText,
+      dimensions: { width: 1080, height: 1350 }, publicReadbackVerified: true,
+    },
+    draft: {
+      platform: 'facebook', accountId: 'verified_jussnco_business',
+      text: 'What is ' + spec.name + '? It is a product project with repository-backed engineering evidence. Current functionality still needs live-path verification. Learn more: ' + proof,
+      traction: 'Repository source is available for review, not a live-deployment receipt.',
+      governanceAdvantage: 'Exact-source review and release boundaries are explicit.',
+      audienceValue: 'Review public product intent and inspect real source evidence.',
+      investorSignal: 'Verification is separate from authored material.',
+      proofLinks: [{ label: 'Public product evidence', url: proof }],
+      platformCharacterLimit: 2500,
+    },
+  };
+}
+describe('project-specific brand handoff', () => {
+  it.each(['fcr', 'bip', 'sync'] as HandshakeProject[])('routes %s through the existing first-party draft and not Handshake submission', (project) => {
+    const result = prepareHandshakeBrandSocialDraft(fixture(project));
+    expect(result.socialInput.mode).toBe('draft');
+    expect(result.socialInput.publishAllowed).toBe(false);
+    expect(result.socialInput.founderApprovalId).toBeNull();
+    expect(result.reviewedDraft.mode).toBe('draft');
+    expect(result.reviewedDraft.sourceRepository).toBe(HANDSHAKE_PROJECTS[project].repository);
+    expect(result.handshake.status).toBe('NOT_SUBMITTED');
+    expect(getHandshakeBrandSpec(project).publishingEnabled).toBe(false);
+  });
+  it('blocks one product borrowing another logo', () => {
+    const request = fixture('bip');
+    request.mediaReview.logoRepository = 'jussray/founder-control-room';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/cross-brand logo/);
+  });
+  it('blocks public posting against the wrong audience for Bip', () => {
+    const request = fixture('bip');
+    request.audience = 'business';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/target audience/);
+  });
+  it('blocks visual candidate without exact founder-reviewed media hash', () => {
+    const request = fixture('sync');
+    request.mediaReview.founderReviewedExactMediaSha256 = 'c'.repeat(64);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media hash/);
+  });
+  it('blocks an unreviewed replacement logo even when the media URL is unchanged', () => {
+    const request = fixture('fcr');
+    request.mediaReview.logoSha256 = 'e'.repeat(64);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
+  });
+  it('blocks a replacement cover not in the project manifest', () => {
+    const request = fixture('sync');
+    request.mediaReview.assetSha256 = 'e'.repeat(64);
+    request.mediaReview.founderReviewedExactMediaSha256 = 'e'.repeat(64);
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
+  });
+  it('blocks unverified public media even when a local image exists', () => {
+    const request = fixture('fcr');
+    request.mediaReview.publicReadbackVerified = false;
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/readback/);
+  });
+  it('blocks cross-brand CDN media even with a forged boolean review flag', () => {
+    const request = fixture('bip');
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/cover.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/asset URL does not belong/);
+  });
+  it('accepts the product-specific ready-media CDN name from a provider transport', () => {
+    const request = fixture('fcr');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-Founder_Control_Room_Social_Ad_4x5.png';
+    const result = prepareHandshakeBrandSocialDraft(request);
+    expect(result.socialInput.mode).toBe('draft');
+    expect(result.reviewedDraft.media[0].url).toBe(request.mediaReview.mediaUrl);
+  });
+  it('blocks one product accidentally using another Publora image', () => {
+    const request = fixture('bip');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-SYNC_Party_Social_Ad_4x5.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
+  it('blocks provider media URLs with inline credentials or query tokens', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://media.publora.com/images/12345-abc-SYNC_Party_Social_Ad_4x5.png?access_token=unsafe';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
+  it('rejects oversized image URLs at the media readback boundary', () => {
+    const request = fixture('fcr');
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/' + 'a'.repeat(2100) + '.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
+  it('rejects malicious nested suffix candidates without regex backtracking', () => {
+    const request = fixture('fcr');
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/fcr/' +
+      'a.jpg?'.repeat(1500) + '.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
+  it('rejects a port-substituted provider URL rather than trusting hostname only', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://media.publora.com:8443/images/12345-abc-SYNC_Party_Social_Ad_4x5.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
+  it('rejects non-image URL schemes and extensions', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'http://cdn.jussco.company/handshake/sync/social-ad.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+    request.mediaReview.mediaUrl = 'https://cdn.jussco.company/handshake/sync/social-ad.html';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/public raster media readback required/);
+  });
+  it('blocks unapproved media origin', () => {
+    const request = fixture('sync');
+    request.mediaReview.mediaUrl = 'https://unrelated.example/handshake/sync/cover.png';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/media origin/);
+  });
+  it('blocks accidentally sending a 3:2 Handshake cover into the 4:5 social media draft', () => {
+    const request = fixture('fcr');
+    request.mediaReview.assetVariant = 'handshake_cover';
+    request.mediaReview.assetSha256 = HANDSHAKE_PROJECTS.fcr.expectedCoverSha256;
+    request.mediaReview.founderReviewedExactMediaSha256 = HANDSHAKE_PROJECTS.fcr.expectedCoverSha256;
+    request.mediaReview.dimensions = { width: 1536, height: 1024 };
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/social_ad/);
+  });
+  it('blocks replacing a social-ad hash with the project Handshake cover hash', () => {
+    const request = fixture('bip');
+    request.mediaReview.assetSha256 = HANDSHAKE_PROJECTS.bip.expectedCoverSha256;
+    request.mediaReview.founderReviewedExactMediaSha256 = HANDSHAKE_PROJECTS.bip.expectedCoverSha256;
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/pinned project logo/);
+  });
+  it('blocks personal account distribution', () => {
+    const request = fixture('fcr');
+    request.draft.accountId = '@juss_fn_ray';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/personal account/);
+  });
+  it('preserves first-party fail-closed exact-SHA and output firewall', () => {
+    const request = fixture('bip');
+    request.evidence.exactHead = 'not-a-sha';
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/not eligible/);
+    const unsafe = fixture('bip');
+    unsafe.draft.text += ' teen records';
+    expect(() => prepareHandshakeBrandSocialDraft(unsafe)).toThrow(/neverExpose/);
+  });
+  it('blocks media that was replaced after exact review', () => {
+    const request = fixture('sync');
+    request.draft.media = [{ type: 'image', url: 'https://other.example/ad.png', altText: 'another ad' }];
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/draft media must equal/);
+  });
+  it('blocks non-4:5 social ad', () => {
+    const request = fixture('fcr');
+    request.mediaReview.dimensions = { width: 1080, height: 1080 };
+    expect(() => prepareHandshakeBrandSocialDraft(request)).toThrow(/4:5/);
+  });
+});

@@ -392,3 +392,29 @@ describe('uncertain Gmail send cannot be replayed by the same idempotency key', 
     expect(mockSendGmailReply).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('opt-in GitHub inbox provider reconciliation', () => {
+  const message = {
+    accountId: 'founder@example.com', providerMessageId: 'message-1', projectSlug: PROJECT_SLUG,
+    subject: '[example/alpha] Run succeeded: Verify - main (123abcd)',
+    from: 'notifications@github.com', receivedAt: '2026-11-27T13:00:00Z',
+  };
+  it('rejects a large or invalid reconciliation request before reading Gmail', async () => {
+    const res = await request(app()).get('/plugin-center/messaging/ai-inbox').query({ projectSlug: PROJECT_SLUG, reconcileGithub: 'true', maxResults: 6 });
+    expect(res.status).toBe(400);
+    expect(mockReadGmailInbox).not.toHaveBeenCalled();
+  });
+  it('holds a different repository without calling the GitHub provider', async () => {
+    mockReadGmailInbox.mockResolvedValue({ accountId: message.accountId, projectSlug: PROJECT_SLUG, nextPageToken: null, messages: [message] });
+    supabaseMock.from.mockImplementation(() => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({
+        data: { id: PROJECT_ID, slug: PROJECT_SLUG, repo_provider: 'github', repo_identifier: 'example/beta', status: 'active', verification_enabled: true },
+        error: null,
+      }) }) }),
+    }));
+    const res = await request(app()).get('/plugin-center/messaging/ai-inbox').query({ projectSlug: PROJECT_SLUG, reconcileGithub: 'true' });
+    expect(res.status).toBe(200);
+    expect(res.body.githubReconciliation).toEqual([{ status: 'blocked', reason: 'project_scope_mismatch', resolution: 'unverified' }]);
+    expect(mockReadGmailInbox).toHaveBeenCalledWith({ maxResults: 5 });
+  });
+});

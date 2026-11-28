@@ -46,3 +46,15 @@ describe('Owner Intelligence private surface and public SEO/AEO contracts',()=>{
     expect(sitemap).toContain('<lastmod>2026-11-02</lastmod>');
   });
 });
+
+describe('JussCo Search Console monitoring contract',()=>{
+  it('keeps both allowlisted site choices on authenticated Truth Console instead of a public SEO endpoint',()=>{
+    const js=read('public/control-room/seo-evidence.js');
+    const server=read('src/http/routes/truthSeoEvidence.ts');
+    expect(js).toContain('jussco');
+    expect(js).toContain('site');
+    expect(server).toContain("site === 'jussco'");
+    expect(server).toContain('readGscSnapshot');
+    expect(read('public/sitemap.xml')).not.toContain('/control-room/');
+  });
+});

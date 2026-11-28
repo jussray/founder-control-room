@@ -258,7 +258,7 @@ async function request(jwt, path, { method = 'GET', body } = {}) {
 
 const TOKEN_PROFILES = Object.freeze({
   'portfolio-sync': Object.freeze({ contents: 'read', pull_requests: 'read', checks: 'read' }),
-  'actions-audit-read-only': Object.freeze({ contents: 'read', actions: 'read' }),
+  'actions-audit-read-only': Object.freeze({ contents: 'read', actions: 'read', pull_requests: 'read' }),
 });
 
 function tokenPermissions(profile) {
@@ -267,7 +267,7 @@ function tokenPermissions(profile) {
 }
 
 function selfTestTokenProfiles() {
-  assert.deepEqual(tokenPermissions('actions-audit-read-only'), { contents: 'read', actions: 'read' });
+  assert.deepEqual(tokenPermissions('actions-audit-read-only'), { contents: 'read', actions: 'read', pull_requests: 'read' });
   assert.ok(Object.values(tokenPermissions('actions-audit-read-only')).every((permission) => permission === 'read'));
   assert.deepEqual(tokenPermissions('portfolio-sync'), { contents: 'read', pull_requests: 'read', checks: 'read' });
   assert.ok(Object.values(tokenPermissions('portfolio-sync')).every((permission) => permission === 'read'));

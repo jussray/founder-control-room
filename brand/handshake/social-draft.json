@@ -1,0 +1,57 @@
+{
+  "schema": "fcr/handshake-social-draft@v1",
+  "project": "fcr",
+  "sourceRepository": "jussray/founder-control-room",
+  "channelGroup": "business_only",
+  "intendedAccountHandle": "@jussnco",
+  "accountConnection": "UNVERIFIED",
+  "publishAllowed": false,
+  "queueAllowed": false,
+  "owner": "jussray/founder-control-room",
+  "sourcePath": "brand/handshake/logo.svg",
+  "social": {
+    "question": "What is Founder Control Room?",
+    "answer": "Founder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation.",
+    "truthBoundary": "Source code documents the design; current live integrations and operational outcomes require separate verification.",
+    "copy": "What is Founder Control Room?\n\nFounder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation.\n\nSource code documents the design; current live integrations and operational outcomes require separate verification.\n\nProject evidence: https://github.com/jussray/founder-control-room\n\n#FounderControlRoom #AIOperations #ResponsibleAI #ProductEngineering #BuildInPublic",
+    "mediaAltText": "Founder at a control desk surrounded by cyan and violet workflow panels, under the FCR vector wordmark.",
+    "mediaPathLocal": "Social/Founder_Control_Room_Social_Ad_4x5.png",
+    "mediaPublicUrl": "https://media.publora.com/images/1795755717215-0-2e9edd36-Founder_Control_Room_Social_Ad_4x5.png",
+    "mediaPackagePath": "Social/Founder_Control_Room_Social_Ad_4x5.png",
+    "mediaSha256": "9cb6e7a35d268d2095855ad0a84dfc934a6ba7fb3bbe8ce9c8a4c5fe3cfe5e33",
+    "mediaDimensions": [
+      1080,
+      1350
+    ],
+    "mediaPurpose": "social_ad",
+    "mediaState": "PUBLORA_DRAFT_MEDIA_READY",
+    "providerDraft": {
+      "provider": "publora",
+      "platform": "instagram",
+      "businessChannel": "@jussnco",
+      "postGroupId": "6b090ec0f04b2c093e24636d",
+      "mediaId": "6b090ec5f04b2c093e2463c0",
+      "editorUrl": "https://app.publora.com/dashboard/editor?id=6b090ec0f04b2c093e24636d",
+      "state": "draft",
+      "mediaState": "ready",
+      "scheduled": false,
+      "published": false,
+      "verifiedSource": "Publora get_post metadata",
+      "assetByteParity": "UNVERIFIED"
+    }
+  },
+  "handshake": {
+    "name": "Founder Control Room",
+    "description": "Founder Control Room is a founder-directed AI operations platform project built around approval boundaries, evidence tracking, and accountable automation. Source code documents the design; current live integrations and operational outcomes require separate verification.",
+    "productUrl": "https://foundercontrolroom.org/",
+    "submissionState": "NOT_SUBMITTED",
+    "coverPackagePath": "Handshake/Founder_Control_Room_Handshake_3x2.png",
+    "coverStatus": "LOCAL_CANDIDATE_UNHOSTED"
+  },
+  "review": {
+    "exactMediaFounderApproval": false,
+    "liveBrandComparison": false,
+    "sourceCurrentness": false,
+    "providerAccountVerified": false
+  }
+}
