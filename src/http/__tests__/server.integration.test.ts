@@ -1,3 +1,6 @@
+import { once } from 'node:events';
+import { writeFileSync } from 'node:fs';
+import { performance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetUser } = vi.hoisted(() => ({
@@ -27,6 +30,84 @@ describe('createServer', () => {
     expect(res.body).toEqual({ ok: true });
     expect(res.headers['x-founder-control-room-service']).toBe('founder-control-room');
   });
+
+  it('preserves public and denied responses under a bounded concurrent synthetic workload', async () => {
+    const limits = { requests: 96, concurrency: 8, p95Ms: 1000, wallMs: 15000 };
+    const server = createServer().listen(0, '127.0.0.1');
+    const externalFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('SCALABILITY_EXTERNAL_FETCH_BLOCKED'));
+    const samples: number[] = [];
+    const failures = new Set<string>();
+    const counts = { health: 0, deniedOrigin: 0, unauthorizedMcp: 0 };
+    let outboundAttempts = 0;
+    let recovered = false;
+    let wallMs = 0;
+    const rssBeforeBytes = process.memoryUsage().rss;
+    try {
+      await once(server, 'listening');
+      const client = request(server);
+      const start = performance.now();
+      for (let offset = 0; offset < limits.requests; offset += limits.concurrency) {
+        if (performance.now() - start > limits.wallMs) break;
+        await Promise.all(Array.from({ length: limits.concurrency }, async (_, index) => {
+          const id = offset + index;
+          const began = performance.now();
+          try {
+            if (id % 3 === 0) {
+              const res = await client.get('/health').timeout({ response: 2000, deadline: 4000 });
+              if (res.status !== 200 || res.body.ok !== true ||
+                  res.headers['x-founder-control-room-service'] !== 'founder-control-room' ||
+                  res.headers['x-content-type-options'] !== 'nosniff') failures.add('HEALTH_RESPONSE');
+              counts.health++;
+            } else if (id % 3 === 1) {
+              const res = await client.get('/health').set('Origin', 'https://evil.example.com')
+                .timeout({ response: 2000, deadline: 4000 });
+              if (res.status !== 403) failures.add('CORS_ISOLATION');
+              counts.deniedOrigin++;
+            } else {
+              const res = await client.post('/mcp')
+                .send({ jsonrpc: '2.0', id, method: 'tools/list' })
+                .timeout({ response: 2000, deadline: 4000 });
+              if (res.status !== 401 || !res.headers['www-authenticate'] ||
+                  res.body.error?.message !== 'Unauthorized') failures.add('MCP_AUTH_ISOLATION');
+              counts.unauthorizedMcp++;
+            }
+          } catch {
+            failures.add('REQUEST_FAILED');
+          } finally {
+            samples.push(performance.now() - began);
+          }
+        }));
+      }
+      wallMs = performance.now() - start;
+      const res = await client.get('/health').timeout({ response: 2000, deadline: 4000 });
+      recovered = res.status === 200 && res.body.ok === true;
+    } finally {
+      outboundAttempts = externalFetch.mock.calls.length;
+      externalFetch.mockRestore();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+    samples.sort((a, b) => a - b);
+    const p95Ms = samples.length ? samples[Math.ceil(samples.length * 0.95) - 1] : null;
+    if (samples.length !== limits.requests ||
+        Object.values(counts).some(count => count !== limits.requests / 3)) failures.add('INCOMPLETE_SAMPLE');
+    if (p95Ms === null || p95Ms > limits.p95Ms) failures.add('P95_BUDGET');
+    if (wallMs > limits.wallMs) failures.add('WALL_BUDGET');
+    if (!recovered) failures.add('RECOVERY');
+    if (outboundAttempts) failures.add('EXTERNAL_FETCH');
+    if (process.env.FCR_SCALABILITY_RECEIPT === '1') {
+      writeFileSync('fcr-scalability-smoke-receipt.json', JSON.stringify({
+        contract: 'synthetic-scalability-smoke/v1',
+        scope: 'single loopback Express server, synthetic requests, mocked auth/database',
+        expectedHeadSha: process.env.EXPECTED_HEAD_SHA ?? null,
+        limits, counts, completed: samples.length, p95Ms, wallMs,
+        requestsPerSecond: wallMs > 0 ? samples.length * 1000 / wallMs : null,
+        rssBeforeBytes, rssAfterBytes: process.memoryUsage().rss,
+        recovered, outboundAttempts, failures: [...failures], passed: failures.size === 0,
+        limitations: ['Provisional CI thresholds', 'Not peak memory, live database, edge, provider or multi-instance proof'],
+      }, null, 2) + '\n');
+    }
+    expect([...failures]).toEqual([]);
+  }, 25000);
 
   it('exposes exact deployed V10 and Supabase runtime identity without secrets', async () => {
     const sha = 'a'.repeat(40);
