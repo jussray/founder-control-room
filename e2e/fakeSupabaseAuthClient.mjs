@@ -4,7 +4,7 @@
 // separate e2e driver process reads — simulating "click the link in your
 // inbox" without needing a real SMTP provider.
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { renameSync, writeFileSync } from 'node:fs';
 
 const pendingByTokenHash = new Map(); // tokenHash -> email
 const sessionsByAccessToken = new Map(); // accessToken -> { email, userId, refreshToken }
@@ -40,7 +40,10 @@ export function createSupabaseAuthClient() {
         const tokenHash = randomUUID();
         pendingByTokenHash.set(tokenHash, email);
         if (bridgeFile) {
-          writeFileSync(bridgeFile, JSON.stringify({ email, tokenHash }));
+          // Publish complete JSON atomically for the separate reader process.
+          const temporaryBridge = `${bridgeFile}.${randomUUID()}.tmp`;
+          writeFileSync(temporaryBridge, JSON.stringify({ email, tokenHash }), { mode: 0o600 });
+          renameSync(temporaryBridge, bridgeFile);
         }
         return { data: {}, error: null };
       },
