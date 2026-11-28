@@ -149,6 +149,31 @@ describe('runStructuredJson', () => {
     });
   });
 
+  it('redacts provider response bodies and transport exception details', async () => {
+    const privateMarker = 'PRIVATE_PROMPT_AND_SECRET_MARKER';
+    const providerFailure = vi.fn<typeof fetch>(async () => fakeResponse({
+      error: { message: privateMarker },
+    }, 400));
+
+    await expect(runStructuredJson([openAiConfig()], REQUEST, { fetchFn: providerFailure }))
+      .rejects.toMatchObject({
+        message: 'openai request failed with status 400',
+        code: 'OPENAI_HTTP_ERROR',
+        status: 400,
+        retryable: false,
+      });
+
+    const transportFailure = vi.fn<typeof fetch>(async () => {
+      throw new Error(privateMarker);
+    });
+
+    await expect(runStructuredJson([openAiConfig()], REQUEST, { fetchFn: transportFailure }))
+      .rejects.toMatchObject({
+        message: 'openai request failed',
+        code: 'OPENAI_REQUEST_FAILED',
+        retryable: true,
+      });
+  });
   it('fails over only after a retryable provider failure', async () => {
     const fetchFn = vi.fn()
       .mockResolvedValueOnce(fakeResponse({ error: { message: 'temporary outage' } }, 503))
