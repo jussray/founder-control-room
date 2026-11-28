@@ -91,12 +91,9 @@ const composed = composeWorkerHandler(
           runMondayPortfolioOrientationCycle(env as unknown as ControlRoomWorkerEnv),
           publishCloudflareRuntimeSignal(),
           runAiProviderChangeWatchCycle(env as ControlRoomWorkerEnv),
-          runFirecrawlMonitorCycle({ env: process.env, store: firecrawlEventStore(supabase) }).then(result => {
-            if (result.status === 'attempted') console.log(JSON.stringify({ task: 'firecrawl-monitor', ...result }));
-            return result;
-          }),
+          runFirecrawlMonitorCycle({ env: process.env, store: firecrawlEventStore(supabase) }),
           runConfiguredGithubInboxWatch().then((result) => {
-            if (result.status !== 'skipped') console.log(JSON.stringify({ task: 'github-inbox-watch', ...result }));
+            // Durable inbox evidence is retained by the watch; failures surface through the scheduled-task gate.
             if (result.status === 'blocked') throw new Error('github_inbox_watch_blocked:' + result.reason);
             return result;
           }),

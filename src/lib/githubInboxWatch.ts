@@ -22,6 +22,16 @@ interface WatchDeps {
   persist(event: GithubInboxWatchEvent): Promise<{ id: string; isDuplicate: boolean }>;
 }
 
+interface GithubInboxWatchSummary {
+  status: 'skipped' | 'blocked' | 'observed' | 'failed';
+  reason: string;
+  inserted: number;
+  duplicates: number;
+  outOfScope: number;
+  pages: number;
+  coverage: 'unknown' | 'bounded_inbox' | 'truncated';
+}
+
 const PAGE_SIZE = 5;
 const MAX_PAGES = 3;
 const REPO = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i;
@@ -37,7 +47,7 @@ function normalizedCounts(value: Record<string, number> | undefined): Record<str
  * No raw mail, sender address, message ID, cursor, or provider exception is retained.
  * Every receipt remains unresolved; intake and snapshots are not repair authority.
  */
-export async function runGithubInboxWatch(enabled: boolean, now: Date, deps: WatchDeps) {
+export async function runGithubInboxWatch(enabled: boolean, now: Date, deps: WatchDeps): Promise<GithubInboxWatchSummary> {
   let inserted = 0;
   let duplicates = 0;
   let outOfScope = 0;
@@ -129,7 +139,7 @@ export async function runGithubInboxWatch(enabled: boolean, now: Date, deps: Wat
 /** Uses the existing read-only scoped Gmail adapter, provider factory and FCR event inbox.
  * Opt-in is deliberately separate from the on-demand Gmail configuration.
  */
-export async function runConfiguredGithubInboxWatch(now = new Date()) {
+export async function runConfiguredGithubInboxWatch(now = new Date()): Promise<GithubInboxWatchSummary | { status: 'skipped'; reason: string }> {
   if (process.env.FCR_GMAIL_GITHUB_WATCH_ENABLED !== 'true' || now.getUTCMinutes() !== 0) {
     return { status: 'skipped', reason: 'disabled_or_not_due' };
   }

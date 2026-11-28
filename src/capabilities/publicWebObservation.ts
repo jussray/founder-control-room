@@ -355,7 +355,8 @@ export const PUBLIC_WEB_OBSERVATION_CAPABILITY: Capability = {
   environment: [
     'FCR MCP Hub owns adapter policy and tool allowlists',
     'The capability contract is provider-neutral',
-    'Provider secrets are server-only; Firecrawl remains off unless separately enabled',
+    'No provider-specific secret belongs to this capability',
+    'Provider adapters own server-only credentials; Firecrawl remains off unless separately enabled',
     'Returned web content remains untrusted input',
   ],
   proof: [

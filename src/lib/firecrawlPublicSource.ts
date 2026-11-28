@@ -1,4 +1,5 @@
 /** Server-only, public-source observation. No action or publication authority. */
+import { TextDecoder as NodeTextDecoder } from 'node:util';
 const TARGETS = {
   fcr: ['https://foundercontrolroom.org/'],
   studio: ['https://jussco.company/', 'https://www.jussco.company/'],
@@ -21,7 +22,7 @@ async function readBounded(response: Response): Promise<unknown> {
   if (!/^application\/json\b/i.test(response.headers.get('content-type') ?? '') || !response.body) throw Error();
   if (Number(response.headers.get('content-length') ?? 0) > MAX_RESPONSE) { await response.body.cancel(); throw Error(); }
   const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8', {fatal:true});
+  const decoder = new NodeTextDecoder('utf-8', {fatal:true});
   let bytes = 0, body = '';
   try {
     for (;;) {

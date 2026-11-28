@@ -46,6 +46,10 @@ describe('Firecrawl public-source adapter (provider boundary fixtures)', () => {
     expect((await run(vi.fn<typeof fetch>().mockResolvedValue(response))).status).toBe('HOLD_UNVERIFIED');
     expect(cancelled).toBe(true);
   });
+  it('rejects invalid UTF-8 rather than hashing replacement characters', async () => {
+    const response = new Response(new Uint8Array([0xc3, 0x28]), {headers:{'content-type':'application/json'}});
+    expect((await run(vi.fn<typeof fetch>().mockResolvedValue(response))).status).toBe('HOLD_UNVERIFIED');
+  });
   it('rejects empty and oversized markdown', async () => {
     for(const markdown of ['  ','x'.repeat(200001)]) {
       expect((await run(vi.fn<typeof fetch>().mockResolvedValue(json({success:true,data:{...payload.data,markdown}})))).status).toBe('HOLD_UNVERIFIED');

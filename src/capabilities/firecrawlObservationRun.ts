@@ -47,5 +47,6 @@ export async function runFirecrawlMonitorCycle(deps:Dependencies) {
     const result=await runFirecrawlObservation(target,deps);
     outcomes.push({target,status:result.status,...(result.status==='held'?{reason:result.reason}:{receiptId:result.receiptId,change:result.change})});
   }
-  return {status:'attempted' as const,outcomes};
+  const failed=outcomes.some(outcome=>outcome.status==='held'&&outcome.reason!=='DAILY_ATTEMPT_ALREADY_CLAIMED');
+  return {status:failed?'failed' as const:'attempted' as const,outcomes};
 }
