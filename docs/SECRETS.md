@@ -129,7 +129,7 @@ What that does and does not establish:
   base64/base64url PEM, base64 DER (PKCS#1 and PKCS#8), and space-collapsed PEM. The failure is
   therefore **not** evidence that support for those shapes is missing.
 - `b64charset=true` describes a character set only. It is not proof the stored value is a
-  complete key, or valid DER.
+  complete key, or valid DER. `derEnvelope` answers that second question directly: see below.
 - The founder reports prior replacements of `APP_PRIVATE_KEY`. A failing run does not prove a
   replacement never happened. Stored secret values are deliberately unreadable, and neither this
   repository nor the workflow log establishes the provider-held `updated_at` or which scope was
@@ -145,6 +145,34 @@ lower-scope replacement that never reached it.
 
 A corrected secret shape is only the first gate. An installation-token mint, the cross-repository
 evidence sync, and the deployed browser proof each still require their own successful receipt.
+
+#### The `derEnvelope` shape fact
+
+A rejected secret used to report only that its characters looked like base64. That cannot
+separate a key that is merely misencoded from a value that is not a key at all, which is what
+left this incident classified UNKNOWN.
+
+`derEnvelope` supplies that one structural bit. The value is base64-decoded and the decoded bytes
+are checked for a well-formed ASN.1 SEQUENCE header whose declared length equals the payload's
+own size. Every DER-encoded private key satisfies this; a token, a client secret, random bytes,
+and a truncated payload do not.
+
+Read it with `b64charset`:
+
+| `b64charset` | `derEnvelope` | Reading |
+|---|---|---|
+| `true` | `true` | Decodes to a DER structure. The value is key-shaped; a remaining failure is about the key itself, not the paste. |
+| `true` | `false` | Base64-looking but not DER. Consistent with a token, a client secret, or a truncated paste — **not** a private key. |
+| `false` | `false` | Not base64 at all. Check for a PEM that lost its header lines, or a wrong value entirely. |
+
+The check is derived and discarded. It emits one boolean and never the decoded bytes, their size,
+or any hash, so it stays inside the `reconstructableSecretMetadataLogged: false` contract.
+
+`scripts/mint-portfolio-github-app-token.mjs` and the inline classifier in
+`github-app-secret-shape-diagnostic.yml` each implement it. They are deliberately separate copies,
+because that workflow holds the production App key and must never execute repository-checked-out
+code; `src/lib/__tests__/appPrivateKeyTransport.test.ts` executes the workflow's copy in a sandbox
+and asserts both agree on every vector, including this fact.
 
 #### Accepted `APP_PRIVATE_KEY` transport shapes
 

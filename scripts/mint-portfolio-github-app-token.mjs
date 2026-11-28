@@ -80,6 +80,30 @@ function rewrapCollapsedPem(value) {
   return `-----BEGIN ${match[1]}-----\n${wrapped}\n-----END ${match[1]}-----`;
 }
 
+// Does a decoded payload form a well-formed ASN.1 SEQUENCE whose declared
+// length matches its own size? Every DER-encoded private key does. This is one
+// structural bit, derived and discarded: it separates "a key, misencoded" from
+// "not a key at all" without revealing the value or its length.
+function looksLikeDerEnvelope(bytes) {
+  if (!bytes || bytes.length < 2 || bytes[0] !== 0x30) return false;
+  const first = bytes[1];
+  let declared;
+  let headerLength;
+  if (first < 0x80) {
+    declared = first;
+    headerLength = 2;
+  } else {
+    const lengthBytes = first & 0x7f;
+    if (lengthBytes === 0 || lengthBytes > 4 || bytes.length < 2 + lengthBytes) return false;
+    declared = 0;
+    for (let index = 0; index < lengthBytes; index += 1) {
+      declared = declared * 256 + bytes[2 + index];
+    }
+    headerLength = 2 + lengthBytes;
+  }
+  return headerLength + declared === bytes.length;
+}
+
 // Boolean shape facts only, so a rejected secret stays debuggable without being
 // re-pasted. Emits no substring, hash, length, or other reconstructable metadata.
 function shapeDiagnostics(trimmed) {
@@ -90,6 +114,7 @@ function shapeDiagnostics(trimmed) {
     `b64charset=${compact !== '' && /^[A-Za-z0-9+/_-]+={0,2}$/.test(compact)}`,
     `escapedNewlines=${trimmed.includes('\\n')}`,
     `multiline=${trimmed.includes('\n')}`,
+    `derEnvelope=${looksLikeDerEnvelope(base64Bytes(trimmed))}`,
   ].join(' ');
 }
 
