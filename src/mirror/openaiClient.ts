@@ -316,7 +316,7 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
         throw new MirrorProviderError('OpenAI Mirror Engine request timed out', 'OPENAI_TIMEOUT');
       }
       throw new MirrorProviderError(
-        error instanceof Error ? error.message : 'OpenAI Mirror Engine request failed',
+        'OpenAI Mirror Engine request failed',
         'OPENAI_REQUEST_FAILED',
       );
     } finally {
@@ -341,11 +341,7 @@ export function createOpenAiMirrorRunner(dependencies: OpenAiMirrorDependencies 
     }
 
     if (!response.ok) {
-      const errorRecord = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
-      const providerMessage = errorRecord && typeof errorRecord.message === 'string'
-        ? errorRecord.message
-        : `OpenAI request failed with status ${response.status}`;
-      throw new MirrorProviderError(providerMessage, 'OPENAI_HTTP_ERROR', response.status);
+      throw new MirrorProviderError(`OpenAI request failed with status ${response.status}`, 'OPENAI_HTTP_ERROR', response.status);
     }
     if (!isRecord(payload)) {
       throw new MirrorProviderError('OpenAI response body was empty or malformed', 'OPENAI_INVALID_RESPONSE', response.status);

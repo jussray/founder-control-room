@@ -240,11 +240,13 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     expect(result.recommendation.nextAction).toBe('capture_more_evidence');
   });
 
-  it('fails closed when OpenAI rejects the configured credential', async () => {
-    const fetchFn = vi.fn(async () => fakeResponse({ error: { message: 'invalid api key' } }, { status: 401 }));
+  it('fails closed and redacts provider error details when OpenAI rejects the configured credential', async () => {
+    const privateMarker = 'PRIVATE_PROMPT_AND_SECRET_MARKER';
+    const fetchFn = vi.fn(async () => fakeResponse({ error: { message: privateMarker } }, { status: 401 }));
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
 
     await expect(runner(promptInput())).rejects.toMatchObject({
+      message: 'OpenAI request failed with status 401',
       code: 'OPENAI_HTTP_ERROR',
       status: 401,
     });

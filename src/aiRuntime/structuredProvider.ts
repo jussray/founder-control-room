@@ -25,6 +25,18 @@ export interface StructuredJsonResult {
   model: string;
   responseId: string | null;
   output: unknown;
+  /** Token usage as reported by the provider; omitted when the response has none. */
+  usage?: StructuredJsonUsage;
+}
+
+export interface StructuredJsonUsage {
+  /** Uncached input tokens (Anthropic: after the last cache breakpoint). */
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** Input tokens served from the prompt cache. */
+  cacheReadInputTokens: number | null;
+  /** Input tokens written to the prompt cache (Anthropic only; null for OpenAI). */
+  cacheCreationInputTokens: number | null;
 }
 
 export interface StructuredProviderDependencies {
@@ -79,10 +91,9 @@ function retryableStatus(status: number): boolean {
   return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
-function providerErrorMessage(provider: StructuredProviderName, payload: unknown, status: number): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
-    return payload.error.message;
-  }
+function providerErrorMessage(provider: StructuredProviderName, status: number): string {
+  // Provider error bodies are untrusted and may echo submitted prompts or secrets.
+  // Keep only the provider identity and HTTP status in the caller-visible error.
   return `${provider} request failed with status ${status}`;
 }
 
@@ -221,7 +232,12 @@ function requestShape(config: StructuredProviderConfig, request: StructuredJsonR
     body: {
       model: config.model,
       max_tokens: request.maxOutputTokens,
-      system: request.systemPrompt,
+      // The system prompt is a static per-caller constant, so mark it as the
+      // cache breakpoint; the varying user prompt stays after it. Below the
+      // model's minimum cacheable length the API silently skips caching.
+      system: [
+        { type: 'text', text: request.systemPrompt, cache_control: { type: 'ephemeral' } },
+      ],
       messages: [{ role: 'user', content: request.userPrompt }],
       output_config: {
         format: {
@@ -286,8 +302,10 @@ async function runProvider(
         true,
       );
     }
+    // Transport exceptions can include URLs, proxy details, or secret-bearing diagnostics.
+    // Do not forward provider/network exception text across this boundary.
     throw new StructuredProviderError(
-      error instanceof Error ? error.message : `${config.provider} request failed`,
+      `${config.provider} request failed`,
       config.provider,
       `${prefix(config.provider)}_REQUEST_FAILED`,
       null,
@@ -318,7 +336,7 @@ async function runProvider(
 
   if (!response.ok) {
     throw new StructuredProviderError(
-      providerErrorMessage(config.provider, payload, response.status),
+      providerErrorMessage(config.provider, response.status),
       config.provider,
       `${prefix(config.provider)}_HTTP_ERROR`,
       response.status,
@@ -375,11 +393,37 @@ async function runProvider(
     );
   }
 
+  const usage = providerUsage(config.provider, payload);
   return {
     provider: config.provider,
     model: config.model,
     responseId: typeof payload.id === 'string' ? payload.id : null,
     output,
+    ...(usage ? { usage } : {}),
+  };
+}
+
+function tokenCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function providerUsage(provider: StructuredProviderName, payload: JsonRecord): StructuredJsonUsage | undefined {
+  const usage = payload.usage;
+  if (!isRecord(usage)) return undefined;
+  if (provider === 'anthropic') {
+    return {
+      inputTokens: tokenCount(usage.input_tokens),
+      outputTokens: tokenCount(usage.output_tokens),
+      cacheReadInputTokens: tokenCount(usage.cache_read_input_tokens),
+      cacheCreationInputTokens: tokenCount(usage.cache_creation_input_tokens),
+    };
+  }
+  const details = isRecord(usage.input_tokens_details) ? usage.input_tokens_details : {};
+  return {
+    inputTokens: tokenCount(usage.input_tokens),
+    outputTokens: tokenCount(usage.output_tokens),
+    cacheReadInputTokens: tokenCount(details.cached_tokens),
+    cacheCreationInputTokens: null,
   };
 }
 
