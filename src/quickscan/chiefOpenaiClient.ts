@@ -319,7 +319,7 @@ async function runOpenAi(
       throw new QuickScanChiefProviderError('OpenAI QuickScan Chief request timed out', 'OPENAI_TIMEOUT');
     }
     throw new QuickScanChiefProviderError(
-      error instanceof Error ? error.message : 'OpenAI QuickScan Chief request failed',
+      'OpenAI QuickScan Chief request failed',
       'OPENAI_REQUEST_FAILED',
     );
   } finally {
@@ -334,11 +334,7 @@ async function runOpenAi(
   }
 
   if (!response.ok) {
-    const errorRecord = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
-    const providerMessage = errorRecord && typeof errorRecord.message === 'string'
-      ? errorRecord.message
-      : `OpenAI request failed with status ${response.status}`;
-    throw new QuickScanChiefProviderError(providerMessage, 'OPENAI_HTTP_ERROR', response.status);
+    throw new QuickScanChiefProviderError(`OpenAI request failed with status ${response.status}`, 'OPENAI_HTTP_ERROR', response.status);
   }
   if (!isRecord(payload)) {
     throw new QuickScanChiefProviderError('OpenAI response body was empty or malformed', 'OPENAI_INVALID_RESPONSE', response.status);
@@ -401,7 +397,7 @@ async function runLocalOllama(
       throw new QuickScanChiefProviderError('Local QuickScan Chief request timed out', 'LOCAL_CHIEF_TIMEOUT');
     }
     throw new QuickScanChiefProviderError(
-      error instanceof Error ? error.message : 'Local QuickScan Chief request failed',
+      'Local QuickScan Chief request failed',
       'LOCAL_CHIEF_REQUEST_FAILED',
     );
   } finally {
