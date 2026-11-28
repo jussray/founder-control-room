@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { makeSupabaseClient, type SupabaseEnv } from '../lib/supabaseClient.js';
+import { providerForProject } from '../providers/providerFactory.js';
 import {
   sendFounderControlRoomEmail,
   type ProjectEmailBinding,
@@ -25,11 +26,20 @@ interface ProjectRow {
   id: string;
   slug: string;
   repo_identifier: string | null;
+  repo_provider?: string | null;
+}
+
+interface CurrentHeadObservation {
+  repositoryIdentifier: string;
+  branch: string;
+  commitSha: string;
 }
 
 interface VerificationRunRow {
   project_id: string;
   repository_identifier: string;
+  repository_provider?: string;
+  runner?: Record<string, unknown> | null;
   branch: string;
   commit_sha: string;
   overall_status: 'passed' | 'warning' | 'failed';
@@ -74,7 +84,7 @@ export interface MondayPortfolioOrientation {
   decisionsAndDeadlines: string[];
   orderOfOperations: string[];
   sourceStatus: {
-    githubRuntime: 'AVAILABLE';
+    githubRuntime: 'HEAD_OBSERVED' | 'PARTIAL' | 'RECEIPTS_ONLY';
     portfolioContinuity: 'PARTIAL';
     calendar: 'UNAVAILABLE_SCOPE_NOT_PROVEN';
     gmail: 'UNAVAILABLE_SCOPE_NOT_PROVEN';
@@ -187,12 +197,24 @@ function verificationFreshness(
   return age <= EVIDENCE_FRESHNESS_MS ? 'fresh' : 'stale';
 }
 
+function sameRepository(project: ProjectRow, identifier: string): boolean {
+  if (!project.repo_identifier) return false;
+  return project.repo_provider === 'github'
+    ? project.repo_identifier.toLowerCase() === identifier.toLowerCase()
+    : project.repo_identifier === identifier;
+}
+
+function isPreviewReceipt(run: VerificationRunRow): boolean {
+  return typeof run.runner?.mode === 'string' && run.runner.mode.startsWith('preview_branch_');
+}
+
 export function buildMondayPortfolioOrientation(input: {
   now: Date;
   weekKey: string;
   projects: ProjectRow[];
   verificationRuns: VerificationRunRow[];
   findings: FindingRow[];
+  currentHeads?: ReadonlyMap<string, CurrentHeadObservation>;
 }): MondayPortfolioOrientation {
   const latestRun = latestVerificationByProject(input.verificationRuns);
   const topFinding = highestSeverityFindingByProject(input.findings);
@@ -202,6 +224,7 @@ export function buildMondayPortfolioOrientation(input: {
     const run = latestRun.get(project.id);
     const finding = topFinding.get(project.id);
     const freshness = run ? verificationFreshness(run, input.now) : null;
+    const currentHead = input.currentHeads?.get(project.id);
     let item: OrientationItem;
 
     if (finding && (finding.severity === 'critical' || finding.severity === 'high')) {
@@ -219,6 +242,15 @@ export function buildMondayPortfolioOrientation(input: {
         reason: 'No repository verification receipt is available.',
         evidenceAt: null,
         nextAction: 'Refresh repository verification before making a release or merge claim.',
+      };
+    } else if (!sameRepository(project, run.repository_identifier)
+        || (project.repo_provider && run.repository_provider !== project.repo_provider)
+        || isPreviewReceipt(run)) {
+      item = {
+        project: project.slug, state: 'UNKNOWN',
+        reason: 'Receipt repository identity is mismatched or the evidence is preview-only.',
+        evidenceAt: run.scanned_at,
+        nextAction: 'Obtain a signed default-branch verification receipt for the registered repository.',
       };
     } else if (freshness === 'invalid' || freshness === 'future') {
       item = {
@@ -256,13 +288,35 @@ export function buildMondayPortfolioOrientation(input: {
         evidenceAt: finding?.last_seen_at ?? run.received_at,
         nextAction: finding?.suggested_action || 'Review the warning after proof-critical blockers are handled.',
       };
+    } else if (!run.signature_verified || !/^[0-9a-f]{40}$/i.test(run.commit_sha)) {
+      item = {
+        project: project.slug, state: 'UNKNOWN',
+        reason: 'Passing receipt lacks a verified signature or an exact commit SHA.',
+        evidenceAt: run.scanned_at,
+        nextAction: 'Refresh signed exact-head verification.',
+      };
+    } else if (!currentHead || !sameRepository(project, currentHead.repositoryIdentifier)
+        || !/^[0-9a-f]{40}$/i.test(currentHead.commitSha) || !currentHead.branch) {
+      item = {
+        project: project.slug, state: 'UNKNOWN',
+        reason: 'Signed receipt passed, but the current default-branch head was not independently observed.',
+        evidenceAt: run.scanned_at,
+        nextAction: 'Observe the registered repository default-branch head before making a current-state claim.',
+      };
+    } else if (run.branch !== currentHead.branch || run.commit_sha !== currentHead.commitSha) {
+      item = {
+        project: project.slug, state: 'STALE',
+        reason: 'Passing receipt does not match the observed default-branch head.',
+        evidenceAt: run.scanned_at,
+        nextAction: 'Refresh verification for the observed default-branch head.',
+      };
     } else {
       item = {
         project: project.slug,
         state: 'VERIFIED',
-        reason: `Latest repository verification passed at ${run.commit_sha.slice(0, 12)}${run.signature_verified ? ' with verified signature' : ''}.`,
+        reason: `Signed repository verification passed at observed default-branch head ${run.commit_sha.slice(0, 12)}.`,
         evidenceAt: run.scanned_at,
-        nextAction: 'No founder intervention required unless a newer decision or deadline changes the state.',
+        nextAction: 'No immediate intervention; re-observe the head before any release or merge decision.',
       };
     }
 
@@ -297,7 +351,9 @@ export function buildMondayPortfolioOrientation(input: {
     ],
     orderOfOperations,
     sourceStatus: {
-      githubRuntime: 'AVAILABLE',
+      githubRuntime: input.currentHeads?.size
+        ? (input.currentHeads.size === input.projects.length ? 'HEAD_OBSERVED' : 'PARTIAL')
+        : 'RECEIPTS_ONLY',
       portfolioContinuity: 'PARTIAL',
       calendar: 'UNAVAILABLE_SCOPE_NOT_PROVEN',
       gmail: 'UNAVAILABLE_SCOPE_NOT_PROVEN',
@@ -338,7 +394,7 @@ export function renderMondayPortfolioOrientation(orientation: MondayPortfolioOri
     ...orientation.orderOfOperations,
     '',
     'SOURCE STATUS:',
-    `- GitHub/runtime proof: ${orientation.sourceStatus.githubRuntime}`,
+    `- Repository default-head observations: ${orientation.sourceStatus.githubRuntime}`,
     `- Portfolio continuity: ${orientation.sourceStatus.portfolioContinuity}`,
     `- Calendar: ${orientation.sourceStatus.calendar}`,
     `- Gmail: ${orientation.sourceStatus.gmail}`,
@@ -346,39 +402,89 @@ export function renderMondayPortfolioOrientation(orientation: MondayPortfolioOri
   ].join('\n');
 }
 
-async function loadEvidence(client: SupabaseClient): Promise<{
+async function observeCurrentHead(project: ProjectRow): Promise<CurrentHeadObservation | null> {
+  if (!project.repo_identifier || !project.repo_provider) return null;
+  try {
+    const provider = providerForProject({
+      repo_provider: project.repo_provider, slug: project.slug, repo_identifier: project.repo_identifier,
+    });
+    const live = await provider.getProject(project.slug);
+    if (!sameRepository(project, live.locator) || live.provider !== project.repo_provider
+        || !live.defaultBranch || !live.isActive) return null;
+    const ref = await provider.getRef(project.slug, live.defaultBranch);
+    if (ref.name !== live.defaultBranch || !/^[0-9a-f]{40}$/i.test(ref.commitSha)) return null;
+    return { repositoryIdentifier: live.locator, branch: live.defaultBranch, commitSha: ref.commitSha };
+  } catch {
+    // A missing credential, unavailable provider, or failed read cannot become proof.
+    return null;
+  }
+}
+
+/** Read the newest run and highest-priority open finding for every active project.
+ * No portfolio-wide row cap may hide a quieter project's evidence.
+ */
+export async function loadMondayPortfolioEvidence(client: SupabaseClient, now: Date): Promise<{
   projects: ProjectRow[];
   verificationRuns: VerificationRunRow[];
   findings: FindingRow[];
+  currentHeads: Map<string, CurrentHeadObservation>;
 }> {
-  const [projectsResult, runsResult, findingsResult] = await Promise.all([
-    client
-      .from('projects')
-      .select('id,slug,repo_identifier')
-      .eq('status', 'active')
-      .order('slug', { ascending: true }),
-    client
-      .from('repository_verification_runs')
-      .select('project_id,repository_identifier,branch,commit_sha,overall_status,signature_verified,scanned_at,received_at')
-      .order('scanned_at', { ascending: false })
-      .limit(500),
-    client
-      .from('repository_findings')
-      .select('project_id,severity,title,suggested_action,last_seen_at')
-      .eq('status', 'open')
-      .order('last_seen_at', { ascending: false })
-      .limit(500),
-  ]);
+  const projects: ProjectRow[] = [];
+  const pageSize = 200;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await client.from('projects')
+      .select('id,slug,repo_identifier,repo_provider')
+      .eq('status', 'active').order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (page.error) throw new Error('orientation_projects_failed');
+    const rows = (page.data ?? []) as ProjectRow[];
+    projects.push(...rows);
+    if (rows.length < pageSize) break;
+  }
 
-  if (projectsResult.error) throw new Error(`orientation_projects_failed:${projectsResult.error.message}`);
-  if (runsResult.error) throw new Error(`orientation_runs_failed:${runsResult.error.message}`);
-  if (findingsResult.error) throw new Error(`orientation_findings_failed:${findingsResult.error.message}`);
+  const verificationRuns: VerificationRunRow[] = [];
+  const findings: FindingRow[] = [];
+  const currentHeads = new Map<string, CurrentHeadObservation>();
+  const findingColumns = 'project_id,severity,title,suggested_action,last_seen_at';
+  // Bounded concurrency protects the DB and repository providers.
+  for (let offset = 0; offset < projects.length; offset += 4) {
+    await Promise.all(projects.slice(offset, offset + 4).map(async project => {
+      const [runsResult, blockingResult] = await Promise.all([
+        client.from('repository_verification_runs')
+          .select('project_id,repository_identifier,repository_provider,runner,branch,commit_sha,overall_status,signature_verified,scanned_at,received_at')
+          .eq('project_id', project.id)
+          .order('scanned_at', { ascending: false })
+          .order('received_at', { ascending: false }).order('id', { ascending: false }).limit(1),
+        client.from('repository_findings').select(findingColumns)
+          .eq('project_id', project.id).eq('status', 'open').in('severity', ['critical', 'high'])
+          .order('severity', { ascending: true })
+          .order('last_seen_at', { ascending: false }).order('id', { ascending: false }).limit(1),
+      ]);
+      if (runsResult.error) throw new Error('orientation_runs_failed');
+      if (blockingResult.error) throw new Error('orientation_findings_failed');
+      const run = (runsResult.data ?? [])[0] as VerificationRunRow | undefined;
+      if (run) verificationRuns.push(run);
 
-  return {
-    projects: (projectsResult.data ?? []) as ProjectRow[],
-    verificationRuns: (runsResult.data ?? []) as VerificationRunRow[],
-    findings: (findingsResult.data ?? []) as FindingRow[],
-  };
+      let finding = (blockingResult.data ?? [])[0] as FindingRow | undefined;
+      if (!finding) {
+        const routine = await client.from('repository_findings').select(findingColumns)
+          .eq('project_id', project.id).eq('status', 'open').in('severity', ['medium', 'low'])
+          .order('severity', { ascending: false })
+          .order('last_seen_at', { ascending: false }).order('id', { ascending: false }).limit(1);
+        if (routine.error) throw new Error('orientation_findings_failed');
+        finding = (routine.data ?? [])[0] as FindingRow | undefined;
+      }
+      if (finding) findings.push(finding);
+
+      if (run?.overall_status === 'passed' && run.signature_verified && !isPreviewReceipt(run)
+          && sameRepository(project, run.repository_identifier) && verificationFreshness(run, now) === 'fresh'
+          && !finding) {
+        const head = await observeCurrentHead(project);
+        if (head) currentHeads.set(project.id, head);
+      }
+    }));
+  }
+  return { projects, verificationRuns, findings, currentHeads };
 }
 
 function isMissingTable(error: { code?: string } | null | undefined): boolean {
@@ -466,7 +572,7 @@ export async function runMondayPortfolioOrientationCycle(
   let sendAttempted = false;
   let acceptedMessageId: string | null = null;
   try {
-    const evidence = await loadEvidence(client);
+    const evidence = await loadMondayPortfolioEvidence(client, now);
     const orientation = buildMondayPortfolioOrientation({ now, weekKey, ...evidence });
     const text = renderMondayPortfolioOrientation(orientation);
 

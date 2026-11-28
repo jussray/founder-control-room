@@ -88,6 +88,7 @@ describe('Monday portfolio orientation', () => {
         },
       ],
       findings: [],
+      currentHeads: new Map([['fcr', { repositoryIdentifier: 'jussray/founder-control-room', branch: 'main', commitSha: '2222222222222222222222222222222222222222' }]]),
     });
 
     expect(orientation.proofCriticalBlockers).toEqual([]);
@@ -106,6 +107,7 @@ describe('Monday portfolio orientation', () => {
         signature_verified: true, scanned_at: '2026-10-05T11:50:00Z', received_at: '2026-10-05T11:51:00Z',
       }],
       findings: [],
+      currentHeads: new Map([['fcr', { repositoryIdentifier: 'jussray/founder-control-room', branch: 'main', commitSha: 'dddddddddddddddddddddddddddddddddddddddd' }]]),
     });
 
     expect(orientation.verified).toHaveLength(1);
@@ -169,6 +171,41 @@ describe('Monday portfolio orientation', () => {
       'future-observation',
       'invalid-observation',
     ]);
+  });
+
+  it('never upgrades unsigned, preview, wrong-repository or wrong-provider passes', () => {
+    const now = new Date('2026-10-05T12:00:00Z');
+    const project = { id: 'p', slug: 'p', repo_identifier: 'jussray/p', repo_provider: 'github' };
+    const sha = 'a'.repeat(40);
+    const run = {
+      project_id: 'p', repository_identifier: 'jussray/p', repository_provider: 'github',
+      branch: 'main', commit_sha: sha, overall_status: 'passed' as const,
+      signature_verified: true, scanned_at: '2026-10-05T11:50:00Z', received_at: '2026-10-05T11:51:00Z',
+    };
+    const head = { repositoryIdentifier: 'jussray/p', branch: 'main', commitSha: sha };
+    for (const override of [
+      { signature_verified: false }, { runner: { mode: 'preview_branch_import' } },
+      { repository_identifier: 'jussray/other' }, { repository_provider: 'gitlab' },
+    ]) {
+      const result = buildMondayPortfolioOrientation({
+        now, weekKey: '2026-10-05', projects: [project], findings: [],
+        verificationRuns: [{ ...run, ...override }], currentHeads: new Map([['p', head]]),
+      });
+      expect(result.verified).toEqual([]);
+      expect(result.unknown).toHaveLength(1);
+    }
+    for (const observed of [undefined, { ...head, commitSha: 'b'.repeat(40) }, { ...head, branch: 'other' }]) {
+      const result = buildMondayPortfolioOrientation({
+        now, weekKey: '2026-10-05', projects: [project], findings: [], verificationRuns: [run],
+        currentHeads: observed ? new Map([['p', observed]]) : new Map(),
+      });
+      expect(result.verified).toEqual([]);
+      expect(observed ? result.stale : result.unknown).toHaveLength(1);
+    }
+    expect(buildMondayPortfolioOrientation({
+      now, weekKey: '2026-10-05', projects: [project], findings: [], verificationRuns: [run],
+      currentHeads: new Map([['p', head]]),
+    }).verified).toHaveLength(1);
   });
 
 });
